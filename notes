@@ -1,5 +1,3 @@
-smaller untyped
-
 take some ideas from colorForth
   "dictionary only records 32 bits of identifier"
     shannon/huffman coding
@@ -7,12 +5,6 @@ take some ideas from colorForth
   editor ?
     could do it on the web?
     or love 2d or something
-
-very few builtins
-not complicated
-easy to read
-
-easy to implement vm
 
 a very short global circular queue could be useful
 
@@ -44,3 +36,48 @@ there can be a bytecode like
 for external function calls
 
 atmega program memory is 2bytes (12 bits up to 0x3fff)
+
+===
+
+if builtins are 0-127
+and compiled words are 0xC.......
+
+then defining core words as deriving from builtins takes up more space
+  than just having it as a builtin
+  ie
+  <= builtin takes less space even though it could be defined as
+  : <= > 0= ;
+
+but also want to balance 'ease of implementing vm' with 'core code reusability'
+
+===
+
+dictionary
+
+definition names can be encoded
+  if shannon encoding from colorforth is an example,
+  you can fit names 12 chars long in 8 bytes
+
+with untyped, all words have a dictionary entry, even builtins
+mini doesnt need that
+
+===
+
+interactivity
+
+bye & quit should be implemented
+
+===
+
+console drawing or display would be nice
+could be external functions
+
+===
+
+should be able to interpret itself
+  used for
+    including files
+    executing xts
+  words needed
+    execute
+

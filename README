@@ -2,4 +2,12 @@ mini
 
 untyped but smaller
 
+goals:
+  "it's a forth"
+  easy
+    easy to write/read mini code
+    easy to implement vm
+  usable on microcontrollers
+    small memory footprint
+
 MIT
