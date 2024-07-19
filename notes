@@ -1,0 +1,46 @@
+smaller untyped
+
+take some ideas from colorForth
+  "dictionary only records 32 bits of identifier"
+    shannon/huffman coding
+  code must be in fixed sized blocks
+  editor ?
+    could do it on the web?
+    or love 2d or something
+
+very few builtins
+not complicated
+easy to read
+
+easy to implement vm
+
+a very short global circular queue could be useful
+
+should be good for
+  web (TS or webasm)
+  microcontroller
+  zig
+
+===
+
+input line buffer
+basic most used stack manipulation words
+small cells
+
+byte based (?)
+
+memory indexed from zero
+
+hex and decimal numbers
+
+===
+
+builtins can be bytecodes
+
+bytecodes gives you 256 builtins
+
+there can be a bytecode like
+#ext sizeof(OS pointer)
+for external function calls
+
+atmega program memory is 2bytes (12 bits up to 0x3fff)
