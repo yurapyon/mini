@@ -1,13 +1,29 @@
 mini
 
-untyped but smaller
+small forth vm
 
 goals:
-  "it's a forth"
   easy
     easy to write/read mini code
-    easy to implement vm
+    easy to implement/port vm
   usable on microcontrollers
     small memory footprint
+  io
+    graphics
+    mouse/keyboard input
+    filesystem access
+  stable
+    reach v1.0 and stay there
+
+maybe:
+  good performance
+  io
+    audio
+  interactive
+    nice repl
+    built-in editor
+
+you need:
+  untyped
 
 MIT

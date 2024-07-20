@@ -1,17 +1,52 @@
+built in
+  console read/emit
+devices
+  screen
+  audio
+  terminal ui
+  keyboard
+  mouse
+
+terminal drawing / pixel graphics would be nice
+
+all io could be in terms of 'devices'
+  this means
+    you dont need externals for io
+    you can check device capabilites easily
+    you dont need to define builtins for io, can just have a general get/set
+
 take some ideas from colorForth
   "dictionary only records 32 bits of identifier"
     shannon/huffman coding
+    complicates things and doesnt save a ton of space
+      could also just use 6bits per character, this is 64 different options
   code must be in fixed sized blocks
   editor ?
     could do it on the web?
     or love 2d or something
 
-a very short global circular queue could be useful
+for colorForth words
+  00------*-------*-------
+  ^ ^     ^       ^
+  | 6bit  8bit    8bit
+  tag
+  for every word youre restricted on the first letter
+  3 bit tag with 5bit char means 32 options
+  could restrict it so words can only start with a-z
+
+a very short global circular queue could be useful ( ? )
 
 should be good for
   web (TS or webasm)
   microcontroller
   zig
+
+should mini be a whole forth system including an editor?
+  this makes it harder to write but the editor could be written in mini
+    and included in the base file
+  no reading from stdin or running scripts
+  would need disk i/o
+  need screen/console i/o
 
 ===
 
@@ -163,3 +198,7 @@ miniword 1-------*-------
     enum `ext
 constant bytecode-ct
 )
+
+read from stdin
+          repl
+          including files
