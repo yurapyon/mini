@@ -1,13 +1,20 @@
-built in
-  console read/emit
-devices
-  screen
-  audio
-  terminal ui
-  keyboard
-  mouse
+io
+  built in
+    console read/emit
+  devices
+    screen
+    sprites
+    terminal ui
+    audio / music
+    keyboard
+    mouse
+    datetime
+    system id (ie zig, untyped, web, webasm, love2d)
+    floats ?
 
-terminal drawing / pixel graphics would be nice
+builtins for writing to devices that check memory location and may trigger actions
+
+\ ===
 
 all io could be in terms of 'devices'
   this means
@@ -120,84 +127,11 @@ should be able to interpret itself
 
 all bytecode <= 127
 
-bytecode 0-------0-------
-miniword 1-------*-------
+bytecode 00------00------
+     ext 01------01------
+miniword 10------*-------
+miniword 11------*-------
 
-( _
-  0 enum `nop
-
-    enum `lit
-    enum `exit
-    enum `define
-    enum `bye
-
-    enum `word
-
-    enum `dup
-    enum `drop
-    enum `swap
-    enum `over
-    enum `flip
-    enum `rot
-    enum `-rot
-
-    enum `c!
-    enum `c@
-    enum `c,
-
-    enum `!
-    enum `@
-    enum `,
-
-    enum `char
-
-    enum `+
-    enum `-
-    enum `*
-    enum `/mod
-
-    enum `>r
-    enum `r>
-    enum `r@
-
-    enum `=
-    enum `0=
-    enum `<
-    enum `<=
-    enum `>
-    enum `>=
-
-    enum `and
-    enum `or
-    enum `xor
-    enum `invert
-    enum `lshift
-    enum `rshift
-
-    enum `move
-    enum `mem=
-
-    enum `here
-    enum `latest
-
-    enum `state
-    enum `]
-    enum `[
-
-    enum `define
-
-    enum `jump
-    enum `branch
-    enum `branch0
-
-    enum `emit
-
-    enum `make-immediate
-    enum `make-hidden
-
-    enum `ext
-constant bytecode-ct
-)
 
 read from stdin
           repl

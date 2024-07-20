@@ -55,30 +55,71 @@ constant buffer
   `cell +field >screen-x
   `cell +field >screen-y
       1 +field >screen-pixel
-         `cell aligned-to
-constant screen
+      1 +field >screen-config \ i.e. refresh rate
+constant #screen
 
-`cell constant device-capabilities
+0 `cell +field >sprites-x
+  `cell +field >sprites-y
+  `cell +field >sprites-sprite
+constant #sprites
+
+0 1 +field >sys-ptr
+  1 +field >sys-len
+  1 +field >sys-exit
+     `cell aligned-to
+constant #system
+
+0     1 +field >console-control
+         `cell aligned-to
+  `cell +field >console-on-input
+      1 +field >console-read
+      1 +field >console-write
+constant #console
+
+0 `cell +field >source-control
+  `cell +field >source-ptr
+  `cell +field >source-len
+constant #source
+
+0 `cell +field >memcmp-control
+  `cell +field >memcmp-src
+  `cell +field >memcmp-dest
+constant #memcmp
+
+1   flag ^screen
+    flag ^sprites
+    flag ^system
+    flag ^console
+    flag ^source
+drop
+
+`cell constant dev-connected
+`cell constant dev-on
 
 \ ===
 
 32 k      constant mmem-sz
-64 `cells constant mstk-sz
-64 `cells constant mrstk-sz
+48 `cells constant mstk-sz
+48 `cells constant mrstk-sz
 128       constant mibuf-sz
 
 0    `cell memmap mpc
+     `cell memmap mhere
+     `cell memmap mlatest
+     `cell memmap mstate
+     `cell memmap mbase
     buffer memmap mibuf
   mibuf-sz memmap mibuf-mem
     buffer memmap mstk
    mstk-sz memmap mstk-mem
     buffer memmap mrstk
   mrstk-sz memmap mrstk-mem
-     `cell memmap mhere
-     `cell memmap mlatest
-     `cell memmap mstate
-     `cell memmap mbase
 constant mdict-start
+
+\ state can have an asm mode
+\ 0   enum %interpret
+\     enum %compile
+\ constant %asm
 
 create mmem mmem-sz allot
 : >m mmem + ;
@@ -91,13 +132,13 @@ create mmem mmem-sz allot
 
 : init-vm
   0 mpc m!
-  mibuf-sz |i| <buffer>
-  mstk-sz  |s| <buffer>
-  mrstk-sz |r| <buffer>
   mdict-start mhere m!
   0 mlatest m!
   0 mstate m!
-  10 mbase m! ;
+  10 mbase m!
+  mibuf-sz |i| <buffer>
+  mstk-sz  |s| <buffer>
+  mrstk-sz |r| <buffer> ;
 
 create builtins 128 cells allot
 0 value builtins-ct
@@ -133,25 +174,68 @@ builtin `dup
 
 \ ===
 
+  0 enum `exit
+    enum `jump
+    enum `branch
+    enum `branch0
+
+    enum `find
+
+    enum `lit  \ literal cell
+    enum `litc \ literal char
+    enum `data \ like lit-string, data with length
+    enum `'
+    enum `[']
+    enum `]
+    enum `[
+
+    enum `dup
+    enum `drop
+    enum `swap
+    enum `c!
+    enum `c@
+    enum `c,
+
+    enum `d>
+    enum `>d
+
+    enum `+
+    enum `-
+    enum `*
+    enum `u/mod
+    enum `lshift
+    enum `rshift
+    enum `nand
+
+    enum `=
+    enum `<
+
+    enum `>r
+    enum `r>
+
+    enum `execute
+constant bytecode-ct
+
 : .addr ."   0x" 4 u.0 ." : " ;
 
 : .mmem-status
   ." memory layout:  " cr
   hex
   mpc         .addr ." program counter" cr
+  mhere       .addr ." here" cr
+  mlatest     .addr ." latest" cr
+  mstate      .addr ." state" cr
+  mbase       .addr ." base" cr
   mibuf       .addr ." input buffer" cr
   mibuf-mem   .addr ." input buffer memory" cr
   mstk        .addr ." stack" cr
   mstk-mem    .addr ." stack memory" cr
   mrstk       .addr ." return stack" cr
   mrstk-mem   .addr ." return stack memory" cr
-  mhere       .addr ." here" cr
-  mlatest     .addr ." latest" cr
-  mstate      .addr ." state" cr
-  mbase       .addr ." base" cr
   mdict-start .addr ." dictionary start" cr
   decimal
   ." builtins count: " builtins-ct . cr
+  ." bytecode count: " bytecode-ct . cr
   ;
 
 \ ===

@@ -1,0 +1,13 @@
+tiny
+4k memory
+8 bit words
+16 bit address/pc width
+small stacks and input buffer
+<=64 bytecodes
+6 bit chars
+64 bit max word length
+
+|       |       |       |
+0000111111......111111...... etc
+^   0     1     2     3      etc
+name len
