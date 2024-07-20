@@ -1,0 +1,10 @@
+mini specs ===
+
+memory:
+  cell size:    2 bytes
+  memory:       32k bytes
+  max builtins: 128
+  endianness:   little
+
+language:
+  case-insensitive

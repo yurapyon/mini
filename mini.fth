@@ -5,68 +5,88 @@
   create ,
   does> @ ;
 
+: c!+ ( value addr -- addr+1 ) tuck c! 1+ ;
+: c@+ ( addr -- value addr+1 ) dup c@ swap 1+ ;
+
 \ ===
 
 : `cell 2 ;
 : `cells `cell * ;
-: `c!
-  2dup c!
-  swap 8 rshift swap 1 + c! ;
-: `c@
-  ;
-: `c+!
-  ;
+: `split   ( `cell -- Lbyte Hbyte ) dup 8 rshift ;
+: `combine ( Lbyte Hbyte -- `cell ) 8 lshift or ;
+: `! swap `split flip c!+ c! ;
+: `@ c@+ c@ `combine ;
+: `+! tuck `@ + swap `! ;
 
 \ ===
 
-0 `cell +field >stk-mem
-  `cell +field >stk-size
-  `cell +field >stk-top
-constant stack
+0 `cell +field >buf-at
+  `cell +field >buf-sz
+  dup constant >buf-mem
+constant buffer
 
-: <stack> >r
-      r@ >stk-size `c!
-  dup r@ >stk-mem `c!
-      r> >stk-top `c! ;
+: <buffer> >r
+    r@ >buf-sz `!
+  0 r> >buf-at `! ;
 
-: spush >r
-  r@ >stk-top @ `c!
-  r> >stk-top `cell swap `c+! ;
+: >b[] ( idx buf item-sz -- buf[idx] )
+  rot * swap >buf-mem + ;
 
-: spop
-  ;
+: >b[at] ( buf item-sz -- buf[at] )
+  over >buf-at @ -rot >b[] ;
 
-: sdrop spop drop ;
-: sdup dup spop swap 2dup spush spush ;
+: adv-buf >buf-at `+! ;
+
+: bpush ( value buf -- )
+  tuck
+  `cell >b[at] `!
+  1 swap adv-buf ;
+
+: bpop ( buf -- value )
+  dup -1 swap adv-buf
+  `cell >b[at] ;
+
+\ : bdrop bpop drop ;
+\ : bdup dup bpop swap 2dup spush spush ;
 
 \ ===
 
-128 `cells constant |s|sz
-128 `cells constant |r|sz
+32 k       constant mmem-sz
+128 `cells constant mstk-sz
+128 `cells constant mrstk-sz
+128        constant mibuf-sz
 
-create mmem 32 k allot
-: m! mmem + `c! ;
-: m@ mmem + `c@ ;
-
-0 `cell memmap mpc
-  stack memmap |s|
-  |s|sz memmap |s|mem
-  stack memmap |r|
-  |r|sz memmap |r|mem
-  `cell memmap mhere
-  `cell memmap mlatest
-  `cell memmap mstate
+0    `cell memmap mpc
+    buffer memmap mibuf
+  mibuf-sz memmap mibuf-mem
+    buffer memmap mstk
+   mstk-sz memmap mstk-mem
+    buffer memmap mrstk
+  mrstk-sz memmap mrstk-mem
+     `cell memmap mhere
+     `cell memmap mlatest
+     `cell memmap mstate
 constant mdict-start
 
-|s|mem |s|sz |s| <stack>
-|r|mem |r|sz |s| <stack>
-mdict-start mhere m!
-0 mlatest m!
-0 mstate m!
+create mmem mmem-sz allot
+: >m mmem + ;
+: m! >m `! ;
+: m@ >m `@ ;
+: |pc| mpc  >m ;
+: |i| mibuf >m ;
+: |s| mstk  >m ;
+: |r| mrstk >m ;
 
-\ ===
+: init-vm
+  0 mpc m!
+  mibuf-sz |i| <buffer>
+  mstk-sz  |s| <buffer>
+  mrstk-sz |r| <buffer>
+  mdict-start mhere m!
+  0 mlatest m!
+  0 mstate m! ;
 
-create builtins 127 cells allot
+create builtins 128 cells allot
 0 value builtins-ct
 
 : builtin
@@ -78,15 +98,17 @@ create builtins 127 cells allot
 builtin `nop
 
 :noname
-  mpc `cell + @ |s| spush
-  mpc `cell pc +! ;
+  \ |pc| `cell + @ |s| spush
+  \ |pc| `cell |pc| +! ;
   ;
 builtin `lit
 
-:noname |s| sdrop ;
+\ :noname |s| sdrop ;
+0
 builtin `drop
 
-:noname |s| sdup ;
+\ :noname |s| sdup ;
+0
 builtin `dup
 
 \ ===
@@ -99,3 +121,4 @@ builtin `dup
 \ ===
 
 .mmem-status
+
