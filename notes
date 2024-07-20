@@ -1,4 +1,6 @@
-io
+platform specific things are done by supporting or not supporting devices
+
+devices
   built in
     console read/emit
   devices
@@ -13,6 +15,29 @@ io
     floats ?
 
 builtins for writing to devices that check memory location and may trigger actions
+
+\ ===
+
+\ bytecodes
+core     00------00------ \ 64
+core     010-----010----- \ 32  (96 core)
+external 011-----011----- \ 32
+literal  10------10------ \ 64
+abs jump 11-------------- \ 16k
+
+bytecodes are 1 byte
+
+11xxxxxx xxxxxxxx
+is abs jump
+
+
+
+
+literal
+  +-32
+  0-63
+  mem addr 0-63 or 0-127 by multiple of 2
+  chars
 
 \ ===
 
@@ -125,13 +150,16 @@ should be able to interpret itself
 
 ===
 
-all bytecode <= 127
+literals
+  cell
+  char literals
+  control*
+  here*
+  latest*
+  stk-top*
+  rstk-top*
 
-bytecode 00------00------
-     ext 01------01------
-miniword 10------*-------
-miniword 11------*-------
-
+  control registers for devices
 
 read from stdin
           repl

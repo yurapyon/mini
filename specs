@@ -2,9 +2,32 @@ mini specs ===
 
 memory:
   cell size:    2 bytes
-  memory:       32k bytes
-  max builtins: 128
+  memory:       64k bytes
   endianness:   little
 
 language:
   case-insensitive
+
+bytecode list: ( tenative )
+  0b00...... 64       core
+  0b0100.... 16       core
+  0b01010000 aaaaaaaa litc  push the next byte
+  0b01010010 aaaaaaaa datac push the next byte as a length for data that follows
+  0b01010001 ...      lit   push the next u16
+  0b01010011 ...      data  push the next u16 as a length for data that follows
+  0b010101aa ...      call external with the next 2^a bytes (implementation defined)
+  0b01011aaa          push 2^a
+  0b01011111          push 0
+  0b01100000          mask 0x0007
+         001          "    0x000f
+         010          "    0x007f
+         011          "    0x00ff
+         100          "    0x07ff
+         101          "    0x0fff
+         110          "    0x7fff
+         111          push 0xffff
+  0b01101aaa          test-bit (1<<a and)
+  0b0111vaaa          set-bit  (1<<a ior)
+  0b100ddddd aaaaaaaa device read  (d[addr] > stk)
+  0b101ddddd aaaaaaaa device write (stk > d[addr])
+  0b11aaaaaa aaaaaaaa abs jump to a

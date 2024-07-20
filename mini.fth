@@ -96,24 +96,27 @@ drop
 `cell constant dev-connected
 `cell constant dev-on
 
+\ mcontrol: compile state, base
+
 \ ===
 
-32 k      constant mmem-sz
-48 `cells constant mstk-sz
-48 `cells constant mrstk-sz
-128       constant mibuf-sz
+     64 k constant mmem-sz
+32 `cells constant mstk-sz
+32 `cells constant mrstk-sz
 
-0    `cell memmap mpc
-     `cell memmap mhere
-     `cell memmap mlatest
-     `cell memmap mstate
-     `cell memmap mbase
-    buffer memmap mibuf
-  mibuf-sz memmap mibuf-mem
-    buffer memmap mstk
-   mstk-sz memmap mstk-mem
-    buffer memmap mrstk
-  mrstk-sz memmap mrstk-mem
+0       `cell memmap mcontrol
+        `cell memmap mpc
+        `cell memmap mhere
+        `cell memmap mlatest
+       buffer memmap mstk
+      mstk-sz memmap mstk-mem
+       buffer memmap mrstk
+     mrstk-sz memmap mrstk-mem
+
+dev-connected memmap mdconn
+       dev-on memmap mdon
+      #system memmap mdsys
+      #source memmap mdsource
 constant mdict-start
 
 \ state can have an asm mode
@@ -126,7 +129,7 @@ create mmem mmem-sz allot
 : m! >m `! ;
 : m@ >m `@ ;
 : |pc| mpc  >m ;
-: |i| mibuf >m ;
+\ : |i| mibuf >m ;
 : |s| mstk  >m ;
 : |r| mrstk >m ;
 
@@ -134,9 +137,9 @@ create mmem mmem-sz allot
   0 mpc m!
   mdict-start mhere m!
   0 mlatest m!
-  0 mstate m!
-  10 mbase m!
-  mibuf-sz |i| <buffer>
+  \ 0 mstate m!
+  \ 10 mbase m!
+  \ mibuf-sz |i| <buffer>
   mstk-sz  |s| <buffer>
   mrstk-sz |r| <buffer> ;
 
@@ -182,7 +185,7 @@ builtin `dup
     enum `find
 
     enum `lit  \ literal cell
-    enum `litc \ literal char
+    \ enum `litc \ literal char
     enum `data \ like lit-string, data with length
     enum `'
     enum `[']
@@ -224,10 +227,10 @@ constant bytecode-ct
   mpc         .addr ." program counter" cr
   mhere       .addr ." here" cr
   mlatest     .addr ." latest" cr
-  mstate      .addr ." state" cr
-  mbase       .addr ." base" cr
-  mibuf       .addr ." input buffer" cr
-  mibuf-mem   .addr ." input buffer memory" cr
+  \ mstate      .addr ." state" cr
+  \ mbase       .addr ." base" cr
+  \ mibuf       .addr ." input buffer" cr
+  \ mibuf-mem   .addr ." input buffer memory" cr
   mstk        .addr ." stack" cr
   mstk-mem    .addr ." stack memory" cr
   mrstk       .addr ." return stack" cr
