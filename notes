@@ -81,3 +81,85 @@ should be able to interpret itself
   words needed
     execute
 
+===
+
+all bytecode <= 127
+
+bytecode 0-------0-------
+miniword 1-------*-------
+
+( _
+  0 enum `nop
+
+    enum `lit
+    enum `exit
+    enum `define
+    enum `bye
+
+    enum `word
+
+    enum `dup
+    enum `drop
+    enum `swap
+    enum `over
+    enum `flip
+    enum `rot
+    enum `-rot
+
+    enum `c!
+    enum `c@
+    enum `c,
+
+    enum `!
+    enum `@
+    enum `,
+
+    enum `char
+
+    enum `+
+    enum `-
+    enum `*
+    enum `/mod
+
+    enum `>r
+    enum `r>
+    enum `r@
+
+    enum `=
+    enum `0=
+    enum `<
+    enum `<=
+    enum `>
+    enum `>=
+
+    enum `and
+    enum `or
+    enum `xor
+    enum `invert
+    enum `lshift
+    enum `rshift
+
+    enum `move
+    enum `mem=
+
+    enum `here
+    enum `latest
+
+    enum `state
+    enum `]
+    enum `[
+
+    enum `define
+
+    enum `jump
+    enum `branch
+    enum `branch0
+
+    enum `emit
+
+    enum `make-immediate
+    enum `make-hidden
+
+    enum `ext
+constant bytecode-ct
+)
