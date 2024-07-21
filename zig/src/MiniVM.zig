@@ -79,13 +79,76 @@ pub const MiniVM = struct {
 
     fn evaluateByte(self: *@This(), byte: u8) void {
         switch (byte) {
-            inline 0...0x6f => {},
-            inline 0x70...0x7f => |b| {
+            inline 0b00000000...0b00111111 => |b| {
+                const fn_idx = b & 0xcf;
+                const lookup_table = [_]u8{
+                    0,
+                } ** 64;
+                _ = lookup_table[fn_idx];
+            },
+            inline 0b01000000...0b01001111 => {
+                // note: currently undefined
+                unreachable;
+            },
+            inline 0b01010000...0b01010011 => |b| {
+                const high: u16 = b & 0x03;
+                self.program_counter.* += 1;
+                const pc_at = self.program_counter.*;
+                const low = self.memory[pc_at];
+                const length = high << 8 | low;
+                _ = length;
+            },
+            inline 0b01010100...0b01011111 => |b| {
+                const action_id: u2 = (b & 0x0c) >> 2;
+                const register_id: u2 = b & 0x3;
+                _ = register_id;
+                switch (action_id) {
+                    inline 0b00 => {
+                        unreachable;
+                    },
+                    inline 0b01 => {},
+                    inline 0b10 => {},
+                    inline 0b11 => {},
+                }
+            },
+            inline 0b01100000...0b01100111 => |b| {
+                const shift_amt = b & 0x7;
+                const value = if (shift_amt == 7) 0 else 1 << shift_amt;
+                _ = value;
+            },
+            inline 0b01101000...0b01101111 => |b| {
+                const shift_amt = b & 0x7;
+                const value: u16 = (1 << ((shift_amt + 1) * 2)) - 1;
+                _ = value;
+            },
+            inline 0b01110000...0b01111111 => |b| {
                 const device_id = b & 0xf;
                 self.active_device.* = device_id;
                 self.devices.activate(self, device_id);
             },
-            inline 0x80...0xff => {},
+            inline 0b10000000...0b10111111 => |b| {
+                const do_read = (b & 0x20) != 0;
+                const register_addr = b & 0x1f;
+                _ = register_addr;
+                if (do_read) {
+                    // TODO
+                    // const value = self.devices.read(register_addr)
+                    // push stack
+                } else {
+                    // TODO
+                    // pop stack
+                    // self.devices.write(register_addr, value)
+                }
+            },
+            inline 0b11000000...0b11111111 => |b| {
+                const high: u16 = b & 0x3f;
+                self.program_counter.* += 1;
+                const pc_at = self.program_counter.*;
+                const low = self.memory[pc_at];
+                const addr = high << 8 | low;
+                // TODO manage return stack
+                self.program_counter.* = addr;
+            },
         }
     }
 };
