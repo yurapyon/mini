@@ -1,13 +1,45 @@
-built in
-  console read/emit
-devices
-  screen
-  audio
-  terminal ui
-  keyboard
-  mouse
+platform specific things are done by supporting or not supporting devices
 
-terminal drawing / pixel graphics would be nice
+devices
+  built in
+    console read/emit
+  devices
+    screen
+    sprites
+    terminal ui
+    audio / music
+    keyboard
+    mouse
+    datetime
+    system id (ie zig, untyped, web, webasm, love2d)
+    floats ?
+
+builtins for writing to devices that check memory location and may trigger actions
+
+\ ===
+
+\ bytecodes
+core     00------00------ \ 64
+core     010-----010----- \ 32  (96 core)
+external 011-----011----- \ 32
+literal  10------10------ \ 64
+abs jump 11-------------- \ 16k
+
+bytecodes are 1 byte
+
+11xxxxxx xxxxxxxx
+is abs jump
+
+
+
+
+literal
+  +-32
+  0-63
+  mem addr 0-63 or 0-127 by multiple of 2
+  chars
+
+\ ===
 
 all io could be in terms of 'devices'
   this means
@@ -118,87 +150,28 @@ should be able to interpret itself
 
 ===
 
-all bytecode <= 127
+literals
+  cell
+  char literals
+  control*
+  here*
+  latest*
+  stk-top*
+  rstk-top*
 
-bytecode 0-------0-------
-miniword 1-------*-------
-
-( _
-  0 enum `nop
-
-    enum `lit
-    enum `exit
-    enum `define
-    enum `bye
-
-    enum `word
-
-    enum `dup
-    enum `drop
-    enum `swap
-    enum `over
-    enum `flip
-    enum `rot
-    enum `-rot
-
-    enum `c!
-    enum `c@
-    enum `c,
-
-    enum `!
-    enum `@
-    enum `,
-
-    enum `char
-
-    enum `+
-    enum `-
-    enum `*
-    enum `/mod
-
-    enum `>r
-    enum `r>
-    enum `r@
-
-    enum `=
-    enum `0=
-    enum `<
-    enum `<=
-    enum `>
-    enum `>=
-
-    enum `and
-    enum `or
-    enum `xor
-    enum `invert
-    enum `lshift
-    enum `rshift
-
-    enum `move
-    enum `mem=
-
-    enum `here
-    enum `latest
-
-    enum `state
-    enum `]
-    enum `[
-
-    enum `define
-
-    enum `jump
-    enum `branch
-    enum `branch0
-
-    enum `emit
-
-    enum `make-immediate
-    enum `make-hidden
-
-    enum `ext
-constant bytecode-ct
-)
+  control registers for devices
 
 read from stdin
           repl
           including files
+
+
+
+a device is just a memory block of 256 chars
+there can be 32 devices
+
+.....
+
+litc devicenumber 
+0b100aaaaa d>
+0b101aaaaa >d
