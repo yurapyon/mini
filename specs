@@ -1,16 +1,12 @@
 mini specs ===
 
 memory:
-  cell size:    2 bytes
-  memory:       32k bytes
-  endianness:   little
+  cell size:     2 bytes
+  address space: 64k bytes
+  endianness:    little
 
 language:
   case-insensitive
-
-devices:
-  can have 16
-  32 byte-registers
 
 bytecode list: ( tenative )
   0b00...... core 64

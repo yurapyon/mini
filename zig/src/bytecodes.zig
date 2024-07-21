@@ -1,5 +1,163 @@
-const MiniVM = @import("MiniVM.zig").MiniVM;
+const vm = @import("MiniVM.zig");
 
-pub const bytecodes = struct {
-    pub fn exit(_: *MiniVM) void {}
+fn nop(_: *vm.MiniVM) vm.Error!void {}
+
+fn dup(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.dup();
+}
+
+fn drop(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.drop();
+}
+
+fn swap(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.swap();
+}
+
+pub const lookup_table = [_]vm.BytecodeFn{
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    dup,
+    drop,
+    swap,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    // ===
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
+
+    nop,
+    nop,
+    nop,
+    nop,
 };
