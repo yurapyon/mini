@@ -1,4 +1,4 @@
-const MiniVM = @import("../vm.zig").MiniVM;
+const MiniVM = @import("../MiniVM.zig").MiniVM;
 const System = @import("System.zig").System;
 
 pub const Devices = struct {

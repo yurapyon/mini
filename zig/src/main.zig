@@ -1,12 +1,12 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const vm = @import("vm.zig");
+const MiniVM = @import("MiniVM.zig").MiniVM;
 
 fn runMiniVM(allocator: Allocator) !void {
-    var VM: vm.MiniVM = undefined;
-    try VM.init(allocator);
-    defer VM.deinit();
+    var vm: MiniVM = undefined;
+    try vm.init(allocator);
+    defer vm.deinit();
 }
 
 pub fn main() !void {}

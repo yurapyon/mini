@@ -3,10 +3,6 @@ const Allocator = std.mem.Allocator;
 
 const Devices = @import("devices/Devices.zig").Devices;
 
-const bytecodes = struct {
-    fn exit(_: *MiniVM) void {}
-};
-
 pub const MiniVM = struct {
     const Cell = u16;
 

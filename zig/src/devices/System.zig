@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const MiniVM = @import("../vm.zig").MiniVM;
+const MiniVM = @import("../MiniVM.zig").MiniVM;
 
 pub const System = struct {
     pub fn onActivate(_: @This(), _: *MiniVM) void {
