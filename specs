@@ -98,7 +98,7 @@ bytecode list: ( tenative )
   0b010111aa          register a @
 
   0b01100aaa          push 1<<a (a == 7, push 0)
-  0b01101aaa          push (1<<((a+1)*4))-1 (0x0007,0x000f,0x007f etc)
+  0b01101aaa          push (1<<((a+1)*4))-1 (0x0003,0x000f,0x003f etc)
   0b0111aaaa          set active device
 
   0b100ddddd          >d device read

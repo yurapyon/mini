@@ -6,6 +6,7 @@ const vm = @import("vm.zig");
 fn runMiniVM(allocator: Allocator) !void {
     var VM: vm.MiniVM = undefined;
     try VM.init(allocator);
+    defer VM.deinit();
 }
 
 pub fn main() !void {}
