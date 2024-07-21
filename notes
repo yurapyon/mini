@@ -164,3 +164,14 @@ literals
 read from stdin
           repl
           including files
+
+
+
+a device is just a memory block of 256 chars
+there can be 32 devices
+
+.....
+
+litc devicenumber 
+0b100aaaaa d>
+0b101aaaaa >d

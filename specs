@@ -2,32 +2,135 @@ mini specs ===
 
 memory:
   cell size:    2 bytes
-  memory:       64k bytes
+  memory:       32k bytes
   endianness:   little
 
 language:
   case-insensitive
 
+devices:
+  can have 16
+  32 byte-registers
+
 bytecode list: ( tenative )
-  0b00...... 64       core
-  0b0100.... 16       core
-  0b01010000 aaaaaaaa litc  push the next byte
-  0b01010010 aaaaaaaa datac push the next byte as a length for data that follows
-  0b01010001 ...      lit   push the next u16
-  0b01010011 ...      data  push the next u16 as a length for data that follows
-  0b010101aa ...      call external with the next 2^a bytes (implementation defined)
-  0b01011aaa          push 2^a
-  0b01011111          push 0
-  0b01100000          mask 0x0007
-         001          "    0x000f
-         010          "    0x007f
-         011          "    0x00ff
-         100          "    0x07ff
-         101          "    0x0fff
-         110          "    0x7fff
-         111          push 0xffff
-  0b01101aaa          test-bit (1<<a and)
-  0b0111vaaa          set-bit  (1<<a ior)
-  0b100ddddd aaaaaaaa device read  (d[addr] > stk)
-  0b101ddddd aaaaaaaa device write (stk > d[addr])
+  0b00...... core 64
+    exit
+    quit
+    panic
+    bye
+
+    '
+    [']
+    ]
+    [
+
+    find
+    word
+    next-char
+    define
+
+    jump
+    branch
+    branch0
+    execute
+  =====
+    +
+    -
+    *
+    /mod
+    u/mod
+    negate
+    1+
+    1-
+
+    u16>u8s
+    u8s>u16
+    lshift
+    rshift
+    and
+    or
+    xor
+    invert
+  =====
+    =
+    0=
+    <
+    <=
+    >
+    >=
+
+    !
+    +!
+    @
+    ,
+    lit
+
+    c!
+    +c!
+    c@
+    c,
+    litc
+  =====
+    >r
+    r>
+    r@
+
+    cmove<
+    cmove>
+    mem=
+
+    dup
+    drop
+
+    nip
+    swap
+    flip
+    tuck
+
+    over
+    pick
+    rot
+    -rot
+  0b0100.... 16
+  0b010100.. 4
+  0b010101aa aaaaaaaa data (push address+2 and length of data (a) (max len is 1024 bytes))
+  0b010110aa          read u16 from register a
+  0b010111aa          write u16 to register a
+
+  0b01100aaa          push 1<<a (a == 7, push 0)
+  0b01101aaa          push (1<<((a+1)*4))-1 (0x0007,0x000f,0x007f etc)
+  0b0111aaaa          set active device
+
+  0b100ddddd          >d device read
+  0b101ddddd          d> device write
+
   0b11aaaaaa aaaaaaaa abs jump to a
+
+registers:
+  0x0 scratch/temp
+    #!
+    #@
+  0x1 control ( 2b state, 2b base, 12b ? )
+    state!
+    state@
+    base!
+    base@
+    ?
+  0x2 here
+    here!
+    here@
+  0x3 latest
+    latest!
+    latest@
+
+states:
+  0x0 interpret
+  0x1 compile
+  0x2 asm
+  0x3
+
+bases:
+  0x0 2  binary
+  0x1 10 decimal
+  0x2 16 hex
+  0x3
