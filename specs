@@ -92,10 +92,10 @@ bytecode list: ( tenative )
     rot
     -rot
   0b0100.... 16
-  0b010100.. 4
-  0b010101aa aaaaaaaa data (push address+2 and length of data (a) (max len is 1024 bytes))
-  0b010110aa          read u16 from register a
-  0b010111aa          write u16 to register a
+  0b010100aa aaaaaaaa data (push address+2 and length of data (a) (max len is 1024 bytes))
+  0b010101aa          register a !
+  0b010110aa          register a +!
+  0b010111aa          register a @
 
   0b01100aaa          push 1<<a (a == 7, push 0)
   0b01101aaa          push (1<<((a+1)*4))-1 (0x0007,0x000f,0x007f etc)
@@ -107,20 +107,19 @@ bytecode list: ( tenative )
   0b11aaaaaa aaaaaaaa abs jump to a
 
 registers:
+  16 bits
   0x0 scratch/temp
     #!
+    #+!
     #@
-  0x1 control ( 2b state, 2b base, 12b ? )
-    state!
-    state@
-    base!
-    base@
-    ?
-  0x2 here
+  0x1 here
     here!
+    here+!
     here@
+  0x2
   0x3 latest
     latest!
+    latest+!
     latest@
 
 states:
