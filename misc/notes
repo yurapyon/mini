@@ -14,38 +14,14 @@ devices
     system id (ie zig, untyped, web, webasm, love2d)
     floats ?
 
-builtins for writing to devices that check memory location and may trigger actions
-
 \ ===
 
-\ bytecodes
-core     00------00------ \ 64
-core     010-----010----- \ 32  (96 core)
-external 011-----011----- \ 32
-literal  10------10------ \ 64
-abs jump 11-------------- \ 16k
+being able to save/load vm images would be cool
 
-bytecodes are 1 byte
-
-11xxxxxx xxxxxxxx
-is abs jump
-
-
-
-
-literal
-  +-32
-  0-63
-  mem addr 0-63 or 0-127 by multiple of 2
-  chars
+could write a basic vm w/o interpreter ie on the web
+  then just load an image of an interpreter written in mini for the zig vm
 
 \ ===
-
-all io could be in terms of 'devices'
-  this means
-    you dont need externals for io
-    you can check device capabilites easily
-    you dont need to define builtins for io, can just have a general get/set
 
 take some ideas from colorForth
   "dictionary only records 32 bits of identifier"
