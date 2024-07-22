@@ -93,6 +93,7 @@ pub const WordHeader = struct {
 
 pub const MiniVM = struct {
     const mem_size = 64 * 1024;
+    const return_stack_sentinel = 0xffff;
 
     memory: Memory,
 
@@ -108,6 +109,9 @@ pub const MiniVM = struct {
     // TODO move this into a device
     input_buffer: []const u8,
     input_buffer_at: usize,
+
+    should_quit: bool,
+    should_bye: bool,
 
     devices: Devices,
 
@@ -137,6 +141,9 @@ pub const MiniVM = struct {
         self.base.* = 10;
         self.active_device.* = 0;
 
+        self.should_quit = false;
+        self.should_bye = false;
+
         // TODO
         // run base file
     }
@@ -147,15 +154,12 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn quit(self: *@This()) Error!void {
-        _ = self;
-        // reset stack
-        // quit to repl
+    pub fn onQuit(self: *@This()) Error!void {
+        self.data_stack.clear();
     }
 
-    pub fn bye(self: *@This()) Error!void {
-        try self.quit();
-        // quit the entire process (what does that mean in this context)
+    pub fn onBye(self: *@This()) Error!void {
+        self.data_stack.clear();
     }
 
     // ===
@@ -166,7 +170,7 @@ pub const MiniVM = struct {
     }
 
     pub fn readNextChar(self: *@This()) ?u8 {
-        if (self.input_buffer_at < self.input_buffer.len - 1) {
+        if (self.input_buffer_at + 1 < self.input_buffer.len) {
             self.input_buffer_at += 1;
             return self.input_buffer[self.input_buffer_at];
         } else {
@@ -175,7 +179,7 @@ pub const MiniVM = struct {
     }
 
     pub fn readNextWord(self: *@This()) ?[]const u8 {
-        var char = self.readNextChar() orelse return null;
+        var char = self.input_buffer[self.input_buffer_at];
 
         while (isWhitespace(char)) {
             char = self.readNextChar() orelse return null;
@@ -183,17 +187,11 @@ pub const MiniVM = struct {
 
         const word_start = self.input_buffer_at;
 
-        var word_end = word_start;
-        while (isWhitespace(char)) {
-            if (self.readNextChar()) |ch| {
-                char = ch;
-                word_end += 1;
-            } else {
-                break;
-            }
+        while (!isWhitespace(char)) {
+            char = self.readNextChar() orelse break;
         }
 
-        return self.input_buffer[word_start..word_end];
+        return self.input_buffer[word_start..self.input_buffer_at];
     }
 
     // returns memory mapped addr
@@ -223,11 +221,13 @@ pub const MiniVM = struct {
         switch (try self.lookupWord(word)) {
             .bytecode => |byte| {
                 // if byte.shouldInterpret
-                try self.evaluateByte(byte);
+                // try self.evaluateByte(byte);
+                _ = byte;
             },
             .mini_word => |addr| {
                 // TODO get the cfa of the definition at addr
                 try self.absoluteJump(addr, false);
+                try self.return_stack.push(return_stack_sentinel);
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -253,8 +253,7 @@ pub const MiniVM = struct {
     }
 
     pub fn interpretLoop(self: *@This()) Error!void {
-        var out_of_input = false;
-        while (!out_of_input) {
+        while (!self.should_quit and !self.should_bye) {
             const state: CompileState = @enumFromInt(self.state.*);
             switch (state) {
                 .interpret => {
@@ -262,16 +261,18 @@ pub const MiniVM = struct {
                     if (word) |w| {
                         try self.interpretWord(w);
                     } else {
-                        out_of_input = true;
+                        self.should_quit = true;
                     }
+                    try self.evaluateLoop();
                 },
                 .compile => {
                     const word = self.readNextWord();
                     if (word) |w| {
                         try self.compileWord(w);
                     } else {
-                        out_of_input = true;
+                        self.should_quit = true;
                     }
+                    try self.evaluateLoop();
                 },
                 // TODO
                 else => {
@@ -279,6 +280,19 @@ pub const MiniVM = struct {
                 },
             }
         }
+
+        try self.onQuit();
+    }
+
+    // example main loop
+    pub fn repl(self: *@This()) Error!void {
+        while (!self.should_bye) {
+            self.should_quit = false;
+            // refill input buffer
+            try self.interpretLoop();
+        }
+
+        try self.onBye();
     }
 
     pub fn readByteAndAdvancePC(self: *@This()) u8 {
@@ -316,15 +330,30 @@ pub const MiniVM = struct {
         self.evaluateByte(byte);
     }
 
+    fn evalutateLoop(self: *@This()) Error!void {
+        while (self.return_stack.depth() > 0) {
+            const nextPCAddr = try self.return_stack.pop();
+            if (nextPCAddr != return_stack_sentinel) {
+                try self.absoluteJump(nextPCAddr, true);
+                try self.evaluateOne();
+            }
+        }
+    }
+
     // program_counter may be moved
-    fn evaluateByte(self: *@This(), byte: u8) Error!void {
+    fn evaluateByte(self: *@This(), byte: u8, programCounterIsValid: bool) Error!void {
         switch (byte) {
             inline 0b00000000...0b01101111 => |b| {
                 const id = b & 0x7f;
                 const named_callback = bytecodes.getCallbackById(id);
-                try named_callback.callback(self);
+                if (programCounterIsValid or !named_callback.needsValidProgramCounter) {
+                    try named_callback.callback(self);
+                }
             },
             inline 0b01110000...0b01111111 => |b| {
+                if (!programCounterIsValid) {
+                    return;
+                }
                 // TODO how should endianness be handled for this
                 const high = b & 0x0f;
                 const low = self.readByteAndAdvancePC();
@@ -335,6 +364,9 @@ pub const MiniVM = struct {
                 self.program_counter.* += length;
             },
             inline 0b10000000...0b11111111 => |b| {
+                if (!programCounterIsValid) {
+                    return;
+                }
                 // TODO how should endianness be handled for this
                 const high = b & 0x7f;
                 const low = self.readByteAndAdvancePC();

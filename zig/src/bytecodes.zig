@@ -8,7 +8,26 @@ const NamedCallback = struct {
     name: []const u8 = "",
     callback: vm.BytecodeFn = nop,
     isImmediate: bool = false,
+    needsValidProgramCounter: bool = false,
 };
+
+fn bye(mini: *vm.MiniVM) vm.Error!void {
+    mini.should_bye = true;
+}
+
+fn quit(mini: *vm.MiniVM) vm.Error!void {
+    mini.should_quit = true;
+}
+
+fn exit(mini: *vm.MiniVM) vm.Error!void {
+    const addr = try mini.return_stack.pop();
+    try mini.absoluteJump(addr);
+}
+
+fn panic(mini: *vm.MiniVM) vm.Error!void {
+    // TODO some type of panic message
+    mini.should_bye = true;
+}
 
 fn branch(_: *vm.MiniVM) vm.Error!void {}
 fn branch0(_: *vm.MiniVM) vm.Error!void {}
@@ -308,11 +327,10 @@ fn over(mini: *vm.MiniVM) vm.Error!void {
 
 const lookup_table = [_]NamedCallback{
     // ===
-    // TODO
-    .{ .name = "exit", .callback = nop },
-    .{ .name = "quit", .callback = nop },
-    .{ .name = "panic", .callback = nop },
-    .{ .name = "bye", .callback = nop },
+    .{ .name = "bye", .callback = bye },
+    .{ .name = "quit", .callback = quit },
+    .{ .name = "exit", .callback = exit },
+    .{ .name = "panic", .callback = panic },
 
     // TODO
     .{ .name = "'", .callback = nop },
@@ -327,10 +345,10 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "define", .callback = nop },
 
     // TODO
-    .{ .name = "branch", .callback = branch },
-    .{ .name = "branch0", .callback = branch0 },
-    .{ .name = "execute", .callback = execute },
-    .{ .name = "tailcall", .callback = tailcall },
+    .{ .name = "branch", .callback = branch, .needsValidProgramCounter = true },
+    .{ .name = "branch0", .callback = branch0, .needsValidProgramCounter = true },
+    .{ .name = "execute", .callback = execute, .needsValidProgramCounter = true },
+    .{ .name = "tailcall", .callback = tailcall, .needsValidProgramCounter = true },
 
     // ===
     .{ .name = "!", .callback = store },
@@ -338,14 +356,14 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "@", .callback = fetch },
     // TODO
     .{ .name = ",", .callback = nop },
-    .{ .name = "lit", .callback = lit },
+    .{ .name = "lit", .callback = lit, .needsValidProgramCounter = true },
 
     .{ .name = "c!", .callback = storeC },
     .{ .name = "+c!", .callback = storeAddC },
     .{ .name = "c@", .callback = fetchC },
     // TODO
     .{ .name = "c,", .callback = nop },
-    .{ .name = "litc", .callback = litC },
+    .{ .name = "litc", .callback = litC, .needsValidProgramCounter = true },
 
     .{ .name = ">r", .callback = toR },
     .{ .name = "r>", .callback = fromR },
