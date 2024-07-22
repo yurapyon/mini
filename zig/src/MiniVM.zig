@@ -54,6 +54,15 @@ fn Stack(comptime count_: usize) type {
             return ret;
         }
 
+        pub fn popCount(self: *@This(), comptime ct: usize) Error![ct]Cell {
+            var ret = [_]Cell{0} ** ct;
+            comptime var i = 0;
+            inline while (i < ct) : (i += 1) {
+                ret[i] = try self.pop();
+            }
+            return ret;
+        }
+
         pub fn dup(self: *@This()) Error!void {
             try self.push(try self.peek());
         }
@@ -63,10 +72,11 @@ fn Stack(comptime count_: usize) type {
         }
 
         pub fn swap(self: *@This()) Error!void {
-            const a = try self.pop();
-            const b = try self.pop();
-            try self.push(a);
-            try self.push(b);
+            const a_addr = try cellAccess(self.memory, self.top.* - @sizeOf(Cell));
+            const b_addr = try cellAccess(self.memory, self.top.* - 2 * @sizeOf(Cell));
+            const temp = a_addr.*;
+            a_addr.* = b_addr.*;
+            b_addr.* = temp;
         }
     };
 }
@@ -128,7 +138,7 @@ pub const MiniVM = struct {
         self.allocator.free(self.memory);
     }
 
-    fn advancePCAndReadByte(self: *@This()) u8 {
+    pub fn advancePCAndReadByte(self: *@This()) u8 {
         self.program_counter.* += 1;
         const pc_at = self.program_counter.*;
         return self.memory[pc_at];
@@ -137,9 +147,9 @@ pub const MiniVM = struct {
     fn evaluateByte(self: *@This(), byte: u8) Error!void {
         switch (byte) {
             inline 0b00000000...0b01101111 => |b| {
-                const fn_idx = b & 0x7f;
-                const bytecode_fn = bytecodes.lookup_table[fn_idx];
-                try bytecode_fn(self);
+                const id = b & 0x7f;
+                const named_callback = bytecodes.getCallbackById(id);
+                try named_callback.callback(self);
             },
             inline 0b01110000...0b01111111 => |b| {
                 const high: u16 = b & 0x0f;
