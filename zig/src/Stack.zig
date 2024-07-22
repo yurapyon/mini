@@ -38,7 +38,7 @@ pub fn Stack(comptime count_: usize) type {
         }
 
         pub fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
-            const addr = @as(isize, @intCast(self.top_addr.*)) - 1 + at;
+            const addr = @as(isize, @intCast(self.top_addr.*)) + (at - 1) * @sizeOf(Cell);
             return self.memory.cellAt(@intCast(addr));
         }
 

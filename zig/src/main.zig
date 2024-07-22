@@ -7,7 +7,7 @@ fn runMiniVM(allocator: Allocator) !void {
     var vmInstance: vm.MiniVM = undefined;
     try vmInstance.init(allocator);
 
-    vmInstance.setBuffer("1 dup dup\n");
+    vmInstance.setInputBuffer("1 dup dup\n");
     try vmInstance.interpretLoop();
 
     defer vmInstance.deinit();

@@ -160,34 +160,37 @@ pub const MiniVM = struct {
 
     // ===
 
-    // vm should operate as follows
-    // 1. set input buffer
-    // 2. interpret input buffer
-    // input buffer is exposed to vm through a device
-
-    pub fn setBuffer(self: *@This(), buffer: []const u8) void {
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) void {
         self.input_buffer = buffer;
         self.input_buffer_at = 0;
     }
 
-    pub fn readNextChar(self: *@This()) u8 {
-        // TODO handle end of input
-        self.input_buffer_at += 1;
-        return self.input_buffer[self.input_buffer_at];
+    pub fn readNextChar(self: *@This()) ?u8 {
+        if (self.input_buffer_at < self.input_buffer.len - 1) {
+            self.input_buffer_at += 1;
+            return self.input_buffer[self.input_buffer_at];
+        } else {
+            return null;
+        }
     }
 
-    pub fn readNextWord(self: *@This()) []const u8 {
-        var ch = self.input_buffer[self.input_buffer_at];
-        while (isWhitespace(ch)) {
-            ch = self.readNextChar();
+    pub fn readNextWord(self: *@This()) ?[]const u8 {
+        var char = self.readNextChar() orelse return null;
+
+        while (isWhitespace(char)) {
+            char = self.readNextChar() orelse return null;
         }
 
         const word_start = self.input_buffer_at;
 
         var word_end = word_start;
-        while (!isWhitespace(ch)) {
-            ch = self.readNextChar();
-            word_end += 1;
+        while (isWhitespace(char)) {
+            if (self.readNextChar()) |ch| {
+                char = ch;
+                word_end += 1;
+            } else {
+                break;
+            }
         }
 
         return self.input_buffer[word_start..word_end];
@@ -202,14 +205,12 @@ pub const MiniVM = struct {
     }
 
     fn lookupWord(self: *@This(), word: []const u8) Error!WordLookupResult {
-        if (bytecodes.getCallbackBytecode(word)) |b| {
-            return .{ .bytecode = b };
+        if (bytecodes.getCallbackBytecode(word)) |bytecode| {
+            return .{ .bytecode = bytecode };
         } else if (self.lookupMiniDefinition(word)) |definition_addr| {
-            // TODO addr should point to cfa of definition
-            const addr = definition_addr;
-            return .{ .mini_word = addr };
+            return .{ .mini_word = definition_addr };
         } else if (tryParseNumber(word)) |value| {
-            return .{ .number = try self.data_stack.push(value) };
+            return .{ .number = value };
         } else {
             return WordLookupResult.not_found;
         }
@@ -220,11 +221,13 @@ pub const MiniVM = struct {
         //   ie lit, litc, branch
         // TODO how to handle this
         switch (try self.lookupWord(word)) {
-            .bytecode => |b| {
-                try self.evaluateByte(b);
+            .bytecode => |byte| {
+                // if byte.shouldInterpret
+                try self.evaluateByte(byte);
             },
             .mini_word => |addr| {
-                try self.absoluteJump(addr);
+                // TODO get the cfa of the definition at addr
+                try self.absoluteJump(addr, false);
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -236,8 +239,8 @@ pub const MiniVM = struct {
     fn compileWord(self: *@This(), word: []const u8) Error!void {
         // TODO
         switch (try self.lookupWord(word)) {
-            .bytecode => |b| {
-                _ = b;
+            .bytecode => |byte| {
+                _ = byte;
             },
             .mini_word => |addr| {
                 _ = addr;
@@ -250,18 +253,27 @@ pub const MiniVM = struct {
     }
 
     pub fn interpretLoop(self: *@This()) Error!void {
-        while (true) {
+        var out_of_input = false;
+        while (!out_of_input) {
             const state: CompileState = @enumFromInt(self.state.*);
-
             switch (state) {
                 .interpret => {
                     const word = self.readNextWord();
-                    try self.interpretWord(word);
+                    if (word) |w| {
+                        try self.interpretWord(w);
+                    } else {
+                        out_of_input = true;
+                    }
                 },
                 .compile => {
                     const word = self.readNextWord();
-                    try self.compileWord(word);
+                    if (word) |w| {
+                        try self.compileWord(w);
+                    } else {
+                        out_of_input = true;
+                    }
                 },
+                // TODO
                 else => {
                     unreachable;
                 },
