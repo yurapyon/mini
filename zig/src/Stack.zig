@@ -10,7 +10,8 @@ pub fn Stack(comptime count_: usize) type {
 
         memory: []u8,
 
-        // top points to an empty Cell right beyond the actual topmost value
+        // top.* is a memory mapped address of the
+        //   empty Cell right beyond the actual topmost value
         top: *Cell,
         mem: *Cell,
 
