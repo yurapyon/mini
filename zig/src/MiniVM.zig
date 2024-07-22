@@ -6,7 +6,13 @@ const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
 
-pub const Error = error{ AlignmentError, StackOverflow, StackUnderflow, ReturnStackOverflow, ReturnStackUnderflow } || Allocator.Error;
+pub const Error = error{
+    AlignmentError,
+    StackOverflow,
+    StackUnderflow,
+    ReturnStackOverflow,
+    ReturnStackUnderflow,
+} || Allocator.Error;
 
 pub const Cell = u16;
 
@@ -79,8 +85,16 @@ pub const MiniVM = struct {
         self.memory = try allocator.allocWithOptions(u8, mem_size, @alignOf(Cell), null);
 
         self.program_counter = @ptrCast(@alignCast(&self.memory[program_counter_mem]));
-        self.data_stack.init(self.memory, @ptrCast(@alignCast(&self.memory[data_stack_top])), @ptrCast(@alignCast(&self.memory[data_stack_mem])));
-        self.return_stack.init(self.memory, @ptrCast(@alignCast(&self.memory[return_stack_top])), @ptrCast(@alignCast(&self.memory[return_stack_mem])));
+        self.data_stack.init(
+            self.memory,
+            @ptrCast(@alignCast(&self.memory[data_stack_top])),
+            @ptrCast(@alignCast(&self.memory[data_stack_mem])),
+        );
+        self.return_stack.init(
+            self.memory,
+            @ptrCast(@alignCast(&self.memory[return_stack_top])),
+            @ptrCast(@alignCast(&self.memory[return_stack_mem])),
+        );
         self.here = @ptrCast(@alignCast(&self.memory[here_mem]));
         self.latest = @ptrCast(@alignCast(&self.memory[latest_mem]));
         self.state = @ptrCast(@alignCast(&self.memory[state_mem]));

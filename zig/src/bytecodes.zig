@@ -46,16 +46,22 @@ fn fetchC(mini: *vm.MiniVM) vm.Error!void {
 
 fn toR(mini: *vm.MiniVM) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.return_stack.push(value) catch |err| return vm.returnStackErrorFromStackError(err);
+    mini.return_stack.push(value) catch |err| {
+        return vm.returnStackErrorFromStackError(err);
+    };
 }
 
 fn fromR(mini: *vm.MiniVM) vm.Error!void {
-    const value = mini.return_stack.pop() catch |err| return vm.returnStackErrorFromStackError(err);
+    const value = mini.return_stack.pop() catch |err| {
+        return vm.returnStackErrorFromStackError(err);
+    };
     try mini.data_stack.push(value);
 }
 
 fn Rfetch(mini: *vm.MiniVM) vm.Error!void {
-    const value = mini.return_stack.peek() catch |err| return vm.returnStackErrorFromStackError(err);
+    const value = mini.return_stack.peek() catch |err| {
+        return vm.returnStackErrorFromStackError(err);
+    };
     try mini.data_stack.push(value);
 }
 

@@ -15,7 +15,12 @@ pub fn Stack(comptime count_: usize) type {
         top_addr: *Cell,
         mem_addr: *Cell,
 
-        pub fn init(self: *@This(), memory: []u8, top_addr: *Cell, mem_addr: *Cell) void {
+        pub fn init(
+            self: *@This(),
+            memory: []u8,
+            top_addr: *Cell,
+            mem_addr: *Cell,
+        ) void {
             self.memory = memory;
             self.top_addr = top_addr;
             self.mem_addr = mem_addr;
@@ -36,7 +41,11 @@ pub fn Stack(comptime count_: usize) type {
             return try cellAccess(self.memory, @intCast(addr));
         }
 
-        pub fn unsafeSwapValues(self: *@This(), a_idx: isize, b_idx: isize) Error!void {
+        pub fn unsafeSwapValues(
+            self: *@This(),
+            a_idx: isize,
+            b_idx: isize,
+        ) Error!void {
             const a_cell = try self.unsafeIndex(a_idx);
             const b_cell = try self.unsafeIndex(b_idx);
             const temp = a_cell.*;
@@ -51,7 +60,11 @@ pub fn Stack(comptime count_: usize) type {
             return self.unsafeIndex(@intCast(at));
         }
 
-        pub fn swapValues(self: *@This(), a_idx: usize, b_idx: usize) Error!void {
+        pub fn swapValues(
+            self: *@This(),
+            a_idx: usize,
+            b_idx: usize,
+        ) Error!void {
             const max_idx = @max(a_idx, b_idx);
             if (max_idx >= self.depth()) {
                 return Error.StackUnderflow;
