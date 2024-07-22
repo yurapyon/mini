@@ -1,21 +1,42 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
 
-pub const Error = error{ AlignmentError, StackOverflow, StackUnderflow } || Allocator.Error;
+pub const Error = error{ AlignmentError, StackOverflow, StackUnderflow, ReturnStackOverflow, ReturnStackUnderflow } || Allocator.Error;
 
 pub const Cell = u16;
+
+comptime {
+    const nativeEndianness = builtin.target.cpu.arch.endian();
+    if (nativeEndianness != .little) {
+        // TODO convert u16s to little endian on memory write
+        @compileError("native endianness must be .little");
+    }
+}
 
 // TODO this should take an i16 and memory should be initialized on init
 pub fn cellAccess(memory: []u8, addr: u16) Error!*Cell {
     return @ptrCast(@alignCast(&memory[addr]));
 }
 
-pub fn isTruthy(val: Cell) bool {
-    return val != 0;
+pub fn cellFromBool(value: bool) Cell {
+    return if (value) 0xffff else 0;
+}
+
+pub fn isTruthy(value: Cell) bool {
+    return value != 0;
+}
+
+pub fn returnStackErrorFromStackError(err: Error) Error {
+    return switch (err) {
+        Error.StackOverflow => Error.ReturnStackOverflow,
+        Error.StackUnderflow => Error.ReturnStackUnderflow,
+        else => err,
+    };
 }
 
 pub const BytecodeFn = *const fn (

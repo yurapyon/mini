@@ -10,13 +10,13 @@ const NamedCallback = struct {
 fn nop(_: *vm.MiniVM) vm.Error!void {}
 
 fn store(mini: *vm.MiniVM) vm.Error!void {
-    const addr, const value = try mini.data_stack.popCount(2);
+    const addr, const value = try mini.data_stack.popMultiple(2);
     const mem_ptr = try vm.cellAccess(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM) vm.Error!void {
-    const addr, const value = try mini.data_stack.popCount(2);
+    const addr, const value = try mini.data_stack.popMultiple(2);
     const mem_ptr = try vm.cellAccess(mini.memory, addr);
     mem_ptr.* +%= value;
 }
@@ -28,13 +28,13 @@ fn fetch(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn storeC(mini: *vm.MiniVM) vm.Error!void {
-    const addr, const value = try mini.data_stack.popCount(2);
+    const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     mini.memory[addr] = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM) vm.Error!void {
-    const addr, const value = try mini.data_stack.popCount(2);
+    const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     mini.memory[addr] +%= byte;
 }
@@ -44,14 +44,100 @@ fn fetchC(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.push(mini.memory[addr]);
 }
 
+fn toR(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    mini.return_stack.push(value) catch |err| return vm.returnStackErrorFromStackError(err);
+}
+
+fn fromR(mini: *vm.MiniVM) vm.Error!void {
+    const value = mini.return_stack.pop() catch |err| return vm.returnStackErrorFromStackError(err);
+    try mini.data_stack.push(value);
+}
+
+fn Rfetch(mini: *vm.MiniVM) vm.Error!void {
+    const value = mini.return_stack.peek() catch |err| return vm.returnStackErrorFromStackError(err);
+    try mini.data_stack.push(value);
+}
+
+fn eq(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(vm.cellFromBool(a == b));
+}
+
+fn lt(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    // NOTE, the actual operator is '>' because stack order is ( b a )
+    try mini.data_stack.push(vm.cellFromBool(a > b));
+}
+
+fn lteq(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    // NOTE, the actual operator is '>=' because stack order is ( b a )
+    try mini.data_stack.push(vm.cellFromBool(a >= b));
+}
+
+fn plus(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a +% b);
+}
+
+fn minus(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a -% b);
+}
+
+fn multiply(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a *% b);
+}
+
+fn divMod(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    // not currenly clear wether this bytecode is needed or not
+    _ = mini;
+}
+
+fn uDivMod(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    const q = @divTrunc(b, a);
+    const mod = @mod(b, a);
+    try mini.data_stack.push(mod);
+    try mini.data_stack.push(q);
+}
+
+fn negate(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    try mini.data_stack.push(-value);
+}
+
 fn lshift(mini: *vm.MiniVM) vm.Error!void {
-    const value, const shift_ = try mini.data_stack.popCount(2);
+    const value, const shift_ = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(value << @truncate(shift_));
 }
 
 fn rshift(mini: *vm.MiniVM) vm.Error!void {
-    const value, const shift_ = try mini.data_stack.popCount(2);
+    const value, const shift_ = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(value >> @truncate(shift_));
+}
+
+fn miniAnd(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a & b);
+}
+
+fn miniOr(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a | b);
+}
+
+fn xor(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(a ^ b);
+}
+
+fn invert(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    try mini.data_stack.push(~value);
 }
 
 fn dup(mini: *vm.MiniVM) vm.Error!void {
@@ -72,6 +158,33 @@ fn rot(mini: *vm.MiniVM) vm.Error!void {
 
 fn nrot(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.nrot();
+}
+
+fn eq0(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    try mini.data_stack.push(vm.cellFromBool(value == 0));
+}
+
+fn gt(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    // NOTE, the actual operator is '<' because stack order is ( b a )
+    try mini.data_stack.push(vm.cellFromBool(a < b));
+}
+
+fn gteq(mini: *vm.MiniVM) vm.Error!void {
+    const a, const b = try mini.data_stack.popMultiple(2);
+    // NOTE, the actual operator is '<=' because stack order is ( b a )
+    try mini.data_stack.push(vm.cellFromBool(a <= b));
+}
+
+fn plus1(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    try mini.data_stack.push(value +% 1);
+}
+
+fn minus1(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    try mini.data_stack.push(value -% 1);
 }
 
 fn push0(mini: *vm.MiniVM) vm.Error!void {
@@ -99,6 +212,9 @@ fn push8(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn cellToBytes(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    // instead of doing all this, could potentially just
+    //   manipulate stack memory as bytes
     const value = try mini.data_stack.pop();
     const low = @as(u8, @truncate(value));
     const high = @as(u8, @truncate(value >> 8));
@@ -107,11 +223,32 @@ fn cellToBytes(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn bytesToCell(mini: *vm.MiniVM) vm.Error!void {
-    const low, const high = try mini.data_stack.popCount(2);
+    // TODO
+    // instead of doing all this, could potentially just
+    //   manipulate stack memory as bytes
+    const high, const low = try mini.data_stack.popMultiple(2);
     const low_byte = @as(u8, @truncate(low));
     const high_byte = @as(u8, @truncate(high));
     const value = low_byte | (@as(vm.Cell, high_byte) << 8);
     try mini.data_stack.push(value);
+}
+
+fn cmove(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+    // mem.copyForwards()
+}
+
+fn cmoveUp(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+    // mem.copyBackwards()
+}
+
+fn memEq(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+    // mem.eql
 }
 
 fn maybeDup(mini: *vm.MiniVM) vm.Error!void {
@@ -139,21 +276,25 @@ fn over(mini: *vm.MiniVM) vm.Error!void {
 
 const lookup_table = [_]NamedCallback{
     // ===
+    // TODO
     .{ .name = "exit", .callback = nop },
     .{ .name = "quit", .callback = nop },
     .{ .name = "panic", .callback = nop },
     .{ .name = "bye", .callback = nop },
 
+    // TODO
     .{ .name = "'", .callback = nop },
     .{ .name = "[']", .callback = nop },
     .{ .name = "]", .callback = nop },
     .{ .name = "[", .callback = nop },
 
+    // TODO
     .{ .name = "find", .callback = nop },
     .{ .name = "word", .callback = nop },
     .{ .name = "next-char", .callback = nop },
     .{ .name = "define", .callback = nop },
 
+    // TODO
     .{ .name = "jump", .callback = nop },
     .{ .name = "branch", .callback = nop },
     .{ .name = "branch0", .callback = nop },
@@ -163,38 +304,41 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "!", .callback = store },
     .{ .name = "+!", .callback = storeAdd },
     .{ .name = "@", .callback = fetch },
+    // TODO
     .{ .name = ",", .callback = nop },
     .{ .name = "lit", .callback = nop },
 
     .{ .name = "c!", .callback = storeC },
     .{ .name = "+c!", .callback = storeAddC },
     .{ .name = "c@", .callback = fetchC },
+    // TODO
     .{ .name = "c,", .callback = nop },
     .{ .name = "litc", .callback = nop },
 
-    .{ .name = ">r", .callback = nop },
-    .{ .name = "r>", .callback = nop },
-    .{ .name = "r@", .callback = nop },
+    .{ .name = ">r", .callback = toR },
+    .{ .name = "r>", .callback = fromR },
+    .{ .name = "r@", .callback = Rfetch },
 
-    .{ .name = "=", .callback = nop },
-    .{ .name = "<", .callback = nop },
-    .{ .name = "<=", .callback = nop },
+    .{ .name = "=", .callback = eq },
+    .{ .name = "<", .callback = lt },
+    .{ .name = "<=", .callback = lteq },
 
     // ===
-    .{ .name = "+", .callback = nop },
-    .{ .name = "-", .callback = nop },
-    .{ .name = "*", .callback = nop },
-    .{ .name = "/mod", .callback = nop },
-    .{ .name = "u/mod", .callback = nop },
-    .{ .name = "negate", .callback = nop },
+    .{ .name = "+", .callback = plus },
+    .{ .name = "-", .callback = minus },
+    .{ .name = "*", .callback = multiply },
+    .{ .name = "/mod", .callback = divMod },
+    .{ .name = "u/mod", .callback = uDivMod },
+    .{ .name = "negate", .callback = negate },
 
     .{ .name = "lshift", .callback = lshift },
     .{ .name = "rshift", .callback = rshift },
-    .{ .name = "and", .callback = nop },
-    .{ .name = "or", .callback = nop },
-    .{ .name = "xor", .callback = nop },
-    .{ .name = "invert", .callback = nop },
+    .{ .name = "and", .callback = miniAnd },
+    .{ .name = "or", .callback = miniOr },
+    .{ .name = "xor", .callback = xor },
+    .{ .name = "invert", .callback = invert },
 
+    // TODO
     .{ .name = "seldev", .callback = nop },
     .{ .name = "d!", .callback = nop },
     .{ .name = "d+!", .callback = nop },
@@ -222,16 +366,17 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "", .callback = nop },
 
     // ===
-    .{ .name = "0=", .callback = nop },
-    .{ .name = ">", .callback = nop },
-    .{ .name = ">=", .callback = nop },
+    .{ .name = "0=", .callback = eq0 },
+    .{ .name = ">", .callback = gt },
+    .{ .name = ">=", .callback = gteq },
 
+    // TODO
     .{ .name = "here!", .callback = nop },
     .{ .name = "here+!", .callback = nop },
     .{ .name = "here@", .callback = nop },
 
-    .{ .name = "1+", .callback = nop },
-    .{ .name = "1-", .callback = nop },
+    .{ .name = "1+", .callback = plus1 },
+    .{ .name = "1-", .callback = minus1 },
 
     .{ .name = "0", .callback = push0 },
     .{ .name = "0xffff", .callback = pushFFFF },
@@ -245,9 +390,9 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "bytes>cell", .callback = bytesToCell },
 
     // ===
-    .{ .name = "cmove<", .callback = nop },
-    .{ .name = "cmove>", .callback = nop },
-    .{ .name = "mem=", .callback = nop },
+    .{ .name = "cmove", .callback = cmove },
+    .{ .name = "cmove>", .callback = cmoveUp },
+    .{ .name = "mem=", .callback = memEq },
 
     .{ .name = "?dup", .callback = maybeDup },
 

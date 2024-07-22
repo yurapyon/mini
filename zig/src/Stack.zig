@@ -10,29 +10,29 @@ pub fn Stack(comptime count_: usize) type {
 
         memory: []u8,
 
-        // top.* is a memory mapped address of the
+        // top_addr.* is a memory mapped address of the
         //   empty Cell right beyond the actual topmost value
-        top: *Cell,
-        mem: *Cell,
+        top_addr: *Cell,
+        mem_addr: *Cell,
 
-        pub fn init(self: *@This(), memory: []u8, top: *Cell, mem: *Cell) void {
+        pub fn init(self: *@This(), memory: []u8, top_addr: *Cell, mem_addr: *Cell) void {
             self.memory = memory;
-            self.top = top;
-            self.mem = mem;
+            self.top_addr = top_addr;
+            self.mem_addr = mem_addr;
             self.clear();
         }
 
         pub fn depth(self: @This()) usize {
-            const stack_size = self.top.* - self.mem.*;
+            const stack_size = self.top_addr.* - self.mem_addr.*;
             return stack_size / @sizeOf(Cell);
         }
 
         pub fn clear(self: @This()) void {
-            self.top.* = self.mem.*;
+            self.top_addr.* = self.mem_addr.*;
         }
 
         pub fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
-            const addr = @as(isize, self.top.*) - 1 + at;
+            const addr = @as(isize, @intCast(self.top_addr.*)) - 1 + at;
             return try cellAccess(self.memory, @intCast(addr));
         }
 
@@ -67,16 +67,16 @@ pub fn Stack(comptime count_: usize) type {
         pub fn push(self: *@This(), value: Cell) Error!void {
             const ptr = try self.unsafeIndex(-1);
             ptr.* = value;
-            self.top.* += @sizeOf(Cell);
+            self.top_addr.* += @sizeOf(Cell);
         }
 
         pub fn pop(self: *@This()) Error!Cell {
             const ret = try self.peek();
-            self.top.* -= @sizeOf(Cell);
+            self.top_addr.* -= @sizeOf(Cell);
             return ret;
         }
 
-        pub fn popCount(self: *@This(), comptime ct: usize) Error![ct]Cell {
+        pub fn popMultiple(self: *@This(), comptime ct: usize) Error![ct]Cell {
             var ret = [_]Cell{0} ** ct;
             comptime var i = 0;
             inline while (i < ct) : (i += 1) {
