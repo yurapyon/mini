@@ -326,11 +326,11 @@ pub const MiniVM = struct {
     // this makes return stack and jump logic easier
 
     fn evaluateOne(self: *@This()) Error!void {
-        const byte = self.readByteAndAvancePC();
-        self.evaluateByte(byte);
+        const byte = self.readByteAndAdvancePC();
+        try self.evaluateByte(byte, true);
     }
 
-    fn evalutateLoop(self: *@This()) Error!void {
+    fn evaluateLoop(self: *@This()) Error!void {
         while (self.return_stack.depth() > 0) {
             const nextPCAddr = try self.return_stack.pop();
             if (nextPCAddr != return_stack_sentinel) {

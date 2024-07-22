@@ -21,7 +21,7 @@ fn quit(mini: *vm.MiniVM) vm.Error!void {
 
 fn exit(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.return_stack.pop();
-    try mini.absoluteJump(addr);
+    try mini.absoluteJump(addr, false);
 }
 
 fn panic(mini: *vm.MiniVM) vm.Error!void {
