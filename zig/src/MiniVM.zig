@@ -3,82 +3,19 @@ const Allocator = std.mem.Allocator;
 
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
+const Stack = @import("Stack.zig").Stack;
 
 pub const Error = error{ AlignmentError, StackOverflow, StackUnderflow } || Allocator.Error;
 
 pub const Cell = u16;
 
+// TODO this should take an i16 and memory should be initialized on init
 pub fn cellAccess(memory: []u8, addr: u16) Error!*Cell {
     return @ptrCast(@alignCast(&memory[addr]));
 }
 
-fn Stack(comptime count_: usize) type {
-    return struct {
-        const count = count_;
-        const size = count * @sizeOf(Cell);
-
-        memory: []u8,
-
-        // top points to an empty Cell right beyond the actual topmost value
-        top: *Cell,
-        mem: *Cell,
-
-        fn init(self: *@This(), memory: []u8, top: *Cell, mem: *Cell) void {
-            self.memory = memory;
-            self.top = top;
-            self.mem = mem;
-            self.clear();
-        }
-
-        pub fn clear(self: @This()) void {
-            self.top.* = self.mem.*;
-        }
-
-        pub fn peek(self: *@This()) Error!Cell {
-            if (self.top.* == self.mem.*) {
-                return Error.StackUnderflow;
-            }
-            const ptr: *Cell = try cellAccess(self.memory, self.top.* - @sizeOf(Cell));
-            return ptr.*;
-        }
-
-        pub fn push(self: *@This(), value: Cell) Error!void {
-            const ptr: *Cell = try cellAccess(self.memory, self.top.*);
-            ptr.* = value;
-            self.top.* += @sizeOf(Cell);
-        }
-
-        pub fn pop(self: *@This()) Error!Cell {
-            const ret = try self.peek();
-            self.top.* -= @sizeOf(Cell);
-            return ret;
-        }
-
-        pub fn popCount(self: *@This(), comptime ct: usize) Error![ct]Cell {
-            var ret = [_]Cell{0} ** ct;
-            comptime var i = 0;
-            inline while (i < ct) : (i += 1) {
-                ret[i] = try self.pop();
-            }
-            return ret;
-        }
-
-        pub fn dup(self: *@This()) Error!void {
-            try self.push(try self.peek());
-        }
-
-        pub fn drop(self: *@This()) Error!void {
-            _ = try self.pop();
-        }
-
-        pub fn swap(self: *@This()) Error!void {
-            const a_addr = try cellAccess(self.memory, self.top.* - @sizeOf(Cell));
-            const b_addr = try cellAccess(self.memory, self.top.* - 2 * @sizeOf(Cell));
-            const temp = a_addr.*;
-            a_addr.* = b_addr.*;
-            b_addr.* = temp;
-        }
-    };
+pub fn isTruthy(val: Cell) bool {
+    return val != 0;
 }
 
 pub const BytecodeFn = *const fn (

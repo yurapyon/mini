@@ -44,6 +44,16 @@ fn fetchC(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.push(mini.memory[addr]);
 }
 
+fn lshift(mini: *vm.MiniVM) vm.Error!void {
+    const value, const shift_ = try mini.data_stack.popCount(2);
+    try mini.data_stack.push(value << @truncate(shift_));
+}
+
+fn rshift(mini: *vm.MiniVM) vm.Error!void {
+    const value, const shift_ = try mini.data_stack.popCount(2);
+    try mini.data_stack.push(value >> @truncate(shift_));
+}
+
 fn dup(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.dup();
 }
@@ -54,6 +64,77 @@ fn drop(mini: *vm.MiniVM) vm.Error!void {
 
 fn swap(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.swap();
+}
+
+fn rot(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.rot();
+}
+
+fn nrot(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.nrot();
+}
+
+fn push0(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(0);
+}
+
+fn pushFFFF(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(0xFFFF);
+}
+
+fn push1(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(1);
+}
+
+fn push2(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(2);
+}
+
+fn push4(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(4);
+}
+
+fn push8(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.push(8);
+}
+
+fn cellToBytes(mini: *vm.MiniVM) vm.Error!void {
+    const value = try mini.data_stack.pop();
+    const low = @as(u8, @truncate(value));
+    const high = @as(u8, @truncate(value >> 8));
+    try mini.data_stack.push(low);
+    try mini.data_stack.push(high);
+}
+
+fn bytesToCell(mini: *vm.MiniVM) vm.Error!void {
+    const low, const high = try mini.data_stack.popCount(2);
+    const low_byte = @as(u8, @truncate(low));
+    const high_byte = @as(u8, @truncate(high));
+    const value = low_byte | (@as(vm.Cell, high_byte) << 8);
+    try mini.data_stack.push(value);
+}
+
+fn maybeDup(mini: *vm.MiniVM) vm.Error!void {
+    const condition = try mini.data_stack.pop();
+    if (vm.isTruthy(condition)) {
+        try dup(mini);
+    }
+}
+
+fn nip(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.nip();
+}
+
+fn flip(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.flip();
+}
+
+fn tuck(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.tuck();
+}
+
+fn over(mini: *vm.MiniVM) vm.Error!void {
+    try mini.data_stack.over();
 }
 
 const lookup_table = [_]NamedCallback{
@@ -107,8 +188,8 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "u/mod", .callback = nop },
     .{ .name = "negate", .callback = nop },
 
-    .{ .name = "lshift", .callback = nop },
-    .{ .name = "rshift", .callback = nop },
+    .{ .name = "lshift", .callback = lshift },
+    .{ .name = "rshift", .callback = rshift },
     .{ .name = "and", .callback = nop },
     .{ .name = "or", .callback = nop },
     .{ .name = "xor", .callback = nop },
@@ -125,8 +206,8 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "swap", .callback = swap },
     .{ .name = "pick", .callback = nop },
 
-    .{ .name = "rot", .callback = nop },
-    .{ .name = "-rot", .callback = nop },
+    .{ .name = "rot", .callback = rot },
+    .{ .name = "-rot", .callback = nrot },
     .{ .name = "", .callback = nop },
     .{ .name = "", .callback = nop },
 
@@ -152,28 +233,28 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "1+", .callback = nop },
     .{ .name = "1-", .callback = nop },
 
-    .{ .name = "0", .callback = nop },
-    .{ .name = "0xffff", .callback = nop },
+    .{ .name = "0", .callback = push0 },
+    .{ .name = "0xffff", .callback = pushFFFF },
 
-    .{ .name = "1", .callback = nop },
-    .{ .name = "2", .callback = nop },
-    .{ .name = "4", .callback = nop },
-    .{ .name = "8", .callback = nop },
+    .{ .name = "1", .callback = push1 },
+    .{ .name = "2", .callback = push2 },
+    .{ .name = "4", .callback = push4 },
+    .{ .name = "8", .callback = push8 },
 
-    .{ .name = "cell>bytes", .callback = nop },
-    .{ .name = "bytes>cell", .callback = nop },
+    .{ .name = "cell>bytes", .callback = cellToBytes },
+    .{ .name = "bytes>cell", .callback = bytesToCell },
 
     // ===
     .{ .name = "cmove<", .callback = nop },
     .{ .name = "cmove>", .callback = nop },
     .{ .name = "mem=", .callback = nop },
 
-    .{ .name = "?dup", .callback = nop },
+    .{ .name = "?dup", .callback = maybeDup },
 
-    .{ .name = "nip", .callback = nop },
-    .{ .name = "flip", .callback = nop },
-    .{ .name = "tuck", .callback = nop },
-    .{ .name = "over", .callback = nop },
+    .{ .name = "nip", .callback = nip },
+    .{ .name = "flip", .callback = flip },
+    .{ .name = "tuck", .callback = tuck },
+    .{ .name = "over", .callback = over },
 
     .{ .name = "", .callback = nop },
     .{ .name = "", .callback = nop },
