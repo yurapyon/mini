@@ -2,9 +2,12 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
+const utils = @import("utils.zig");
+
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
+pub const Memory = @import("Memory.zig").Memory;
 
 comptime {
     const nativeEndianness = builtin.target.cpu.arch.endian();
@@ -38,11 +41,6 @@ pub const CompileState = enum(Cell) {
 
 pub const Cell = u16;
 
-// TODO this should take an i16 and memory should be initialized on init
-pub fn cellAccess(memory: []u8, addr: u16) Error!*Cell {
-    return @ptrCast(@alignCast(&memory[addr]));
-}
-
 pub fn cellFromBool(value: bool) Cell {
     return if (value) 0xffff else 0;
 }
@@ -59,8 +57,7 @@ pub const MiniVM = struct {
     const DataStack = Stack(32);
     const ReturnStack = Stack(32);
 
-    allocator: Allocator,
-    memory: []u8,
+    memory: Memory,
 
     program_counter: *Cell,
     data_stack: DataStack,
@@ -73,37 +70,38 @@ pub const MiniVM = struct {
 
     devices: Devices,
 
-    const program_counter_mem = 0;
-    const data_stack_top = program_counter_mem + @sizeOf(Cell);
-    const data_stack_mem = data_stack_top + @sizeOf(Cell);
-    const return_stack_top = data_stack_mem + DataStack.size;
-    const return_stack_mem = return_stack_top + @sizeOf(Cell);
-    const here_mem = return_stack_mem + ReturnStack.size;
-    const latest_mem = here_mem + @sizeOf(Cell);
-    const state_mem = latest_mem + @sizeOf(Cell);
-    const base_mem = state_mem + @sizeOf(Cell);
-    const active_device_mem = base_mem + @sizeOf(Cell);
+    const memory_layout = utils.buildMemoryLayout(struct {
+        program_counter: Cell,
+        data_stack_top: Cell,
+        data_stack: [32]Cell,
+        return_stack_top: Cell,
+        return_stack: [32]Cell,
+        here: Cell,
+        latest: Cell,
+        state: Cell,
+        base: Cell,
+        active_device: Cell,
+    });
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
-        self.allocator = allocator;
-        self.memory = try allocator.allocWithOptions(u8, mem_size, @alignOf(Cell), null);
+        try self.memory.init(allocator, mem_size);
 
-        self.program_counter = @ptrCast(@alignCast(&self.memory[program_counter_mem]));
+        self.program_counter = self.memory.cellAt(memory_layout.program_counter);
         self.data_stack.init(
-            self.memory,
-            @ptrCast(@alignCast(&self.memory[data_stack_top])),
-            @ptrCast(@alignCast(&self.memory[data_stack_mem])),
+            &self.memory,
+            self.memory.cellAt(memory_layout.data_stack_top),
+            self.memory.cellAt(memory_layout.data_stack),
         );
         self.return_stack.init(
-            self.memory,
-            @ptrCast(@alignCast(&self.memory[return_stack_top])),
-            @ptrCast(@alignCast(&self.memory[return_stack_mem])),
+            &self.memory,
+            self.memory.cellAt(memory_layout.return_stack_top),
+            self.memory.cellAt(memory_layout.return_stack),
         );
-        self.here = @ptrCast(@alignCast(&self.memory[here_mem]));
-        self.latest = @ptrCast(@alignCast(&self.memory[latest_mem]));
-        self.state = @ptrCast(@alignCast(&self.memory[state_mem]));
-        self.base = @ptrCast(@alignCast(&self.memory[base_mem]));
-        self.active_device = @ptrCast(@alignCast(&self.memory[active_device_mem]));
+        self.here = self.memory.cellAt(memory_layout.here);
+        self.latest = self.memory.cellAt(memory_layout.latest);
+        self.state = self.memory.cellAt(memory_layout.state);
+        self.base = self.memory.cellAt(memory_layout.base);
+        self.active_device = self.memory.cellAt(memory_layout.active_device);
 
         try self.evaluateByte(0x60);
         // self.evaluateByte(0x70);
@@ -111,7 +109,7 @@ pub const MiniVM = struct {
     }
 
     pub fn deinit(self: @This()) void {
-        self.allocator.free(self.memory);
+        self.memory.deinit();
     }
 
     // ===
@@ -129,7 +127,7 @@ pub const MiniVM = struct {
         const pc_at = self.program_counter.*;
         // TODO handle reaching end of memory
         self.program_counter.* += 1;
-        return self.memory[pc_at];
+        return self.memory.byteAt(pc_at).*;
     }
 
     pub fn readCellAndAdvancePC(self: *@This()) Cell {
