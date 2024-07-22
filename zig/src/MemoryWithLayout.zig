@@ -12,7 +12,11 @@ pub fn MemoryWithLayout(comptime Layout: type) type {
         allocator: Allocator,
         memory: []u8,
 
-        pub fn init(self: *@This(), allocator: Allocator, size: usize) Allocator.Error!void {
+        pub fn init(
+            self: *@This(),
+            allocator: Allocator,
+            size: usize,
+        ) Allocator.Error!void {
             self.allocator = allocator;
             self.memory = try allocator.allocWithOptions(
                 u8,

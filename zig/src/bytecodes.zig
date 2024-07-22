@@ -1,4 +1,4 @@
-const mem = @import("mem");
+const mem = @import("std").mem;
 
 const vm = @import("MiniVM.zig");
 
@@ -15,12 +15,12 @@ fn branch0(_: *vm.MiniVM) vm.Error!void {}
 
 fn execute(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    try mini.absJump(addr, true);
+    try mini.absoluteJump(addr, true);
 }
 
 fn tailcall(mini: *vm.MiniVM) vm.Error!void {
     const addr = mini.readCellAndAdvancePC();
-    try mini.absJump(addr, false);
+    try mini.absoluteJump(addr, false);
 }
 
 fn store(mini: *vm.MiniVM) vm.Error!void {
@@ -91,19 +91,19 @@ fn Rfetch(mini: *vm.MiniVM) vm.Error!void {
 
 fn eq(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.cellFromBool(a == b));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a == b));
 }
 
 fn lt(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
     // NOTE, the actual operator is '>' because stack order is ( b a )
-    try mini.data_stack.push(vm.cellFromBool(a > b));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
 }
 
 fn lteq(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
     // NOTE, the actual operator is '>=' because stack order is ( b a )
-    try mini.data_stack.push(vm.cellFromBool(a >= b));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
 }
 
 fn plus(mini: *vm.MiniVM) vm.Error!void {
@@ -194,19 +194,19 @@ fn nrot(mini: *vm.MiniVM) vm.Error!void {
 
 fn eq0(mini: *vm.MiniVM) vm.Error!void {
     const value = try mini.data_stack.pop();
-    try mini.data_stack.push(vm.cellFromBool(value == 0));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, value == 0));
 }
 
 fn gt(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
     // NOTE, the actual operator is '<' because stack order is ( b a )
-    try mini.data_stack.push(vm.cellFromBool(a < b));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
 }
 
 fn gteq(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
     // NOTE, the actual operator is '<=' because stack order is ( b a )
-    try mini.data_stack.push(vm.cellFromBool(a <= b));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
 }
 
 fn plus1(mini: *vm.MiniVM) vm.Error!void {
@@ -469,11 +469,21 @@ pub fn getCallbackById(id: u8) NamedCallback {
     return lookup_table[id];
 }
 
-pub fn getCallbackByName(name: []u8) ?NamedCallback {
-    for (lookup_table) |named_callback| {
-        const eql = mem.eql(named_callback.name, name);
+// pub fn getCallbackByName(name: []u8) ?struct { ncb: NamedCallback, index: usize } {
+// for (lookup_table, 0..) |named_callback, i| {
+// const eql = mem.eql(named_callback.name, name);
+// if (eql) {
+// return .{ .named_callback = named_callback, .index = i };
+// }
+// }
+// return null;
+// }
+
+pub fn getCallbackBytecode(name: []const u8) ?u8 {
+    for (lookup_table, 0..) |named_callback, i| {
+        const eql = mem.eql(u8, named_callback.name, name);
         if (eql) {
-            return named_callback;
+            return @truncate(i);
         }
     }
     return null;

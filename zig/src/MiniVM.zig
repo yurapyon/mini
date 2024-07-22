@@ -5,7 +5,7 @@ const Allocator = std.mem.Allocator;
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
-const MemoryWithLayout = @import("Memory.zig").MemoryWithLayout;
+const MemoryWithLayout = @import("MemoryWithLayout.zig").MemoryWithLayout;
 
 comptime {
     const nativeEndianness = builtin.target.cpu.arch.endian();
@@ -21,6 +21,7 @@ pub const Error = error{
     StackUnderflow,
     ReturnStackOverflow,
     ReturnStackUnderflow,
+    WordNotFound,
 } || Allocator.Error;
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
@@ -31,7 +32,7 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
     };
 }
 
-pub const CompileState = enum(Cell) {
+const CompileState = enum(Cell) {
     interpret = 0,
     compile,
     bytecode,
@@ -54,17 +55,41 @@ pub const Memory = MemoryWithLayout(struct {
     active_device: Cell,
 });
 
+pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
+
+const WordLookupResult = union(enum) {
+    bytecode: u8,
+    mini_word: Cell,
+    number: Cell,
+    not_found,
+};
+
 pub const Cell = u16;
 
-pub fn cellFromBool(value: bool) Cell {
-    return if (value) 0xffff else 0;
+pub fn fromBool(comptime Type: type, value: bool) Type {
+    return if (value) ~@as(Type, 0) else 0;
 }
 
-pub fn isTruthy(value: Cell) bool {
+pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
+pub fn isWhitespace(char: u8) bool {
+    return char == ' ' or char == '\n';
+}
+
+pub fn tryParseNumber(str: []const u8) ?Cell {
+    // TODO
+    _ = str;
+    return null;
+}
+
+pub const WordHeader = struct {
+    previousHeader: Cell,
+    name: []const u8,
+    isImmediate: bool,
+    isHidden: bool,
+};
 
 pub const MiniVM = struct {
     const mem_size = 64 * 1024;
@@ -79,6 +104,10 @@ pub const MiniVM = struct {
     state: *Cell,
     base: *Cell,
     active_device: *Cell,
+
+    // TODO move this into a device
+    input_buffer: []const u8,
+    input_buffer_at: usize,
 
     devices: Devices,
 
@@ -102,13 +131,31 @@ pub const MiniVM = struct {
         self.base = self.memory.atLayout(Cell, "base");
         self.active_device = self.memory.atLayout(Cell, "active_device");
 
-        try self.evaluateByte(0x60);
-        // self.evaluateByte(0x70);
-        // self.evaluateByte(0x80);
+        self.here.* = 0;
+        self.latest.* = 0;
+        self.state.* = 0;
+        self.base.* = 10;
+        self.active_device.* = 0;
+
+        // TODO
+        // run base file
     }
 
     pub fn deinit(self: @This()) void {
         self.memory.deinit();
+    }
+
+    // ===
+
+    pub fn quit(self: *@This()) Error!void {
+        _ = self;
+        // reset stack
+        // quit to repl
+    }
+
+    pub fn bye(self: *@This()) Error!void {
+        try self.quit();
+        // quit the entire process (what does that mean in this context)
     }
 
     // ===
@@ -118,9 +165,109 @@ pub const MiniVM = struct {
     // 2. interpret input buffer
     // input buffer is exposed to vm through a device
 
-    pub fn setBuffer(_: *@This(), _: []u8) void {}
+    pub fn setBuffer(self: *@This(), buffer: []const u8) void {
+        self.input_buffer = buffer;
+        self.input_buffer_at = 0;
+    }
 
-    pub fn interpret(_: *@This()) Error!void {}
+    pub fn readNextChar(self: *@This()) u8 {
+        // TODO handle end of input
+        self.input_buffer_at += 1;
+        return self.input_buffer[self.input_buffer_at];
+    }
+
+    pub fn readNextWord(self: *@This()) []const u8 {
+        var ch = self.input_buffer[self.input_buffer_at];
+        while (isWhitespace(ch)) {
+            ch = self.readNextChar();
+        }
+
+        const word_start = self.input_buffer_at;
+
+        var word_end = word_start;
+        while (!isWhitespace(ch)) {
+            ch = self.readNextChar();
+            word_end += 1;
+        }
+
+        return self.input_buffer[word_start..word_end];
+    }
+
+    // returns memory mapped addr
+    fn lookupMiniDefinition(self: *@This(), word: []const u8) ?Cell {
+        // TODO
+        _ = self;
+        _ = word;
+        return null;
+    }
+
+    fn lookupWord(self: *@This(), word: []const u8) Error!WordLookupResult {
+        if (bytecodes.getCallbackBytecode(word)) |b| {
+            return .{ .bytecode = b };
+        } else if (self.lookupMiniDefinition(word)) |definition_addr| {
+            // TODO addr should point to cfa of definition
+            const addr = definition_addr;
+            return .{ .mini_word = addr };
+        } else if (tryParseNumber(word)) |value| {
+            return .{ .number = try self.data_stack.push(value) };
+        } else {
+            return WordLookupResult.not_found;
+        }
+    }
+
+    fn interpretWord(self: *@This(), word: []const u8) Error!void {
+        // note there are some bytecodes that only make sense to be compiled
+        //   ie lit, litc, branch
+        // TODO how to handle this
+        switch (try self.lookupWord(word)) {
+            .bytecode => |b| {
+                try self.evaluateByte(b);
+            },
+            .mini_word => |addr| {
+                try self.absoluteJump(addr);
+            },
+            .number => |value| {
+                try self.data_stack.push(value);
+            },
+            .not_found => return Error.WordNotFound,
+        }
+    }
+
+    fn compileWord(self: *@This(), word: []const u8) Error!void {
+        // TODO
+        switch (try self.lookupWord(word)) {
+            .bytecode => |b| {
+                _ = b;
+            },
+            .mini_word => |addr| {
+                _ = addr;
+            },
+            .number => |value| {
+                _ = value;
+            },
+            .not_found => return Error.WordNotFound,
+        }
+    }
+
+    pub fn interpretLoop(self: *@This()) Error!void {
+        while (true) {
+            const state: CompileState = @enumFromInt(self.state.*);
+
+            switch (state) {
+                .interpret => {
+                    const word = self.readNextWord();
+                    try self.interpretWord(word);
+                },
+                .compile => {
+                    const word = self.readNextWord();
+                    try self.compileWord(word);
+                },
+                else => {
+                    unreachable;
+                },
+            }
+        }
+    }
 
     pub fn readByteAndAdvancePC(self: *@This()) u8 {
         const pc_at = self.program_counter.*;
@@ -135,7 +282,7 @@ pub const MiniVM = struct {
         return @as(Cell, high) << 8 | low;
     }
 
-    pub fn absJump(
+    pub fn absoluteJump(
         self: *@This(),
         addr: Cell,
         useReturnStack: bool,
@@ -180,14 +327,14 @@ pub const MiniVM = struct {
                 const high = b & 0x7f;
                 const low = self.readByteAndAdvancePC();
                 const addr = @as(Cell, high) << 8 | low;
-                try self.absJump(addr, true);
+                try self.absoluteJump(addr, true);
             },
         }
     }
 
-    fn compileWord(self: *@This(), word: []u8) void {
+    fn defineWordHeader(self: *@This(), word_header: WordHeader) void {
         // TODO
         _ = self;
-        _ = word;
+        _ = word_header;
     }
 };
