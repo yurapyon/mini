@@ -34,7 +34,7 @@ pub fn MemoryWithLayout(comptime Layout: type) type {
             return @ptrCast(@alignCast(&self.memory[addr]));
         }
 
-        pub fn layoutAt(
+        pub fn atLayout(
             self: *@This(),
             comptime Type: type,
             comptime field: []const u8,
