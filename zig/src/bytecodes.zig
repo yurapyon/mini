@@ -2,12 +2,26 @@ const mem = @import("mem");
 
 const vm = @import("MiniVM.zig");
 
+fn nop(_: *vm.MiniVM) vm.Error!void {}
+
 const NamedCallback = struct {
-    name: []const u8,
-    callback: vm.BytecodeFn,
+    name: []const u8 = "",
+    callback: vm.BytecodeFn = nop,
+    isImmediate: bool = false,
 };
 
-fn nop(_: *vm.MiniVM) vm.Error!void {}
+fn branch(_: *vm.MiniVM) vm.Error!void {}
+fn branch0(_: *vm.MiniVM) vm.Error!void {}
+
+fn execute(mini: *vm.MiniVM) vm.Error!void {
+    const addr = try mini.data_stack.pop();
+    try mini.absJump(addr, true);
+}
+
+fn tailcall(mini: *vm.MiniVM) vm.Error!void {
+    const addr = mini.readCellAndAdvancePC();
+    try mini.absJump(addr, false);
+}
 
 fn store(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
@@ -27,6 +41,11 @@ fn fetch(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.push(mem_ptr.*);
 }
 
+fn lit(mini: *vm.MiniVM) vm.Error!void {
+    const value = mini.readCellAndAdvancePC();
+    try mini.data_stack.push(value);
+}
+
 fn storeC(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
@@ -42,6 +61,11 @@ fn storeAddC(mini: *vm.MiniVM) vm.Error!void {
 fn fetchC(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.data_stack.push(mini.memory[addr]);
+}
+
+fn litC(mini: *vm.MiniVM) vm.Error!void {
+    const byte = mini.readByteAndAdvancePC();
+    try mini.data_stack.push(byte);
 }
 
 fn toR(mini: *vm.MiniVM) vm.Error!void {
@@ -113,7 +137,9 @@ fn uDivMod(mini: *vm.MiniVM) vm.Error!void {
 
 fn negate(mini: *vm.MiniVM) vm.Error!void {
     const value = try mini.data_stack.pop();
-    try mini.data_stack.push(-value);
+    _ = value;
+    // TODO
+    // try mini.data_stack.push(-value);
 }
 
 fn lshift(mini: *vm.MiniVM) vm.Error!void {
@@ -290,8 +316,8 @@ const lookup_table = [_]NamedCallback{
 
     // TODO
     .{ .name = "'", .callback = nop },
-    .{ .name = "[']", .callback = nop },
-    .{ .name = "]", .callback = nop },
+    .{ .name = "[']", .callback = nop, .isImmediate = true },
+    .{ .name = "]", .callback = nop, .isImmediate = true },
     .{ .name = "[", .callback = nop },
 
     // TODO
@@ -301,10 +327,10 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "define", .callback = nop },
 
     // TODO
-    .{ .name = "jump", .callback = nop },
-    .{ .name = "branch", .callback = nop },
-    .{ .name = "branch0", .callback = nop },
-    .{ .name = "execute", .callback = nop },
+    .{ .name = "branch", .callback = branch },
+    .{ .name = "branch0", .callback = branch0 },
+    .{ .name = "execute", .callback = execute },
+    .{ .name = "tailcall", .callback = tailcall },
 
     // ===
     .{ .name = "!", .callback = store },
@@ -312,14 +338,14 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "@", .callback = fetch },
     // TODO
     .{ .name = ",", .callback = nop },
-    .{ .name = "lit", .callback = nop },
+    .{ .name = "lit", .callback = lit },
 
     .{ .name = "c!", .callback = storeC },
     .{ .name = "+c!", .callback = storeAddC },
     .{ .name = "c@", .callback = fetchC },
     // TODO
     .{ .name = "c,", .callback = nop },
-    .{ .name = "litc", .callback = nop },
+    .{ .name = "litc", .callback = litC },
 
     .{ .name = ">r", .callback = toR },
     .{ .name = "r>", .callback = fromR },
@@ -358,18 +384,18 @@ const lookup_table = [_]NamedCallback{
 
     .{ .name = "rot", .callback = rot },
     .{ .name = "-rot", .callback = nrot },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
     // ===
     .{ .name = "0=", .callback = eq0 },
@@ -407,36 +433,36 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "tuck", .callback = tuck },
     .{ .name = "over", .callback = over },
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
     // ===
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
-    .{ .name = "", .callback = nop },
+    .{},
+    .{},
+    .{},
+    .{},
 };
 
 pub fn getCallbackById(id: u8) NamedCallback {
