@@ -7,6 +7,7 @@ pub fn Stack(comptime count_: usize) type {
     return struct {
         pub const count = count_;
         pub const size = count * @sizeOf(Cell);
+        pub const MemType = [size]u8;
 
         memory: *Memory,
 

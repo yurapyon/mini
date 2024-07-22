@@ -2,12 +2,10 @@ const std = @import("std");
 const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
-const utils = @import("utils.zig");
-
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
-pub const Memory = @import("Memory.zig").Memory;
+const MemoryWithLayout = @import("Memory.zig").MemoryWithLayout;
 
 comptime {
     const nativeEndianness = builtin.target.cpu.arch.endian();
@@ -35,9 +33,26 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
 
 pub const CompileState = enum(Cell) {
     interpret = 0,
-    compile = 1,
-    bytecode = 2,
+    compile,
+    bytecode,
+    system,
 };
+
+const DataStack = Stack(32);
+const ReturnStack = Stack(32);
+
+pub const Memory = MemoryWithLayout(struct {
+    program_counter: Cell,
+    data_stack_top: Cell,
+    data_stack: DataStack.MemType,
+    return_stack_top: Cell,
+    return_stack: ReturnStack.MemType,
+    here: Cell,
+    latest: Cell,
+    state: Cell,
+    base: Cell,
+    active_device: Cell,
+});
 
 pub const Cell = u16;
 
@@ -54,9 +69,6 @@ pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
 pub const MiniVM = struct {
     const mem_size = 64 * 1024;
 
-    const DataStack = Stack(32);
-    const ReturnStack = Stack(32);
-
     memory: Memory,
 
     program_counter: *Cell,
@@ -70,38 +82,25 @@ pub const MiniVM = struct {
 
     devices: Devices,
 
-    const memory_layout = utils.buildMemoryLayout(struct {
-        program_counter: Cell,
-        data_stack_top: Cell,
-        data_stack: [32]Cell,
-        return_stack_top: Cell,
-        return_stack: [32]Cell,
-        here: Cell,
-        latest: Cell,
-        state: Cell,
-        base: Cell,
-        active_device: Cell,
-    });
-
     pub fn init(self: *@This(), allocator: Allocator) !void {
         try self.memory.init(allocator, mem_size);
 
-        self.program_counter = self.memory.cellAt(memory_layout.program_counter);
+        self.program_counter = self.memory.atLayout(Cell, "program_counter");
         self.data_stack.init(
             &self.memory,
-            self.memory.cellAt(memory_layout.data_stack_top),
-            self.memory.cellAt(memory_layout.data_stack),
+            self.memory.atLayout(Cell, "data_stack_top"),
+            self.memory.atLayout(Cell, "data_stack"),
         );
         self.return_stack.init(
             &self.memory,
-            self.memory.cellAt(memory_layout.return_stack_top),
-            self.memory.cellAt(memory_layout.return_stack),
+            self.memory.atLayout(Cell, "return_stack_top"),
+            self.memory.atLayout(Cell, "return_stack"),
         );
-        self.here = self.memory.cellAt(memory_layout.here);
-        self.latest = self.memory.cellAt(memory_layout.latest);
-        self.state = self.memory.cellAt(memory_layout.state);
-        self.base = self.memory.cellAt(memory_layout.base);
-        self.active_device = self.memory.cellAt(memory_layout.active_device);
+        self.here = self.memory.atLayout(Cell, "here");
+        self.latest = self.memory.atLayout(Cell, "latest");
+        self.state = self.memory.atLayout(Cell, "state");
+        self.base = self.memory.atLayout(Cell, "base");
+        self.active_device = self.memory.atLayout(Cell, "active_device");
 
         try self.evaluateByte(0x60);
         // self.evaluateByte(0x70);
