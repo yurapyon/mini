@@ -11,8 +11,8 @@ fn runMiniVM(allocator: Allocator) !void {
     try vmInstance.init(mem);
     defer vmInstance.deinit();
 
-    vmInstance.setInputBuffer("1 dup dup\n");
-    try vmInstance.interpretLoop();
+    vmInstance.input_source.setInputBuffer("1 dup dup\n");
+    try vmInstance.repl();
 }
 
 pub fn main() !void {}
@@ -22,6 +22,7 @@ test "simple test" {
     _ = @import("WordHeader.zig");
     _ = @import("utils.zig");
     _ = @import("Register.zig");
+    _ = @import("InputSource.zig");
 
     try runMiniVM(std.testing.allocator);
 }

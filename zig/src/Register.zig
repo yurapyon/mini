@@ -1,3 +1,5 @@
+const std = @import("std");
+
 const vm = @import("MiniVM.zig");
 
 pub const Register = struct {
@@ -54,6 +56,14 @@ pub const Register = struct {
         self.memory[self.fetch()] = value;
         self.storeAdd(1);
     }
+
+    pub fn alignForward(self: @This(), comptime Type: type) void {
+        self.store(std.mem.alignForward(
+            Type,
+            self.fetch(),
+            @alignOf(Type),
+        ));
+    }
 };
 
 test "registers" {
@@ -92,4 +102,6 @@ test "registers" {
     try testing.expectEqual(0x04, here.fetchC());
     here.storeAddC(1);
     try testing.expectEqual(0x05, here.fetchC());
+    here.alignForward(vm.Cell);
+    try testing.expectEqual(0x06, here.fetchC());
 }
