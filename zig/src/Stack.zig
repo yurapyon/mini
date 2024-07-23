@@ -1,7 +1,6 @@
 const vm = @import("MiniVM.zig");
 const Cell = vm.Cell;
 const Error = vm.Error;
-const Memory = vm.Memory;
 
 pub fn Stack(comptime count_: usize) type {
     return struct {
@@ -9,7 +8,7 @@ pub fn Stack(comptime count_: usize) type {
         pub const size = count * @sizeOf(Cell);
         pub const MemType = [size]u8;
 
-        memory: *Memory,
+        memory: vm.Memory,
 
         // top_addr.* is a memory mapped address of the
         //   empty Cell right beyond the actual topmost value
@@ -18,7 +17,7 @@ pub fn Stack(comptime count_: usize) type {
 
         pub fn init(
             self: *@This(),
-            memory: *Memory,
+            memory: vm.Memory,
             top_addr: *Cell,
             mem_addr: *Cell,
         ) void {
@@ -39,7 +38,7 @@ pub fn Stack(comptime count_: usize) type {
 
         pub fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
             const addr = @as(isize, @intCast(self.top_addr.*)) - (at + 1) * @sizeOf(Cell);
-            return self.memory.cellAt(@intCast(addr));
+            return vm.cellAt(self.memory, @intCast(addr));
         }
 
         pub fn unsafeSwapValues(
@@ -140,4 +139,12 @@ pub fn Stack(comptime count_: usize) type {
             try self.push(over_cell.*);
         }
     };
+}
+
+fn prepStack() void {}
+
+test "stack" {
+    const testing = @import("std").testing;
+
+    _ = testing;
 }

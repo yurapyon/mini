@@ -21,12 +21,6 @@ states:
   0x2 mini bytecode
   0x3 system dependent
 
-bases:
-  0x0 2  binary
-  0x1 10 decimal
-  0x2 16 hex
-  0x3
-
 behavior:
   quit: exits interpret loop
   bye: system dependent

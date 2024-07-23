@@ -5,7 +5,9 @@ const Allocator = std.mem.Allocator;
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
-const MemoryWithLayout = @import("MemoryWithLayout.zig").MemoryWithLayout;
+const WordHeader = @import("WordHeader").WordHeader;
+
+const utils = @import("utils.zig");
 
 comptime {
     const nativeEndianness = builtin.target.cpu.arch.endian();
@@ -15,6 +17,8 @@ comptime {
     }
 }
 
+pub const max_memory_size = 64 * 1024;
+
 pub const Error = error{
     AlignmentError,
     StackOverflow,
@@ -22,7 +26,8 @@ pub const Error = error{
     ReturnStackOverflow,
     ReturnStackUnderflow,
     WordNotFound,
-} || Allocator.Error;
+    InvalidProgramCounter,
+} || utils.ParseNumberError || Allocator.Error;
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
@@ -40,7 +45,9 @@ pub const CompileState = enum(Cell) {
 const DataStack = Stack(32);
 const ReturnStack = Stack(32);
 
-pub const Memory = MemoryWithLayout(struct {
+pub const Memory = []align(@alignOf(Cell)) u8;
+
+pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
     data_stack_top: Cell,
     data_stack: DataStack.MemType,
@@ -76,22 +83,11 @@ pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';
 }
 
-pub fn tryParseNumber(str: []const u8) ?Cell {
-    // TODO
-    _ = str;
-    return null;
+pub fn cellAt(mem: Memory, addr: Cell) *Cell {
+    return @ptrCast(@alignCast(&mem[addr]));
 }
 
-pub const WordHeader = struct {
-    previousHeader: Cell,
-    name: []const u8,
-    isImmediate: bool,
-    isHidden: bool,
-};
-
 pub const MiniVM = struct {
-    const mem_size = 64 * 1024;
-
     memory: Memory,
 
     program_counter: *Cell,
@@ -103,7 +99,7 @@ pub const MiniVM = struct {
     base: *Cell,
     active_device: *Cell,
 
-    // TODO move this into a device
+    // TODO move this into a device ? somehow
     input_buffer: []const u8,
     input_buffer_at: usize,
 
@@ -112,25 +108,25 @@ pub const MiniVM = struct {
 
     devices: Devices,
 
-    pub fn init(self: *@This(), allocator: Allocator) !void {
-        try self.memory.init(allocator, mem_size);
+    pub fn init(self: *@This(), memory: Memory) !void {
+        self.memory = memory;
 
-        self.program_counter = self.memory.atLayout(Cell, "program_counter");
+        self.program_counter = MemoryLayout.memoryAt(Cell, self.memory, "program_counter");
         self.data_stack.init(
-            &self.memory,
-            self.memory.atLayout(Cell, "data_stack_top"),
-            self.memory.atLayout(Cell, "data_stack"),
+            self.memory,
+            MemoryLayout.memoryAt(Cell, self.memory, "data_stack_top"),
+            MemoryLayout.memoryAt(Cell, self.memory, "data_stack"),
         );
         self.return_stack.init(
-            &self.memory,
-            self.memory.atLayout(Cell, "return_stack_top"),
-            self.memory.atLayout(Cell, "return_stack"),
+            self.memory,
+            MemoryLayout.memoryAt(Cell, self.memory, "return_stack_top"),
+            MemoryLayout.memoryAt(Cell, self.memory, "return_stack"),
         );
-        self.here = self.memory.atLayout(Cell, "here");
-        self.latest = self.memory.atLayout(Cell, "latest");
-        self.state = self.memory.atLayout(Cell, "state");
-        self.base = self.memory.atLayout(Cell, "base");
-        self.active_device = self.memory.atLayout(Cell, "active_device");
+        self.here = MemoryLayout.memoryAt(Cell, self.memory, "here");
+        self.latest = MemoryLayout.memoryAt(Cell, self.memory, "latest");
+        self.state = MemoryLayout.memoryAt(Cell, self.memory, "state");
+        self.base = MemoryLayout.memoryAt(Cell, self.memory, "base");
+        self.active_device = MemoryLayout.memoryAt(Cell, self.memory, "active_device");
 
         self.here.* = 0;
         self.latest.* = 0;
@@ -146,7 +142,7 @@ pub const MiniVM = struct {
     }
 
     pub fn deinit(self: @This()) void {
-        self.memory.deinit();
+        _ = self;
     }
 
     // ===
@@ -204,8 +200,9 @@ pub const MiniVM = struct {
             return .{ .bytecode = bytecode };
         } else if (self.lookupMiniDefinition(word)) |definition_addr| {
             return .{ .mini_word = definition_addr };
-        } else if (tryParseNumber(word)) |value| {
-            return .{ .number = value };
+            // TODO rethrow InvalidBase errors
+        } else if (utils.parseNumber(word, self.base.*) catch null) |value| {
+            return .{ .number = @truncate(value) };
         } else {
             return WordLookupResult.not_found;
         }
@@ -284,7 +281,7 @@ pub const MiniVM = struct {
         const pc_at = self.program_counter.*;
         // TODO handle reaching end of memory
         self.program_counter.* += 1;
-        return self.memory.byteAt(pc_at).*;
+        return self.memory[pc_at];
     }
 
     pub fn readCellAndAdvancePC(self: *@This()) Cell {
@@ -326,12 +323,12 @@ pub const MiniVM = struct {
                 if (programCounterIsValid or !named_callback.needsValidProgramCounter) {
                     try named_callback.callback(self);
                 } else {
-                    // TODO error
+                    return Error.InvalidProgramCounter;
                 }
             },
             inline 0b01110000...0b01111111 => |b| {
                 if (!programCounterIsValid) {
-                    // TODO error
+                    return Error.InvalidProgramCounter;
                 }
                 // TODO how should endianness be handled for this
                 const high = b & 0x0f;
@@ -344,7 +341,7 @@ pub const MiniVM = struct {
             },
             inline 0b10000000...0b11111111 => |b| {
                 if (!programCounterIsValid) {
-                    // TODO error
+                    return Error.InvalidProgramCounter;
                 }
                 // TODO how should endianness be handled for this
                 const high = b & 0x7f;

@@ -91,19 +91,19 @@ fn tailcall(mini: *vm.MiniVM) vm.Error!void {
 
 fn store(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = mini.memory.cellAt(addr);
+    const mem_ptr = vm.cellAt(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = mini.memory.cellAt(addr);
+    const mem_ptr = vm.cellAt(mini.memory, addr);
     mem_ptr.* +%= value;
 }
 
 fn fetch(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    const mem_ptr = mini.memory.cellAt(addr);
+    const mem_ptr = vm.cellAt(mini.memory, addr);
     try mini.data_stack.push(mem_ptr.*);
 }
 
@@ -120,18 +120,18 @@ fn lit(mini: *vm.MiniVM) vm.Error!void {
 fn storeC(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
-    mini.memory.byteAt(addr).* = byte;
+    mini.memory[addr] = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
-    mini.memory.byteAt(addr).* +%= byte;
+    mini.memory[addr] +%= byte;
 }
 
 fn fetchC(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    try mini.data_stack.push(mini.memory.byteAt(addr).*);
+    try mini.data_stack.push(mini.memory[addr]);
 }
 
 fn commaC(mini: *vm.MiniVM) vm.Error!void {
