@@ -68,6 +68,7 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     state: Cell,
     base: Cell,
     active_device: Cell,
+    dictionary_start: u0,
 }, Cell);
 
 pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
@@ -138,11 +139,7 @@ pub const MiniVM = struct {
         self.base.init(self.memory, MemoryLayout.offsetOf("base"));
         self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
 
-        // NOTE
-        // advancing here so 'latest == 0'
-        //   can be used as a reliable sentinel for the first definitiion in the dictionary
-        std.mem.copyForwards(u8, self.memory[0..], "mini");
-        self.here.store(4);
+        self.here.store(MemoryLayout.offsetOf("dictionary_start"));
         self.latest.store(0);
         self.state.store(0);
         self.base.store(10);

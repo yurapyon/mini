@@ -108,8 +108,8 @@ fn fetch(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn comma(mini: *vm.MiniVM) vm.Error!void {
-    // TODO
-    _ = mini;
+    const value = try mini.data_stack.pop();
+    mini.here.comma(value);
 }
 
 fn lit(mini: *vm.MiniVM) vm.Error!void {
@@ -135,8 +135,8 @@ fn fetchC(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn commaC(mini: *vm.MiniVM) vm.Error!void {
-    // TODO
-    _ = mini;
+    const value = try mini.data_stack.pop();
+    mini.here.commaC(@truncate(value));
 }
 
 fn litC(mini: *vm.MiniVM) vm.Error!void {
@@ -280,6 +280,11 @@ fn swap(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.swap();
 }
 
+fn pick(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
 fn rot(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.rot();
 }
@@ -306,18 +311,17 @@ fn gteq(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn storeHere(mini: *vm.MiniVM) vm.Error!void {
-    // TODO
-    _ = mini;
+    const value = try mini.data_stack.pop();
+    mini.here.store(value);
 }
 
 fn storeAddHere(mini: *vm.MiniVM) vm.Error!void {
-    // TODO
-    _ = mini;
+    const value = try mini.data_stack.pop();
+    mini.here.storeAdd(value);
 }
 
 fn fetchHere(mini: *vm.MiniVM) vm.Error!void {
-    // TODO
-    _ = mini;
+    try mini.data_stack.push(mini.here.fetch());
 }
 
 fn plus1(mini: *vm.MiniVM) vm.Error!void {
@@ -484,7 +488,7 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "dup", .callback = dup },
     .{ .name = "drop", .callback = drop },
     .{ .name = "swap", .callback = swap },
-    .{ .name = "pick", .callback = nop },
+    .{ .name = "pick", .callback = pick },
 
     .{ .name = "rot", .callback = rot },
     .{ .name = "-rot", .callback = nrot },
@@ -571,16 +575,6 @@ const lookup_table = [_]NamedCallback{
 pub fn getCallbackById(id: u8) NamedCallback {
     return lookup_table[id];
 }
-
-// pub fn getCallbackByName(name: []u8) ?struct { ncb: NamedCallback, index: usize } {
-// for (lookup_table, 0..) |named_callback, i| {
-// const eql = mem.eql(named_callback.name, name);
-// if (eql) {
-// return .{ .named_callback = named_callback, .index = i };
-// }
-// }
-// return null;
-// }
 
 pub fn getCallbackBytecode(name: []const u8) ?u8 {
     for (lookup_table, 0..) |named_callback, i| {
