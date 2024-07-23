@@ -16,5 +16,7 @@ fn runMiniVM(allocator: Allocator) !void {
 pub fn main() !void {}
 
 test "simple test" {
+    _ = @import("WordHeader.zig");
+
     try runMiniVM(std.testing.allocator);
 }

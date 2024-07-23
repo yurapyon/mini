@@ -32,11 +32,9 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
     };
 }
 
-const CompileState = enum(Cell) {
+pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
-    bytecode,
-    system,
 };
 
 const DataStack = Stack(32);
@@ -93,7 +91,6 @@ pub const WordHeader = struct {
 
 pub const MiniVM = struct {
     const mem_size = 64 * 1024;
-    const return_stack_sentinel = 0xffff;
 
     memory: Memory,
 
@@ -215,19 +212,15 @@ pub const MiniVM = struct {
     }
 
     fn interpretWord(self: *@This(), word: []const u8) Error!void {
-        // note there are some bytecodes that only make sense to be compiled
-        //   ie lit, litc, branch
-        // TODO how to handle this
         switch (try self.lookupWord(word)) {
             .bytecode => |byte| {
-                // if byte.shouldInterpret
-                // try self.evaluateByte(byte);
-                _ = byte;
+                try self.evaluateByte(byte, false);
             },
             .mini_word => |addr| {
                 // TODO get the cfa of the definition at addr
+                // addr = cfa.*
                 try self.absoluteJump(addr, false);
-                try self.return_stack.push(return_stack_sentinel);
+                try self.evaluateLoop();
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -240,10 +233,13 @@ pub const MiniVM = struct {
         // TODO
         switch (try self.lookupWord(word)) {
             .bytecode => |byte| {
+                // if is immediate
                 _ = byte;
             },
             .mini_word => |addr| {
+                // if is immediate
                 _ = addr;
+                // try self.evaluateLoop();
             },
             .number => |value| {
                 _ = value;
@@ -254,30 +250,19 @@ pub const MiniVM = struct {
 
     pub fn interpretLoop(self: *@This()) Error!void {
         while (!self.should_quit and !self.should_bye) {
-            const state: CompileState = @enumFromInt(self.state.*);
-            switch (state) {
-                .interpret => {
-                    const word = self.readNextWord();
-                    if (word) |w| {
+            const word = self.readNextWord();
+            if (word) |w| {
+                const state: CompileState = @enumFromInt(self.state.*);
+                switch (state) {
+                    .interpret => {
                         try self.interpretWord(w);
-                    } else {
-                        self.should_quit = true;
-                    }
-                    try self.evaluateLoop();
-                },
-                .compile => {
-                    const word = self.readNextWord();
-                    if (word) |w| {
+                    },
+                    .compile => {
                         try self.compileWord(w);
-                    } else {
-                        self.should_quit = true;
-                    }
-                    try self.evaluateLoop();
-                },
-                // TODO
-                else => {
-                    unreachable;
-                },
+                    },
+                }
+            } else {
+                self.should_quit = true;
             }
         }
 
@@ -325,18 +310,10 @@ pub const MiniVM = struct {
     //   2. evaluate byte at pc-1
     // this makes return stack and jump logic easier
 
-    fn evaluateOne(self: *@This()) Error!void {
-        const byte = self.readByteAndAdvancePC();
-        try self.evaluateByte(byte, true);
-    }
-
     fn evaluateLoop(self: *@This()) Error!void {
         while (self.return_stack.depth() > 0) {
-            const nextPCAddr = try self.return_stack.pop();
-            if (nextPCAddr != return_stack_sentinel) {
-                try self.absoluteJump(nextPCAddr, true);
-                try self.evaluateOne();
-            }
+            const byte = self.readByteAndAdvancePC();
+            try self.evaluateByte(byte, true);
         }
     }
 
@@ -348,11 +325,13 @@ pub const MiniVM = struct {
                 const named_callback = bytecodes.getCallbackById(id);
                 if (programCounterIsValid or !named_callback.needsValidProgramCounter) {
                     try named_callback.callback(self);
+                } else {
+                    // TODO error
                 }
             },
             inline 0b01110000...0b01111111 => |b| {
                 if (!programCounterIsValid) {
-                    return;
+                    // TODO error
                 }
                 // TODO how should endianness be handled for this
                 const high = b & 0x0f;
@@ -365,7 +344,7 @@ pub const MiniVM = struct {
             },
             inline 0b10000000...0b11111111 => |b| {
                 if (!programCounterIsValid) {
-                    return;
+                    // TODO error
                 }
                 // TODO how should endianness be handled for this
                 const high = b & 0x7f;

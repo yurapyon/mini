@@ -29,8 +29,55 @@ fn panic(mini: *vm.MiniVM) vm.Error!void {
     mini.should_bye = true;
 }
 
-fn branch(_: *vm.MiniVM) vm.Error!void {}
-fn branch0(_: *vm.MiniVM) vm.Error!void {}
+fn tick(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn bracketTick(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn rBracket(mini: *vm.MiniVM) vm.Error!void {
+    mini.state.* = @intFromEnum(vm.CompileState.interpret);
+}
+
+fn lBracket(mini: *vm.MiniVM) vm.Error!void {
+    mini.state.* = @intFromEnum(vm.CompileState.compile);
+}
+
+fn branch(mini: *vm.MiniVM) vm.Error!void {
+    const addr = mini.readByteAndAdvancePC();
+    try mini.absoluteJump(addr, false);
+}
+
+fn branch0(mini: *vm.MiniVM) vm.Error!void {
+    const condition = try mini.data_stack.pop();
+    if (!vm.isTruthy(condition)) {
+        return try branch(mini);
+    }
+}
+
+fn find(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn word(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn nextChar(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn define(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
 
 fn execute(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
@@ -60,6 +107,11 @@ fn fetch(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.push(mem_ptr.*);
 }
 
+fn comma(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
 fn lit(mini: *vm.MiniVM) vm.Error!void {
     const value = mini.readCellAndAdvancePC();
     try mini.data_stack.push(value);
@@ -80,6 +132,11 @@ fn storeAddC(mini: *vm.MiniVM) vm.Error!void {
 fn fetchC(mini: *vm.MiniVM) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.data_stack.push(mini.memory.byteAt(addr).*);
+}
+
+fn commaC(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
 }
 
 fn litC(mini: *vm.MiniVM) vm.Error!void {
@@ -191,6 +248,26 @@ fn invert(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.push(~value);
 }
 
+fn selDev(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn storeD(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+}
+
+fn storeAddD(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+}
+
+fn fetchD(mini: *vm.MiniVM) vm.Error!void {
+    _ = mini;
+    // TODO
+}
+
 fn dup(mini: *vm.MiniVM) vm.Error!void {
     try mini.data_stack.dup();
 }
@@ -226,6 +303,21 @@ fn gteq(mini: *vm.MiniVM) vm.Error!void {
     const a, const b = try mini.data_stack.popMultiple(2);
     // NOTE, the actual operator is '<=' because stack order is ( b a )
     try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
+}
+
+fn storeHere(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn storeAddHere(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
+}
+
+fn fetchHere(mini: *vm.MiniVM) vm.Error!void {
+    // TODO
+    _ = mini;
 }
 
 fn plus1(mini: *vm.MiniVM) vm.Error!void {
@@ -332,37 +424,32 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "exit", .callback = exit },
     .{ .name = "panic", .callback = panic },
 
-    // TODO
-    .{ .name = "'", .callback = nop },
-    .{ .name = "[']", .callback = nop, .isImmediate = true },
-    .{ .name = "]", .callback = nop, .isImmediate = true },
-    .{ .name = "[", .callback = nop },
+    .{ .name = "'", .callback = tick },
+    .{ .name = "[']", .callback = bracketTick, .isImmediate = true },
+    .{ .name = "]", .callback = rBracket, .isImmediate = true },
+    .{ .name = "[", .callback = lBracket },
 
-    // TODO
-    .{ .name = "find", .callback = nop },
-    .{ .name = "word", .callback = nop },
-    .{ .name = "next-char", .callback = nop },
-    .{ .name = "define", .callback = nop },
+    .{ .name = "find", .callback = find },
+    .{ .name = "word", .callback = word },
+    .{ .name = "next-char", .callback = nextChar },
+    .{ .name = "define", .callback = define },
 
-    // TODO
     .{ .name = "branch", .callback = branch, .needsValidProgramCounter = true },
     .{ .name = "branch0", .callback = branch0, .needsValidProgramCounter = true },
-    .{ .name = "execute", .callback = execute, .needsValidProgramCounter = true },
+    .{ .name = "execute", .callback = execute },
     .{ .name = "tailcall", .callback = tailcall, .needsValidProgramCounter = true },
 
     // ===
     .{ .name = "!", .callback = store },
     .{ .name = "+!", .callback = storeAdd },
     .{ .name = "@", .callback = fetch },
-    // TODO
-    .{ .name = ",", .callback = nop },
+    .{ .name = ",", .callback = comma },
     .{ .name = "lit", .callback = lit, .needsValidProgramCounter = true },
 
     .{ .name = "c!", .callback = storeC },
     .{ .name = "+c!", .callback = storeAddC },
     .{ .name = "c@", .callback = fetchC },
-    // TODO
-    .{ .name = "c,", .callback = nop },
+    .{ .name = "c,", .callback = commaC },
     .{ .name = "litc", .callback = litC, .needsValidProgramCounter = true },
 
     .{ .name = ">r", .callback = toR },
@@ -388,11 +475,10 @@ const lookup_table = [_]NamedCallback{
     .{ .name = "xor", .callback = xor },
     .{ .name = "invert", .callback = invert },
 
-    // TODO
-    .{ .name = "seldev", .callback = nop },
-    .{ .name = "d!", .callback = nop },
-    .{ .name = "d+!", .callback = nop },
-    .{ .name = "d@", .callback = nop },
+    .{ .name = "seldev", .callback = selDev },
+    .{ .name = "d!", .callback = storeD },
+    .{ .name = "d+!", .callback = storeAddD },
+    .{ .name = "d@", .callback = fetchD },
 
     // ===
     .{ .name = "dup", .callback = dup },
@@ -420,10 +506,9 @@ const lookup_table = [_]NamedCallback{
     .{ .name = ">", .callback = gt },
     .{ .name = ">=", .callback = gteq },
 
-    // TODO
-    .{ .name = "here!", .callback = nop },
-    .{ .name = "here+!", .callback = nop },
-    .{ .name = "here@", .callback = nop },
+    .{ .name = "here!", .callback = storeHere },
+    .{ .name = "here+!", .callback = storeAddHere },
+    .{ .name = "here@", .callback = fetchHere },
 
     .{ .name = "1+", .callback = plus1 },
     .{ .name = "1-", .callback = minus1 },
