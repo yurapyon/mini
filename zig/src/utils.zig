@@ -32,11 +32,11 @@ fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
     return ret;
 }
 
-pub fn MemoryLayout(comptime Type: type) type {
+pub fn MemoryLayout(comptime Type: type, comptime OffsetType: type) type {
     return struct {
         pub const layout = structToMemoryLayout(Type);
 
-        pub fn offsetOf(comptime field: []const u8) usize {
+        pub fn offsetOf(comptime field: []const u8) OffsetType {
             if (!@hasField(Type, field)) {
                 @compileError(std.fmt.comptimePrint(
                     "Field '{s}' doesnt exist on type '{}'\n",
@@ -72,7 +72,7 @@ test "layouts" {
         b: u8,
         c: [3]u16,
         d: u8,
-    });
+    }, usize);
 
     try testing.expectEqual(TestLayout.offsetOf("a"), 0);
     try testing.expectEqual(TestLayout.offsetOf("b"), 1);

@@ -4,12 +4,7 @@ const Allocator = std.mem.Allocator;
 const vm = @import("MiniVM.zig");
 
 fn runMiniVM(allocator: Allocator) !void {
-    const mem = try allocator.allocWithOptions(
-        u8,
-        vm.max_memory_size,
-        @alignOf(vm.Cell),
-        null,
-    );
+    const mem = try vm.allocateMemory(allocator);
     defer allocator.free(mem);
 
     var vmInstance: vm.MiniVM = undefined;
@@ -26,6 +21,7 @@ test "simple test" {
     _ = @import("Stack.zig");
     _ = @import("WordHeader.zig");
     _ = @import("utils.zig");
+    _ = @import("Register.zig");
 
     try runMiniVM(std.testing.allocator);
 }

@@ -5,7 +5,8 @@ const Allocator = std.mem.Allocator;
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/Devices.zig").Devices;
 const Stack = @import("Stack.zig").Stack;
-const WordHeader = @import("WordHeader").WordHeader;
+const WordHeader = @import("WordHeader.zig").WordHeader;
+const Register = @import("Register.zig").Register;
 
 const utils = @import("utils.zig");
 
@@ -47,6 +48,15 @@ const ReturnStack = Stack(32);
 
 pub const Memory = []align(@alignOf(Cell)) u8;
 
+pub fn allocateMemory(allocator: Allocator) Error!Memory {
+    return try allocator.allocWithOptions(
+        u8,
+        max_memory_size,
+        @alignOf(Cell),
+        null,
+    );
+}
+
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
     data_stack_top: Cell,
@@ -58,7 +68,7 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     state: Cell,
     base: Cell,
     active_device: Cell,
-});
+}, Cell);
 
 pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
 
@@ -90,14 +100,14 @@ pub fn cellAt(mem: Memory, addr: Cell) *Cell {
 pub const MiniVM = struct {
     memory: Memory,
 
-    program_counter: *Cell,
+    program_counter: Register,
     data_stack: DataStack,
     return_stack: ReturnStack,
-    here: *Cell,
-    latest: *Cell,
-    state: *Cell,
-    base: *Cell,
-    active_device: *Cell,
+    here: Register,
+    latest: Register,
+    state: Register,
+    base: Register,
+    active_device: Register,
 
     // TODO move this into a device ? somehow
     input_buffer: []const u8,
@@ -111,28 +121,32 @@ pub const MiniVM = struct {
     pub fn init(self: *@This(), memory: Memory) !void {
         self.memory = memory;
 
-        self.program_counter = MemoryLayout.memoryAt(Cell, self.memory, "program_counter");
+        self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
         self.data_stack.init(
             self.memory,
-            MemoryLayout.memoryAt(Cell, self.memory, "data_stack_top"),
-            MemoryLayout.memoryAt(Cell, self.memory, "data_stack"),
+            MemoryLayout.offsetOf("data_stack_top"),
+            MemoryLayout.offsetOf("data_stack"),
         );
         self.return_stack.init(
             self.memory,
-            MemoryLayout.memoryAt(Cell, self.memory, "return_stack_top"),
-            MemoryLayout.memoryAt(Cell, self.memory, "return_stack"),
+            MemoryLayout.offsetOf("return_stack_top"),
+            MemoryLayout.offsetOf("return_stack"),
         );
-        self.here = MemoryLayout.memoryAt(Cell, self.memory, "here");
-        self.latest = MemoryLayout.memoryAt(Cell, self.memory, "latest");
-        self.state = MemoryLayout.memoryAt(Cell, self.memory, "state");
-        self.base = MemoryLayout.memoryAt(Cell, self.memory, "base");
-        self.active_device = MemoryLayout.memoryAt(Cell, self.memory, "active_device");
+        self.here.init(self.memory, MemoryLayout.offsetOf("here"));
+        self.latest.init(self.memory, MemoryLayout.offsetOf("latest"));
+        self.state.init(self.memory, MemoryLayout.offsetOf("state"));
+        self.base.init(self.memory, MemoryLayout.offsetOf("base"));
+        self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
 
-        self.here.* = 0;
-        self.latest.* = 0;
-        self.state.* = 0;
-        self.base.* = 10;
-        self.active_device.* = 0;
+        // NOTE
+        // advancing here so 'latest == 0'
+        //   can be used as a reliable sentinel for the first definitiion in the dictionary
+        std.mem.copyForwards(u8, self.memory[0..], "mini");
+        self.here.store(4);
+        self.latest.store(0);
+        self.state.store(0);
+        self.base.store(10);
+        self.active_device.store(0);
 
         self.should_quit = false;
         self.should_bye = false;
@@ -187,21 +201,25 @@ pub const MiniVM = struct {
         return self.input_buffer[word_start..self.input_buffer_at];
     }
 
-    // returns memory mapped addr
-    fn lookupMiniDefinition(self: *@This(), word: []const u8) ?Cell {
-        // TODO
-        _ = self;
-        _ = word;
+    fn lookupMiniDefinition(self: *@This(), word: []const u8) Error!?Cell {
+        var latest = self.latest.fetch();
+        var temp_word_header: WordHeader = undefined;
+        while (latest != 0) : (latest = temp_word_header.latest) {
+            try temp_word_header.initFromMemory(self.memory[latest..]);
+            if (temp_word_header.nameEquals(word)) {
+                return latest;
+            }
+        }
         return null;
     }
 
     fn lookupWord(self: *@This(), word: []const u8) Error!WordLookupResult {
         if (bytecodes.getCallbackBytecode(word)) |bytecode| {
             return .{ .bytecode = bytecode };
-        } else if (self.lookupMiniDefinition(word)) |definition_addr| {
+        } else if (try self.lookupMiniDefinition(word)) |definition_addr| {
             return .{ .mini_word = definition_addr };
             // TODO rethrow InvalidBase errors
-        } else if (utils.parseNumber(word, self.base.*) catch null) |value| {
+        } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
             return .{ .number = @truncate(value) };
         } else {
             return WordLookupResult.not_found;
@@ -214,9 +232,10 @@ pub const MiniVM = struct {
                 try self.evaluateByte(byte, false);
             },
             .mini_word => |addr| {
-                // TODO get the cfa of the definition at addr
-                // addr = cfa.*
-                try self.absoluteJump(addr, false);
+                // TODO limit word size somewhere
+                const header_size = WordHeader.calculateSize(@truncate(word.len));
+                const cfa_addr = addr + header_size;
+                try self.absoluteJump(cfa_addr, false);
                 try self.evaluateLoop();
             },
             .number => |value| {
@@ -249,7 +268,7 @@ pub const MiniVM = struct {
         while (!self.should_quit and !self.should_bye) {
             const word = self.readNextWord();
             if (word) |w| {
-                const state: CompileState = @enumFromInt(self.state.*);
+                const state: CompileState = @enumFromInt(self.state.fetch());
                 switch (state) {
                     .interpret => {
                         try self.interpretWord(w);
@@ -270,6 +289,7 @@ pub const MiniVM = struct {
     pub fn repl(self: *@This()) Error!void {
         while (!self.should_bye) {
             self.should_quit = false;
+            // TODO
             // refill input buffer
             try self.interpretLoop();
         }
@@ -278,9 +298,9 @@ pub const MiniVM = struct {
     }
 
     pub fn readByteAndAdvancePC(self: *@This()) u8 {
-        const pc_at = self.program_counter.*;
+        const pc_at = self.program_counter.fetch();
         // TODO handle reaching end of memory
-        self.program_counter.* += 1;
+        self.program_counter.storeAdd(1);
         return self.memory[pc_at];
     }
 
@@ -296,9 +316,9 @@ pub const MiniVM = struct {
         useReturnStack: bool,
     ) Error!void {
         if (useReturnStack) {
-            try self.return_stack.push(self.program_counter.*);
+            try self.return_stack.push(self.program_counter.fetch());
         }
-        self.program_counter.* = addr;
+        self.program_counter.store(addr);
     }
 
     // NOTE
@@ -333,11 +353,11 @@ pub const MiniVM = struct {
                 // TODO how should endianness be handled for this
                 const high = b & 0x0f;
                 const low = self.readByteAndAdvancePC();
-                const addr = self.program_counter.*;
+                const addr = self.program_counter.fetch();
                 const length = @as(Cell, high) << 8 | low;
                 try self.data_stack.push(addr);
                 try self.data_stack.push(length);
-                self.program_counter.* += length;
+                self.program_counter.storeAdd(length);
             },
             inline 0b10000000...0b11111111 => |b| {
                 if (!programCounterIsValid) {
@@ -352,9 +372,31 @@ pub const MiniVM = struct {
         }
     }
 
-    fn defineWordHeader(self: *@This(), word_header: WordHeader) void {
-        // TODO
-        _ = self;
-        _ = word_header;
+    fn alignHere(self: *@This()) void {
+        self.here.store(std.mem.alignForward(
+            Cell,
+            self.here.fetch(),
+            @alignOf(Cell),
+        ));
+    }
+
+    pub fn defineWordHeader(
+        self: *@This(),
+        name: []const u8,
+    ) Error!void {
+        const word_header = WordHeader{
+            .latest = self.latest.fetch(),
+            .isImmediate = false,
+            .isHidden = false,
+            .name = name,
+        };
+        const header_size = @as(Cell, @truncate(word_header.size()));
+        self.alignHere();
+        self.latest.store(self.here.fetch());
+        try word_header.writeToMemory(
+            self.memory[self.here.fetch()..][0..header_size],
+        );
+        self.here.storeAdd(header_size);
+        self.alignHere();
     }
 };

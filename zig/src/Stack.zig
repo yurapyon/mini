@@ -2,6 +2,8 @@ const vm = @import("MiniVM.zig");
 const Cell = vm.Cell;
 const Error = vm.Error;
 
+const Register = @import("Register.zig").Register;
+
 pub fn Stack(comptime count_: usize) type {
     return struct {
         pub const count = count_;
@@ -10,34 +12,34 @@ pub fn Stack(comptime count_: usize) type {
 
         memory: vm.Memory,
 
-        // top_addr.* is a memory mapped address of the
+        // top.fetch() is a ptr to
         //   empty Cell right beyond the actual topmost value
-        top_addr: *Cell,
-        mem_addr: *Cell,
+        top: Register,
+        bottom_offset: Cell,
 
         pub fn init(
             self: *@This(),
             memory: vm.Memory,
-            top_addr: *Cell,
-            mem_addr: *Cell,
+            top_offset: Cell,
+            bottom_offset: Cell,
         ) void {
             self.memory = memory;
-            self.top_addr = top_addr;
-            self.mem_addr = mem_addr;
+            self.top.init(self.memory, top_offset);
+            self.bottom_offset = bottom_offset;
             self.clear();
         }
 
         pub fn depth(self: @This()) usize {
-            const stack_size = self.top_addr.* - self.mem_addr.*;
+            const stack_size = self.top.fetch() - self.bottom_offset;
             return stack_size / @sizeOf(Cell);
         }
 
         pub fn clear(self: @This()) void {
-            self.top_addr.* = self.mem_addr.*;
+            self.top.store(self.bottom_offset);
         }
 
         pub fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
-            const addr = @as(isize, @intCast(self.top_addr.*)) - (at + 1) * @sizeOf(Cell);
+            const addr = @as(isize, @intCast(self.top.fetch())) - (at + 1) * @sizeOf(Cell);
             return vm.cellAt(self.memory, @intCast(addr));
         }
 
@@ -80,12 +82,12 @@ pub fn Stack(comptime count_: usize) type {
         pub fn push(self: *@This(), value: Cell) Error!void {
             const ptr = try self.unsafeIndex(-1);
             ptr.* = value;
-            self.top_addr.* += @sizeOf(Cell);
+            self.top.storeAdd(@sizeOf(Cell));
         }
 
         pub fn pop(self: *@This()) Error!Cell {
             const ret = try self.peek();
-            self.top_addr.* -= @sizeOf(Cell);
+            self.top.storeSubtract(@sizeOf(Cell));
             return ret;
         }
 
@@ -141,10 +143,9 @@ pub fn Stack(comptime count_: usize) type {
     };
 }
 
-fn prepStack() void {}
-
 test "stack" {
     const testing = @import("std").testing;
 
+    // TODO
     _ = testing;
 }

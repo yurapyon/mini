@@ -15,8 +15,9 @@ pub const WordHeader = struct {
     latest: vm.Cell,
     isImmediate: bool,
     isHidden: bool,
-    name: [:0]const u8,
+    name: []const u8,
 
+    // TODO handle out of bounds errors
     pub fn initFromMemory(self: *@This(), memory: []const u8) vm.Error!void {
         const latest_low = memory[0];
         const latest_high = memory[1];
@@ -25,9 +26,10 @@ pub const WordHeader = struct {
         self.isImmediate = (flag_name_len & 0x8) > 0;
         self.isHidden = (flag_name_len & 0x4) > 0;
         const name_len = flag_name_len & 0x3f;
-        self.name = memory[3..(name_len + 3) :0];
+        self.name = memory[3..(name_len + 3)];
     }
 
+    // TODO handle out of bounds errors
     pub fn writeToMemory(self: @This(), memory: []u8) vm.Error!void {
         memory[0] = @truncate(self.latest);
         memory[1] = @truncate(self.latest >> 8);
@@ -39,15 +41,28 @@ pub const WordHeader = struct {
         }
         memory[2] |= @truncate(self.name.len & 0x3f);
         std.mem.copyForwards(u8, memory[3..], self.name);
+        memory[self.name.len + 3] = 0;
     }
 
+    pub fn nameEquals(self: @This(), name: []const u8) bool {
+        return std.mem.eql(u8, self.name, name);
+    }
+
+    // TODO note
+    // headers have a max size because name.len has to be a u6
+    // should limit namelen somehow
+
     // assumes starting address is cell aligned
-    pub fn calculateLength(name_len: usize) usize {
+    pub fn calculateSize(name_len: vm.Cell) vm.Cell {
         return std.mem.alignForward(
-            usize,
+            vm.Cell,
             3 + name_len + 1,
             @alignOf(vm.Cell),
         );
+    }
+
+    pub fn size(self: @This()) vm.Cell {
+        return calculateSize(@truncate(self.name.len));
     }
 };
 
@@ -76,6 +91,8 @@ test "word headers" {
 
     try testing.expectEqualDeep(wh_b, wh_a);
 
-    try testing.expectEqual(14, WordHeader.calculateLength(9));
-    try testing.expectEqual(12, WordHeader.calculateLength(8));
+    try testing.expectEqual(14, WordHeader.calculateSize(9));
+    try testing.expectEqual(12, WordHeader.calculateSize(8));
+
+    try testing.expect(wh_a.nameEquals("mini-word"));
 }

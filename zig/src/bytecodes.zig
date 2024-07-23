@@ -40,11 +40,11 @@ fn bracketTick(mini: *vm.MiniVM) vm.Error!void {
 }
 
 fn rBracket(mini: *vm.MiniVM) vm.Error!void {
-    mini.state.* = @intFromEnum(vm.CompileState.interpret);
+    mini.state.store(@intFromEnum(vm.CompileState.interpret));
 }
 
 fn lBracket(mini: *vm.MiniVM) vm.Error!void {
-    mini.state.* = @intFromEnum(vm.CompileState.compile);
+    mini.state.store(@intFromEnum(vm.CompileState.compile));
 }
 
 fn branch(mini: *vm.MiniVM) vm.Error!void {
@@ -76,7 +76,7 @@ fn nextChar(mini: *vm.MiniVM) vm.Error!void {
 
 fn define(mini: *vm.MiniVM) vm.Error!void {
     // TODO
-    _ = mini;
+    try mini.defineWordHeader("");
 }
 
 fn execute(mini: *vm.MiniVM) vm.Error!void {
@@ -590,4 +590,29 @@ pub fn getCallbackBytecode(name: []const u8) ?u8 {
         }
     }
     return null;
+}
+
+pub const BytecodeType = enum {
+    basic,
+    data,
+    absolute_jump,
+};
+
+pub fn bytecodeType(byte: u8) BytecodeType {
+    return switch (byte) {
+        0b00000000...0b01101111 => BytecodeType.basic,
+        0b01110000...0b01111111 => BytecodeType.data,
+        0b10000000...0b11111111 => BytecodeType.absolute_jump,
+    };
+}
+
+pub fn bytecodeNeedsValidProgramCounter(byte: u8) bool {
+    return switch (bytecodeType(byte)) {
+        .basic => {
+            const id = byte & 0x7f;
+            const named_callback = getCallbackById(id);
+            return named_callback.needsValidProgramCounter;
+        },
+        .data, .absolute_jump => true,
+    };
 }
