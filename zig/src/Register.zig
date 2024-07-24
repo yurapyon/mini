@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const vm = @import("MiniVM.zig");
+const vm = @import("mini.zig");
 
 /// A register is basically a pointer into VM Memory
 /// It's memory-mapped, rather than being a system pointer

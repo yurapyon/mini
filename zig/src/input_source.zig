@@ -1,4 +1,4 @@
-const vm = @import("MiniVM.zig");
+const vm = @import("mini.zig");
 
 pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';

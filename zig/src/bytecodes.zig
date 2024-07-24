@@ -1,6 +1,6 @@
 const mem = @import("std").mem;
 
-const vm = @import("MiniVM.zig");
+const vm = @import("mini.zig");
 
 // ===
 

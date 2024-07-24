@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const MiniVM = @import("../MiniVM.zig").MiniVM;
+const vm = @import("../mini.zig");
 
 pub const System = struct {
-    pub fn onActivate(_: @This(), _: *MiniVM) void {
+    pub fn onActivate(_: @This(), _: *vm.MiniVM) void {
         std.debug.print("activate system\n", .{});
     }
 };

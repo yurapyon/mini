@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 
 const FieldLayout = struct {
     name: []const u8,
@@ -47,7 +46,7 @@ pub fn MemoryLayout(comptime Type: type, comptime OffsetType: type) type {
             }
             comptime var i = 0;
             inline while (i < layout.len) : (i += 1) {
-                if (mem.eql(u8, field, layout[i].name)) {
+                if (std.mem.eql(u8, field, layout[i].name)) {
                     return layout[i].offset;
                 }
             }

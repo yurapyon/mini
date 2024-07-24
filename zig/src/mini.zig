@@ -3,13 +3,12 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const bytecodes = @import("bytecodes.zig");
-const Devices = @import("devices/Devices.zig").Devices;
-const Stack = @import("Stack.zig").Stack;
-const WordHeader = @import("WordHeader.zig").WordHeader;
-const Register = @import("Register.zig").Register;
-const InputSource = @import("InputSource.zig").InputSource;
-const Dictionary = @import("Dictionary.zig").Dictionary;
-
+const Devices = @import("devices/devices.zig").Devices;
+const Stack = @import("stack.zig").Stack;
+const WordHeader = @import("word_header.zig").WordHeader;
+const Register = @import("register.zig").Register;
+const InputSource = @import("input_source.zig").InputSource;
+const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 
 comptime {
@@ -405,5 +404,33 @@ pub const MiniVM = struct {
 };
 
 test "mini" {
+    const testing = std.testing;
+    const stack = @import("Stack.zig");
+
+    const mem = try allocateMemory(testing.allocator);
+    defer testing.allocator.free(mem);
+
+    var vm: MiniVM = undefined;
+    try vm.init(mem);
+
     // TODO
+    vm.input_source.setInputBuffer("1 dup 1+ dup 1+ \n");
+
+    var word = try vm.input_source.readNextWord();
+    if (word) |w| {
+        try vm.interpretString(w);
+    }
+    word = try vm.input_source.readNextWord();
+    if (word) |w| {
+        try vm.interpretString(w);
+    }
+    word = try vm.input_source.readNextWord();
+    if (word) |w| {
+        try vm.interpretString(w);
+    }
+
+    _ = stack;
+
+    // TODO
+    // try stack.expectStack(vm.data_stack, &[_]Cell{ 1, 2, 3 });
 }

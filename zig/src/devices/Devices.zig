@@ -1,13 +1,14 @@
-const MiniVM = @import("../MiniVM.zig").MiniVM;
-const System = @import("System.zig").System;
+const vm = @import("../mini.zig");
+
+const System = @import("system.zig").System;
 
 pub const Devices = struct {
     system: System,
 
-    pub fn activate(self: *@This(), vm: *MiniVM, device_id: u8) void {
+    pub fn activate(self: *@This(), mini: *vm.MiniVM, device_id: u8) void {
         switch (device_id) {
             0x0 => {
-                self.system.onActivate(vm);
+                self.system.onActivate(mini);
             },
             else => {},
         }

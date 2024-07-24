@@ -1,6 +1,6 @@
 const std = @import("std");
 
-const vm = @import("MiniVM.zig");
+const vm = @import("mini.zig");
 
 /// Struct representing a MiniVM word definition
 ///   this is not bit-for-bit equivalent to the definition in Forth memory

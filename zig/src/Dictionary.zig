@@ -1,10 +1,10 @@
 const std = @import("std");
 
-const vm = @import("MiniVM.zig");
+const vm = @import("mini.zig");
 
 const bytecodes = @import("bytecodes.zig");
-const WordHeader = @import("WordHeader.zig").WordHeader;
-const Register = @import("Register.zig").Register;
+const WordHeader = @import("word_header.zig").WordHeader;
+const Register = @import("register.zig").Register;
 
 /// This is a Forth style dictionary
 ///   where each definition has a pointer to the previous definition
