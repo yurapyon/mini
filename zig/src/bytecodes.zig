@@ -118,7 +118,7 @@ const lookup_table = [_]BytecodeDefinition{
     .{ .name = "[", .callback = lBracket },
 
     .{ .name = "find", .callback = find },
-    .{ .name = "word", .callback = word },
+    .{ .name = "word", .callback = nextWord },
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "define", .callback = define },
 
@@ -273,19 +273,17 @@ fn exit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.absoluteJump(addr, false);
 }
 
-fn panic(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO some type of panic message
-    mini.should_bye = true;
+fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    return error.Panic;
 }
 
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
+    try mini.data_stack.push(try mini.readWordAndGetCfaAddress());
 }
 
 fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
+    const cfa_addr = try mini.readWordAndGetCfaAddress();
+    mini.dictionary.compileLit(cfa_addr);
 }
 
 fn rBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -313,23 +311,40 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 }
 
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
+    const word = try mini.popSlice();
+    if (try mini.dictionary.lookup(word)) |definition_addr| {
+        try mini.data_stack.push(definition_addr);
+        try mini.data_stack.push(vm.fromBool(vm.Cell, true));
+    } else {
+        try mini.data_stack.push(0);
+        try mini.data_stack.push(vm.fromBool(vm.Cell, false));
+    }
 }
 
-fn word(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO
+    // this currently wont work because the input source buffer memory
+    //   isn't a part of the main vm memory
     _ = mini;
 }
 
 fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
+    // TODO this is messy
+    if (try mini.input_source.readNextChar()) |char| {
+        try mini.data_stack.push(char);
+    } else {
+        try mini.input_source.refill();
+        if (try mini.input_source.readNextChar()) |char| {
+            try mini.data_stack.push(char);
+        } else {
+            return error.Panic;
+        }
+    }
 }
 
 fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    try mini.dictionary.defineWordHeader("");
+    const word = try mini.popSlice();
+    try mini.dictionary.defineWord(word);
 }
 
 fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -477,9 +492,9 @@ fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // TODO need to figure out signed in handling
     const value = try mini.data_stack.pop();
     _ = value;
-    // TODO
     // try mini.data_stack.push(-value);
 }
 
@@ -546,8 +561,9 @@ fn swap(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn pick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
+    const idx = try mini.data_stack.pop();
+    const value = (try mini.data_stack.index(idx)).*;
+    try mini.data_stack.push(value);
 }
 
 fn rot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

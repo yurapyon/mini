@@ -51,7 +51,7 @@ pub const Dictionary = struct {
             .name = name,
         };
 
-        const header_size = @as(vm.Cell, @truncate(word_header.size()));
+        const header_size = word_header.size();
 
         self.here.alignForward(vm.Cell);
         const aligned_here = self.here.fetch();
@@ -63,6 +63,16 @@ pub const Dictionary = struct {
         self.here.storeAdd(header_size);
 
         self.here.alignForward(vm.Cell);
+    }
+
+    pub fn compileLit(self: *@This(), value: vm.Cell) void {
+        self.here.comma(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+        self.here.comma(value);
+    }
+
+    pub fn compileLitC(self: *@This(), value: u8) void {
+        self.here.comma(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+        self.here.commaC(value);
     }
 
     pub fn compile(self: *@This(), word_info: vm.WordInfo) void {
@@ -86,11 +96,9 @@ pub const Dictionary = struct {
             },
             .number => |value| {
                 if ((value & 0xff00) > 0) {
-                    self.here.comma(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-                    self.here.comma(value);
+                    self.compileLit(value);
                 } else {
-                    self.here.comma(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-                    self.here.commaC(@truncate(value));
+                    self.compileLitC(@truncate(value));
                 }
             },
         }

@@ -23,6 +23,7 @@ comptime {
 pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
+    Panic,
     AlignmentError,
     StackOverflow,
     StackUnderflow,
@@ -30,12 +31,13 @@ pub const Error = error{
     ReturnStackUnderflow,
     WordNotFound,
     InvalidProgramCounter,
+    WordNameTooLong,
 } || InputError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
+    UnexpectedEndOfInput,
     NoInputBuffer,
     CannotRefill,
-    RefillTimeout,
 };
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
@@ -65,6 +67,11 @@ pub fn allocateMemory(allocator: Allocator) Error!Memory {
     );
 }
 
+pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) []u8 {
+    // TODO handle out of bounds errors
+    return memory[addr..][0..len];
+}
+
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
     data_stack_top: Cell,
@@ -88,8 +95,11 @@ pub const ExecutionContext = struct {
 
 pub const WordInfo = struct {
     value: union(enum) {
+        // the bytecode
         bytecode: u8,
+        // the definition address
         mini_word: Cell,
+        // the number
         number: Cell,
     },
     is_immediate: bool,
@@ -107,6 +117,12 @@ pub fn isTruthy(value: anytype) bool {
 
 pub fn cellAt(mem: Memory, addr: Cell) *Cell {
     return @ptrCast(@alignCast(&mem[addr]));
+}
+
+pub fn calculateCfaAddress(memory: Memory, addr: Cell) Error!Cell {
+    var temp_word_header: WordHeader = undefined;
+    try temp_word_header.initFromMemory(memory[addr..]);
+    return addr + temp_word_header.size();
 }
 
 /// MiniVM
@@ -230,12 +246,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        // TODO limit word size somehwere
-
-        // TODO check headersize a different way
-        // const header_size = WordHeader.calculateSize(@truncate(word.len));
-        const header_size = 0;
-        const cfa_addr = addr + header_size;
+        const cfa_addr = try calculateCfaAddress(self.memory, addr);
         try self.absoluteJump(cfa_addr, false);
         try self.evaluateLoop();
     }
@@ -252,12 +263,13 @@ pub const MiniVM = struct {
                 .is_immediate = bytecode_definition.is_immediate,
             };
         } else if (try self.dictionary.lookup(word)) |definition_addr| {
-            // TODO is_immediate
+            var temp_word_header: WordHeader = undefined;
+            try temp_word_header.initFromMemory(self.memory[definition_addr..]);
             return .{
                 .value = .{
                     .mini_word = definition_addr,
                 },
-                .is_immediate = false,
+                .is_immediate = temp_word_header.is_immediate,
             };
             // TODO rethrow InvalidBase errors
         } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
@@ -295,6 +307,27 @@ pub const MiniVM = struct {
                 },
             }
         }
+    }
+
+    // helpers ===
+
+    pub fn readWordAndGetCfaAddress(self: *@This()) Error!Cell {
+        const word = try self.input_source.readNextWord();
+        if (word) |w| {
+            const addr = try self.dictionary.lookup(w);
+            if (addr) |a| {
+                return calculateCfaAddress(self.memory, a);
+            } else {
+                return error.WordNotFound;
+            }
+        } else {
+            return error.UnexpectedEndOfInput;
+        }
+    }
+
+    pub fn popSlice(self: *@This()) Error![]u8 {
+        const len, const addr = try self.data_stack.popMultiple(2);
+        return sliceFromAddrAndLen(self.memory, addr, len);
     }
 };
 

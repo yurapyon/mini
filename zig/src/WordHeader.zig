@@ -11,6 +11,15 @@ pub const WordHeader = struct {
     //
     // flags & name len is
     // is_immediate(1), is_hidden(1), name_len(6)
+    //
+    // name_len is a u6
+    //   this means the max name length is 64 chars
+    //   this also means the max size of a header is:
+    //     3 + 1 + 64 = 70 bytes
+    //     ^   ^   ^
+    //     |   |   name
+    //     |   terminator
+    //     latest&flags&len
 
     latest: vm.Cell,
     is_immediate: bool,
@@ -31,6 +40,10 @@ pub const WordHeader = struct {
 
     // TODO handle out of bounds errors
     pub fn writeToMemory(self: @This(), memory: []u8) vm.Error!void {
+        if (self.name.len > std.math.maxInt(u6)) {
+            return error.WordNameTooLong;
+        }
+
         memory[0] = @truncate(self.latest);
         memory[1] = @truncate(self.latest >> 8);
         var flag_name_len = @as(u8, @truncate(self.name.len & 0x3f));
@@ -49,25 +62,18 @@ pub const WordHeader = struct {
         return std.mem.eql(u8, self.name, name);
     }
 
-    // TODO note
-    // headers have a max size because name.len has to be a u6
-    // should limit namelen somehow
-
     // assumes starting address is cell aligned
-    pub fn calculateSize(name_len: vm.Cell) vm.Cell {
+    pub fn calculateSize(name_len: u6) u8 {
         return std.mem.alignForward(
-            vm.Cell,
+            u8,
             3 + name_len + 1,
             @alignOf(vm.Cell),
         );
     }
 
-    pub fn size(self: @This()) vm.Cell {
+    pub fn size(self: @This()) u8 {
         return calculateSize(@truncate(self.name.len));
     }
-
-    // TODO
-    // need a toCfa thing
 };
 
 test "word headers" {

@@ -4,6 +4,7 @@ memory:
   cell size:     2 bytes
   address space: 64k bytes
   endianness:    little
+  negatives:     twos-compilment
 
 language:
   case-insensitive
