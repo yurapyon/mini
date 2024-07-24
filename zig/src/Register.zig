@@ -64,6 +64,19 @@ pub const Register = struct {
             @alignOf(Type),
         ));
     }
+
+    pub fn readByteAndAdvance(self: @This(), memory: []const u8) u8 {
+        const addr = self.fetch();
+        // TODO handle reaching end of memory
+        self.storeAdd(1);
+        return memory[addr];
+    }
+
+    pub fn readCellAndAdvance(self: *@This(), memory: []const u8) vm.Cell {
+        const low = self.readByteAndAdvance(memory);
+        const high = self.readByteAndAdvance(memory);
+        return @as(vm.Cell, high) << 8 | low;
+    }
 };
 
 test "registers" {

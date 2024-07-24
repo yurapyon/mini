@@ -8,12 +8,13 @@ const Stack = @import("Stack.zig").Stack;
 const WordHeader = @import("WordHeader.zig").WordHeader;
 const Register = @import("Register.zig").Register;
 const InputSource = @import("InputSource.zig").InputSource;
+const Dictionary = @import("Dictionary.zig").Dictionary;
 
 const utils = @import("utils.zig");
 
 comptime {
-    const nativeEndianness = builtin.target.cpu.arch.endian();
-    if (nativeEndianness != .little) {
+    const native_endianness = builtin.target.cpu.arch.endian();
+    if (native_endianness != .little) {
         // TODO convert u16s to little endian on memory write
         @compileError("native endianness must be .little");
     }
@@ -91,7 +92,7 @@ pub const WordInfo = struct {
         mini_word: Cell,
         number: Cell,
     },
-    isImmediate: bool,
+    is_immediate: bool,
 };
 
 pub const Cell = u16;
@@ -108,27 +109,31 @@ pub fn cellAt(mem: Memory, addr: Cell) *Cell {
     return @ptrCast(@alignCast(&mem[addr]));
 }
 
+/// MiniVM
+/// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
     memory: Memory,
-
-    program_counter: Register,
+    dictionary: Dictionary,
     data_stack: DataStack,
     return_stack: ReturnStack,
-    here: Register,
-    latest: Register,
+    input_source: InputSource,
+    devices: Devices,
+
+    program_counter: Register,
     state: Register,
     base: Register,
     active_device: Register,
 
-    input_source: InputSource,
-
     should_quit: bool,
     should_bye: bool,
 
-    devices: Devices,
-
     pub fn init(self: *@This(), memory: Memory) !void {
         self.memory = memory;
+        self.dictionary.init(
+            self.memory,
+            MemoryLayout.offsetOf("latest"),
+            MemoryLayout.offsetOf("here"),
+        );
 
         self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
         self.data_stack.init(
@@ -141,14 +146,12 @@ pub const MiniVM = struct {
             MemoryLayout.offsetOf("return_stack_top"),
             MemoryLayout.offsetOf("return_stack"),
         );
-        self.here.init(self.memory, MemoryLayout.offsetOf("here"));
-        self.latest.init(self.memory, MemoryLayout.offsetOf("latest"));
         self.state.init(self.memory, MemoryLayout.offsetOf("state"));
         self.base.init(self.memory, MemoryLayout.offsetOf("base"));
         self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
 
-        self.here.store(MemoryLayout.offsetOf("dictionary_start"));
-        self.latest.store(0);
+        self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
+        self.dictionary.latest.store(0);
         self.state.store(0);
         self.base.store(10);
         self.active_device.store(0);
@@ -162,11 +165,6 @@ pub const MiniVM = struct {
         // run base file
     }
 
-    pub fn deinit(self: @This()) void {
-        _ = self;
-        // note: currently does nothing
-    }
-
     // ===
 
     pub fn onQuit(self: *@This()) Error!void {
@@ -177,120 +175,6 @@ pub const MiniVM = struct {
         self.data_stack.clear();
     }
 
-    // ===
-
-    fn lookupMiniDefinition(self: *@This(), word: []const u8) Error!?Cell {
-        var latest = self.latest.fetch();
-        var temp_word_header: WordHeader = undefined;
-        while (latest != 0) : (latest = temp_word_header.latest) {
-            try temp_word_header.initFromMemory(self.memory[latest..]);
-            if (!temp_word_header.isHidden and temp_word_header.nameEquals(word)) {
-                return latest;
-            }
-        }
-        return null;
-    }
-
-    fn lookupWord(self: *@This(), word: []const u8) Error!?WordInfo {
-        if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
-            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
-            return .{
-                .value = .{
-                    .bytecode = bytecode,
-                },
-                .isImmediate = bytecode_definition.isImmediate,
-            };
-        } else if (try self.lookupMiniDefinition(word)) |definition_addr| {
-            // TODO isImmediate
-            return .{
-                .value = .{
-                    .mini_word = definition_addr,
-                },
-                .isImmediate = false,
-            };
-            // TODO rethrow InvalidBase errors
-        } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
-            return .{
-                .value = .{
-                    .number = @truncate(value),
-                },
-                .isImmediate = false,
-            };
-        } else {
-            return null;
-        }
-    }
-
-    fn interpretWord(self: *@This(), word_info: WordInfo) Error!void {
-        switch (word_info.value) {
-            .bytecode => |byte| {
-                try bytecodes.executeBytecode(byte, self, false);
-            },
-            .mini_word => |addr| {
-                // TODO limit word size somewhere
-                // TODO check headersize a different way
-                // const header_size = WordHeader.calculateSize(@truncate(word.len));
-                const header_size = 0;
-                const cfa_addr = addr + header_size;
-                try self.absoluteJump(cfa_addr, false);
-                try self.evaluateLoop();
-            },
-            .number => |value| {
-                try self.data_stack.push(value);
-            },
-        }
-    }
-
-    fn compileWord(self: *@This(), word_info: WordInfo) Error!void {
-        if (word_info.isImmediate) {
-            try self.interpretWord(word_info);
-        } else {
-            switch (word_info.value) {
-                .bytecode => |bytecode| {
-                    switch (bytecodes.determineType(bytecode)) {
-                        .basic => {
-                            self.here.commaC(bytecode);
-                        },
-                        .data, .absolute_jump => {
-                            // TODO error
-                            // this is a case that shouldnt happen in normal execution
-                            // but may happen if compileWord was called from zig
-                        },
-                    }
-                },
-                .mini_word => |addr| {
-                    _ = addr;
-                    // TODO
-                    // compile an abs jump to the cfa of this addr
-                },
-                .number => |value| {
-                    if ((value & 0xff00) > 0) {
-                        self.here.comma(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-                        self.here.comma(value);
-                    } else {
-                        self.here.comma(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-                        self.here.commaC(@truncate(value));
-                    }
-                },
-            }
-        }
-    }
-
-    // TODO rename this
-    pub fn consumeWord(self: *@This(), word: []const u8) Error!void {
-        if (try self.lookupWord(word)) |word_info| {
-            const state: CompileState = @enumFromInt(self.state.fetch());
-            switch (state) {
-                .interpret => {
-                    try self.interpretWord(word_info);
-                },
-                .compile => {
-                    try self.compileWord(word_info);
-                },
-            }
-        }
-    }
-
     pub fn repl(self: *@This()) Error!void {
         while (!self.should_bye) {
             self.should_quit = false;
@@ -299,7 +183,7 @@ pub const MiniVM = struct {
             while (!self.should_quit and !self.should_bye) {
                 const word = try self.input_source.readNextWord();
                 if (word) |w| {
-                    try self.consumeWord(w);
+                    try self.interpretString(w);
                 } else {
                     self.should_quit = true;
                 }
@@ -311,17 +195,14 @@ pub const MiniVM = struct {
         try self.onBye();
     }
 
+    // ===
+
     pub fn readByteAndAdvancePC(self: *@This()) u8 {
-        const pc_at = self.program_counter.fetch();
-        // TODO handle reaching end of memory
-        self.program_counter.storeAdd(1);
-        return self.memory[pc_at];
+        return self.program_counter.readByteAndAdvance(self.memory);
     }
 
     pub fn readCellAndAdvancePC(self: *@This()) Cell {
-        const low = self.readByteAndAdvancePC();
-        const high = self.readByteAndAdvancePC();
-        return @as(Cell, high) << 8 | low;
+        return self.program_counter.readCellAndAdvance(self.memory);
     }
 
     pub fn absoluteJump(
@@ -348,29 +229,75 @@ pub const MiniVM = struct {
         }
     }
 
-    pub fn defineWordHeader(
-        self: *@This(),
-        name: []const u8,
-    ) Error!void {
-        const word_header = WordHeader{
-            .latest = self.latest.fetch(),
-            .isImmediate = false,
-            .isHidden = false,
-            .name = name,
-        };
-        const header_size = @as(Cell, @truncate(word_header.size()));
-        self.here.alignForward(Cell);
-        const aligned_here = self.here.fetch();
-        self.latest.store(aligned_here);
-        try word_header.writeToMemory(
-            self.memory[aligned_here..][0..header_size],
-        );
-        self.here.storeAdd(header_size);
-        self.here.alignForward(Cell);
+    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
+        // TODO limit word size somehwere
+
+        // TODO check headersize a different way
+        // const header_size = WordHeader.calculateSize(@truncate(word.len));
+        const header_size = 0;
+        const cfa_addr = addr + header_size;
+        try self.absoluteJump(cfa_addr, false);
+        try self.evaluateLoop();
+    }
+
+    // ===
+
+    fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
+        if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
+            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
+            return .{
+                .value = .{
+                    .bytecode = bytecode,
+                },
+                .is_immediate = bytecode_definition.is_immediate,
+            };
+        } else if (try self.dictionary.lookup(word)) |definition_addr| {
+            // TODO is_immediate
+            return .{
+                .value = .{
+                    .mini_word = definition_addr,
+                },
+                .is_immediate = false,
+            };
+            // TODO rethrow InvalidBase errors
+        } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
+            return .{
+                .value = .{
+                    .number = @truncate(value),
+                },
+                .is_immediate = false,
+            };
+        } else {
+            return null;
+        }
+    }
+
+    pub fn interpretString(self: *@This(), word: []const u8) Error!void {
+        if (try self.lookupString(word)) |word_info| {
+            const state: CompileState = @enumFromInt(self.state.fetch());
+            const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
+            switch (effective_state) {
+                .interpret => {
+                    switch (word_info.value) {
+                        .bytecode => |byte| {
+                            try bytecodes.executeBytecode(byte, self, false);
+                        },
+                        .mini_word => |addr| {
+                            try self.executeMiniWord(addr);
+                        },
+                        .number => |value| {
+                            try self.data_stack.push(value);
+                        },
+                    }
+                },
+                .compile => {
+                    self.dictionary.compile(word_info);
+                },
+            }
+        }
     }
 };
 
 test "mini" {
-    // defineWordHeader
-    //     check here, latest, memory
+    // TODO
 }

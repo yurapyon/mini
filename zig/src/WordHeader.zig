@@ -13,8 +13,8 @@ pub const WordHeader = struct {
     // is_immediate(1), is_hidden(1), name_len(6)
 
     latest: vm.Cell,
-    isImmediate: bool,
-    isHidden: bool,
+    is_immediate: bool,
+    is_hidden: bool,
     name: []const u8,
 
     // TODO handle out of bounds errors
@@ -23,8 +23,8 @@ pub const WordHeader = struct {
         const latest_high = memory[1];
         const flag_name_len = memory[2];
         self.latest = @as(u16, latest_high) << 8 | latest_low;
-        self.isImmediate = (flag_name_len & 0x8) > 0;
-        self.isHidden = (flag_name_len & 0x4) > 0;
+        self.is_immediate = (flag_name_len & 0x8) > 0;
+        self.is_hidden = (flag_name_len & 0x4) > 0;
         const name_len = flag_name_len & 0x3f;
         self.name = memory[3..(name_len + 3)];
     }
@@ -33,10 +33,10 @@ pub const WordHeader = struct {
     pub fn writeToMemory(self: @This(), memory: []u8) vm.Error!void {
         memory[0] = @truncate(self.latest);
         memory[1] = @truncate(self.latest >> 8);
-        if (self.isImmediate) {
+        if (self.is_immediate) {
             memory[2] |= 1 << 7;
         }
-        if (self.isHidden) {
+        if (self.is_hidden) {
             memory[2] |= 1 << 6;
         }
         memory[2] |= @truncate(self.name.len & 0x3f);
@@ -64,6 +64,9 @@ pub const WordHeader = struct {
     pub fn size(self: @This()) vm.Cell {
         return calculateSize(@truncate(self.name.len));
     }
+
+    // TODO
+    // need a toCfa thing
 };
 
 test "word headers" {
@@ -73,8 +76,8 @@ test "word headers" {
 
     const wh_a: WordHeader = .{
         .latest = 0xbeef,
-        .isImmediate = true,
-        .isHidden = false,
+        .is_immediate = true,
+        .is_hidden = false,
         .name = "mini-word",
     };
 

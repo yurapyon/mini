@@ -21,7 +21,7 @@ pub fn determineType(bytecode: u8) BytecodeType {
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     callback: vm.BytecodeFn = nop,
-    isImmediate: bool = false,
+    is_immediate: bool = false,
     bytecode_type: BytecodeType = .basic,
 };
 
@@ -44,7 +44,7 @@ fn data(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 const dataDefinition = BytecodeDefinition{
     .name = "data",
     .callback = data,
-    .isImmediate = false,
+    .is_immediate = false,
     .bytecode_type = .data,
 };
 
@@ -64,7 +64,7 @@ fn absjump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 const absJumpDefinition = BytecodeDefinition{
     .name = "absjump",
     .callback = absjump,
-    .isImmediate = false,
+    .is_immediate = false,
     .bytecode_type = .absolute_jump,
 };
 
@@ -84,36 +84,12 @@ pub fn executeBytecode(
     mini: *vm.MiniVM,
     program_counter_is_valid: bool,
 ) vm.Error!void {
-    // Note
-    // constructing the execution context in here to hopefully help
-    // zig with turning this switch statement into a fancy jump table thing
-    // TODO veryify this is compiling how we want it to
-    // off the top of my head i think it might not be...
-    // the execution context stuff is a little confusing
-    switch (bytecode) {
-        inline 0b00000000...0b01101111 => |byte| {
-            const ctx: vm.ExecutionContext = .{
-                .last_bytecode = byte,
-                .program_counter_is_valid = program_counter_is_valid,
-            };
-            const id = byte & 0x7f;
-            try lookup_table[id].callback(mini, ctx);
-        },
-        inline 0b01110000...0b01111111 => |byte| {
-            const ctx: vm.ExecutionContext = .{
-                .last_bytecode = byte,
-                .program_counter_is_valid = program_counter_is_valid,
-            };
-            try dataDefinition.callback(mini, ctx);
-        },
-        inline 0b10000000...0b11111111 => |byte| {
-            const ctx: vm.ExecutionContext = .{
-                .last_bytecode = byte,
-                .program_counter_is_valid = program_counter_is_valid,
-            };
-            try absJumpDefinition.callback(mini, ctx);
-        },
-    }
+    const ctx: vm.ExecutionContext = .{
+        .last_bytecode = bytecode,
+        .program_counter_is_valid = program_counter_is_valid,
+    };
+
+    try getBytecodeDefinition(bytecode).callback(mini, ctx);
 }
 
 pub fn lookupBytecodeByName(name: []const u8) ?u8 {
@@ -137,8 +113,8 @@ const lookup_table = [_]BytecodeDefinition{
     .{ .name = "panic", .callback = panic },
 
     .{ .name = "'", .callback = tick },
-    .{ .name = "[']", .callback = bracketTick, .isImmediate = true },
-    .{ .name = "]", .callback = rBracket, .isImmediate = true },
+    .{ .name = "[']", .callback = bracketTick, .is_immediate = true },
+    .{ .name = "]", .callback = rBracket, .is_immediate = true },
     .{ .name = "[", .callback = lBracket },
 
     .{ .name = "find", .callback = find },
@@ -353,7 +329,7 @@ fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO
-    try mini.defineWordHeader("");
+    try mini.dictionary.defineWordHeader("");
 }
 
 fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -390,7 +366,7 @@ fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.here.comma(value);
+    mini.dictionary.here.comma(value);
 }
 
 fn lit(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
@@ -421,7 +397,7 @@ fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.here.commaC(@truncate(value));
+    mini.dictionary.here.commaC(@truncate(value));
 }
 
 fn litC(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
@@ -601,16 +577,16 @@ fn gteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn storeHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.here.store(value);
+    mini.dictionary.here.store(value);
 }
 
 fn storeAddHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.here.storeAdd(value);
+    mini.dictionary.here.storeAdd(value);
 }
 
 fn fetchHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(mini.here.fetch());
+    try mini.data_stack.push(mini.dictionary.here.fetch());
 }
 
 fn plus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

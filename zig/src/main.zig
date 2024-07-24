@@ -7,12 +7,11 @@ fn runMiniVM(allocator: Allocator) !void {
     const mem = try vm.allocateMemory(allocator);
     defer allocator.free(mem);
 
-    var vmInstance: vm.MiniVM = undefined;
-    try vmInstance.init(mem);
-    defer vmInstance.deinit();
+    var vm_instance: vm.MiniVM = undefined;
+    try vm_instance.init(mem);
 
-    vmInstance.input_source.setInputBuffer("1 dup dup\n");
-    try vmInstance.repl();
+    vm_instance.input_source.setInputBuffer("1 dup dup\n");
+    try vm_instance.repl();
 }
 
 pub fn main() !void {}
@@ -23,6 +22,7 @@ test "simple test" {
     _ = @import("utils.zig");
     _ = @import("Register.zig");
     _ = @import("InputSource.zig");
+    _ = @import("Dictionary.zig");
 
     try runMiniVM(std.testing.allocator);
 }
