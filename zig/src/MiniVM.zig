@@ -245,12 +245,15 @@ pub const MiniVM = struct {
         //     directly without having to do any math
 
         while (self.return_stack.depth() > 0) {
-            const byte = self.readByteAndAdvancePC();
+            const bytecode = self.readByteAndAdvancePC();
             const ctx = ExecutionContext{
-                .current_bytecode = byte,
+                .current_bytecode = bytecode,
                 .program_counter_is_valid = true,
             };
-            try self.executeBytecode(byte, ctx);
+            try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
+                self,
+                ctx,
+            );
         }
     }
 
@@ -315,7 +318,10 @@ pub const MiniVM = struct {
                                         .current_bytecode = bytecode,
                                         .program_counter_is_valid = false,
                                     };
-                                    try self.executeBytecode(bytecode, ctx);
+                                    try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
+                                        self,
+                                        ctx,
+                                    );
                                 },
                                 .data, .absolute_jump => return error.CannotInterpretWord,
                             }
@@ -338,19 +344,15 @@ pub const MiniVM = struct {
     pub fn compile(self: *@This(), word_info: WordInfo) Error!void {
         switch (word_info.value) {
             .bytecode => |bytecode| {
-                switch (bytecodes.BytecodeType.fromBytecode(bytecode)) {
-                    .basic => {
-                        self.dictionary.here.commaC(bytecode);
-                    },
-                    .data => {
-                        const data = try self.popSlice();
-                        self.dictionary.compileData(data);
-                    },
-                    .absolute_jump => {
-                        const cfa_addr = try self.data_stack.pop();
-                        self.dictionary.compileAbsJump(cfa_addr);
-                    },
-                }
+                const ctx = ExecutionContext{
+                    .current_bytecode = bytecode,
+                    // TODO what is this?
+                    .program_counter_is_valid = false,
+                };
+                try bytecodes.getBytecodeDefinition(bytecode).compileSemantics(
+                    self,
+                    ctx,
+                );
             },
             .mini_word => |addr| {
                 const cfa_addr = try calculateCfaAddress(self.memory, addr);
