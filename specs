@@ -27,6 +27,16 @@ behavior:
   bye: system dependent
 
 words:
-  compile only:
-    ##data ( addr len -- )
-    ##absjump ( cfa-addr -- )
+  semantics:
+    most words:
+      compile:   write bytecode for self to memory
+      interpret: do something
+      execute:   do the same thing as above
+    ##data:
+      compile:   write bytecode for self and data from the stack to memory
+      interpret: write bytecode for self and data from the stack to memory
+      execute:   push address of data and len to stack
+    ##absjump:
+      compile:   write bytecode for self and absolute jump to memory
+      interpret: write bytecode for self and absolute jump to memory
+      execute:   jump to the address

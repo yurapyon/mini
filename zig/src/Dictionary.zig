@@ -78,15 +78,22 @@ pub const Dictionary = struct {
     }
 
     pub fn compileAbsJump(self: *@This(), addr: vm.Cell) void {
+        // TODO check addr isnt bigger than 2^15
         const base = bytecodes.base_abs_jump_bytecode;
-        const jump = base | (addr & 0x7f);
+        const jump = base | (addr & 0x7fff);
         self.here.commaC(@truncate(jump >> 8));
         self.here.commaC(@truncate(jump));
     }
 
     pub fn compileData(self: *@This(), data: []u8) void {
-        _ = self;
-        _ = data;
+        // TODO check data.len isnt bigger than 2^12
+        const base = bytecodes.base_data_bytecode;
+        const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
+        self.here.commaC(@truncate(data_len >> 8));
+        self.here.commaC(@truncate(data_len));
+        for (data) |byte| {
+            self.here.commaC(byte);
+        }
     }
 };
 

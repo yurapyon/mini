@@ -31,7 +31,6 @@ pub const Error = error{
     ReturnStackUnderflow,
     WordNotFound,
     WordNameTooLong,
-    CannotInterpretWord,
     InvalidProgramCounter,
     CannotGetAddressOfBytecode,
 } || InputError || utils.ParseNumberError || Allocator.Error;
@@ -312,19 +311,14 @@ pub const MiniVM = struct {
                 .interpret => {
                     switch (word_info.value) {
                         .bytecode => |bytecode| {
-                            switch (bytecodes.BytecodeType.fromBytecode(bytecode)) {
-                                .basic => {
-                                    const ctx = ExecutionContext{
-                                        .current_bytecode = bytecode,
-                                        .program_counter_is_valid = false,
-                                    };
-                                    try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
-                                        self,
-                                        ctx,
-                                    );
-                                },
-                                .data, .absolute_jump => return error.CannotInterpretWord,
-                            }
+                            const ctx = ExecutionContext{
+                                .current_bytecode = bytecode,
+                                .program_counter_is_valid = false,
+                            };
+                            try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
+                                self,
+                                ctx,
+                            );
                         },
                         .mini_word => |addr| {
                             try self.executeMiniWord(addr);
@@ -346,7 +340,7 @@ pub const MiniVM = struct {
             .bytecode => |bytecode| {
                 const ctx = ExecutionContext{
                     .current_bytecode = bytecode,
-                    // TODO what is this?
+                    // TODO i'm like 95% sure this should be false
                     .program_counter_is_valid = false,
                 };
                 try bytecodes.getBytecodeDefinition(bytecode).compileSemantics(

@@ -685,23 +685,22 @@ const data_definition = BytecodeDefinition{
     .name = "##data",
     .compileSemantics = dataCompile,
     .interpretSemantics = dataCompile,
-    .executeSemantics = data,
+    .executeSemantics = dataExecute,
     .is_immediate = true,
     .bytecode_type = .data,
 };
 
 fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const data_ = try mini.popSlice();
-    mini.dictionary.compileData(data_);
+    const data = try mini.popSlice();
+    mini.dictionary.compileData(data);
 }
 
-fn data(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     if (!ctx.program_counter_is_valid) {
         return error.InvalidProgramCounter;
     }
 
     // TODO verify this works
-    // TODO how should endianness be handled for this
     const high = ctx.current_bytecode & 0x0f;
     const low = mini.readByteAndAdvancePC();
     const addr = mini.program_counter.fetch();
@@ -717,7 +716,7 @@ const abs_jump_definition = BytecodeDefinition{
     .name = "##absjump",
     .compileSemantics = absjumpCompile,
     .interpretSemantics = absjumpCompile,
-    .executeSemantics = absjump,
+    .executeSemantics = absjumpExecute,
     .is_immediate = true,
     .bytecode_type = .absolute_jump,
 };
@@ -727,13 +726,12 @@ fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     mini.dictionary.compileAbsJump(cfa_addr);
 }
 
-fn absjump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     if (!ctx.program_counter_is_valid) {
         return error.InvalidProgramCounter;
     }
 
     // TODO verify this works
-    // TODO how should endianness be handled for this
     const high = ctx.current_bytecode & 0x7f;
     const low = mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;
