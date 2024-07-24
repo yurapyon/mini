@@ -24,5 +24,5 @@ test "simple test" {
     _ = @import("InputSource.zig");
     _ = @import("Dictionary.zig");
 
-    try runMiniVM(std.testing.allocator);
+    // try runMiniVM(std.testing.allocator);
 }

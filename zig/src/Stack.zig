@@ -4,6 +4,7 @@ const Error = vm.Error;
 
 const Register = @import("Register.zig").Register;
 
+// TODO handle stack overflows
 pub fn Stack(comptime count_: usize) type {
     return struct {
         pub const count = count_;
@@ -38,12 +39,12 @@ pub fn Stack(comptime count_: usize) type {
             self.top.store(self.bottom_offset);
         }
 
-        pub fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
+        fn unsafeIndex(self: *@This(), at: isize) Error!*Cell {
             const addr = @as(isize, @intCast(self.top.fetch())) - (at + 1) * @sizeOf(Cell);
             return vm.cellAt(self.memory, @intCast(addr));
         }
 
-        pub fn unsafeSwapValues(
+        fn unsafeSwapValues(
             self: *@This(),
             a_idx: isize,
             b_idx: isize,
@@ -146,6 +147,60 @@ pub fn Stack(comptime count_: usize) type {
 test "stack" {
     const testing = @import("std").testing;
 
-    // TODO
-    _ = testing;
+    const memory = try vm.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    var stack: Stack32 = undefined;
+    stack.init(memory, 0, 2);
+
+    try testing.expectEqual(0, stack.depth());
+
+    try stack.push(0);
+    try stack.push(1);
+    try stack.push(2);
+    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+
+    try testing.expectEqual(2, try stack.pop());
+
+    try stack.tuck();
+    try expectStack(stack, &[_]vm.Cell{ 1, 0, 1 });
+
+    try stack.drop();
+    try stack.swap();
+    try stack.push(2);
+    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+
+    try stack.rot();
+    try expectStack(stack, &[_]vm.Cell{ 1, 2, 0 });
+
+    try stack.nrot();
+    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+
+    try stack.flip();
+    try stack.nip();
+    try stack.over();
+    try expectStack(stack, &[_]vm.Cell{ 2, 0, 2 });
+
+    try stack.dup();
+    try expectStack(stack, &[_]vm.Cell{ 2, 0, 2, 2 });
+
+    const a, const b, const c, const d = try stack.popMultiple(4);
+    try testing.expectEqual(2, a);
+    try testing.expectEqual(2, b);
+    try testing.expectEqual(0, c);
+    try testing.expectEqual(2, d);
+
+    try testing.expectEqual(0, stack.depth());
+}
+
+const Stack32 = Stack(32);
+
+fn expectStack(stack: Stack32, expectation: []const vm.Cell) !void {
+    const testing = @import("std").testing;
+    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack.memory[stack.bottom_offset]));
+    try testing.expectEqualSlices(
+        vm.Cell,
+        expectation,
+        mem[0..expectation.len],
+    );
 }

@@ -23,8 +23,8 @@ pub const WordHeader = struct {
         const latest_high = memory[1];
         const flag_name_len = memory[2];
         self.latest = @as(u16, latest_high) << 8 | latest_low;
-        self.is_immediate = (flag_name_len & 0x8) > 0;
-        self.is_hidden = (flag_name_len & 0x4) > 0;
+        self.is_immediate = (flag_name_len & 0x80) > 0;
+        self.is_hidden = (flag_name_len & 0x40) > 0;
         const name_len = flag_name_len & 0x3f;
         self.name = memory[3..(name_len + 3)];
     }
@@ -33,13 +33,14 @@ pub const WordHeader = struct {
     pub fn writeToMemory(self: @This(), memory: []u8) vm.Error!void {
         memory[0] = @truncate(self.latest);
         memory[1] = @truncate(self.latest >> 8);
+        var flag_name_len = @as(u8, @truncate(self.name.len & 0x3f));
         if (self.is_immediate) {
-            memory[2] |= 1 << 7;
+            flag_name_len |= 1 << 7;
         }
         if (self.is_hidden) {
-            memory[2] |= 1 << 6;
+            flag_name_len |= 1 << 6;
         }
-        memory[2] |= @truncate(self.name.len & 0x3f);
+        memory[2] = flag_name_len;
         std.mem.copyForwards(u8, memory[3..], self.name);
         memory[self.name.len + 3] = 0;
     }
@@ -98,4 +99,19 @@ test "word headers" {
     try testing.expectEqual(12, WordHeader.calculateSize(8));
 
     try testing.expect(wh_a.nameEquals("mini-word"));
+
+    const wh_c: WordHeader = .{
+        .latest = 0,
+        .is_immediate = false,
+        .is_hidden = false,
+        .name = "name",
+    };
+
+    try wh_c.writeToMemory(&memory);
+
+    try testing.expectEqualSlices(
+        u8,
+        &[_]u8{ 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', 0 },
+        memory[0..8],
+    );
 }
