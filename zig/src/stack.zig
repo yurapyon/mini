@@ -195,7 +195,7 @@ test "stack" {
 
 const Stack32 = Stack(32);
 
-pub fn expectStack(stack: Stack32, expectation: []const vm.Cell) !void {
+pub fn expectStack(stack: anytype, expectation: []const vm.Cell) !void {
     const testing = @import("std").testing;
     const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack.memory[stack.bottom_offset]));
     try testing.expectEqualSlices(

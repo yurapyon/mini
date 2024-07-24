@@ -413,24 +413,14 @@ test "mini" {
     var vm: MiniVM = undefined;
     try vm.init(mem);
 
-    // TODO
-    vm.input_source.setInputBuffer("1 dup 1+ dup 1+ \n");
+    vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
 
-    var word = try vm.input_source.readNextWord();
-    if (word) |w| {
-        try vm.interpretString(w);
-    }
-    word = try vm.input_source.readNextWord();
-    if (word) |w| {
-        try vm.interpretString(w);
-    }
-    word = try vm.input_source.readNextWord();
-    if (word) |w| {
-        try vm.interpretString(w);
+    for (0..5) |_| {
+        const word = try vm.input_source.readNextWord();
+        if (word) |w| {
+            try vm.interpretString(w);
+        }
     }
 
-    _ = stack;
-
-    // TODO
-    // try stack.expectStack(vm.data_stack, &[_]Cell{ 1, 2, 3 });
+    try stack.expectStack(vm.data_stack, &[_]Cell{ 1, 2, 3 });
 }

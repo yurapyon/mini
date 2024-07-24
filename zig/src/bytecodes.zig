@@ -55,7 +55,7 @@ pub fn lookupBytecodeByName(name: []const u8) ?u8 {
     return null;
 }
 
-test "bytecodes" {
+test "bytecode-utils" {
     // TODO
 }
 
@@ -481,19 +481,19 @@ fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO need to figure out signed in handling
+    // TODO need to figure out signed int handling
     const value = try mini.data_stack.pop();
     _ = value;
     // try mini.data_stack.push(-value);
 }
 
 fn lshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value, const shift_ = try mini.data_stack.popMultiple(2);
+    const shift_, const value = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(value << @truncate(shift_));
 }
 
 fn rshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value, const shift_ = try mini.data_stack.popMultiple(2);
+    const shift_, const value = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(value >> @truncate(shift_));
 }
 
@@ -740,4 +740,75 @@ fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     const low = mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;
     try mini.absoluteJump(addr, true);
+}
+
+test "bytecodes" {
+    const testing = @import("std").testing;
+
+    const memory = try vm.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    var mini: vm.MiniVM = undefined;
+    try mini.init(memory);
+
+    try mini.data_stack.push(1);
+    try mini.data_stack.push(0xabcd);
+
+    try testWords(
+        &mini,
+        &[_]VmWordTest{
+            .{ .word = "dup", .stack = &[_]u16{ 1, 0xabcd, 0xabcd } },
+            .{ .word = "0xffff", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff } },
+            .{ .word = "4", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff, 4 } },
+            .{ .word = "rshift", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0x0fff } },
+            .{ .word = "and", .stack = &[_]u16{ 1, 0xabcd, 0x0bcd } },
+        },
+    );
+}
+const TestMode = enum {
+    compile,
+    interpret,
+    execute,
+};
+
+const VmWordTest = struct {
+    word: []const u8,
+    stack: []const vm.Cell,
+    mode: TestMode = .interpret,
+};
+
+fn testWords(mini: *vm.MiniVM, word_tests: []const VmWordTest) !void {
+    // TODO is there a way to print which line failed?
+    for (word_tests) |word_test| {
+        try testBytecodeStack(
+            mini,
+            word_test.word,
+            word_test.mode,
+            word_test.stack,
+        );
+    }
+}
+
+fn testBytecodeStack(
+    mini: *vm.MiniVM,
+    word: []const u8,
+    mode: TestMode,
+    expect_stack: []const vm.Cell,
+) !void {
+    const stack = @import("stack.zig");
+
+    const bytecode = lookupBytecodeByName(word) orelse unreachable;
+    const bytecode_definition = getBytecodeDefinition(bytecode);
+
+    const ctx = vm.ExecutionContext{
+        .current_bytecode = bytecode,
+    };
+
+    try switch (mode) {
+        .compile => bytecode_definition.compileSemantics(mini, ctx),
+        .interpret => bytecode_definition.interpretSemantics(mini, ctx),
+        .execute => bytecode_definition.executeSemantics(mini, ctx),
+    };
+
+    try stack.expectStack(mini.data_stack, expect_stack);
 }
