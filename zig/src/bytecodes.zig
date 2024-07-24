@@ -4,25 +4,26 @@ const vm = @import("MiniVM.zig");
 
 // ===
 
-pub const BytecodeType = enum {
-    basic,
-    data,
-    absolute_jump,
+fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
 
-    pub fn fromBytecode(bytecode: u8) @This() {
-        return switch (bytecode) {
-            0b00000000...0b01101111 => .basic,
-            0b01110000...0b01111111 => .data,
-            0b10000000...0b11111111 => .absolute_jump,
-        };
-    }
-};
+fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    mini.dictionary.here.commaC(ctx.current_bytecode);
+}
+
+fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    return error.CannotInterpret;
+}
+
+fn cannotCompile(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    return error.CannotCompile;
+}
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
-    callback: vm.BytecodeFn = nop,
+    compileSemantics: vm.BytecodeFn = nop,
+    interpretSemantics: vm.BytecodeFn = nop,
+    executeSemantics: vm.BytecodeFn = nop,
     is_immediate: bool = false,
-    bytecode_type: BytecodeType = .basic,
 };
 
 pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
@@ -60,124 +61,163 @@ test "bytecodes" {
 
 // ===
 
+fn constructBasicBytecode(
+    name: []const u8,
+    callback: vm.BytecodeFn,
+) BytecodeDefinition {
+    return .{
+        .name = name,
+        .compileSemantics = compileSelf,
+        .interpretSemantics = callback,
+        .executeSemantics = callback,
+        .is_immediate = false,
+    };
+}
+
+fn constructBasicImmediateBytecode(
+    name: []const u8,
+    callback: vm.BytecodeFn,
+) BytecodeDefinition {
+    return .{
+        .name = name,
+        .compileSemantics = callback,
+        .interpretSemantics = callback,
+        .executeSemantics = callback,
+        .is_immediate = true,
+    };
+}
+
+fn constructExecuteOnlyBytecode(
+    name: []const u8,
+    callback: vm.BytecodeFn,
+) BytecodeDefinition {
+    return .{
+        .name = name,
+        .compileSemantics = cannotCompile,
+        .interpretSemantics = cannotInterpret,
+        .executeSemantics = callback,
+        .is_immediate = false,
+    };
+}
+
 const lookup_table = [_]BytecodeDefinition{
     // ===
-    .{ .name = "bye", .callback = bye },
-    .{ .name = "quit", .callback = quit },
-    .{ .name = "exit", .callback = exit },
-    .{ .name = "panic", .callback = panic },
+    constructBasicBytecode("bye", bye),
+    constructBasicBytecode("quit", quit),
+    constructBasicBytecode("exit", exit),
+    constructBasicBytecode("panic", panic),
 
-    .{ .name = "'", .callback = tick },
-    .{ .name = "[']", .callback = bracketTick, .is_immediate = true },
-    .{ .name = "]", .callback = rBracket, .is_immediate = true },
-    .{ .name = "[", .callback = lBracket },
+    constructBasicBytecode("'", tick),
+    constructBasicImmediateBytecode("[']", bracketTick),
+    constructBasicImmediateBytecode("]", rBracket),
+    constructBasicBytecode("[", lBracket),
 
-    .{ .name = "find", .callback = find },
-    .{ .name = "word", .callback = nextWord },
-    .{ .name = "next-char", .callback = nextChar },
-    .{ .name = "define", .callback = define },
+    constructBasicBytecode("find", find),
+    constructBasicBytecode("word", nextWord),
+    constructBasicBytecode("next-char", nextChar),
+    constructBasicBytecode("define", define),
 
-    .{ .name = "branch", .callback = branch },
-    .{ .name = "branch0", .callback = branch0 },
-    .{ .name = "execute", .callback = execute },
-    .{ .name = "tailcall", .callback = tailcall },
-
-    // ===
-    .{ .name = "!", .callback = store },
-    .{ .name = "+!", .callback = storeAdd },
-    .{ .name = "@", .callback = fetch },
-    .{ .name = ",", .callback = comma },
-    .{ .name = "lit", .callback = lit },
-
-    .{ .name = "c!", .callback = storeC },
-    .{ .name = "+c!", .callback = storeAddC },
-    .{ .name = "c@", .callback = fetchC },
-    .{ .name = "c,", .callback = commaC },
-    .{ .name = "litc", .callback = litC },
-
-    .{ .name = ">r", .callback = toR },
-    .{ .name = "r>", .callback = fromR },
-    .{ .name = "r@", .callback = Rfetch },
-
-    .{ .name = "=", .callback = eq },
-    .{ .name = "<", .callback = lt },
-    .{ .name = "<=", .callback = lteq },
+    constructExecuteOnlyBytecode("branch", branch),
+    constructExecuteOnlyBytecode("branch0", branch0),
+    constructBasicBytecode("execute", execute),
+    constructExecuteOnlyBytecode("tailcall", tailcall),
 
     // ===
-    .{ .name = "+", .callback = plus },
-    .{ .name = "-", .callback = minus },
-    .{ .name = "*", .callback = multiply },
-    .{ .name = "/mod", .callback = divMod },
-    .{ .name = "u/mod", .callback = uDivMod },
-    .{ .name = "negate", .callback = negate },
+    constructBasicBytecode("!", store),
+    constructBasicBytecode("+!", storeAdd),
+    constructBasicBytecode("@", fetch),
+    constructBasicBytecode(",", comma),
+    constructExecuteOnlyBytecode("lit", lit),
 
-    .{ .name = "lshift", .callback = lshift },
-    .{ .name = "rshift", .callback = rshift },
-    .{ .name = "and", .callback = miniAnd },
-    .{ .name = "or", .callback = miniOr },
-    .{ .name = "xor", .callback = xor },
-    .{ .name = "invert", .callback = invert },
+    constructBasicBytecode("c!", storeC),
+    constructBasicBytecode("+c!", storeAddC),
+    constructBasicBytecode("c@", fetchC),
+    constructBasicBytecode("c,", commaC),
+    constructExecuteOnlyBytecode("litc", litC),
 
-    .{ .name = "seldev", .callback = selDev },
-    .{ .name = "d!", .callback = storeD },
-    .{ .name = "d+!", .callback = storeAddD },
-    .{ .name = "d@", .callback = fetchD },
+    constructBasicBytecode(">r", toR),
+    constructBasicBytecode("r>", fromR),
+    constructBasicBytecode("r@", Rfetch),
 
-    // ===
-    .{ .name = "dup", .callback = dup },
-    .{ .name = "drop", .callback = drop },
-    .{ .name = "swap", .callback = swap },
-    .{ .name = "pick", .callback = pick },
-
-    .{ .name = "rot", .callback = rot },
-    .{ .name = "-rot", .callback = nrot },
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
+    constructBasicBytecode("=", eq),
+    constructBasicBytecode("<", lt),
+    constructBasicBytecode("<=", lteq),
 
     // ===
-    .{ .name = "0=", .callback = eq0 },
-    .{ .name = ">", .callback = gt },
-    .{ .name = ">=", .callback = gteq },
+    constructBasicBytecode("+", plus),
+    constructBasicBytecode("-", minus),
+    constructBasicBytecode("*", multiply),
+    constructBasicBytecode("/mod", divMod),
+    constructBasicBytecode("u/mod", uDivMod),
+    constructBasicBytecode("negate", negate),
 
-    .{ .name = "here!", .callback = storeHere },
-    .{ .name = "here+!", .callback = storeAddHere },
-    .{ .name = "here@", .callback = fetchHere },
+    constructBasicBytecode("lshift", lshift),
+    constructBasicBytecode("rshift", rshift),
+    constructBasicBytecode("and", miniAnd),
+    constructBasicBytecode("or", miniOr),
+    constructBasicBytecode("xor", xor),
+    constructBasicBytecode("invert", invert),
 
-    .{ .name = "1+", .callback = plus1 },
-    .{ .name = "1-", .callback = minus1 },
-
-    .{ .name = "0", .callback = push0 },
-    .{ .name = "0xffff", .callback = pushFFFF },
-
-    .{ .name = "1", .callback = push1 },
-    .{ .name = "2", .callback = push2 },
-    .{ .name = "4", .callback = push4 },
-    .{ .name = "8", .callback = push8 },
-
-    .{ .name = "cell>bytes", .callback = cellToBytes },
-    .{ .name = "bytes>cell", .callback = bytesToCell },
+    constructBasicBytecode("seldev", selDev),
+    constructBasicBytecode("d!", storeD),
+    constructBasicBytecode("d+!", storeAddD),
+    constructBasicBytecode("d@", fetchD),
 
     // ===
-    .{ .name = "cmove", .callback = cmove },
-    .{ .name = "cmove>", .callback = cmoveUp },
-    .{ .name = "mem=", .callback = memEq },
+    constructBasicBytecode("dup", dup),
+    constructBasicBytecode("drop", drop),
+    constructBasicBytecode("swap", swap),
+    constructBasicBytecode("pick", pick),
 
-    .{ .name = "?dup", .callback = maybeDup },
+    constructBasicBytecode("rot", rot),
+    constructBasicBytecode("-rot", nrot),
+    .{},
+    .{},
 
-    .{ .name = "nip", .callback = nip },
-    .{ .name = "flip", .callback = flip },
-    .{ .name = "tuck", .callback = tuck },
-    .{ .name = "over", .callback = over },
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    // ===
+    constructBasicBytecode("0=", eq0),
+    constructBasicBytecode(">", gt),
+    constructBasicBytecode(">=", gteq),
+
+    constructBasicBytecode("here!", storeHere),
+    constructBasicBytecode("here+!", storeAddHere),
+    constructBasicBytecode("here@", fetchHere),
+
+    constructBasicBytecode("1+", plus1),
+    constructBasicBytecode("1-", minus1),
+
+    constructBasicBytecode("0", push0),
+    constructBasicBytecode("0xffff", pushFFFF),
+
+    constructBasicBytecode("1", push1),
+    constructBasicBytecode("2", push2),
+    constructBasicBytecode("4", push4),
+    constructBasicBytecode("8", push8),
+
+    constructBasicBytecode("cell>bytes", cellToBytes),
+    constructBasicBytecode("bytes>cell", bytesToCell),
+
+    // ===
+    constructBasicBytecode("cmove", cmove),
+    constructBasicBytecode("cmove>", cmoveUp),
+    constructBasicBytecode("mem=", memEq),
+
+    constructBasicBytecode("?dup", maybeDup),
+
+    constructBasicBytecode("nip", nip),
+    constructBasicBytecode("flip", flip),
+    constructBasicBytecode("tuck", tuck),
+    constructBasicBytecode("over", over),
 
     .{},
     .{},
@@ -213,8 +253,6 @@ const lookup_table = [_]BytecodeDefinition{
 
 // ===
 
-fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
-
 fn bye(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     mini.should_bye = true;
 }
@@ -232,13 +270,21 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     return error.Panic;
 }
 
+/// Pushes whether word is bytecode or not
+///   followed by bytecode or cfa_addr
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(try mini.readWordAndGetCfaAddress());
+    const result = try mini.readWordAndGetAddress();
+    try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
+    try mini.data_stack.push(result.value);
 }
 
 fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const cfa_addr = try mini.readWordAndGetCfaAddress();
-    mini.dictionary.compileLit(cfa_addr);
+    const result = try mini.readWordAndGetAddress();
+    if (result.is_bytecode) {
+        mini.dictionary.compileLitC(@truncate(result.value));
+    } else {
+        mini.dictionary.compileLit(result.value);
+    }
 }
 
 fn rBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -249,11 +295,7 @@ fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     mini.state.store(@intFromEnum(vm.CompileState.compile));
 }
 
-fn branch(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
+fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = mini.readByteAndAdvancePC();
     try mini.absoluteJump(addr, false);
 }
@@ -307,13 +349,13 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.absoluteJump(addr, true);
 }
 
-fn tailcall(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
+/// This jumps to the following address in memory without
+///   pushing anything to the return stack
+fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = mini.readCellAndAdvancePC();
-    try mini.absoluteJump(addr, false);
+    // TODO this mask should be a constant somewhere
+    const masked_addr = addr & 0x7fff;
+    try mini.absoluteJump(masked_addr, false);
 }
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -339,11 +381,7 @@ fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     mini.dictionary.here.comma(value);
 }
 
-fn lit(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
+fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = mini.readCellAndAdvancePC();
     try mini.data_stack.push(value);
 }
@@ -370,11 +408,7 @@ fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     mini.dictionary.here.commaC(@truncate(value));
 }
 
-fn litC(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
+fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const byte = mini.readByteAndAdvancePC();
     try mini.data_stack.push(byte);
 }
@@ -663,18 +697,19 @@ pub const base_data_bytecode = 0b01110000;
 
 const data_definition = BytecodeDefinition{
     .name = "##data",
-    .callback = data,
-    .is_immediate = false,
-    .bytecode_type = .data,
+    .compileSemantics = dataCompile,
+    .interpretSemantics = dataCompile,
+    .executeSemantics = dataExecute,
+    .is_immediate = true,
 };
 
-fn data(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
+fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const data = try mini.popSlice();
+    mini.dictionary.compileData(data);
+}
 
+fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
-    // TODO how should endianness be handled for this
     const high = ctx.current_bytecode & 0x0f;
     const low = mini.readByteAndAdvancePC();
     const addr = mini.program_counter.fetch();
@@ -688,18 +723,19 @@ pub const base_abs_jump_bytecode = 0b10000000;
 
 const abs_jump_definition = BytecodeDefinition{
     .name = "##absjump",
-    .callback = absjump,
-    .is_immediate = false,
-    .bytecode_type = .absolute_jump,
+    .compileSemantics = absjumpCompile,
+    .interpretSemantics = absjumpCompile,
+    .executeSemantics = absjumpExecute,
+    .is_immediate = true,
 };
 
-fn absjump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
+fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const cfa_addr = try mini.data_stack.pop();
+    mini.dictionary.compileAbsJump(cfa_addr);
+}
 
+fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
-    // TODO how should endianness be handled for this
     const high = ctx.current_bytecode & 0x7f;
     const low = mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;

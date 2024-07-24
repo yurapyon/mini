@@ -26,7 +26,25 @@ behavior:
   quit: exits interpret loop
   bye: system dependent
 
-words:
-  compile only:
-    ##data ( addr len -- )
-    ##absjump ( cfa-addr -- )
+bytecodes:
+  semantics:
+    most bytecodes:
+      compile:   write bytecode for self to memory
+      interpret: do something
+      execute:   do the same thing as above
+    immediate (bracketTick, rBracket):
+      compile:   do something
+      interpret: do the same thing as above
+      execute:   do the same thing as above
+    execute only (branch, branch0, tailcall, lit, litc):
+      compile:   error
+      interpret: error
+      execute:   do something
+    ##data:
+      compile:   write bytecode for self and data from the stack to memory
+      interpret: write bytecode for self and data from the stack to memory
+      execute:   push address of data and len to stack
+    ##absjump:
+      compile:   write bytecode for self and absolute jump to memory
+      interpret: write bytecode for self and absolute jump to memory
+      execute:   push following addr to return stack and jump to address read from memory
