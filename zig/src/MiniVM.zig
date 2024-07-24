@@ -78,13 +78,20 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     dictionary_start: u0,
 }, Cell);
 
-pub const BytecodeFn = *const fn (vm: *MiniVM) Error!void;
+pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void;
 
-// todo could put isImmediate in here too
-const WordInfo = union(enum) {
-    bytecode: u8,
-    mini_word: Cell,
-    number: Cell,
+pub const ExecutionContext = struct {
+    last_bytecode: u8,
+    program_counter_is_valid: bool,
+};
+
+pub const WordInfo = struct {
+    value: union(enum) {
+        bytecode: u8,
+        mini_word: Cell,
+        number: Cell,
+    },
+    isImmediate: bool,
 };
 
 pub const Cell = u16;
@@ -173,12 +180,11 @@ pub const MiniVM = struct {
     // ===
 
     fn lookupMiniDefinition(self: *@This(), word: []const u8) Error!?Cell {
-        // TODO account for isHidden
         var latest = self.latest.fetch();
         var temp_word_header: WordHeader = undefined;
         while (latest != 0) : (latest = temp_word_header.latest) {
             try temp_word_header.initFromMemory(self.memory[latest..]);
-            if (temp_word_header.nameEquals(word)) {
+            if (!temp_word_header.isHidden and temp_word_header.nameEquals(word)) {
                 return latest;
             }
         }
@@ -186,22 +192,39 @@ pub const MiniVM = struct {
     }
 
     fn lookupWord(self: *@This(), word: []const u8) Error!?WordInfo {
-        if (bytecodes.getCallbackBytecode(word)) |bytecode| {
-            return .{ .bytecode = bytecode };
+        if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
+            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
+            return .{
+                .value = .{
+                    .bytecode = bytecode,
+                },
+                .isImmediate = bytecode_definition.isImmediate,
+            };
         } else if (try self.lookupMiniDefinition(word)) |definition_addr| {
-            return .{ .mini_word = definition_addr };
+            // TODO isImmediate
+            return .{
+                .value = .{
+                    .mini_word = definition_addr,
+                },
+                .isImmediate = false,
+            };
             // TODO rethrow InvalidBase errors
         } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
-            return .{ .number = @truncate(value) };
+            return .{
+                .value = .{
+                    .number = @truncate(value),
+                },
+                .isImmediate = false,
+            };
         } else {
             return null;
         }
     }
 
-    fn interpretWord(self: *@This(), wordInfo: WordInfo) Error!void {
-        switch (wordInfo) {
+    fn interpretWord(self: *@This(), word_info: WordInfo) Error!void {
+        switch (word_info.value) {
             .bytecode => |byte| {
-                try self.evaluateByte(byte, false);
+                try bytecodes.executeBytecode(byte, self, false);
             },
             .mini_word => |addr| {
                 // TODO limit word size somewhere
@@ -218,27 +241,38 @@ pub const MiniVM = struct {
         }
     }
 
-    fn compileWord(self: *@This(), wordInfo: WordInfo) Error!void {
-        switch (wordInfo) {
-            .bytecode => |byte| {
-                const id = byte & 0x7f;
-                const named_callback = bytecodes.getCallbackById(id);
-                if (named_callback.isImmediate) {
-                    try self.interpretWord(wordInfo);
-                } else {
+    fn compileWord(self: *@This(), word_info: WordInfo) Error!void {
+        if (word_info.isImmediate) {
+            try self.interpretWord(word_info);
+        } else {
+            switch (word_info.value) {
+                .bytecode => |bytecode| {
+                    switch (bytecodes.determineType(bytecode)) {
+                        .basic => {
+                            self.here.commaC(bytecode);
+                        },
+                        .data, .absolute_jump => {
+                            // TODO error
+                            // this is a case that shouldnt happen in normal execution
+                            // but may happen if compileWord was called from zig
+                        },
+                    }
+                },
+                .mini_word => |addr| {
+                    _ = addr;
                     // TODO
-                }
-            },
-            .mini_word => |addr| {
-                // TODO
-                // if is immediate
-                _ = addr;
-                // try self.evaluateLoop();
-            },
-            .number => |value| {
-                // TODO
-                _ = value;
-            },
+                    // compile an abs jump to the cfa of this addr
+                },
+                .number => |value| {
+                    if ((value & 0xff00) > 0) {
+                        self.here.comma(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+                        self.here.comma(value);
+                    } else {
+                        self.here.comma(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+                        self.here.commaC(@truncate(value));
+                    }
+                },
+            }
         }
     }
 
@@ -310,45 +344,7 @@ pub const MiniVM = struct {
         //     directly without having to do any math
         while (self.return_stack.depth() > 0) {
             const byte = self.readByteAndAdvancePC();
-            try self.evaluateByte(byte, true);
-        }
-    }
-
-    // program_counter may be moved
-    fn evaluateByte(self: *@This(), byte: u8, programCounterIsValid: bool) Error!void {
-        switch (byte) {
-            inline 0b00000000...0b01101111 => |b| {
-                const id = b & 0x7f;
-                const named_callback = bytecodes.getCallbackById(id);
-                if (programCounterIsValid or !named_callback.needsValidProgramCounter) {
-                    try named_callback.callback(self);
-                } else {
-                    return Error.InvalidProgramCounter;
-                }
-            },
-            inline 0b01110000...0b01111111 => |b| {
-                if (!programCounterIsValid) {
-                    return Error.InvalidProgramCounter;
-                }
-                // TODO how should endianness be handled for this
-                const high = b & 0x0f;
-                const low = self.readByteAndAdvancePC();
-                const addr = self.program_counter.fetch();
-                const length = @as(Cell, high) << 8 | low;
-                try self.data_stack.push(addr);
-                try self.data_stack.push(length);
-                self.program_counter.storeAdd(length);
-            },
-            inline 0b10000000...0b11111111 => |b| {
-                if (!programCounterIsValid) {
-                    return Error.InvalidProgramCounter;
-                }
-                // TODO how should endianness be handled for this
-                const high = b & 0x7f;
-                const low = self.readByteAndAdvancePC();
-                const addr = @as(Cell, high) << 8 | low;
-                try self.absoluteJump(addr, true);
-            },
+            try bytecodes.executeBytecode(byte, self, true);
         }
     }
 
