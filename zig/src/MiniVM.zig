@@ -32,13 +32,16 @@ pub const Error = error{
     WordNotFound,
     WordNameTooLong,
     InvalidProgramCounter,
-    CannotGetAddressOfBytecode,
-} || InputError || utils.ParseNumberError || Allocator.Error;
+} || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
     NoInputBuffer,
     CannotRefill,
+};
+
+pub const SemanticsError = error{
+    CannotInterpret,
 };
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
@@ -90,12 +93,13 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
 pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void;
 
 /// Passed to bytecode callbacks when they are called
+// TODO think about if we still need execution contexts
+//   or if the current_bytecode and just be put in the vm instance
 pub const ExecutionContext = struct {
     current_bytecode: u8,
-    program_counter_is_valid: bool,
 };
 
-// TODO this is a little messy
+// TODO this should have semantics in here and not is_immediate
 pub const WordInfo = struct {
     value: union(enum) {
         // the bytecode
@@ -247,7 +251,6 @@ pub const MiniVM = struct {
             const bytecode = self.readByteAndAdvancePC();
             const ctx = ExecutionContext{
                 .current_bytecode = bytecode,
-                .program_counter_is_valid = true,
             };
             try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
                 self,
@@ -272,7 +275,7 @@ pub const MiniVM = struct {
 
     // ===
 
-    fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
+    pub fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
         if (try self.dictionary.lookup(word)) |definition_addr| {
             var temp_word_header: WordHeader = undefined;
             try temp_word_header.initFromMemory(self.memory[definition_addr..]);
@@ -282,7 +285,6 @@ pub const MiniVM = struct {
                 },
                 .is_immediate = temp_word_header.is_immediate,
             };
-            // TODO rethrow InvalidBase errors
         } else if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
             const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
             return .{
@@ -291,6 +293,7 @@ pub const MiniVM = struct {
                 },
                 .is_immediate = bytecode_definition.is_immediate,
             };
+            // TODO rethrow InvalidBase errors
         } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
             return .{
                 .value = .{
@@ -313,7 +316,6 @@ pub const MiniVM = struct {
                         .bytecode => |bytecode| {
                             const ctx = ExecutionContext{
                                 .current_bytecode = bytecode,
-                                .program_counter_is_valid = false,
                             };
                             try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
                                 self,
@@ -340,8 +342,6 @@ pub const MiniVM = struct {
             .bytecode => |bytecode| {
                 const ctx = ExecutionContext{
                     .current_bytecode = bytecode,
-                    // TODO i'm like 95% sure this should be false
-                    .program_counter_is_valid = false,
                 };
                 try bytecodes.getBytecodeDefinition(bytecode).compileSemantics(
                     self,
@@ -364,17 +364,26 @@ pub const MiniVM = struct {
 
     // helpers ===
 
-    pub fn readWordAndGetCfaAddress(self: *@This()) Error!Cell {
+    pub fn readWordAndGetAddress(self: *@This()) Error!struct {
+        is_bytecode: bool,
+        value: Cell,
+    } {
         const word = try self.input_source.readNextWord();
         if (word) |w| {
             const word_info = try self.lookupString(w);
             if (word_info) |wi| {
                 switch (wi.value) {
-                    .bytecode => |_| {
-                        return error.CannotGetAddressOfBytecode;
+                    .bytecode => |bytecode| {
+                        return .{
+                            .is_bytecode = true,
+                            .value = bytecode,
+                        };
                     },
                     .mini_word => |addr| {
-                        return calculateCfaAddress(self.memory, addr);
+                        return .{
+                            .is_bytecode = false,
+                            .value = try calculateCfaAddress(self.memory, addr),
+                        };
                     },
                     .number => |_| {
                         return error.WordNotFound;
