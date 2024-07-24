@@ -4,19 +4,19 @@ const vm = @import("MiniVM.zig");
 
 // ===
 
-const BytecodeType = enum {
+pub const BytecodeType = enum {
     basic,
     data,
     absolute_jump,
-};
 
-pub fn determineType(bytecode: u8) BytecodeType {
-    return switch (bytecode) {
-        inline 0b00000000...0b01101111 => .basic,
-        inline 0b01110000...0b01111111 => .data,
-        inline 0b10000000...0b11111111 => .absolute_jump,
-    };
-}
+    pub fn fromBytecode(bytecode: u8) @This() {
+        return switch (bytecode) {
+            0b00000000...0b01101111 => .basic,
+            0b01110000...0b01111111 => .data,
+            0b10000000...0b11111111 => .absolute_jump,
+        };
+    }
+};
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
@@ -25,74 +25,25 @@ const BytecodeDefinition = struct {
     bytecode_type: BytecodeType = .basic,
 };
 
-fn data(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
-    // TODO verify this works
-    // TODO how should endianness be handled for this
-    const high = ctx.last_bytecode & 0x0f;
-    const low = mini.readByteAndAdvancePC();
-    const addr = mini.program_counter.fetch();
-    const length = @as(vm.Cell, high) << 8 | low;
-    try mini.data_stack.push(addr);
-    try mini.data_stack.push(length);
-    mini.program_counter.storeAdd(length);
-}
-
-const dataDefinition = BytecodeDefinition{
-    .name = "data",
-    .callback = data,
-    .is_immediate = false,
-    .bytecode_type = .data,
-};
-
-fn absjump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    if (!ctx.program_counter_is_valid) {
-        return error.InvalidProgramCounter;
-    }
-
-    // TODO verify this works
-    // TODO how should endianness be handled for this
-    const high = ctx.last_bytecode & 0x7f;
-    const low = mini.readByteAndAdvancePC();
-    const addr = @as(vm.Cell, high) << 8 | low;
-    try mini.absoluteJump(addr, true);
-}
-
-const absJumpDefinition = BytecodeDefinition{
-    .name = "absjump",
-    .callback = absjump,
-    .is_immediate = false,
-    .bytecode_type = .absolute_jump,
-};
-
 pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
     return switch (bytecode) {
+        // TODO probably shouldnt hardcode these values
         inline 0b00000000...0b01101111 => |byte| {
             const id = byte & 0x7f;
             return lookup_table[id];
         },
-        inline 0b01110000...0b01111111 => dataDefinition,
-        inline 0b10000000...0b11111111 => absJumpDefinition,
+        inline 0b01110000...0b01111111 => data_definition,
+        inline 0b10000000...0b11111111 => abs_jump_definition,
     };
-}
-
-pub fn executeBytecode(
-    bytecode: u8,
-    mini: *vm.MiniVM,
-    program_counter_is_valid: bool,
-) vm.Error!void {
-    const ctx: vm.ExecutionContext = .{
-        .last_bytecode = bytecode,
-        .program_counter_is_valid = program_counter_is_valid,
-    };
-
-    try getBytecodeDefinition(bytecode).callback(mini, ctx);
 }
 
 pub fn lookupBytecodeByName(name: []const u8) ?u8 {
+    if (mem.eql(u8, name, data_definition.name)) {
+        return base_data_bytecode;
+    }
+    if (mem.eql(u8, name, abs_jump_definition.name)) {
+        return base_abs_jump_bytecode;
+    }
     for (lookup_table, 0..) |named_callback, i| {
         const eql = mem.eql(u8, named_callback.name, name);
         if (eql) {
@@ -101,6 +52,10 @@ pub fn lookupBytecodeByName(name: []const u8) ?u8 {
     }
 
     return null;
+}
+
+test "bytecodes" {
+    // TODO
 }
 
 // ===
@@ -700,4 +655,53 @@ fn tuck(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.over();
+}
+
+// ===
+
+pub const base_data_bytecode = 0b01110000;
+
+const data_definition = BytecodeDefinition{
+    .name = "##data",
+    .callback = data,
+    .is_immediate = false,
+    .bytecode_type = .data,
+};
+
+fn data(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    if (!ctx.program_counter_is_valid) {
+        return error.InvalidProgramCounter;
+    }
+
+    // TODO verify this works
+    // TODO how should endianness be handled for this
+    const high = ctx.current_bytecode & 0x0f;
+    const low = mini.readByteAndAdvancePC();
+    const addr = mini.program_counter.fetch();
+    const length = @as(vm.Cell, high) << 8 | low;
+    try mini.data_stack.push(addr);
+    try mini.data_stack.push(length);
+    mini.program_counter.storeAdd(length);
+}
+
+pub const base_abs_jump_bytecode = 0b10000000;
+
+const abs_jump_definition = BytecodeDefinition{
+    .name = "##absjump",
+    .callback = absjump,
+    .is_immediate = false,
+    .bytecode_type = .absolute_jump,
+};
+
+fn absjump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    if (!ctx.program_counter_is_valid) {
+        return error.InvalidProgramCounter;
+    }
+
+    // TODO verify this works
+    // TODO how should endianness be handled for this
+    const high = ctx.current_bytecode & 0x7f;
+    const low = mini.readByteAndAdvancePC();
+    const addr = @as(vm.Cell, high) << 8 | low;
+    try mini.absoluteJump(addr, true);
 }

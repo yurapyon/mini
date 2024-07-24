@@ -25,3 +25,8 @@ states:
 behavior:
   quit: exits interpret loop
   bye: system dependent
+
+words:
+  compile only:
+    ##data ( addr len -- )
+    ##absjump ( cfa-addr -- )

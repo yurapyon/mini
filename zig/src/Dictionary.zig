@@ -6,14 +6,16 @@ const bytecodes = @import("bytecodes.zig");
 const WordHeader = @import("WordHeader.zig").WordHeader;
 const Register = @import("Register.zig").Register;
 
+/// This is a Forth style dictionary
+///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
-    // TODO i think this should be a pointer ?
+    // TODO should this be a *vm.Memory pointer?
     memory: vm.Memory,
     here: Register,
     latest: Register,
 
-    // Note
-    // assumes latest and here are in the same memory block as the dictionary
+    // NOTE
+    // Assumes latest and here are in the same memory block as the dictionary
     pub fn init(
         self: *@This(),
         memory: vm.Memory,
@@ -75,33 +77,16 @@ pub const Dictionary = struct {
         self.here.commaC(value);
     }
 
-    pub fn compile(self: *@This(), word_info: vm.WordInfo) void {
-        switch (word_info.value) {
-            .bytecode => |bytecode| {
-                switch (bytecodes.determineType(bytecode)) {
-                    .basic => {
-                        self.here.commaC(bytecode);
-                    },
-                    .data, .absolute_jump => {
-                        // TODO error
-                        // this is a case that shouldnt happen in normal execution
-                        // but may happen if compile was called not from the main executor
-                    },
-                }
-            },
-            .mini_word => |addr| {
-                _ = addr;
-                // TODO
-                // compile an abs jump to the cfa of this addr
-            },
-            .number => |value| {
-                if ((value & 0xff00) > 0) {
-                    self.compileLit(value);
-                } else {
-                    self.compileLitC(@truncate(value));
-                }
-            },
-        }
+    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) void {
+        const base = bytecodes.base_abs_jump_bytecode;
+        const jump = base | (addr & 0x7f);
+        self.here.commaC(@truncate(jump >> 8));
+        self.here.commaC(@truncate(jump));
+    }
+
+    pub fn compileData(self: *@This(), data: []u8) void {
+        _ = self;
+        _ = data;
     }
 };
 
@@ -181,6 +166,4 @@ test "dictionary" {
         dictionary_start + (WordHeader.calculateSize(4) * 2),
         try dictionary.lookup("hellow"),
     );
-
-    // TODO test dictionary.compile
 }

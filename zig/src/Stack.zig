@@ -5,6 +5,8 @@ const Error = vm.Error;
 const Register = @import("Register.zig").Register;
 
 // TODO handle stack overflows
+
+/// Stack
 pub fn Stack(comptime count_: usize) type {
     return struct {
         pub const count = count_;
@@ -58,7 +60,7 @@ pub fn Stack(comptime count_: usize) type {
 
         pub fn index(self: *@This(), at: usize) Error!*Cell {
             if (at >= self.depth()) {
-                return Error.StackUnderflow;
+                return error.StackUnderflow;
             }
             return self.unsafeIndex(@intCast(at));
         }
@@ -70,7 +72,7 @@ pub fn Stack(comptime count_: usize) type {
         ) Error!void {
             const max_idx = @max(a_idx, b_idx);
             if (max_idx >= self.depth()) {
-                return Error.StackUnderflow;
+                return error.StackUnderflow;
             }
             return self.unsafeSwapValues(@intCast(a_idx), @intCast(b_idx));
         }

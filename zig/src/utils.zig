@@ -32,6 +32,8 @@ fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
     return ret;
 }
 
+/// Memory layouts
+///   build a representation of packed memory with the ability to query offsets by field name
 pub fn MemoryLayout(comptime Type: type, comptime OffsetType: type) type {
     return struct {
         pub const layout = structToMemoryLayout(Type);

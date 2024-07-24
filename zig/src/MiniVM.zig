@@ -30,8 +30,10 @@ pub const Error = error{
     ReturnStackOverflow,
     ReturnStackUnderflow,
     WordNotFound,
-    InvalidProgramCounter,
     WordNameTooLong,
+    CannotInterpretWord,
+    InvalidProgramCounter,
+    CannotGetAddressOfBytecode,
 } || InputError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
@@ -42,8 +44,8 @@ pub const InputError = error{
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
-        Error.StackOverflow => Error.ReturnStackOverflow,
-        Error.StackUnderflow => Error.ReturnStackUnderflow,
+        error.StackOverflow => error.ReturnStackOverflow,
+        error.StackUnderflow => error.ReturnStackUnderflow,
         else => err,
     };
 }
@@ -88,11 +90,13 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
 
 pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void;
 
+/// Passed to bytecode callbacks when they are called
 pub const ExecutionContext = struct {
-    last_bytecode: u8,
+    current_bytecode: u8,
     program_counter_is_valid: bool,
 };
 
+// TODO this is a little messy
 pub const WordInfo = struct {
     value: union(enum) {
         // the bytecode
@@ -239,9 +243,14 @@ pub const MiniVM = struct {
         // this makes return stack and jump logic easier
         //   because bytecodes can just set the jump location
         //     directly without having to do any math
+
         while (self.return_stack.depth() > 0) {
             const byte = self.readByteAndAdvancePC();
-            try bytecodes.executeBytecode(byte, self, true);
+            const ctx = ExecutionContext{
+                .current_bytecode = byte,
+                .program_counter_is_valid = true,
+            };
+            try self.executeBytecode(byte, ctx);
         }
     }
 
@@ -251,18 +260,18 @@ pub const MiniVM = struct {
         try self.evaluateLoop();
     }
 
+    fn executeBytecode(
+        self: *@This(),
+        bytecode: u8,
+        ctx: ExecutionContext,
+    ) Error!void {
+        try bytecodes.getBytecodeDefinition(bytecode).callback(self, ctx);
+    }
+
     // ===
 
     fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
-        if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
-            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
-            return .{
-                .value = .{
-                    .bytecode = bytecode,
-                },
-                .is_immediate = bytecode_definition.is_immediate,
-            };
-        } else if (try self.dictionary.lookup(word)) |definition_addr| {
+        if (try self.dictionary.lookup(word)) |definition_addr| {
             var temp_word_header: WordHeader = undefined;
             try temp_word_header.initFromMemory(self.memory[definition_addr..]);
             return .{
@@ -272,6 +281,14 @@ pub const MiniVM = struct {
                 .is_immediate = temp_word_header.is_immediate,
             };
             // TODO rethrow InvalidBase errors
+        } else if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
+            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
+            return .{
+                .value = .{
+                    .bytecode = bytecode,
+                },
+                .is_immediate = bytecode_definition.is_immediate,
+            };
         } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
             return .{
                 .value = .{
@@ -284,15 +301,24 @@ pub const MiniVM = struct {
         }
     }
 
-    pub fn interpretString(self: *@This(), word: []const u8) Error!void {
+    fn interpretString(self: *@This(), word: []const u8) Error!void {
         if (try self.lookupString(word)) |word_info| {
             const state: CompileState = @enumFromInt(self.state.fetch());
             const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
             switch (effective_state) {
                 .interpret => {
                     switch (word_info.value) {
-                        .bytecode => |byte| {
-                            try bytecodes.executeBytecode(byte, self, false);
+                        .bytecode => |bytecode| {
+                            switch (bytecodes.BytecodeType.fromBytecode(bytecode)) {
+                                .basic => {
+                                    const ctx = ExecutionContext{
+                                        .current_bytecode = bytecode,
+                                        .program_counter_is_valid = false,
+                                    };
+                                    try self.executeBytecode(bytecode, ctx);
+                                },
+                                .data, .absolute_jump => return error.CannotInterpretWord,
+                            }
                         },
                         .mini_word => |addr| {
                             try self.executeMiniWord(addr);
@@ -303,9 +329,40 @@ pub const MiniVM = struct {
                     }
                 },
                 .compile => {
-                    self.dictionary.compile(word_info);
+                    try self.compile(word_info);
                 },
             }
+        }
+    }
+
+    pub fn compile(self: *@This(), word_info: WordInfo) Error!void {
+        switch (word_info.value) {
+            .bytecode => |bytecode| {
+                switch (bytecodes.BytecodeType.fromBytecode(bytecode)) {
+                    .basic => {
+                        self.dictionary.here.commaC(bytecode);
+                    },
+                    .data => {
+                        const data = try self.popSlice();
+                        self.dictionary.compileData(data);
+                    },
+                    .absolute_jump => {
+                        const cfa_addr = try self.data_stack.pop();
+                        self.dictionary.compileAbsJump(cfa_addr);
+                    },
+                }
+            },
+            .mini_word => |addr| {
+                const cfa_addr = try calculateCfaAddress(self.memory, addr);
+                self.dictionary.compileAbsJump(cfa_addr);
+            },
+            .number => |value| {
+                if ((value & 0xff00) > 0) {
+                    self.dictionary.compileLit(value);
+                } else {
+                    self.dictionary.compileLitC(@truncate(value));
+                }
+            },
         }
     }
 
@@ -314,9 +371,19 @@ pub const MiniVM = struct {
     pub fn readWordAndGetCfaAddress(self: *@This()) Error!Cell {
         const word = try self.input_source.readNextWord();
         if (word) |w| {
-            const addr = try self.dictionary.lookup(w);
-            if (addr) |a| {
-                return calculateCfaAddress(self.memory, a);
+            const word_info = try self.lookupString(w);
+            if (word_info) |wi| {
+                switch (wi.value) {
+                    .bytecode => |_| {
+                        return error.CannotGetAddressOfBytecode;
+                    },
+                    .mini_word => |addr| {
+                        return calculateCfaAddress(self.memory, addr);
+                    },
+                    .number => |_| {
+                        return error.WordNotFound;
+                    },
+                }
             } else {
                 return error.WordNotFound;
             }

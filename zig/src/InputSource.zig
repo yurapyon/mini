@@ -5,6 +5,11 @@ pub fn isWhitespace(char: u8) bool {
 }
 
 // TODO turn this into a device instead
+// TODO this should use a buffer in vm memory rather than its own memory
+
+/// Forth-style input:
+///   i.e. line-by-line input from a buffer
+//         ability to ready from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
     pub const RefillFn = *const fn () []const u8;
 

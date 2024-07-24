@@ -2,6 +2,9 @@ const std = @import("std");
 
 const vm = @import("MiniVM.zig");
 
+/// Struct representing a MiniVM word definition
+///   this is not bit-for-bit equivalent to the definition in Forth memory
+///   this is just a normal Zig struct
 pub const WordHeader = struct {
     // Layout:
     // |-------|---|---|---|...\0  |...|

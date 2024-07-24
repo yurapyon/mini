@@ -2,6 +2,9 @@ const std = @import("std");
 
 const vm = @import("MiniVM.zig");
 
+/// A register is basically a pointer into VM Memory
+/// It's memory-mapped, rather than being a system pointer
+///   so, an offset of 0 means memory[0]
 pub const Register = struct {
     memory: vm.Memory,
     offset: vm.Cell,
@@ -67,8 +70,8 @@ pub const Register = struct {
 
     pub fn readByteAndAdvance(self: @This(), memory: []const u8) u8 {
         const addr = self.fetch();
-        // TODO handle reaching end of memory
         self.storeAdd(1);
+        // TODO handle addr >= memory.len
         return memory[addr];
     }
 
