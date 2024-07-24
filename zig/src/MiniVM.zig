@@ -276,7 +276,7 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
+    fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
         if (try self.dictionary.lookup(word)) |definition_addr| {
             var temp_word_header: WordHeader = undefined;
             try temp_word_header.initFromMemory(self.memory[definition_addr..]);

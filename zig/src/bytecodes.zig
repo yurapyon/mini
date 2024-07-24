@@ -353,7 +353,8 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 ///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = mini.readCellAndAdvancePC();
-    const masked_addr = addr & 0x7f;
+    // TODO this mask should be a constant somewhere
+    const masked_addr = addr & 0x7fff;
     try mini.absoluteJump(masked_addr, false);
 }
 
