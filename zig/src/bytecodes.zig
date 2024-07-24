@@ -14,6 +14,10 @@ fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     return error.CannotInterpret;
 }
 
+fn cannotCompile(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    return error.CannotCompile;
+}
+
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     compileSemantics: vm.BytecodeFn = nop,
@@ -83,13 +87,13 @@ fn constructBasicImmediateBytecode(
     };
 }
 
-fn constructCantInterpretBytecode(
+fn constructExecuteOnlyBytecode(
     name: []const u8,
     callback: vm.BytecodeFn,
 ) BytecodeDefinition {
     return .{
         .name = name,
-        .compileSemantics = compileSelf,
+        .compileSemantics = cannotCompile,
         .interpretSemantics = cannotInterpret,
         .executeSemantics = callback,
         .is_immediate = false,
@@ -113,23 +117,23 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("next-char", nextChar),
     constructBasicBytecode("define", define),
 
-    constructCantInterpretBytecode("branch", branch),
-    constructCantInterpretBytecode("branch0", branch0),
+    constructExecuteOnlyBytecode("branch", branch),
+    constructExecuteOnlyBytecode("branch0", branch0),
     constructBasicBytecode("execute", execute),
-    constructCantInterpretBytecode("tailcall", tailcall),
+    constructExecuteOnlyBytecode("tailcall", tailcall),
 
     // ===
     constructBasicBytecode("!", store),
     constructBasicBytecode("+!", storeAdd),
     constructBasicBytecode("@", fetch),
     constructBasicBytecode(",", comma),
-    constructCantInterpretBytecode("lit", lit),
+    constructExecuteOnlyBytecode("lit", lit),
 
     constructBasicBytecode("c!", storeC),
     constructBasicBytecode("+c!", storeAddC),
     constructBasicBytecode("c@", fetchC),
     constructBasicBytecode("c,", commaC),
-    constructCantInterpretBytecode("litc", litC),
+    constructExecuteOnlyBytecode("litc", litC),
 
     constructBasicBytecode(">r", toR),
     constructBasicBytecode("r>", fromR),
@@ -266,8 +270,11 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     return error.Panic;
 }
 
+/// Pushes whether word is bytecode or not
+///   followed by bytecode or cfa_addr
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const result = try mini.readWordAndGetAddress();
+    try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
     try mini.data_stack.push(result.value);
 }
 
@@ -342,9 +349,12 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.absoluteJump(addr, true);
 }
 
+/// This jumps to the following address in memory without
+///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = mini.readCellAndAdvancePC();
-    try mini.absoluteJump(addr, false);
+    const masked_addr = addr & 0x7f;
+    try mini.absoluteJump(masked_addr, false);
 }
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

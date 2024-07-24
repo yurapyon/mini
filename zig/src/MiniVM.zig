@@ -42,6 +42,7 @@ pub const InputError = error{
 
 pub const SemanticsError = error{
     CannotInterpret,
+    CannotCompile,
 };
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
