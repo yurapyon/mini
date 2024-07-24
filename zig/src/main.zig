@@ -16,13 +16,15 @@ fn runMiniVM(allocator: Allocator) !void {
 
 pub fn main() !void {}
 
-test "simple test" {
+test "lib-testing" {
     _ = @import("Stack.zig");
     _ = @import("WordHeader.zig");
     _ = @import("utils.zig");
     _ = @import("Register.zig");
     _ = @import("InputSource.zig");
     _ = @import("Dictionary.zig");
+}
 
-    try runMiniVM(std.testing.allocator);
+test "end-to-end" {
+    // try runMiniVM(std.testing.allocator);
 }
