@@ -1,4 +1,5 @@
 const vm = @import("mini.zig");
+const memory = @import("memory.zig");
 
 const Register = @import("register.zig").Register;
 
@@ -9,7 +10,7 @@ pub fn Stack(comptime count_: usize) type {
         pub const size = count * @sizeOf(vm.Cell);
         pub const MemType = [size]u8;
 
-        _memory: vm.Memory,
+        _memory: memory.CellAlignedMemory,
 
         // top.fetch() is a ptr to
         //   empty Cell right beyond the actual topmost value
@@ -18,15 +19,15 @@ pub fn Stack(comptime count_: usize) type {
 
         pub fn init(
             self: *@This(),
-            memory: vm.Memory,
+            mem: memory.CellAlignedMemory,
             top_offset: vm.Cell,
             bottom_offset: vm.Cell,
         ) vm.OutOfBoundsError!void {
-            if (bottom_offset > memory.len) {
+            if (bottom_offset > mem.data.len) {
                 return error.OutOfBounds;
             }
 
-            self._memory = memory;
+            self._memory = mem;
             try self.top.init(self._memory, top_offset);
             self._bottom_offset = bottom_offset;
             self.clear();
@@ -39,17 +40,17 @@ pub fn Stack(comptime count_: usize) type {
         }
 
         pub fn asSlice(self: *@This()) vm.OutOfBoundsError![]vm.Cell {
-            return vm.sliceAt(self._memory, self._bottom_offset, self.depth());
+            return self._memory.sliceAt(self._bottom_offset, self.depth());
         }
 
-        pub fn clear(self: @This()) void {
+        pub fn clear(self: *@This()) void {
             self.top.store(self._bottom_offset);
         }
 
         fn unsafeIndex(self: *@This(), at: isize) vm.OutOfBoundsError!*vm.Cell {
             const top = self.top.fetch();
             const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
-            return try vm.cellAt(self._memory, @intCast(addr));
+            return try self._memory.cellAt(@intCast(addr));
         }
 
         fn unsafeSwapValues(
@@ -160,11 +161,12 @@ pub fn Stack(comptime count_: usize) type {
 test "stack" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
-    defer testing.allocator.free(memory);
+    var m: memory.CellAlignedMemory = undefined;
+    try m.init(testing.allocator);
+    defer m.deinit();
 
     var stack: Stack32 = undefined;
-    try stack.init(memory, 0, 2);
+    try stack.init(m, 0, 2);
 
     try testing.expectEqual(0, stack.depth());
 
@@ -210,7 +212,7 @@ const Stack32 = Stack(32);
 
 pub fn expectStack(stack: anytype, expectation: []const vm.Cell) !void {
     const testing = @import("std").testing;
-    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack._memory[stack._bottom_offset]));
+    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack._memory.data[stack._bottom_offset]));
     try testing.expectEqualSlices(
         vm.Cell,
         expectation,

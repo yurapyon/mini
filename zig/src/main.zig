@@ -1,9 +1,19 @@
 const std = @import("std");
+const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const vm = @import("mini.zig");
+const memory = @import("memory.zig");
 
 const base_file = @embedFile("base.mini.fth");
+
+comptime {
+    const native_endianness = builtin.target.cpu.arch.endian();
+    if (native_endianness != .little) {
+        // TODO convert u16s to little endian on memory write
+        @compileError("native endianness must be .little");
+    }
+}
 
 pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
@@ -36,23 +46,20 @@ const LineByLineRefiller = struct {
 };
 
 fn runMiniVM(allocator: Allocator) !void {
-    const mem = try vm.allocateMemory(allocator);
-    defer allocator.free(mem);
+    var mem: memory.CellAlignedMemory = undefined;
+    try mem.init(allocator);
+    defer mem.deinit();
 
     var vm_instance: vm.MiniVM = undefined;
     try vm_instance.init(mem);
 
     try vm_instance.dictionary.compileConstant("asdf", 100);
 
-    // try vm_instance.input_source.setInputBuffer("1 dup 1+ dup 1+ ##.s bye\n");
-    // try vm_instance.repl();
-
     var refiller: LineByLineRefiller = undefined;
     refiller.init(base_file);
 
     vm_instance.should_bye = false;
     vm_instance.should_quit = false;
-    // try vm_instance.input_source.setInputBuffer(base_file);
     vm_instance.input_source.setRefillCallback(
         LineByLineRefiller.refill,
         @ptrCast(&refiller),

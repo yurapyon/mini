@@ -11,15 +11,7 @@ const InputSource = @import("input_source.zig").InputSource;
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 
-comptime {
-    const native_endianness = builtin.target.cpu.arch.endian();
-    if (native_endianness != .little) {
-        // TODO convert u16s to little endian on memory write
-        @compileError("native endianness must be .little");
-    }
-}
-
-pub const max_memory_size = 64 * 1024;
+const memory = @import("memory.zig");
 
 pub const Error = error{
     Panic,
@@ -60,26 +52,10 @@ pub const CompileState = enum(Cell) {
     compile,
 };
 
+pub const max_memory_size = 64 * 1024;
+
 const DataStack = Stack(32);
 const ReturnStack = Stack(32);
-
-pub const Memory = []align(@alignOf(Cell)) u8;
-
-pub fn allocateMemory(allocator: Allocator) Error!Memory {
-    return try allocator.allocWithOptions(
-        u8,
-        max_memory_size,
-        @alignOf(Cell),
-        null,
-    );
-}
-
-pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) OutOfBoundsError![]u8 {
-    if (addr + len >= memory.len) {
-        return error.OutOfBounds;
-    }
-    return memory[addr..][0..len];
-}
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
@@ -130,31 +106,10 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-pub fn cellAt(memory: Memory, addr: Cell) OutOfBoundsError!*Cell {
-    if (addr >= memory.len) {
-        return error.OutOfBounds;
-    }
-    return @ptrCast(@alignCast(&memory[addr]));
-}
-
-pub fn sliceAt(memory: Memory, addr: Cell, len: Cell) OutOfBoundsError![]Cell {
-    if (addr + len >= memory.len) {
-        return error.OutOfBounds;
-    }
-    const ptr: [*]Cell = @ptrCast(@alignCast(&memory[addr]));
-    return ptr[0..len];
-}
-
-pub fn calculateCfaAddress(memory: Memory, addr: Cell) Error!Cell {
-    var temp_word_header: WordHeader = undefined;
-    try temp_word_header.initFromMemory(memory[addr..]);
-    return addr + temp_word_header.size();
-}
-
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
-    memory: Memory,
+    memory: memory.CellAlignedMemory,
     dictionary: Dictionary,
     data_stack: DataStack,
     return_stack: ReturnStack,
@@ -169,8 +124,8 @@ pub const MiniVM = struct {
     should_quit: bool,
     should_bye: bool,
 
-    pub fn init(self: *@This(), memory: Memory) !void {
-        self.memory = memory;
+    pub fn init(self: *@This(), mem: memory.CellAlignedMemory) !void {
+        self.memory = mem;
         try self.dictionary.init(
             self.memory,
             MemoryLayout.offsetOf("latest"),
@@ -215,11 +170,11 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn onQuit(self: *@This()) Error!void {
+    pub fn onQuit(self: *@This()) void {
         self.data_stack.clear();
     }
 
-    pub fn onBye(self: *@This()) Error!void {
+    pub fn onBye(self: *@This()) void {
         self.data_stack.clear();
     }
 
@@ -239,10 +194,10 @@ pub const MiniVM = struct {
                 }
             }
 
-            try self.onQuit();
+            self.onQuit();
         }
 
-        try self.onBye();
+        self.onBye();
     }
 
     fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
@@ -259,11 +214,11 @@ pub const MiniVM = struct {
     // ===
 
     pub fn readByteAndAdvancePC(self: *@This()) OutOfBoundsError!u8 {
-        return try self.program_counter.readByteAndAdvance(self.memory);
+        return try self.program_counter.readByteAndAdvance(self.memory.data);
     }
 
     pub fn readCellAndAdvancePC(self: *@This()) OutOfBoundsError!Cell {
-        return try self.program_counter.readCellAndAdvance(self.memory);
+        return try self.program_counter.readCellAndAdvance(self.memory.data);
     }
 
     pub fn absoluteJump(
@@ -298,7 +253,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try calculateCfaAddress(self.memory, addr);
+        const cfa_addr = try memory.calculateCfaAddress(self.memory, addr);
         try self.absoluteJump(cfa_addr, true);
         try self.evaluateLoop();
     }
@@ -390,7 +345,7 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |addr| {
-                const cfa_addr = try calculateCfaAddress(self.memory, addr);
+                const cfa_addr = try memory.calculateCfaAddress(self.memory, addr);
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
@@ -423,7 +378,7 @@ pub const MiniVM = struct {
                     .mini_word => |addr| {
                         return .{
                             .is_bytecode = false,
-                            .value = try calculateCfaAddress(self.memory, addr),
+                            .value = try memory.calculateCfaAddress(self.memory, addr),
                         };
                     },
                     .number => |_| {
@@ -440,7 +395,7 @@ pub const MiniVM = struct {
 
     pub fn popSlice(self: *@This()) Error![]u8 {
         const len, const addr = try self.data_stack.popMultiple(2);
-        return sliceFromAddrAndLen(self.memory, addr, len);
+        return memory.sliceFromAddrAndLen(self.memory.data, addr, len);
     }
 };
 
@@ -448,11 +403,12 @@ test "mini" {
     const testing = std.testing;
     const stack = @import("Stack.zig");
 
-    const mem = try allocateMemory(testing.allocator);
-    defer testing.allocator.free(mem);
+    var m: memory.CellAlignedMemory = undefined;
+    try m.init(testing.allocator);
+    defer m.deinit();
 
     var vm: MiniVM = undefined;
-    try vm.init(mem);
+    try vm.init(m);
 
     try vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
 

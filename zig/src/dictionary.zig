@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const memory = @import("memory.zig");
 
 const bytecodes = @import("bytecodes.zig");
 const WordHeader = @import("word_header.zig").WordHeader;
@@ -10,7 +11,7 @@ const Register = @import("register.zig").Register;
 ///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
     // TODO should this be a *vm.Memory pointer?
-    _memory: vm.Memory,
+    _memory: memory.CellAlignedMemory,
     here: Register,
     latest: Register,
 
@@ -18,13 +19,13 @@ pub const Dictionary = struct {
     // Assumes latest and here are in the same memory block as the dictionary
     pub fn init(
         self: *@This(),
-        memory: vm.Memory,
+        mem: memory.CellAlignedMemory,
         here_offset: vm.Cell,
         latest_offset: vm.Cell,
     ) Register.Error!void {
-        self._memory = memory;
-        try self.here.init(memory, here_offset);
-        try self.latest.init(memory, latest_offset);
+        self._memory = mem;
+        try self.here.init(self._memory, here_offset);
+        try self.latest.init(self._memory, latest_offset);
     }
 
     pub fn lookup(
@@ -34,7 +35,7 @@ pub const Dictionary = struct {
         var latest = self.latest.fetch();
         var temp_word_header: WordHeader = undefined;
         while (latest != 0) : (latest = temp_word_header.latest) {
-            try temp_word_header.initFromMemory(self._memory[latest..]);
+            try temp_word_header.initFromMemory(self._memory.data[latest..]);
             if (!temp_word_header.is_hidden and temp_word_header.nameEquals(word)) {
                 return latest;
             }
@@ -59,9 +60,11 @@ pub const Dictionary = struct {
         const aligned_here = self.here.fetch();
         self.latest.store(aligned_here);
 
-        try word_header.writeToMemory(
-            self._memory[aligned_here..][0..header_size],
-        );
+        try word_header.writeToMemory(try memory.sliceFromAddrAndLen(
+            self._memory.data,
+            aligned_here,
+            header_size,
+        ));
         self.here.storeAdd(header_size);
 
         self.here.alignForward(vm.Cell);
@@ -116,15 +119,16 @@ pub const Dictionary = struct {
 test "dictionary" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
-    defer testing.allocator.free(memory);
+    var m: memory.CellAlignedMemory = undefined;
+    try m.init(testing.allocator);
+    defer m.deinit();
 
     const here_offset = 0;
     const latest_offset = 2;
     const dictionary_start = 16;
 
     var dictionary: Dictionary = undefined;
-    try dictionary.init(memory, here_offset, latest_offset);
+    try dictionary.init(m, here_offset, latest_offset);
 
     dictionary.here.store(dictionary_start);
     dictionary.latest.store(0);
@@ -139,7 +143,7 @@ test "dictionary" {
     try testing.expectEqualSlices(
         u8,
         &[_]u8{ 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', 0 },
-        memory[dictionary_start..][0..8],
+        m.data[dictionary_start..][0..8],
     );
 
     const wh_a: WordHeader = .{
@@ -151,7 +155,7 @@ test "dictionary" {
 
     var wh_b: WordHeader = undefined;
 
-    try wh_b.initFromMemory(memory[dictionary_start..]);
+    try wh_b.initFromMemory(m.data[dictionary_start..]);
     try testing.expectEqualDeep(wh_a, wh_b);
 
     const c_latest = dictionary.latest.fetch();
@@ -168,10 +172,10 @@ test "dictionary" {
     try testing.expectEqualSlices(
         u8,
         &[_]u8{ 0x10, 0x00, 0x04, 'w', 'o', 'w', 'o', 0 },
-        memory[dictionary.latest.fetch()..][0..8],
+        m.data[dictionary.latest.fetch()..][0..8],
     );
 
-    try wh_b.initFromMemory(memory[dictionary.latest.fetch()..]);
+    try wh_b.initFromMemory(m.data[dictionary.latest.fetch()..]);
     try testing.expectEqualDeep(wh_c, wh_b);
 
     try dictionary.defineWord("hellow");

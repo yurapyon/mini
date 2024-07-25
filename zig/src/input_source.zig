@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const memory = @import("memory.zig");
 
 const Register = @import("register.zig").Register;
 
@@ -21,7 +22,7 @@ pub const InputSource = struct {
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 
-    _memory: vm.Memory,
+    _memory: memory.CellAlignedMemory,
     _buffer_offset: vm.Cell,
     buffer_len: Register,
     buffer_at: Register,
@@ -30,12 +31,12 @@ pub const InputSource = struct {
 
     pub fn init(
         self: *@This(),
-        memory: vm.Memory,
+        mem: memory.CellAlignedMemory,
         buffer_offset: vm.Cell,
         buffer_at_offset: vm.Cell,
         buffer_len_offset: vm.Cell,
     ) Register.Error!void {
-        self._memory = memory;
+        self._memory = mem;
         self._buffer_offset = buffer_offset;
         try self.buffer_len.init(self._memory, buffer_len_offset);
         try self.buffer_at.init(self._memory, buffer_at_offset);
@@ -52,8 +53,8 @@ pub const InputSource = struct {
         if (buffer.len > max_buffer_len) {
             return error.OversizeInputBuffer;
         }
-        const mem_slice = try vm.sliceFromAddrAndLen(
-            self._memory,
+        const mem_slice = try memory.sliceFromAddrAndLen(
+            self._memory.data,
             self._buffer_offset,
             buffer.len,
         );
@@ -75,7 +76,7 @@ pub const InputSource = struct {
         const buffer_at = self.buffer_at.fetch();
         const buffer_len = self.buffer_len.fetch();
         if (buffer_at < buffer_len) {
-            const ret = self._memory[self._buffer_offset + buffer_at];
+            const ret = self._memory.data[self._buffer_offset + buffer_at];
             self.buffer_at.storeAdd(1);
             return ret;
         } else {
@@ -117,7 +118,7 @@ pub const InputSource = struct {
     pub fn readNextWord(self: *@This()) ?[]const u8 {
         const range = self.readNextWordRange() orelse return null;
         // TODO we should write a test to make sure that this won't happen
-        return vm.sliceFromAddrAndLen(self._memory, range.address, range.len) catch unreachable;
+        return memory.sliceFromAddrAndLen(self._memory.data, range.address, range.len) catch unreachable;
     }
 
     pub fn refill(
@@ -133,8 +134,9 @@ pub const InputSource = struct {
 test "input-sources" {
     const testing = @import("std").testing;
 
-    const mem = try vm.allocateMemory(testing.allocator);
-    defer testing.allocator.free(mem);
+    var m: memory.CellAlignedMemory = undefined;
+    try m.init(testing.allocator);
+    defer m.deinit();
 
     const buffer_offset = 4;
     const at_offset = 0;
@@ -142,7 +144,7 @@ test "input-sources" {
 
     var input_source: InputSource = undefined;
     try input_source.init(
-        mem,
+        m,
         buffer_offset,
         at_offset,
         len_offset,
