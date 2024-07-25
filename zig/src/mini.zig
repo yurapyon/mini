@@ -127,8 +127,19 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-pub fn cellAt(mem: Memory, addr: Cell) *Cell {
-    return @ptrCast(@alignCast(&mem[addr]));
+pub fn cellAt(memory: Memory, addr: Cell) OutOfBoundsError!*Cell {
+    if (addr >= memory.len) {
+        return error.OutOfBounds;
+    }
+    return @ptrCast(@alignCast(&memory[addr]));
+}
+
+pub fn sliceAt(memory: Memory, addr: Cell, len: Cell) OutOfBoundsError![]Cell {
+    if (addr + len >= memory.len) {
+        return error.OutOfBounds;
+    }
+    const ptr: [*]Cell = @ptrCast(@alignCast(&memory[addr]));
+    return ptr[0..len];
 }
 
 pub fn calculateCfaAddress(memory: Memory, addr: Cell) Error!Cell {

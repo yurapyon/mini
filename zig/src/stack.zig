@@ -2,9 +2,6 @@ const vm = @import("mini.zig");
 
 const Register = @import("register.zig").Register;
 
-// TODO
-// use the same strategy as registers to make sure _bottom_offset stays valid
-
 // TODO handle stack overflows
 
 /// Stack
@@ -26,41 +23,42 @@ pub fn Stack(comptime count_: usize) type {
             memory: vm.Memory,
             top_offset: vm.Cell,
             bottom_offset: vm.Cell,
-        ) Register.Error!void {
+        ) vm.OutOfBoundsError!void {
+            if (bottom_offset > memory.len) {
+                return error.OutOfBounds;
+            }
+
             self._memory = memory;
             try self.top.init(self._memory, top_offset);
             self._bottom_offset = bottom_offset;
             self.clear();
         }
 
-        pub fn depth(self: @This()) usize {
+        pub fn depth(self: @This()) vm.Cell {
             const top = self.top.fetch();
             const stack_size = top - self._bottom_offset;
             return stack_size / @sizeOf(vm.Cell);
         }
 
-        pub fn asSlice(self: *@This()) []vm.Cell {
-            // TODO this can throw an out of bounds error
-            const ptr: [*]vm.Cell = @ptrCast(@alignCast(&self._memory[self._bottom_offset]));
-            return ptr[0..self.depth()];
+        pub fn asSlice(self: *@This()) vm.OutOfBoundsError![]vm.Cell {
+            return vm.sliceAt(self._memory, self._bottom_offset, self.depth());
         }
 
         pub fn clear(self: @This()) void {
             self.top.store(self._bottom_offset);
         }
 
-        fn unsafeIndex(self: *@This(), at: isize) vm.Error!*vm.Cell {
+        fn unsafeIndex(self: *@This(), at: isize) vm.OutOfBoundsError!*vm.Cell {
             const top = self.top.fetch();
             const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
-            // TODO cellAt needs to be checked
-            return vm.cellAt(self._memory, @intCast(addr));
+            return try vm.cellAt(self._memory, @intCast(addr));
         }
 
         fn unsafeSwapValues(
             self: *@This(),
             a_idx: isize,
             b_idx: isize,
-        ) vm.Error!void {
+        ) vm.OutOfBoundsError!void {
             const a_cell = try self.unsafeIndex(a_idx);
             const b_cell = try self.unsafeIndex(b_idx);
             const temp = a_cell.*;
@@ -72,6 +70,7 @@ pub fn Stack(comptime count_: usize) type {
             if (at >= self.depth()) {
                 return error.StackUnderflow;
             }
+            // TODO could probably catch unreachable on this if we have stack overflow checking
             return self.unsafeIndex(@intCast(at));
         }
 
@@ -84,6 +83,7 @@ pub fn Stack(comptime count_: usize) type {
             if (max_idx >= self.depth()) {
                 return error.StackUnderflow;
             }
+            // TODO could probably catch unreachable on this if we have stack overflow checking
             return self.unsafeSwapValues(@intCast(a_idx), @intCast(b_idx));
         }
 
