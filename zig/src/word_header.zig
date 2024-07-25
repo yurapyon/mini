@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const utils = @import("utils.zig");
 
 /// Struct representing a MiniVM word definition
 ///   this is not bit-for-bit equivalent to the definition in Forth memory
@@ -68,7 +69,7 @@ pub const WordHeader = struct {
     }
 
     pub fn nameEquals(self: @This(), name: []const u8) bool {
-        return std.mem.eql(u8, self.name, name);
+        return utils.stringsEqual(self.name, name);
     }
 
     // assumes starting address is cell aligned

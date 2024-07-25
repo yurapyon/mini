@@ -31,6 +31,7 @@ pub const Error = error{
     WordNotFound,
     WordNameTooLong,
     InvalidProgramCounter,
+    InvalidAddress,
 } || OutOfBoundsError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
@@ -73,8 +74,10 @@ pub fn allocateMemory(allocator: Allocator) Error!Memory {
     );
 }
 
-pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) []u8 {
-    // TODO handle out of bounds errors
+pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) OutOfBoundsError![]u8 {
+    if (addr + len >= memory.len) {
+        return error.OutOfBounds;
+    }
     return memory[addr..][0..len];
 }
 

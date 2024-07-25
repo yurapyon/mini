@@ -2,6 +2,7 @@ const std = @import("std");
 const mem = std.mem;
 
 const vm = @import("mini.zig");
+const utils = @import("utils.zig");
 
 // TODO
 // need set-immediate and set-hidden
@@ -43,14 +44,14 @@ pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
 }
 
 pub fn lookupBytecodeByName(name: []const u8) ?u8 {
-    if (mem.eql(u8, name, data_definition.name)) {
+    if (utils.stringsEqual(name, data_definition.name)) {
         return base_data_bytecode;
     }
-    if (mem.eql(u8, name, abs_jump_definition.name)) {
+    if (utils.stringsEqual(name, abs_jump_definition.name)) {
         return base_abs_jump_bytecode;
     }
     for (lookup_table, 0..) |named_callback, i| {
-        const eql = mem.eql(u8, named_callback.name, name);
+        const eql = utils.stringsEqual(named_callback.name, name);
         if (eql) {
             return @truncate(i);
         }
@@ -278,7 +279,6 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 ///   followed by bytecode or cfa_addr
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const result = try mini.readWordAndGetAddress();
-    // TODO maybe dont do this?
     try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
     try mini.data_stack.push(result.value);
 }
@@ -392,22 +392,28 @@ fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn storeC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO check out of bounds
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
+    if (addr >= mini.memory.len) {
+        return error.OutOfBounds;
+    }
     mini.memory[addr] = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO check out of bounds
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
+    if (addr >= mini.memory.len) {
+        return error.OutOfBounds;
+    }
     mini.memory[addr] +%= byte;
 }
 
 fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO check out of bounds
     const addr = try mini.data_stack.pop();
+    if (addr >= mini.memory.len) {
+        return error.OutOfBounds;
+    }
     try mini.data_stack.push(mini.memory[addr]);
 }
 

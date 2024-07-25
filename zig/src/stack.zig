@@ -2,8 +2,6 @@ const vm = @import("mini.zig");
 
 const Register = @import("register.zig").Register;
 
-// TODO handle stack overflows
-
 /// Stack
 pub fn Stack(comptime count_: usize) type {
     return struct {
@@ -93,6 +91,9 @@ pub fn Stack(comptime count_: usize) type {
         }
 
         pub fn push(self: *@This(), value: vm.Cell) vm.Error!void {
+            if (self.top.fetch() >= self._bottom_offset + size) {
+                return error.StackOverflow;
+            }
             const ptr = try self.unsafeIndex(-1);
             ptr.* = value;
             self.top.storeAdd(@sizeOf(vm.Cell));

@@ -21,8 +21,8 @@ pub const InputSource = struct {
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 
-    memory: vm.Memory,
-    buffer_offset: vm.Cell,
+    _memory: vm.Memory,
+    _buffer_offset: vm.Cell,
     buffer_len: Register,
     buffer_at: Register,
     refill_fn: ?RefillFn,
@@ -35,10 +35,10 @@ pub const InputSource = struct {
         buffer_at_offset: vm.Cell,
         buffer_len_offset: vm.Cell,
     ) Register.Error!void {
-        self.memory = memory;
-        self.buffer_offset = buffer_offset;
-        try self.buffer_len.init(self.memory, buffer_len_offset);
-        try self.buffer_at.init(self.memory, buffer_at_offset);
+        self._memory = memory;
+        self._buffer_offset = buffer_offset;
+        try self.buffer_len.init(self._memory, buffer_len_offset);
+        try self.buffer_at.init(self._memory, buffer_at_offset);
 
         self.buffer_len.store(0);
         self.buffer_at.store(0);
@@ -48,13 +48,13 @@ pub const InputSource = struct {
     }
 
     // TODO maybe make this private ?
-    pub fn setInputBuffer(self: *@This(), buffer: []const u8) vm.InputError!void {
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) (vm.InputError || vm.OutOfBoundsError)!void {
         if (buffer.len > max_buffer_len) {
             return error.OversizeInputBuffer;
         }
-        const mem_slice = vm.sliceFromAddrAndLen(
-            self.memory,
-            self.buffer_offset,
+        const mem_slice = try vm.sliceFromAddrAndLen(
+            self._memory,
+            self._buffer_offset,
             buffer.len,
         );
         std.mem.copyForwards(u8, mem_slice, buffer);
@@ -75,7 +75,7 @@ pub const InputSource = struct {
         const buffer_at = self.buffer_at.fetch();
         const buffer_len = self.buffer_len.fetch();
         if (buffer_at < buffer_len) {
-            const ret = self.memory[self.buffer_offset + buffer_at];
+            const ret = self._memory[self._buffer_offset + buffer_at];
             self.buffer_at.storeAdd(1);
             return ret;
         } else {
@@ -109,19 +109,20 @@ pub const InputSource = struct {
 
         const word_end = self.buffer_at.fetch();
         return .{
-            .address = self.buffer_offset + word_start,
+            .address = self._buffer_offset + word_start,
             .len = word_end - word_start,
         };
     }
 
     pub fn readNextWord(self: *@This()) ?[]const u8 {
         const range = self.readNextWordRange() orelse return null;
-        return vm.sliceFromAddrAndLen(self.memory, range.address, range.len);
+        // TODO we should write a test to make sure that this won't happen
+        return vm.sliceFromAddrAndLen(self._memory, range.address, range.len) catch unreachable;
     }
 
     pub fn refill(
         self: *@This(),
-    ) vm.InputError!void {
+    ) (vm.InputError || vm.OutOfBoundsError)!void {
         const refill_fn = self.refill_fn orelse return error.CannotRefill;
         const userdata = self.refill_userdata orelse return error.CannotRefill;
         const buffer = try refill_fn(userdata);

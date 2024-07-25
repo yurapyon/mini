@@ -77,7 +77,7 @@ pub const Dictionary = struct {
         try self.here.commaC(value);
     }
 
-    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) Register.Error!void {
+    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
         if (addr > std.math.maxInt(u15)) {
             return error.InvalidAddress;
         }
@@ -88,7 +88,7 @@ pub const Dictionary = struct {
         try self.here.commaC(@truncate(jump));
     }
 
-    pub fn compileData(self: *@This(), data: []u8) Register.Error!void {
+    pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
         if (data.len > std.math.maxInt(u12)) {
             return error.InvalidAddress;
         }

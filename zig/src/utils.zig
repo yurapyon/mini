@@ -155,3 +155,18 @@ test "parse number" {
     try testing.expectEqual(10, try parseNumber("+10", 10));
     try testing.expectEqual(845402850256, try parseNumber("asdf1234", 36));
 }
+
+/// Case insensitive string compare
+pub fn stringsEqual(a: []const u8, b: []const u8) bool {
+    if (a.len != b.len) {
+        return false;
+    }
+
+    for (a, b) |a_ch, b_ch| {
+        if (std.ascii.toLower(a_ch) != std.ascii.toLower(b_ch)) {
+            return false;
+        }
+    }
+
+    return true;
+}
