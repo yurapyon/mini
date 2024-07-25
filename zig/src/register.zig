@@ -3,10 +3,10 @@ const std = @import("std");
 const vm = @import("mini.zig");
 
 // Error handling strategy:
-// For the sake of not having the entire code base be full of 'try'
+// For the sake of not having the entire codebase be full of 'try'
 //   OutOfBounds errors are only thrown when _memory or _offset is changed
 //     (or from functions that access arbitrary unrelated memory)
-// There are no public functions that allow users to change _memory or _offset
+// There are no public functions that allow users to change _memory or _offset after init
 //   so if they go in and modify them on thier own, that's thier problem
 
 /// A register is basically a pointer into VM Memory
