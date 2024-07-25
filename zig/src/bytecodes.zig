@@ -1,4 +1,5 @@
-const mem = @import("std").mem;
+const std = @import("std");
+const mem = std.mem;
 
 const vm = @import("mini.zig");
 
@@ -230,7 +231,7 @@ const lookup_table = [_]BytecodeDefinition{
     .{},
 
     // ===
-    .{},
+    constructBasicBytecode("##.s", printStack),
     .{},
     .{},
     .{},
@@ -691,6 +692,13 @@ fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.over();
 }
 
+fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    std.debug.print("stack ==\n", .{});
+    for (mini.data_stack.asSlice(), 0..) |cell, i| {
+        std.debug.print("{}: {}\n", .{ i, cell });
+    }
+}
+
 // ===
 
 pub const base_data_bytecode = 0b01110000;
@@ -757,14 +765,58 @@ test "bytecodes" {
     try testWords(
         &mini,
         &[_]VmWordTest{
-            .{ .word = "dup", .stack = &[_]u16{ 1, 0xabcd, 0xabcd } },
-            .{ .word = "0xffff", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff } },
-            .{ .word = "4", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff, 4 } },
-            .{ .word = "rshift", .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0x0fff } },
-            .{ .word = "and", .stack = &[_]u16{ 1, 0xabcd, 0x0bcd } },
+            .{
+                .word = "dup",
+                .stack = &[_]u16{ 1, 0xabcd, 0xabcd },
+            },
+            .{
+                .word = "0xffff",
+                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff },
+            },
+            .{
+                .word = "4",
+                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff, 4 },
+            },
+            .{
+                .word = "rshift",
+                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0x0fff },
+            },
+            .{
+                .word = "and",
+                .stack = &[_]u16{ 1, 0xabcd, 0x0bcd },
+            },
+        },
+    );
+
+    mini.data_stack.clear();
+
+    try testWords(
+        &mini,
+        &[_]VmWordTest{
+            .{
+                .word = "1",
+                .stack = &[_]u16{1},
+            },
+            .{
+                .word = "2",
+                .stack = &[_]u16{ 1, 2 },
+            },
+            .{
+                .word = "+",
+                .stack = &[_]u16{3},
+            },
+            .{
+                .word = "4",
+                .stack = &[_]u16{ 3, 4 },
+            },
+            .{
+                .word = "tuck",
+                .stack = &[_]u16{ 4, 3, 4 },
+            },
         },
     );
 }
+
 const TestMode = enum {
     compile,
     interpret,

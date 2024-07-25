@@ -35,6 +35,11 @@ pub fn Stack(comptime count_: usize) type {
             return stack_size / @sizeOf(vm.Cell);
         }
 
+        pub fn asSlice(self: *@This()) []vm.Cell {
+            const ptr: [*]vm.Cell = @ptrCast(@alignCast(&self.memory[self.bottom_offset]));
+            return ptr[0..self.depth()];
+        }
+
         pub fn clear(self: @This()) void {
             self.top.store(self.bottom_offset);
         }

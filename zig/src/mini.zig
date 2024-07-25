@@ -201,7 +201,8 @@ pub const MiniVM = struct {
     pub fn repl(self: *@This()) Error!void {
         while (!self.should_bye) {
             self.should_quit = false;
-            try self.input_source.refill();
+            // TODO
+            // try self.input_source.refill();
 
             while (!self.should_quit and !self.should_bye) {
                 const word = try self.input_source.readNextWord();

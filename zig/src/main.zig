@@ -3,6 +3,14 @@ const Allocator = std.mem.Allocator;
 
 const vm = @import("mini.zig");
 
+const base_file = @embedFile("base.mini.fth");
+
+pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
+    var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
+    defer file.close();
+    return file.readToEndAlloc(allocator, std.math.maxInt(usize));
+}
+
 fn runMiniVM(allocator: Allocator) !void {
     const mem = try vm.allocateMemory(allocator);
     defer allocator.free(mem);
@@ -10,7 +18,12 @@ fn runMiniVM(allocator: Allocator) !void {
     var vm_instance: vm.MiniVM = undefined;
     try vm_instance.init(mem);
 
-    vm_instance.input_source.setInputBuffer("1 dup dup\n");
+    vm_instance.input_source.setInputBuffer("1 dup 1+ dup 1+ ##.s bye\n");
+    try vm_instance.repl();
+
+    vm_instance.should_bye = false;
+    vm_instance.should_quit = false;
+    vm_instance.input_source.setInputBuffer(base_file);
     try vm_instance.repl();
 }
 
@@ -27,5 +40,5 @@ test "lib-testing" {
 }
 
 test "end-to-end" {
-    // try runMiniVM(std.testing.allocator);
+    try runMiniVM(std.testing.allocator);
 }
