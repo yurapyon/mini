@@ -2,22 +2,6 @@ const std = @import("std");
 
 const vm = @import("mini.zig");
 
-fn checkedAccess(memory: []u8, addr: usize) vm.OutOfBoundsError!*u8 {
-    if (addr >= memory.len) {
-        return error.OutOfBounds;
-    }
-
-    return &memory[addr];
-}
-
-fn checkedRead(memory: []const u8, addr: usize) vm.OutOfBoundsError!u8 {
-    if (addr >= memory.len) {
-        return error.OutOfBounds;
-    }
-
-    return memory[addr];
-}
-
 // Error handling strategy:
 // For the sake of not having the entire code base be full of 'try'
 //   OutOfBounds errors are only thrown when _memory or _offset is changed
@@ -29,15 +13,19 @@ fn checkedRead(memory: []const u8, addr: usize) vm.OutOfBoundsError!u8 {
 /// It's memory-mapped, rather than being a system pointer
 ///   so, an offset of 0 means memory[0]
 pub const Register = struct {
-    pub const Error = vm.OutOfBoundsError;
+    pub const Error = vm.mem.MemoryError;
 
     // NOTE
     // If these two fields were instead a vm.Cell pointer,
     //   you wouldnt be able to have comma() readByteAndAdvance() etc
-    _memory: vm.Memory,
+    _memory: vm.mem.CellAlignedMemory,
     _offset: vm.Cell,
 
-    pub fn init(self: *@This(), memory: vm.Memory, offset: vm.Cell) Error!void {
+    pub fn init(
+        self: *@This(),
+        memory: vm.mem.CellAlignedMemory,
+        offset: vm.Cell,
+    ) Error!void {
         if (offset >= memory.len) {
             return error.OutOfBounds;
         }
@@ -49,68 +37,63 @@ pub const Register = struct {
         return self._offset;
     }
 
-    // NOTE
-    //   we have to be able to access vm.Cells with byte alignment
-    //   so a function like below doesnt work
-    // fn accessCell(self: @This(), addr: usize) *vm.Cell {
-    //    return @ptrCast(@alignCast(&self.memory[addr]));
-    // }
-
-    // TODO try and refactor considering the above note
-    fn readCell(self: @This(), addr: usize) Error!vm.Cell {
-        const high_byte = try checkedAccess(self._memory, addr + 1);
-        const low_byte = try checkedAccess(self._memory, addr);
-        return (@as(vm.Cell, high_byte.*) << 8) | low_byte.*;
-    }
-
-    // TODO try and refactor considering the above note
-    fn writeCell(self: @This(), addr: usize, value: vm.Cell) Error!void {
-        const high_byte = try checkedAccess(self._memory, addr + 1);
-        const low_byte = try checkedAccess(self._memory, addr);
-        high_byte.* = @truncate(value >> 8);
-        low_byte.* = @truncate(value);
-    }
-
     pub fn store(self: @This(), value: vm.Cell) void {
-        self.writeCell(self._offset, value) catch unreachable;
-    }
-
-    pub fn storeAdd(self: @This(), to_add: vm.Cell) void {
-        const value = self.readCell(self._offset) catch unreachable;
-        self.writeCell(self._offset, value +% to_add) catch unreachable;
-    }
-
-    pub fn storeSubtract(self: @This(), to_subtract: vm.Cell) void {
-        const value = self.readCell(self._offset) catch unreachable;
-        self.writeCell(self._offset, value -% to_subtract) catch unreachable;
+        // TODO do we really need this to be byte aligned?
+        vm.mem.writeByteAlignedCell(
+            self._memory,
+            self._offset,
+            value,
+        ) catch unreachable;
     }
 
     pub fn fetch(self: @This()) vm.Cell {
-        return self.readCell(self._offset) catch unreachable;
+        // TODO do we really need this to be byte aligned?
+        return vm.mem.readByteAlignedCell(
+            self._memory,
+            self._offset,
+        ) catch unreachable;
+    }
+
+    pub fn storeAdd(self: @This(), to_add: vm.Cell) void {
+        const value = self.fetch();
+        self.store(value +% to_add);
+    }
+
+    pub fn storeSubtract(self: @This(), to_subtract: vm.Cell) void {
+        const value = self.fetch();
+        self.store(value -% to_subtract);
     }
 
     pub fn comma(self: @This(), value: vm.Cell) Error!void {
-        try self.writeCell(self.fetch(), value);
+        // TODO do we really need this to be byte aligned?
+        // i think this is the main reason for it
+        try vm.mem.writeByteAlignedCell(self._memory, self.fetch(), value);
         self.storeAdd(@sizeOf(vm.Cell));
     }
 
     pub fn storeC(self: @This(), value: u8) void {
-        const byte = checkedAccess(self._memory, self._offset) catch unreachable;
+        const byte = vm.mem.checkedAccess(
+            self._memory,
+            self._offset,
+        ) catch unreachable;
         byte.* = value;
     }
 
+    pub fn fetchC(self: @This()) u8 {
+        const byte = vm.mem.checkedRead(
+            self._memory,
+            self._offset,
+        ) catch unreachable;
+        return byte;
+    }
+
     pub fn storeAddC(self: @This(), value: u8) void {
-        const byte = checkedAccess(self._memory, self._offset) catch unreachable;
+        const byte = vm.mem.checkedAccess(self._memory, self._offset) catch unreachable;
         byte.* +%= value;
     }
 
-    pub fn fetchC(self: @This()) u8 {
-        const byte = checkedAccess(self._memory, self._offset) catch unreachable;
-        return byte.*;
-    }
-
     pub fn commaC(self: @This(), value: u8) Error!void {
-        const byte = try checkedAccess(self._memory, self.fetch());
+        const byte = try vm.mem.checkedAccess(self._memory, self.fetch());
         byte.* = value;
         self.storeAdd(1);
     }
@@ -127,7 +110,7 @@ pub const Register = struct {
     pub fn readByteAndAdvance(self: @This(), memory: []const u8) Error!u8 {
         const addr = self.fetch();
         self.storeAdd(1);
-        return try checkedRead(memory, addr);
+        return try vm.mem.checkedRead(memory, addr);
     }
 
     pub fn readCellAndAdvance(self: *@This(), memory: []const u8) Error!vm.Cell {
@@ -140,7 +123,10 @@ pub const Register = struct {
 test "registers" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     var reg_a: Register = undefined;

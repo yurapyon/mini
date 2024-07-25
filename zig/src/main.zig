@@ -36,7 +36,10 @@ const LineByLineRefiller = struct {
 };
 
 fn runMiniVM(allocator: Allocator) !void {
-    const mem = try vm.allocateMemory(allocator);
+    const mem = try vm.mem.allocateCellAlignedMemory(
+        allocator,
+        vm.max_memory_size,
+    );
     defer allocator.free(mem);
 
     var vm_instance: vm.MiniVM = undefined;

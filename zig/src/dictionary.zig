@@ -10,7 +10,7 @@ const Register = @import("register.zig").Register;
 ///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
     // TODO should this be a *vm.Memory pointer?
-    _memory: vm.Memory,
+    _memory: vm.mem.CellAlignedMemory,
     here: Register,
     latest: Register,
 
@@ -18,7 +18,7 @@ pub const Dictionary = struct {
     // Assumes latest and here are in the same memory block as the dictionary
     pub fn init(
         self: *@This(),
-        memory: vm.Memory,
+        memory: vm.mem.CellAlignedMemory,
         here_offset: vm.Cell,
         latest_offset: vm.Cell,
     ) Register.Error!void {
@@ -59,9 +59,11 @@ pub const Dictionary = struct {
         const aligned_here = self.here.fetch();
         self.latest.store(aligned_here);
 
-        try word_header.writeToMemory(
-            self._memory[aligned_here..][0..header_size],
-        );
+        try word_header.writeToMemory(vm.mem.sliceFromAddrAndLen(
+            self._memory,
+            aligned_here,
+            header_size,
+        ));
         self.here.storeAdd(header_size);
 
         self.here.alignForward(vm.Cell);
@@ -116,7 +118,10 @@ pub const Dictionary = struct {
 test "dictionary" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     const here_offset = 0;

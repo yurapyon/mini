@@ -9,7 +9,7 @@ pub fn Stack(comptime count_: usize) type {
         pub const size = count * @sizeOf(vm.Cell);
         pub const MemType = [size]u8;
 
-        _memory: vm.Memory,
+        _memory: vm.mem.CellAlignedMemory,
 
         // top.fetch() is a ptr to
         //   empty Cell right beyond the actual topmost value
@@ -18,10 +18,10 @@ pub fn Stack(comptime count_: usize) type {
 
         pub fn init(
             self: *@This(),
-            memory: vm.Memory,
+            memory: vm.mem.CellAlignedMemory,
             top_offset: vm.Cell,
             bottom_offset: vm.Cell,
-        ) vm.OutOfBoundsError!void {
+        ) vm.mem.MemoryError!void {
             if (bottom_offset > memory.len) {
                 return error.OutOfBounds;
             }
@@ -38,25 +38,25 @@ pub fn Stack(comptime count_: usize) type {
             return stack_size / @sizeOf(vm.Cell);
         }
 
-        pub fn asSlice(self: *@This()) vm.OutOfBoundsError![]vm.Cell {
-            return vm.sliceAt(self._memory, self._bottom_offset, self.depth());
+        pub fn asSlice(self: *@This()) vm.mem.MemoryError![]vm.Cell {
+            return vm.mem.sliceAt(self._memory, self._bottom_offset, self.depth());
         }
 
         pub fn clear(self: @This()) void {
             self.top.store(self._bottom_offset);
         }
 
-        fn unsafeIndex(self: *@This(), at: isize) vm.OutOfBoundsError!*vm.Cell {
+        fn unsafeIndex(self: *@This(), at: isize) vm.mem.MemoryError!*vm.Cell {
             const top = self.top.fetch();
             const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
-            return try vm.cellAt(self._memory, @intCast(addr));
+            return try vm.mem.cellAt(self._memory, @intCast(addr));
         }
 
         fn unsafeSwapValues(
             self: *@This(),
             a_idx: isize,
             b_idx: isize,
-        ) vm.OutOfBoundsError!void {
+        ) vm.mem.MemoryError!void {
             const a_cell = try self.unsafeIndex(a_idx);
             const b_cell = try self.unsafeIndex(b_idx);
             const temp = a_cell.*;
@@ -68,7 +68,6 @@ pub fn Stack(comptime count_: usize) type {
             if (at >= self.depth()) {
                 return error.StackUnderflow;
             }
-            // TODO could probably catch unreachable on this if we have stack overflow checking
             return self.unsafeIndex(@intCast(at));
         }
 
@@ -160,7 +159,10 @@ pub fn Stack(comptime count_: usize) type {
 test "stack" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     var stack: Stack32 = undefined;

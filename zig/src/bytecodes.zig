@@ -365,19 +365,19 @@ fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* +%= value;
 }
 
 fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     try mini.data_stack.push(mem_ptr.*);
 }
 
@@ -394,27 +394,21 @@ fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn storeC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
-    if (addr >= mini.memory.len) {
-        return error.OutOfBounds;
-    }
-    mini.memory[addr] = byte;
+    const ptr = try vm.mem.checkedAccess(mini.memory, addr);
+    ptr.* = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
-    if (addr >= mini.memory.len) {
-        return error.OutOfBounds;
-    }
-    mini.memory[addr] +%= byte;
+    const ptr = try vm.mem.checkedAccess(mini.memory, addr);
+    ptr.* += byte;
 }
 
 fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    if (addr >= mini.memory.len) {
-        return error.OutOfBounds;
-    }
-    try mini.data_stack.push(mini.memory[addr]);
+    const value = try vm.mem.checkedRead(mini.memory, addr);
+    try mini.data_stack.push(value);
 }
 
 fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -766,7 +760,10 @@ fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 test "bytecodes" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     var mini: vm.MiniVM = undefined;

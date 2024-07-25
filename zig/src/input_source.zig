@@ -21,7 +21,7 @@ pub const InputSource = struct {
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 
-    _memory: vm.Memory,
+    _memory: vm.mem.CellAlignedMemory,
     _buffer_offset: vm.Cell,
     buffer_len: Register,
     buffer_at: Register,
@@ -30,7 +30,7 @@ pub const InputSource = struct {
 
     pub fn init(
         self: *@This(),
-        memory: vm.Memory,
+        memory: vm.mem.CellAlignedMemory,
         buffer_offset: vm.Cell,
         buffer_at_offset: vm.Cell,
         buffer_len_offset: vm.Cell,
@@ -48,11 +48,11 @@ pub const InputSource = struct {
     }
 
     // TODO maybe make this private ?
-    pub fn setInputBuffer(self: *@This(), buffer: []const u8) (vm.InputError || vm.OutOfBoundsError)!void {
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) (vm.InputError || vm.mem.MemoryError)!void {
         if (buffer.len > max_buffer_len) {
             return error.OversizeInputBuffer;
         }
-        const mem_slice = try vm.sliceFromAddrAndLen(
+        const mem_slice = try vm.mem.sliceFromAddrAndLen(
             self._memory,
             self._buffer_offset,
             buffer.len,
@@ -117,12 +117,16 @@ pub const InputSource = struct {
     pub fn readNextWord(self: *@This()) ?[]const u8 {
         const range = self.readNextWordRange() orelse return null;
         // TODO we should write a test to make sure that this won't happen
-        return vm.sliceFromAddrAndLen(self._memory, range.address, range.len) catch unreachable;
+        return vm.mem.sliceFromAddrAndLen(
+            self._memory,
+            range.address,
+            range.len,
+        ) catch unreachable;
     }
 
     pub fn refill(
         self: *@This(),
-    ) (vm.InputError || vm.OutOfBoundsError)!void {
+    ) (vm.InputError || vm.mem.MemoryError)!void {
         const refill_fn = self.refill_fn orelse return error.CannotRefill;
         const userdata = self.refill_userdata orelse return error.CannotRefill;
         const buffer = try refill_fn(userdata);
@@ -133,8 +137,11 @@ pub const InputSource = struct {
 test "input-sources" {
     const testing = @import("std").testing;
 
-    const mem = try vm.allocateMemory(testing.allocator);
-    defer testing.allocator.free(mem);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
+    defer testing.allocator.free(memory);
 
     const buffer_offset = 4;
     const at_offset = 0;
@@ -142,7 +149,7 @@ test "input-sources" {
 
     var input_source: InputSource = undefined;
     try input_source.init(
-        mem,
+        memory,
         buffer_offset,
         at_offset,
         len_offset,
