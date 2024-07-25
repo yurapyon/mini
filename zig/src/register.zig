@@ -13,15 +13,19 @@ const vm = @import("mini.zig");
 /// It's memory-mapped, rather than being a system pointer
 ///   so, an offset of 0 means memory[0]
 pub const Register = struct {
-    pub const Error = vm.OutOfBoundsError;
+    pub const Error = vm.mem.MemoryError;
 
     // NOTE
     // If these two fields were instead a vm.Cell pointer,
     //   you wouldnt be able to have comma() readByteAndAdvance() etc
-    _memory: vm.Memory,
+    _memory: vm.mem.CellAlignedMemory,
     _offset: vm.Cell,
 
-    pub fn init(self: *@This(), memory: vm.Memory, offset: vm.Cell) Error!void {
+    pub fn init(
+        self: *@This(),
+        memory: vm.mem.CellAlignedMemory,
+        offset: vm.Cell,
+    ) Error!void {
         if (offset >= memory.len) {
             return error.OutOfBounds;
         }
@@ -119,7 +123,10 @@ pub const Register = struct {
 test "registers" {
     const testing = @import("std").testing;
 
-    const memory = try vm.allocateMemory(testing.allocator);
+    const memory = try vm.mem.allocateCellAlignedMemory(
+        testing.allocator,
+        vm.max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     var reg_a: Register = undefined;

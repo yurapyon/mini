@@ -25,7 +25,6 @@ pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
     Panic,
-    AlignmentError,
     StackOverflow,
     StackUnderflow,
     ReturnStackOverflow,
@@ -34,7 +33,7 @@ pub const Error = error{
     WordNameTooLong,
     InvalidProgramCounter,
     InvalidAddress,
-} || OutOfBoundsError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || mem.MemoryError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -46,8 +45,6 @@ pub const SemanticsError = error{
     CannotInterpret,
     CannotCompile,
 };
-
-pub const OutOfBoundsError = error{OutOfBounds};
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
@@ -64,24 +61,6 @@ pub const CompileState = enum(Cell) {
 
 const DataStack = Stack(32);
 const ReturnStack = Stack(32);
-
-pub const Memory = []align(@alignOf(Cell)) u8;
-
-pub fn allocateMemory(allocator: Allocator) Error!Memory {
-    return try allocator.allocWithOptions(
-        u8,
-        max_memory_size,
-        @alignOf(Cell),
-        null,
-    );
-}
-
-pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) OutOfBoundsError![]u8 {
-    if (addr + len >= memory.len) {
-        return error.OutOfBounds;
-    }
-    return memory[addr..][0..len];
-}
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
@@ -135,7 +114,7 @@ pub fn isTruthy(value: anytype) bool {
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
-    memory: Memory,
+    memory: mem.CellAlignedMemory,
     dictionary: Dictionary,
     data_stack: DataStack,
     return_stack: ReturnStack,
@@ -150,7 +129,7 @@ pub const MiniVM = struct {
     should_quit: bool,
     should_bye: bool,
 
-    pub fn init(self: *@This(), memory: Memory) !void {
+    pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
         self.memory = memory;
         try self.dictionary.init(
             self.memory,
@@ -239,11 +218,11 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn readByteAndAdvancePC(self: *@This()) OutOfBoundsError!u8 {
+    pub fn readByteAndAdvancePC(self: *@This()) mem.MemoryError!u8 {
         return try self.program_counter.readByteAndAdvance(self.memory);
     }
 
-    pub fn readCellAndAdvancePC(self: *@This()) OutOfBoundsError!Cell {
+    pub fn readCellAndAdvancePC(self: *@This()) mem.MemoryError!Cell {
         return try self.program_counter.readCellAndAdvance(self.memory);
     }
 
@@ -421,7 +400,7 @@ pub const MiniVM = struct {
 
     pub fn popSlice(self: *@This()) Error![]u8 {
         const len, const addr = try self.data_stack.popMultiple(2);
-        return sliceFromAddrAndLen(self.memory, addr, len);
+        return mem.sliceFromAddrAndLen(self.memory, addr, len);
     }
 };
 
@@ -429,7 +408,10 @@ test "mini" {
     const testing = std.testing;
     const stack = @import("Stack.zig");
 
-    const memory = try allocateMemory(testing.allocator);
+    const memory = try mem.allocateCellAlignedMemory(
+        testing.allocator,
+        max_memory_size,
+    );
     defer testing.allocator.free(memory);
 
     var vm: MiniVM = undefined;
