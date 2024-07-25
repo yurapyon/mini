@@ -16,6 +16,8 @@ pub fn isWhitespace(char: u8) bool {
 ///   i.e. line-by-line input from a buffer
 //         ability to read from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
+    pub const Error = vm.InputError || Register.Error;
+
     // TODO should this return an optional?
     pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError![]const u8;
     const max_buffer_len = 128;
@@ -34,21 +36,21 @@ pub const InputSource = struct {
         buffer_offset: vm.Cell,
         buffer_at_offset: vm.Cell,
         buffer_len_offset: vm.Cell,
-    ) void {
+    ) Register.Error!void {
         self.memory = memory;
         self.buffer_offset = buffer_offset;
         self.buffer_len.init(self.memory, buffer_len_offset);
         self.buffer_at.init(self.memory, buffer_at_offset);
 
-        self.buffer_len.store(0);
-        self.buffer_at.store(0);
+        try self.buffer_len.store(0);
+        try self.buffer_at.store(0);
 
         self.refill_fn = null;
         self.refill_userdata = null;
     }
 
     // TODO maybe make this private ?
-    pub fn setInputBuffer(self: *@This(), buffer: []const u8) vm.InputError!void {
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) Error!void {
         if (buffer.len > max_buffer_len) {
             return error.OversizeInputBuffer;
         }
@@ -58,8 +60,8 @@ pub const InputSource = struct {
             buffer.len,
         );
         std.mem.copyForwards(u8, mem_slice, buffer);
-        self.buffer_at.store(0);
-        self.buffer_len.store(@truncate(buffer.len));
+        try self.buffer_at.store(0);
+        try self.buffer_len.store(@truncate(buffer.len));
     }
 
     pub fn setRefillCallback(
@@ -71,18 +73,19 @@ pub const InputSource = struct {
         self.refill_userdata = userdata;
     }
 
-    pub fn readNextChar(self: *@This()) vm.InputError!?u8 {
-        const buffer_at = self.buffer_at.fetch();
-        if (buffer_at < self.buffer_len.fetch()) {
+    pub fn readNextChar(self: *@This()) Error!?u8 {
+        const buffer_at = try self.buffer_at.fetch();
+        const buffer_len = try self.buffer_len.fetch();
+        if (buffer_at < buffer_len) {
             const ret = self.memory[self.buffer_offset + buffer_at];
-            self.buffer_at.storeAdd(1);
+            try self.buffer_at.storeAdd(1);
             return ret;
         } else {
             return null;
         }
     }
 
-    fn skipWhitespace(self: *@This()) vm.InputError!?u8 {
+    fn skipWhitespace(self: *@This()) Error!?u8 {
         var char = try self.readNextChar() orelse return null;
         while (isWhitespace(char)) {
             char = (try self.readNextChar()) orelse return null;
@@ -90,37 +93,37 @@ pub const InputSource = struct {
         return char;
     }
 
-    pub fn readNextWordRange(self: *@This()) vm.InputError!?struct {
+    pub fn readNextWordRange(self: *@This()) Error!?struct {
         address: vm.Cell,
         len: vm.Cell,
     } {
         var char = try self.skipWhitespace() orelse return null;
 
-        const word_start = self.buffer_at.fetch() - 1;
+        const word_start = try self.buffer_at.fetch() - 1;
 
         while (true) {
             char = (try self.readNextChar()) orelse break;
             if (isWhitespace(char)) {
-                self.buffer_at.storeSubtract(1);
+                try self.buffer_at.storeSubtract(1);
                 break;
             }
         }
 
-        const word_end = self.buffer_at.fetch();
+        const word_end = try self.buffer_at.fetch();
         return .{
             .address = self.buffer_offset + word_start,
             .len = word_end - word_start,
         };
     }
 
-    pub fn readNextWord(self: *@This()) vm.InputError!?[]const u8 {
+    pub fn readNextWord(self: *@This()) Error!?[]const u8 {
         const range = try self.readNextWordRange() orelse return null;
         return vm.sliceFromAddrAndLen(self.memory, range.address, range.len);
     }
 
     pub fn refill(
         self: *@This(),
-    ) vm.InputError!void {
+    ) Error!void {
         const refill_fn = self.refill_fn orelse return error.CannotRefill;
         const userdata = self.refill_userdata orelse return error.CannotRefill;
         const buffer = try refill_fn(userdata);
@@ -139,7 +142,7 @@ test "input-sources" {
     const len_offset = 2;
 
     var input_source: InputSource = undefined;
-    input_source.init(
+    try input_source.init(
         mem,
         buffer_offset,
         at_offset,

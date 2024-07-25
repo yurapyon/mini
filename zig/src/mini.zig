@@ -31,7 +31,7 @@ pub const Error = error{
     WordNotFound,
     WordNameTooLong,
     InvalidProgramCounter,
-} || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || OutOfBoundsError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -43,6 +43,8 @@ pub const SemanticsError = error{
     CannotInterpret,
     CannotCompile,
 };
+
+pub const OutOfBoundsError = error{OutOfBounds};
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
@@ -162,12 +164,12 @@ pub const MiniVM = struct {
         );
 
         self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
-        self.data_stack.init(
+        try self.data_stack.init(
             self.memory,
             MemoryLayout.offsetOf("data_stack_top"),
             MemoryLayout.offsetOf("data_stack"),
         );
-        self.return_stack.init(
+        try self.return_stack.init(
             self.memory,
             MemoryLayout.offsetOf("return_stack_top"),
             MemoryLayout.offsetOf("return_stack"),
@@ -175,18 +177,18 @@ pub const MiniVM = struct {
         self.state.init(self.memory, MemoryLayout.offsetOf("state"));
         self.base.init(self.memory, MemoryLayout.offsetOf("base"));
         self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
-        self.input_source.init(
+        try self.input_source.init(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
             MemoryLayout.offsetOf("input_buffer_len"),
             MemoryLayout.offsetOf("input_buffer_at"),
         );
 
-        self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
-        self.dictionary.latest.store(0);
-        self.state.store(0);
-        self.base.store(10);
-        self.active_device.store(0);
+        try self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
+        try self.dictionary.latest.store(0);
+        try self.state.store(0);
+        try self.base.store(10);
+        try self.active_device.store(0);
 
         self.should_quit = false;
         self.should_bye = false;
@@ -211,6 +213,7 @@ pub const MiniVM = struct {
         while (!self.should_bye) {
             self.should_quit = false;
             // TODO
+            // how to handle if refiller is empty
             try self.input_source.refill();
 
             while (!self.should_quit and !self.should_bye) {
@@ -250,7 +253,7 @@ pub const MiniVM = struct {
         if (useReturnStack) {
             try self.return_stack.push(self.program_counter.fetch());
         }
-        self.program_counter.store(addr);
+        try self.program_counter.store(addr);
     }
 
     fn evaluateLoop(self: *@This()) Error!void {
@@ -261,8 +264,8 @@ pub const MiniVM = struct {
         //   because bytecodes can just set the jump location
         //     directly without having to do any math
 
-        while (self.return_stack.depth() > 0) {
-            const bytecode = self.readByteAndAdvancePC();
+        while ((try self.return_stack.depth()) > 0) {
+            const bytecode = try self.readByteAndAdvancePC();
             const ctx = ExecutionContext{
                 .current_bytecode = bytecode,
             };
@@ -308,7 +311,7 @@ pub const MiniVM = struct {
                 .is_immediate = bytecode_definition.is_immediate,
             };
             // TODO rethrow InvalidBase errors
-        } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
+        } else if (utils.parseNumber(word, try self.base.fetch()) catch null) |value| {
             return .{
                 .value = .{
                     .number = @truncate(value),
@@ -322,7 +325,7 @@ pub const MiniVM = struct {
 
     fn interpretString(self: *@This(), word: []const u8) Error!void {
         if (try self.lookupString(word)) |word_info| {
-            const state: CompileState = @enumFromInt(self.state.fetch());
+            const state: CompileState = @enumFromInt(try self.state.fetch());
             const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
             switch (effective_state) {
                 .interpret => {
@@ -367,7 +370,7 @@ pub const MiniVM = struct {
             },
             .mini_word => |addr| {
                 const cfa_addr = try calculateCfaAddress(self.memory, addr);
-                self.dictionary.compileAbsJump(cfa_addr);
+                try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
                 if ((value & 0xff00) > 0) {

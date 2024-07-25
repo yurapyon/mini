@@ -23,29 +23,33 @@ pub fn Stack(comptime count_: usize) type {
             memory: vm.Memory,
             top_offset: vm.Cell,
             bottom_offset: vm.Cell,
-        ) void {
+        ) Register.Error!void {
             self.memory = memory;
             self.top.init(self.memory, top_offset);
             self.bottom_offset = bottom_offset;
-            self.clear();
+            try self.clear();
         }
 
-        pub fn depth(self: @This()) usize {
-            const stack_size = self.top.fetch() - self.bottom_offset;
+        pub fn depth(self: @This()) Register.Error!usize {
+            const top = try self.top.fetch();
+            const stack_size = top - self.bottom_offset;
             return stack_size / @sizeOf(vm.Cell);
         }
 
-        pub fn asSlice(self: *@This()) []vm.Cell {
+        pub fn asSlice(self: *@This()) Register.Error![]vm.Cell {
             const ptr: [*]vm.Cell = @ptrCast(@alignCast(&self.memory[self.bottom_offset]));
-            return ptr[0..self.depth()];
+            const stack_depth = try self.depth();
+            return ptr[0..stack_depth];
         }
 
-        pub fn clear(self: @This()) void {
-            self.top.store(self.bottom_offset);
+        pub fn clear(self: @This()) Register.Error!void {
+            try self.top.store(self.bottom_offset);
         }
 
-        fn unsafeIndex(self: *@This(), at: isize) vm.Error!*vm.Cell {
-            const addr = @as(isize, @intCast(self.top.fetch())) - (at + 1) * @sizeOf(vm.Cell);
+        fn unsafeIndex(self: *@This(), at: isize) Register.Error!*vm.Cell {
+            const top = try self.top.fetch();
+            const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
+            // TODO cellAt needs to be checked
             return vm.cellAt(self.memory, @intCast(addr));
         }
 
@@ -53,7 +57,7 @@ pub fn Stack(comptime count_: usize) type {
             self: *@This(),
             a_idx: isize,
             b_idx: isize,
-        ) vm.Error!void {
+        ) Register.Error!void {
             const a_cell = try self.unsafeIndex(a_idx);
             const b_cell = try self.unsafeIndex(b_idx);
             const temp = a_cell.*;
@@ -62,7 +66,8 @@ pub fn Stack(comptime count_: usize) type {
         }
 
         pub fn index(self: *@This(), at: usize) vm.Error!*vm.Cell {
-            if (at >= self.depth()) {
+            const stack_depth = try self.depth();
+            if (at >= stack_depth) {
                 return error.StackUnderflow;
             }
             return self.unsafeIndex(@intCast(at));
@@ -73,8 +78,9 @@ pub fn Stack(comptime count_: usize) type {
             a_idx: usize,
             b_idx: usize,
         ) vm.Error!void {
+            const stack_depth = try self.depth();
             const max_idx = @max(a_idx, b_idx);
-            if (max_idx >= self.depth()) {
+            if (max_idx >= stack_depth) {
                 return error.StackUnderflow;
             }
             return self.unsafeSwapValues(@intCast(a_idx), @intCast(b_idx));
@@ -88,12 +94,12 @@ pub fn Stack(comptime count_: usize) type {
         pub fn push(self: *@This(), value: vm.Cell) vm.Error!void {
             const ptr = try self.unsafeIndex(-1);
             ptr.* = value;
-            self.top.storeAdd(@sizeOf(vm.Cell));
+            try self.top.storeAdd(@sizeOf(vm.Cell));
         }
 
         pub fn pop(self: *@This()) vm.Error!vm.Cell {
             const ret = try self.peek();
-            self.top.storeSubtract(@sizeOf(vm.Cell));
+            try self.top.storeSubtract(@sizeOf(vm.Cell));
             return ret;
         }
 
@@ -156,7 +162,7 @@ test "stack" {
     defer testing.allocator.free(memory);
 
     var stack: Stack32 = undefined;
-    stack.init(memory, 0, 2);
+    try stack.init(memory, 0, 2);
 
     try testing.expectEqual(0, stack.depth());
 

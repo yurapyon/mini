@@ -31,7 +31,7 @@ pub const Dictionary = struct {
         self: *@This(),
         word: []const u8,
     ) vm.Error!?vm.Cell {
-        var latest = self.latest.fetch();
+        var latest = try self.latest.fetch();
         var temp_word_header: WordHeader = undefined;
         while (latest != 0) : (latest = temp_word_header.latest) {
             try temp_word_header.initFromMemory(self.memory[latest..]);
@@ -47,7 +47,7 @@ pub const Dictionary = struct {
         name: []const u8,
     ) vm.Error!void {
         const word_header = WordHeader{
-            .latest = self.latest.fetch(),
+            .latest = try self.latest.fetch(),
             .is_immediate = false,
             .is_hidden = false,
             .name = name,
@@ -55,44 +55,44 @@ pub const Dictionary = struct {
 
         const header_size = word_header.size();
 
-        self.here.alignForward(vm.Cell);
-        const aligned_here = self.here.fetch();
-        self.latest.store(aligned_here);
+        try self.here.alignForward(vm.Cell);
+        const aligned_here = try self.here.fetch();
+        try self.latest.store(aligned_here);
 
         try word_header.writeToMemory(
             self.memory[aligned_here..][0..header_size],
         );
-        self.here.storeAdd(header_size);
+        try self.here.storeAdd(header_size);
 
-        self.here.alignForward(vm.Cell);
+        try self.here.alignForward(vm.Cell);
     }
 
-    pub fn compileLit(self: *@This(), value: vm.Cell) void {
-        self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-        self.here.comma(value);
+    pub fn compileLit(self: *@This(), value: vm.Cell) vm.Error!void {
+        try self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+        try self.here.comma(value);
     }
 
-    pub fn compileLitC(self: *@This(), value: u8) void {
-        self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-        self.here.commaC(value);
+    pub fn compileLitC(self: *@This(), value: u8) vm.Error!void {
+        try self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+        try self.here.commaC(value);
     }
 
-    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) void {
+    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
         // TODO check addr isnt bigger than 2^15
         const base = bytecodes.base_abs_jump_bytecode;
         const jump = base | (addr & 0x7fff);
-        self.here.commaC(@truncate(jump >> 8));
-        self.here.commaC(@truncate(jump));
+        try self.here.commaC(@truncate(jump >> 8));
+        try self.here.commaC(@truncate(jump));
     }
 
-    pub fn compileData(self: *@This(), data: []u8) void {
+    pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
         // TODO check data.len isnt bigger than 2^12
         const base = bytecodes.base_data_bytecode;
         const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
-        self.here.commaC(@truncate(data_len >> 8));
-        self.here.commaC(@truncate(data_len));
+        try self.here.commaC(@truncate(data_len >> 8));
+        try self.here.commaC(@truncate(data_len));
         for (data) |byte| {
-            self.here.commaC(byte);
+            try self.here.commaC(byte);
         }
     }
 
@@ -102,8 +102,8 @@ pub const Dictionary = struct {
         value: vm.Cell,
     ) vm.Error!void {
         try self.defineWord(name);
-        self.compileLit(value);
-        self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
+        try self.compileLit(value);
+        try self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
     }
 };
 
@@ -120,13 +120,13 @@ test "dictionary" {
     var dictionary: Dictionary = undefined;
     dictionary.init(memory, here_offset, latest_offset);
 
-    dictionary.here.store(dictionary_start);
-    dictionary.latest.store(0);
+    try dictionary.here.store(dictionary_start);
+    try dictionary.latest.store(0);
 
     try dictionary.defineWord("name");
 
     try testing.expectEqual(
-        dictionary.here.fetch() - dictionary_start,
+        try dictionary.here.fetch() - dictionary_start,
         WordHeader.calculateSize(4),
     );
 
@@ -148,7 +148,7 @@ test "dictionary" {
     try wh_b.initFromMemory(memory[dictionary_start..]);
     try testing.expectEqualDeep(wh_a, wh_b);
 
-    const c_latest = dictionary.latest.fetch();
+    const c_latest = try dictionary.latest.fetch();
 
     const wh_c: WordHeader = .{
         .latest = c_latest,
@@ -162,10 +162,10 @@ test "dictionary" {
     try testing.expectEqualSlices(
         u8,
         &[_]u8{ 0x10, 0x00, 0x04, 'w', 'o', 'w', 'o', 0 },
-        memory[dictionary.latest.fetch()..][0..8],
+        memory[(try dictionary.latest.fetch())..][0..8],
     );
 
-    try wh_b.initFromMemory(memory[dictionary.latest.fetch()..]);
+    try wh_b.initFromMemory(memory[(try dictionary.latest.fetch())..]);
     try testing.expectEqualDeep(wh_c, wh_b);
 
     try dictionary.defineWord("hellow");
