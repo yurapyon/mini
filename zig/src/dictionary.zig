@@ -78,7 +78,10 @@ pub const Dictionary = struct {
     }
 
     pub fn compileAbsJump(self: *@This(), addr: vm.Cell) Register.Error!void {
-        // TODO check addr isnt bigger than 2^15
+        if (addr > std.math.maxInt(u15)) {
+            return error.InvalidAddress;
+        }
+
         const base = bytecodes.base_abs_jump_bytecode;
         const jump = base | (addr & 0x7fff);
         try self.here.commaC(@truncate(jump >> 8));
@@ -86,7 +89,10 @@ pub const Dictionary = struct {
     }
 
     pub fn compileData(self: *@This(), data: []u8) Register.Error!void {
-        // TODO check data.len isnt bigger than 2^12
+        if (data.len > std.math.maxInt(u12)) {
+            return error.InvalidAddress;
+        }
+
         const base = bytecodes.base_data_bytecode;
         const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
         try self.here.commaC(@truncate(data_len >> 8));
