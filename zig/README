@@ -18,3 +18,9 @@ files:
   utils.zig        - other random utils
 
   main.zig         - just hacks out an end-to-end test for now
+
+undefined behavior:
+  compared to untyped, mini should never have a chance to segfault
+  alignment needs to be checked and turned into a MemoryError
+  out of bounds access of the vm memory block needs to be checked too
+
