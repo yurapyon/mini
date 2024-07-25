@@ -35,7 +35,6 @@ pub const Error = error{
 
 pub const InputError = error{
     UnexpectedEndOfInput,
-    NoInputBuffer,
     CannotRefill,
 };
 
@@ -87,6 +86,9 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     state: Cell,
     base: Cell,
     active_device: Cell,
+    input_buffer: InputSource.MemType,
+    input_buffer_len: Cell,
+    input_buffer_at: Cell,
     dictionary_start: u0,
 }, Cell);
 
@@ -172,14 +174,18 @@ pub const MiniVM = struct {
         self.state.init(self.memory, MemoryLayout.offsetOf("state"));
         self.base.init(self.memory, MemoryLayout.offsetOf("base"));
         self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
+        self.input_source.init(
+            self.memory,
+            MemoryLayout.offsetOf("input_buffer"),
+            MemoryLayout.offsetOf("input_buffer_len"),
+            MemoryLayout.offsetOf("input_buffer_at"),
+        );
 
         self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
         self.dictionary.latest.store(0);
         self.state.store(0);
         self.base.store(10);
         self.active_device.store(0);
-
-        self.input_source.init();
 
         self.should_quit = false;
         self.should_bye = false;

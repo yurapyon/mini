@@ -6,6 +6,9 @@ const vm = @import("mini.zig");
 /// It's memory-mapped, rather than being a system pointer
 ///   so, an offset of 0 means memory[0]
 pub const Register = struct {
+    // NOTE
+    // If these two fields were instead a vm.Cell pointer,
+    //   you wouldnt be able to have comma() readByteAndAdvance() etc
     memory: vm.Memory,
     offset: vm.Cell,
 
