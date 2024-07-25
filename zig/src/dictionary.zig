@@ -10,7 +10,7 @@ const Register = @import("register.zig").Register;
 ///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
     // TODO should this be a *vm.Memory pointer?
-    memory: vm.Memory,
+    _memory: vm.Memory,
     here: Register,
     latest: Register,
 
@@ -21,10 +21,10 @@ pub const Dictionary = struct {
         memory: vm.Memory,
         here_offset: vm.Cell,
         latest_offset: vm.Cell,
-    ) void {
-        self.memory = memory;
-        self.here.init(memory, here_offset);
-        self.latest.init(memory, latest_offset);
+    ) Register.Error!void {
+        self._memory = memory;
+        try self.here.init(memory, here_offset);
+        try self.latest.init(memory, latest_offset);
     }
 
     pub fn lookup(
@@ -34,7 +34,7 @@ pub const Dictionary = struct {
         var latest = self.latest.fetch();
         var temp_word_header: WordHeader = undefined;
         while (latest != 0) : (latest = temp_word_header.latest) {
-            try temp_word_header.initFromMemory(self.memory[latest..]);
+            try temp_word_header.initFromMemory(self._memory[latest..]);
             if (!temp_word_header.is_hidden and temp_word_header.nameEquals(word)) {
                 return latest;
             }
@@ -60,39 +60,39 @@ pub const Dictionary = struct {
         self.latest.store(aligned_here);
 
         try word_header.writeToMemory(
-            self.memory[aligned_here..][0..header_size],
+            self._memory[aligned_here..][0..header_size],
         );
         self.here.storeAdd(header_size);
 
         self.here.alignForward(vm.Cell);
     }
 
-    pub fn compileLit(self: *@This(), value: vm.Cell) void {
-        self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-        self.here.comma(value);
+    pub fn compileLit(self: *@This(), value: vm.Cell) Register.Error!void {
+        try self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+        try self.here.comma(value);
     }
 
-    pub fn compileLitC(self: *@This(), value: u8) void {
-        self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-        self.here.commaC(value);
+    pub fn compileLitC(self: *@This(), value: u8) Register.Error!void {
+        try self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+        try self.here.commaC(value);
     }
 
-    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) void {
+    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) Register.Error!void {
         // TODO check addr isnt bigger than 2^15
         const base = bytecodes.base_abs_jump_bytecode;
         const jump = base | (addr & 0x7fff);
-        self.here.commaC(@truncate(jump >> 8));
-        self.here.commaC(@truncate(jump));
+        try self.here.commaC(@truncate(jump >> 8));
+        try self.here.commaC(@truncate(jump));
     }
 
-    pub fn compileData(self: *@This(), data: []u8) void {
+    pub fn compileData(self: *@This(), data: []u8) Register.Error!void {
         // TODO check data.len isnt bigger than 2^12
         const base = bytecodes.base_data_bytecode;
         const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
-        self.here.commaC(@truncate(data_len >> 8));
-        self.here.commaC(@truncate(data_len));
+        try self.here.commaC(@truncate(data_len >> 8));
+        try self.here.commaC(@truncate(data_len));
         for (data) |byte| {
-            self.here.commaC(byte);
+            try self.here.commaC(byte);
         }
     }
 
@@ -102,8 +102,8 @@ pub const Dictionary = struct {
         value: vm.Cell,
     ) vm.Error!void {
         try self.defineWord(name);
-        self.compileLit(value);
-        self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
+        try self.compileLit(value);
+        try self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
     }
 };
 
@@ -118,7 +118,7 @@ test "dictionary" {
     const dictionary_start = 16;
 
     var dictionary: Dictionary = undefined;
-    dictionary.init(memory, here_offset, latest_offset);
+    try dictionary.init(memory, here_offset, latest_offset);
 
     dictionary.here.store(dictionary_start);
     dictionary.latest.store(0);

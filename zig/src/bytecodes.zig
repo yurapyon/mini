@@ -8,7 +8,7 @@ const vm = @import("mini.zig");
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
 
 fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    mini.dictionary.here.commaC(ctx.current_bytecode);
+    try mini.dictionary.here.commaC(ctx.current_bytecode);
 }
 
 fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -283,9 +283,9 @@ fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const result = try mini.readWordAndGetAddress();
     if (result.is_bytecode) {
-        mini.dictionary.compileLitC(@truncate(result.value));
+        try mini.dictionary.compileLitC(@truncate(result.value));
     } else {
-        mini.dictionary.compileLit(result.value);
+        try mini.dictionary.compileLit(result.value);
     }
 }
 
@@ -298,7 +298,7 @@ fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = mini.readByteAndAdvancePC();
+    const addr = try mini.readByteAndAdvancePC();
     try mini.absoluteJump(addr, false);
 }
 
@@ -322,18 +322,18 @@ fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO should try and refill
-    const range = try mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
+    const range = mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
     try mini.data_stack.push(range.address);
     try mini.data_stack.push(range.len);
 }
 
 fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO this is messy
-    if (try mini.input_source.readNextChar()) |char| {
+    if (mini.input_source.readNextChar()) |char| {
         try mini.data_stack.push(char);
     } else {
         try mini.input_source.refill();
-        if (try mini.input_source.readNextChar()) |char| {
+        if (mini.input_source.readNextChar()) |char| {
             try mini.data_stack.push(char);
         } else {
             return error.Panic;
@@ -354,7 +354,7 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 /// This jumps to the following address in memory without
 ///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = mini.readCellAndAdvancePC();
+    const addr = try mini.readCellAndAdvancePC();
     // TODO this mask should be a constant somewhere
     const masked_addr = addr & 0x7fff;
     try mini.absoluteJump(masked_addr, false);
@@ -362,56 +362,59 @@ fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.cellAt(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.cellAt(mini.memory, addr);
     mem_ptr.* +%= value;
 }
 
 fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    const mem_ptr = vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.cellAt(mini.memory, addr);
     try mini.data_stack.push(mem_ptr.*);
 }
 
 fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.dictionary.here.comma(value);
+    try mini.dictionary.here.comma(value);
 }
 
 fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.readCellAndAdvancePC();
+    const value = try mini.readCellAndAdvancePC();
     try mini.data_stack.push(value);
 }
 
 fn storeC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // TODO check out of bounds
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     mini.memory[addr] = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // TODO check out of bounds
     const addr, const value = try mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     mini.memory[addr] +%= byte;
 }
 
 fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // TODO check out of bounds
     const addr = try mini.data_stack.pop();
     try mini.data_stack.push(mini.memory[addr]);
 }
 
 fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    mini.dictionary.here.commaC(@truncate(value));
+    try mini.dictionary.here.commaC(@truncate(value));
 }
 
 fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const byte = mini.readByteAndAdvancePC();
+    const byte = try mini.readByteAndAdvancePC();
     try mini.data_stack.push(byte);
 }
 
@@ -695,7 +698,7 @@ fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     std.debug.print("stack ==\n", .{});
-    for (mini.data_stack.asSlice(), 0..) |cell, i| {
+    for (try mini.data_stack.asSlice(), 0..) |cell, i| {
         std.debug.print("{}: {}\n", .{ i, cell });
     }
 }
@@ -714,13 +717,13 @@ const data_definition = BytecodeDefinition{
 
 fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const data = try mini.popSlice();
-    mini.dictionary.compileData(data);
+    try mini.dictionary.compileData(data);
 }
 
 fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
     const high = ctx.current_bytecode & 0x0f;
-    const low = mini.readByteAndAdvancePC();
+    const low = try mini.readByteAndAdvancePC();
     const addr = mini.program_counter.fetch();
     const length = @as(vm.Cell, high) << 8 | low;
     try mini.data_stack.push(addr);
@@ -740,13 +743,13 @@ const abs_jump_definition = BytecodeDefinition{
 
 fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const cfa_addr = try mini.data_stack.pop();
-    mini.dictionary.compileAbsJump(cfa_addr);
+    try mini.dictionary.compileAbsJump(cfa_addr);
 }
 
 fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
     const high = ctx.current_bytecode & 0x7f;
-    const low = mini.readByteAndAdvancePC();
+    const low = try mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;
     try mini.absoluteJump(addr, true);
 }

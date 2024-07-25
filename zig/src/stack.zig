@@ -11,49 +11,54 @@ pub fn Stack(comptime count_: usize) type {
         pub const size = count * @sizeOf(vm.Cell);
         pub const MemType = [size]u8;
 
-        memory: vm.Memory,
+        _memory: vm.Memory,
 
         // top.fetch() is a ptr to
         //   empty Cell right beyond the actual topmost value
         top: Register,
-        bottom_offset: vm.Cell,
+        _bottom_offset: vm.Cell,
 
         pub fn init(
             self: *@This(),
             memory: vm.Memory,
             top_offset: vm.Cell,
             bottom_offset: vm.Cell,
-        ) void {
-            self.memory = memory;
-            self.top.init(self.memory, top_offset);
-            self.bottom_offset = bottom_offset;
+        ) vm.OutOfBoundsError!void {
+            if (bottom_offset > memory.len) {
+                return error.OutOfBounds;
+            }
+
+            self._memory = memory;
+            try self.top.init(self._memory, top_offset);
+            self._bottom_offset = bottom_offset;
             self.clear();
         }
 
-        pub fn depth(self: @This()) usize {
-            const stack_size = self.top.fetch() - self.bottom_offset;
+        pub fn depth(self: @This()) vm.Cell {
+            const top = self.top.fetch();
+            const stack_size = top - self._bottom_offset;
             return stack_size / @sizeOf(vm.Cell);
         }
 
-        pub fn asSlice(self: *@This()) []vm.Cell {
-            const ptr: [*]vm.Cell = @ptrCast(@alignCast(&self.memory[self.bottom_offset]));
-            return ptr[0..self.depth()];
+        pub fn asSlice(self: *@This()) vm.OutOfBoundsError![]vm.Cell {
+            return vm.sliceAt(self._memory, self._bottom_offset, self.depth());
         }
 
         pub fn clear(self: @This()) void {
-            self.top.store(self.bottom_offset);
+            self.top.store(self._bottom_offset);
         }
 
-        fn unsafeIndex(self: *@This(), at: isize) vm.Error!*vm.Cell {
-            const addr = @as(isize, @intCast(self.top.fetch())) - (at + 1) * @sizeOf(vm.Cell);
-            return vm.cellAt(self.memory, @intCast(addr));
+        fn unsafeIndex(self: *@This(), at: isize) vm.OutOfBoundsError!*vm.Cell {
+            const top = self.top.fetch();
+            const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
+            return try vm.cellAt(self._memory, @intCast(addr));
         }
 
         fn unsafeSwapValues(
             self: *@This(),
             a_idx: isize,
             b_idx: isize,
-        ) vm.Error!void {
+        ) vm.OutOfBoundsError!void {
             const a_cell = try self.unsafeIndex(a_idx);
             const b_cell = try self.unsafeIndex(b_idx);
             const temp = a_cell.*;
@@ -65,6 +70,7 @@ pub fn Stack(comptime count_: usize) type {
             if (at >= self.depth()) {
                 return error.StackUnderflow;
             }
+            // TODO could probably catch unreachable on this if we have stack overflow checking
             return self.unsafeIndex(@intCast(at));
         }
 
@@ -77,6 +83,7 @@ pub fn Stack(comptime count_: usize) type {
             if (max_idx >= self.depth()) {
                 return error.StackUnderflow;
             }
+            // TODO could probably catch unreachable on this if we have stack overflow checking
             return self.unsafeSwapValues(@intCast(a_idx), @intCast(b_idx));
         }
 
@@ -156,7 +163,7 @@ test "stack" {
     defer testing.allocator.free(memory);
 
     var stack: Stack32 = undefined;
-    stack.init(memory, 0, 2);
+    try stack.init(memory, 0, 2);
 
     try testing.expectEqual(0, stack.depth());
 
@@ -202,7 +209,7 @@ const Stack32 = Stack(32);
 
 pub fn expectStack(stack: anytype, expectation: []const vm.Cell) !void {
     const testing = @import("std").testing;
-    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack.memory[stack.bottom_offset]));
+    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack._memory[stack._bottom_offset]));
     try testing.expectEqualSlices(
         vm.Cell,
         expectation,

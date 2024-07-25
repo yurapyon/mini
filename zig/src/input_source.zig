@@ -34,11 +34,11 @@ pub const InputSource = struct {
         buffer_offset: vm.Cell,
         buffer_at_offset: vm.Cell,
         buffer_len_offset: vm.Cell,
-    ) void {
+    ) Register.Error!void {
         self.memory = memory;
         self.buffer_offset = buffer_offset;
-        self.buffer_len.init(self.memory, buffer_len_offset);
-        self.buffer_at.init(self.memory, buffer_at_offset);
+        try self.buffer_len.init(self.memory, buffer_len_offset);
+        try self.buffer_at.init(self.memory, buffer_at_offset);
 
         self.buffer_len.store(0);
         self.buffer_at.store(0);
@@ -71,9 +71,10 @@ pub const InputSource = struct {
         self.refill_userdata = userdata;
     }
 
-    pub fn readNextChar(self: *@This()) vm.InputError!?u8 {
+    pub fn readNextChar(self: *@This()) ?u8 {
         const buffer_at = self.buffer_at.fetch();
-        if (buffer_at < self.buffer_len.fetch()) {
+        const buffer_len = self.buffer_len.fetch();
+        if (buffer_at < buffer_len) {
             const ret = self.memory[self.buffer_offset + buffer_at];
             self.buffer_at.storeAdd(1);
             return ret;
@@ -82,24 +83,24 @@ pub const InputSource = struct {
         }
     }
 
-    fn skipWhitespace(self: *@This()) vm.InputError!?u8 {
-        var char = try self.readNextChar() orelse return null;
+    fn skipWhitespace(self: *@This()) ?u8 {
+        var char = self.readNextChar() orelse return null;
         while (isWhitespace(char)) {
-            char = (try self.readNextChar()) orelse return null;
+            char = self.readNextChar() orelse return null;
         }
         return char;
     }
 
-    pub fn readNextWordRange(self: *@This()) vm.InputError!?struct {
+    pub fn readNextWordRange(self: *@This()) ?struct {
         address: vm.Cell,
         len: vm.Cell,
     } {
-        var char = try self.skipWhitespace() orelse return null;
+        var char = self.skipWhitespace() orelse return null;
 
         const word_start = self.buffer_at.fetch() - 1;
 
         while (true) {
-            char = (try self.readNextChar()) orelse break;
+            char = self.readNextChar() orelse break;
             if (isWhitespace(char)) {
                 self.buffer_at.storeSubtract(1);
                 break;
@@ -113,8 +114,8 @@ pub const InputSource = struct {
         };
     }
 
-    pub fn readNextWord(self: *@This()) vm.InputError!?[]const u8 {
-        const range = try self.readNextWordRange() orelse return null;
+    pub fn readNextWord(self: *@This()) ?[]const u8 {
+        const range = self.readNextWordRange() orelse return null;
         return vm.sliceFromAddrAndLen(self.memory, range.address, range.len);
     }
 
@@ -139,7 +140,7 @@ test "input-sources" {
     const len_offset = 2;
 
     var input_source: InputSource = undefined;
-    input_source.init(
+    try input_source.init(
         mem,
         buffer_offset,
         at_offset,
@@ -150,15 +151,15 @@ test "input-sources" {
 
     try input_source.setInputBuffer("asdf wowo hellow");
 
-    try testing.expectEqual('a', try input_source.readNextChar());
-    try testing.expectEqual('s', try input_source.readNextChar());
-    try testing.expectEqual('d', try input_source.readNextChar());
-    try testing.expectEqual('f', try input_source.readNextChar());
+    try testing.expectEqual('a', input_source.readNextChar());
+    try testing.expectEqual('s', input_source.readNextChar());
+    try testing.expectEqual('d', input_source.readNextChar());
+    try testing.expectEqual('f', input_source.readNextChar());
 
     try testing.expectEqualSlices(
         u8,
         "wowo",
-        try input_source.readNextWord() orelse return error.OutOfInput,
+        input_source.readNextWord() orelse return error.OutOfInput,
     );
 
     try input_source.refill();
@@ -166,7 +167,7 @@ test "input-sources" {
     try testing.expectEqualSlices(
         u8,
         "refill",
-        try input_source.readNextWord() orelse return error.OutOfInput,
+        input_source.readNextWord() orelse return error.OutOfInput,
     );
 }
 

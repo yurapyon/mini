@@ -29,8 +29,11 @@ pub const WordHeader = struct {
     is_hidden: bool,
     name: []const u8,
 
-    // TODO handle out of bounds errors
-    pub fn initFromMemory(self: *@This(), memory: []const u8) vm.Error!void {
+    pub fn initFromMemory(self: *@This(), memory: []const u8) vm.OutOfBoundsError!void {
+        if (memory.len < self.size()) {
+            return error.OutOfBounds;
+        }
+
         const latest_low = memory[0];
         const latest_high = memory[1];
         const flag_name_len = memory[2];
@@ -41,10 +44,13 @@ pub const WordHeader = struct {
         self.name = memory[3..(name_len + 3)];
     }
 
-    // TODO handle out of bounds errors
     pub fn writeToMemory(self: @This(), memory: []u8) vm.Error!void {
         if (self.name.len > std.math.maxInt(u6)) {
             return error.WordNameTooLong;
+        }
+
+        if (memory.len < self.size()) {
+            return error.OutOfBounds;
         }
 
         memory[0] = @truncate(self.latest);

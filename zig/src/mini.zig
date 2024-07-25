@@ -31,7 +31,7 @@ pub const Error = error{
     WordNotFound,
     WordNameTooLong,
     InvalidProgramCounter,
-} || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || OutOfBoundsError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -43,6 +43,8 @@ pub const SemanticsError = error{
     CannotInterpret,
     CannotCompile,
 };
+
+pub const OutOfBoundsError = error{OutOfBounds};
 
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
@@ -125,8 +127,19 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-pub fn cellAt(mem: Memory, addr: Cell) *Cell {
-    return @ptrCast(@alignCast(&mem[addr]));
+pub fn cellAt(memory: Memory, addr: Cell) OutOfBoundsError!*Cell {
+    if (addr >= memory.len) {
+        return error.OutOfBounds;
+    }
+    return @ptrCast(@alignCast(&memory[addr]));
+}
+
+pub fn sliceAt(memory: Memory, addr: Cell, len: Cell) OutOfBoundsError![]Cell {
+    if (addr + len >= memory.len) {
+        return error.OutOfBounds;
+    }
+    const ptr: [*]Cell = @ptrCast(@alignCast(&memory[addr]));
+    return ptr[0..len];
 }
 
 pub fn calculateCfaAddress(memory: Memory, addr: Cell) Error!Cell {
@@ -155,27 +168,27 @@ pub const MiniVM = struct {
 
     pub fn init(self: *@This(), memory: Memory) !void {
         self.memory = memory;
-        self.dictionary.init(
+        try self.dictionary.init(
             self.memory,
             MemoryLayout.offsetOf("latest"),
             MemoryLayout.offsetOf("here"),
         );
 
-        self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
-        self.data_stack.init(
+        try self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
+        try self.data_stack.init(
             self.memory,
             MemoryLayout.offsetOf("data_stack_top"),
             MemoryLayout.offsetOf("data_stack"),
         );
-        self.return_stack.init(
+        try self.return_stack.init(
             self.memory,
             MemoryLayout.offsetOf("return_stack_top"),
             MemoryLayout.offsetOf("return_stack"),
         );
-        self.state.init(self.memory, MemoryLayout.offsetOf("state"));
-        self.base.init(self.memory, MemoryLayout.offsetOf("base"));
-        self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
-        self.input_source.init(
+        try self.state.init(self.memory, MemoryLayout.offsetOf("state"));
+        try self.base.init(self.memory, MemoryLayout.offsetOf("base"));
+        try self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
+        try self.input_source.init(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
             MemoryLayout.offsetOf("input_buffer_len"),
@@ -211,10 +224,11 @@ pub const MiniVM = struct {
         while (!self.should_bye) {
             self.should_quit = false;
             // TODO
+            // how to handle if refiller is empty
             try self.input_source.refill();
 
             while (!self.should_quit and !self.should_bye) {
-                const word = try self.input_source.readNextWord();
+                const word = self.input_source.readNextWord();
                 if (word) |w| {
                     try self.interpretString(w);
                 } else {
@@ -234,12 +248,12 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn readByteAndAdvancePC(self: *@This()) u8 {
-        return self.program_counter.readByteAndAdvance(self.memory);
+    pub fn readByteAndAdvancePC(self: *@This()) OutOfBoundsError!u8 {
+        return try self.program_counter.readByteAndAdvance(self.memory);
     }
 
-    pub fn readCellAndAdvancePC(self: *@This()) Cell {
-        return self.program_counter.readCellAndAdvance(self.memory);
+    pub fn readCellAndAdvancePC(self: *@This()) OutOfBoundsError!Cell {
+        return try self.program_counter.readCellAndAdvance(self.memory);
     }
 
     pub fn absoluteJump(
@@ -262,7 +276,7 @@ pub const MiniVM = struct {
         //     directly without having to do any math
 
         while (self.return_stack.depth() > 0) {
-            const bytecode = self.readByteAndAdvancePC();
+            const bytecode = try self.readByteAndAdvancePC();
             const ctx = ExecutionContext{
                 .current_bytecode = bytecode,
             };
@@ -367,13 +381,13 @@ pub const MiniVM = struct {
             },
             .mini_word => |addr| {
                 const cfa_addr = try calculateCfaAddress(self.memory, addr);
-                self.dictionary.compileAbsJump(cfa_addr);
+                try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
                 if ((value & 0xff00) > 0) {
-                    self.dictionary.compileLit(value);
+                    try self.dictionary.compileLit(value);
                 } else {
-                    self.dictionary.compileLitC(@truncate(value));
+                    try self.dictionary.compileLitC(@truncate(value));
                 }
             },
         }
@@ -385,7 +399,7 @@ pub const MiniVM = struct {
         is_bytecode: bool,
         value: Cell,
     } {
-        const word = try self.input_source.readNextWord();
+        const word = self.input_source.readNextWord();
         if (word) |w| {
             const word_info = try self.lookupString(w);
             if (word_info) |wi| {
@@ -433,7 +447,7 @@ test "mini" {
     try vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
 
     for (0..5) |_| {
-        const word = try vm.input_source.readNextWord();
+        const word = vm.input_source.readNextWord();
         if (word) |w| {
             try vm.interpretString(w);
         }
