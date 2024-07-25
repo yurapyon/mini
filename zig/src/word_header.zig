@@ -29,7 +29,7 @@ pub const WordHeader = struct {
     is_hidden: bool,
     name: []const u8,
 
-    pub fn initFromMemory(self: *@This(), memory: []const u8) vm.Error!void {
+    pub fn initFromMemory(self: *@This(), memory: []const u8) vm.OutOfBoundsError!void {
         if (memory.len < self.size()) {
             return error.OutOfBounds;
         }
