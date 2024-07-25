@@ -39,7 +39,7 @@ pub fn Stack(comptime count_: usize) type {
         }
 
         pub fn asSlice(self: *@This()) vm.OutOfBoundsError![]vm.Cell {
-            return vm.sliceAt(self._memory, self._bottom_offset, self.depth());
+            return vm.mem.sliceAt(self._memory, self._bottom_offset, self.depth());
         }
 
         pub fn clear(self: @This()) void {
@@ -49,7 +49,7 @@ pub fn Stack(comptime count_: usize) type {
         fn unsafeIndex(self: *@This(), at: isize) vm.OutOfBoundsError!*vm.Cell {
             const top = self.top.fetch();
             const addr = @as(isize, @intCast(top)) - (at + 1) * @sizeOf(vm.Cell);
-            return try vm.cellAt(self._memory, @intCast(addr));
+            return try vm.mem.cellAt(self._memory, @intCast(addr));
         }
 
         fn unsafeSwapValues(

@@ -365,19 +365,19 @@ fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* +%= value;
 }
 
 fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
-    const mem_ptr = try vm.cellAt(mini.memory, addr);
+    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     try mini.data_stack.push(mem_ptr.*);
 }
 

@@ -11,6 +11,8 @@ const InputSource = @import("input_source.zig").InputSource;
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 
+pub const mem = @import("memory.zig");
+
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
     if (native_endianness != .little) {
@@ -128,27 +130,6 @@ pub fn fromBool(comptime Type: type, value: bool) Type {
 
 pub fn isTruthy(value: anytype) bool {
     return value != 0;
-}
-
-pub fn cellAt(memory: Memory, addr: Cell) OutOfBoundsError!*Cell {
-    if (addr >= memory.len) {
-        return error.OutOfBounds;
-    }
-    return @ptrCast(@alignCast(&memory[addr]));
-}
-
-pub fn sliceAt(memory: Memory, addr: Cell, len: Cell) OutOfBoundsError![]Cell {
-    if (addr + len >= memory.len) {
-        return error.OutOfBounds;
-    }
-    const ptr: [*]Cell = @ptrCast(@alignCast(&memory[addr]));
-    return ptr[0..len];
-}
-
-pub fn calculateCfaAddress(memory: Memory, addr: Cell) Error!Cell {
-    var temp_word_header: WordHeader = undefined;
-    try temp_word_header.initFromMemory(memory[addr..]);
-    return addr + temp_word_header.size();
 }
 
 /// MiniVM
@@ -298,7 +279,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try calculateCfaAddress(self.memory, addr);
+        const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
         try self.absoluteJump(cfa_addr, true);
         try self.evaluateLoop();
     }
@@ -390,7 +371,7 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |addr| {
-                const cfa_addr = try calculateCfaAddress(self.memory, addr);
+                const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
@@ -423,7 +404,7 @@ pub const MiniVM = struct {
                     .mini_word => |addr| {
                         return .{
                             .is_bytecode = false,
-                            .value = try calculateCfaAddress(self.memory, addr),
+                            .value = try mem.calculateCfaAddress(self.memory, addr),
                         };
                     },
                     .number => |_| {
@@ -448,11 +429,11 @@ test "mini" {
     const testing = std.testing;
     const stack = @import("Stack.zig");
 
-    const mem = try allocateMemory(testing.allocator);
-    defer testing.allocator.free(mem);
+    const memory = try allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
 
     var vm: MiniVM = undefined;
-    try vm.init(mem);
+    try vm.init(memory);
 
     try vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
 
