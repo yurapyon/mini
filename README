@@ -1,4 +1,5 @@
-mini
+.   |^|^\ ^ |^\ ^   .
+.   | | | | | | |   ,
 
 small forth vm
 
@@ -12,8 +13,8 @@ goals:
     graphics
     mouse/keyboard input
     filesystem access
-  stable
-    reach v1.0 and stay there
+  self-hosted version
+    it would be fun
 
 maybe:
   good performance
@@ -24,6 +25,6 @@ maybe:
     built-in editor
 
 you need:
-  untyped
+  zig
 
 MIT
