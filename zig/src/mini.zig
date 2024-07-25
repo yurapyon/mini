@@ -132,7 +132,7 @@ pub const MiniVM = struct {
             MemoryLayout.offsetOf("here"),
         );
 
-        try self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
+        try self.program_counter.init(self.memory.data, MemoryLayout.offsetOf("program_counter"));
         try self.data_stack.init(
             self.memory,
             MemoryLayout.offsetOf("data_stack_top"),
@@ -143,9 +143,9 @@ pub const MiniVM = struct {
             MemoryLayout.offsetOf("return_stack_top"),
             MemoryLayout.offsetOf("return_stack"),
         );
-        try self.state.init(self.memory, MemoryLayout.offsetOf("state"));
-        try self.base.init(self.memory, MemoryLayout.offsetOf("base"));
-        try self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
+        try self.state.init(self.memory.data, MemoryLayout.offsetOf("state"));
+        try self.base.init(self.memory.data, MemoryLayout.offsetOf("base"));
+        try self.active_device.init(self.memory.data, MemoryLayout.offsetOf("active_device"));
         try self.input_source.init(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),

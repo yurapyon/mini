@@ -23,6 +23,23 @@ pub fn checkedRead(memory: []const u8, addr: usize) vm.OutOfBoundsError!u8 {
     return memory[addr];
 }
 
+pub fn readByteAlignedCell(memory: []u8, addr: vm.Cell) vm.OutOfBoundsError!vm.Cell {
+    const high_byte = try checkedRead(memory, addr + 1);
+    const low_byte = try checkedRead(memory, addr);
+    return (@as(vm.Cell, high_byte) << 8) | low_byte;
+}
+
+pub fn writeByteAlignedCell(
+    memory: []u8,
+    addr: vm.Cell,
+    value: vm.Cell,
+) vm.OutOfBoundsError!void {
+    const high_byte = try checkedAccess(memory, addr + 1);
+    const low_byte = try checkedAccess(memory, addr);
+    high_byte.* = @truncate(value >> 8);
+    low_byte.* = @truncate(value);
+}
+
 pub fn sliceFromAddrAndLen(
     memory: []u8,
     addr: usize,
@@ -85,22 +102,5 @@ pub const CellAlignedMemory = struct {
         }
         const ptr: [*]vm.Cell = @ptrCast(@alignCast(&self.data[addr]));
         return ptr[0..len];
-    }
-
-    pub fn readByteAlignedCell(self: @This(), addr: vm.Cell) vm.OutOfBoundsError!vm.Cell {
-        const high_byte = try checkedRead(self.data, addr + 1);
-        const low_byte = try checkedRead(self.data, addr);
-        return (@as(vm.Cell, high_byte) << 8) | low_byte;
-    }
-
-    pub fn writeByteAlignedCell(
-        self: *@This(),
-        addr: vm.Cell,
-        value: vm.Cell,
-    ) vm.OutOfBoundsError!void {
-        const high_byte = try checkedAccess(self.data, addr + 1);
-        const low_byte = try checkedAccess(self.data, addr);
-        high_byte.* = @truncate(value >> 8);
-        low_byte.* = @truncate(value);
     }
 };

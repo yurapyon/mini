@@ -39,31 +39,28 @@ pub const Register = struct {
     }
 
     pub fn store(self: *@This(), value: vm.Cell) void {
-        self._memory.writeByteAlignedCell(self._offset, value) catch unreachable;
-    }
-
-    pub fn storeAdd(self: *@This(), to_add: vm.Cell) void {
-        const value = self._memory.readByteAlignedCell(
+        memory.writeByteAlignedCell(
+            self._memory,
             self._offset,
-        ) catch unreachable;
-        self._memory.writeByteAlignedCell(
-            self._offset,
-            value +% to_add,
-        ) catch unreachable;
-    }
-
-    pub fn storeSubtract(self: *@This(), to_subtract: vm.Cell) void {
-        const value = self._memory.readByteAlignedCell(
-            self._offset,
-        ) catch unreachable;
-        self._memory.writeByteAlignedCell(
-            self._offset,
-            value -% to_subtract,
+            value,
         ) catch unreachable;
     }
 
     pub fn fetch(self: @This()) vm.Cell {
-        return self._memory.readByteAlignedCell(self._offset) catch unreachable;
+        return memory.readByteAlignedCell(
+            self._memory,
+            self._offset,
+        ) catch unreachable;
+    }
+
+    pub fn storeAdd(self: *@This(), to_add: vm.Cell) void {
+        const value = self.fetch();
+        self.store(value +% to_add);
+    }
+
+    pub fn storeSubtract(self: *@This(), to_subtract: vm.Cell) void {
+        const value = self.fetch();
+        self.store(value -% to_subtract);
     }
 
     pub fn comma(self: *@This(), value: vm.Cell) Error!void {
@@ -72,22 +69,22 @@ pub const Register = struct {
     }
 
     pub fn storeC(self: *@This(), value: u8) void {
-        const byte = memory.checkedAccess(self._memory.data, self._offset) catch unreachable;
+        const byte = memory.checkedAccess(self._memory, self._offset) catch unreachable;
         byte.* = value;
     }
 
+    pub fn fetchC(self: @This()) u8 {
+        const byte = memory.checkedRead(self._memory, self._offset) catch unreachable;
+        return byte;
+    }
+
     pub fn storeAddC(self: *@This(), value: u8) void {
-        const byte = memory.checkedAccess(self._memory.data, self._offset) catch unreachable;
+        const byte = memory.checkedAccess(self._memory, self._offset) catch unreachable;
         byte.* +%= value;
     }
 
-    pub fn fetchC(self: @This()) u8 {
-        const byte = memory.checkedAccess(self._memory.data, self._offset) catch unreachable;
-        return byte.*;
-    }
-
     pub fn commaC(self: *@This(), value: u8) Error!void {
-        const byte = try memory.checkedAccess(self._memory.data, self.fetch());
+        const byte = try memory.checkedAccess(self._memory, self.fetch());
         byte.* = value;
         self.storeAdd(1);
     }
@@ -117,9 +114,8 @@ pub const Register = struct {
 test "registers" {
     const testing = @import("std").testing;
 
-    var m: memory.CellAlignedMemory = undefined;
-    try m.init(testing.allocator);
-    defer m.deinit();
+    var m = testing.allocator.alloc(u8, 40);
+    defer testing.allocator.free(m);
 
     var reg_a: Register = undefined;
     var reg_b: Register = undefined;
