@@ -90,14 +90,44 @@ pub const ExecutionContext = struct {
 // this should have semantics in here in a general way, and not .is_immediate
 pub const WordInfo = struct {
     value: union(enum) {
-        // the bytecode
-        bytecode: u8,
         // the definition address
         mini_word: Cell,
+        // the bytecode
+        bytecode: u8,
         // the number
         number: Cell,
     },
     is_immediate: bool,
+
+    fn fromMiniWord(memory: mem.CellAlignedMemory, definition_addr: Cell) Error!@This() {
+        var temp_word_header: WordHeader = undefined;
+        try temp_word_header.initFromMemory(memory[definition_addr..]);
+        return .{
+            .value = .{
+                .mini_word = definition_addr,
+            },
+            .is_immediate = temp_word_header.is_immediate,
+        };
+    }
+
+    fn fromBytecode(bytecode: u8) @This() {
+        const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
+        return .{
+            .value = .{
+                .bytecode = bytecode,
+            },
+            .is_immediate = bytecode_definition.is_immediate,
+        };
+    }
+
+    fn fromNumber(value: Cell) @This() {
+        return .{
+            .value = .{
+                .number = value,
+            },
+            .is_immediate = false,
+        };
+    }
 };
 
 pub const Cell = u16;
@@ -219,6 +249,9 @@ pub const MiniVM = struct {
 
     fn evaluateString(self: *@This(), word: []const u8) Error!void {
         if (try self.lookupString(word)) |word_info| {
+            // TODO
+            // this enumFromInt can crash
+            //   CompileState should be non-exhaustive and throw an error if it isn't interpret or compile
             const state: CompileState = @enumFromInt(self.state.fetch());
             const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
             switch (effective_state) {
@@ -236,30 +269,13 @@ pub const MiniVM = struct {
     }
 
     fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
+        // TODO would be nice if lookups couldnt error
         if (try self.dictionary.lookup(word)) |definition_addr| {
-            var temp_word_header: WordHeader = undefined;
-            try temp_word_header.initFromMemory(self.memory[definition_addr..]);
-            return .{
-                .value = .{
-                    .mini_word = definition_addr,
-                },
-                .is_immediate = temp_word_header.is_immediate,
-            };
+            return try WordInfo.fromMiniWord(self.memory, definition_addr);
         } else if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
-            const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
-            return .{
-                .value = .{
-                    .bytecode = bytecode,
-                },
-                .is_immediate = bytecode_definition.is_immediate,
-            };
+            return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(word)) |value| {
-            return .{
-                .value = .{
-                    .number = @truncate(value),
-                },
-                .is_immediate = false,
-            };
+            return WordInfo.fromNumber(value);
         } else {
             return null;
         }
@@ -301,7 +317,7 @@ pub const MiniVM = struct {
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
-                if ((value & 0xff00) > 0) {
+                if (value > std.math.maxInt(u8)) {
                     try self.dictionary.compileLit(value);
                 } else {
                     try self.dictionary.compileLitC(@truncate(value));
@@ -381,35 +397,27 @@ pub const MiniVM = struct {
         is_bytecode: bool,
         value: Cell,
     } {
-        const word = self.input_source.readNextWord();
-        if (word) |w| {
-            const word_info = try self.lookupString(w);
-            if (word_info) |wi| {
-                switch (wi.value) {
-                    .bytecode => |bytecode| {
-                        return .{
-                            .is_bytecode = true,
-                            .value = bytecode,
-                        };
-                    },
-                    .mini_word => |addr| {
-                        return .{
-                            .is_bytecode = false,
-                            .value = try WordHeader.calculateCfaAddress(
-                                self.memory,
-                                addr,
-                            ),
-                        };
-                    },
-                    .number => |_| {
-                        return error.WordNotFound;
-                    },
-                }
-            } else {
+        const word = self.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
+        const word_info = try self.lookupString(word) orelse return error.WordNotFound;
+        switch (word_info.value) {
+            .bytecode => |bytecode| {
+                return .{
+                    .is_bytecode = true,
+                    .value = bytecode,
+                };
+            },
+            .mini_word => |addr| {
+                return .{
+                    .is_bytecode = false,
+                    .value = try WordHeader.calculateCfaAddress(
+                        self.memory,
+                        addr,
+                    ),
+                };
+            },
+            .number => |_| {
                 return error.WordNotFound;
-            }
-        } else {
-            return error.UnexpectedEndOfInput;
+            },
         }
     }
 
