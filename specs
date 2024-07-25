@@ -1,6 +1,6 @@
 mini specs ===
 
-memory:
+system:
   cell size:     2 bytes
   address space: 32k bytes
   endianness:    little
@@ -9,26 +9,44 @@ memory:
 language:
   case-insensitive
   max word name length: 64
-
-bytecode list:
-  0b00...... 64       core       ( see zig/src/bytecodes.zig )
-  0b010..... 32       optimizing ( see zig/src/bytecodes.zig )
-  0b0110.... 16       currently undecided
-  0b0111aaaa aaaaaaaa data       ( push address+2 and length of data (a) (max len is 4096 bytes) )
-  0b1aaaaaaa aaaaaaaa absjump    ( jump to (a), pushing pc+1 to return stack, address space is 32k )
+  max numeric base:     36
 
 states:
   0x0 interpret
   0x1 compile
 
-max numeric base:
-  36
-
-behavior:
+repl behavior:
   quit: exits interpret loop
   bye: system dependent
 
+word definition layout:
+  cell aligned
+  0      16      32    ...
+  |-------|---|---|---|...\0  | data ...
+  ^       ^   ^           ^   ^
+  |       |   name...     |   padding to @alignOf(Cell)
+  |       flags&name_len  terminator
+  addr of previous definition
+
+  flags & name len is
+  is_immediate(1), is_hidden(1), name_len(6)
+
+  name_len is a u6
+    this means the max name length is 64 chars
+    this also means the max size of a header is:
+      3 + 1 + 64 = 70 bytes
+      ^   ^   ^
+      |   |   name
+      |   terminator
+      latest&flags&len
+
 bytecodes:
+  list:
+    0b00...... 64       core       ( see zig/src/bytecodes.zig )
+    0b010..... 32       optimizing ( see zig/src/bytecodes.zig )
+    0b0110.... 16       currently undecided
+    0b0111aaaa aaaaaaaa data       ( push address+2 and length of data (a) (max len is 4096 bytes) )
+    0b1aaaaaaa aaaaaaaa absjump    ( jump to (a), pushing pc+1 to return stack, address space is 32k )
   semantics:
     most bytecodes:
       compile:   write bytecode for self to memory
@@ -50,6 +68,30 @@ bytecodes:
       compile:   write bytecode for self and absolute jump to memory
       interpret: write bytecode for self and absolute jump to memory
       execute:   push following addr to return stack and jump to address read from memory
+
+non-standard forth words:
+  seldev     - ( id -- )         select device to send commands to
+  d!         - ( value addr -- ) store to current device
+  d+!        - ( value addr -- ) store-add to current device
+  d@         - ( addr -- value ) fetch to current device
+
+  here!      - ( value addr -- ) store to 'here'
+  here+!     - ( value addr -- ) store-add to 'here'
+  here@      - ( addr -- value ) fetch from 'here'
+
+  0          - ( -- 0 )      0 == 'false'
+  0xffff     - ( -- 0xffff ) 0xffff == 'true'
+  1          - ( -- 1 )
+  2          - ( -- 2 )
+  4          - ( -- 4 )
+  8          - ( -- 8 )
+
+  cell>bytes - ( cell -- low-byte high-byte )
+  bytes>cell - ( low-byte high-byte -- cell )
+
+  ##.s       - ( -- )          print the stack from zig
+  ##data     - ( addr len -- ) compile data block at memory[addr..len] into memory
+  ##absjump  - ( addr -- )     compile address into memory as an absolute jump
 
 devices:
   TBD

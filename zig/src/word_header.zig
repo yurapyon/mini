@@ -7,24 +7,6 @@ const utils = @import("utils.zig");
 ///   this is not bit-for-bit equivalent to the definition in Forth memory
 ///   this is just a normal Zig struct
 pub const WordHeader = struct {
-    // Layout:
-    // |-------|---|---|---|...\0  |...|
-    // ^       ^   ^           ^   ^
-    // |       |   name...     |   padding to @alignOf(Cell)
-    // latest  flags&name_len  terminator
-    //
-    // flags & name len is
-    // is_immediate(1), is_hidden(1), name_len(6)
-    //
-    // name_len is a u6
-    //   this means the max name length is 64 chars
-    //   this also means the max size of a header is:
-    //     3 + 1 + 64 = 70 bytes
-    //     ^   ^   ^
-    //     |   |   name
-    //     |   terminator
-    //     latest&flags&len
-
     latest: vm.Cell,
     is_immediate: bool,
     is_hidden: bool,
