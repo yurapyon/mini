@@ -82,13 +82,12 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
 pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void;
 
 /// Passed to bytecode callbacks when they are called
-// TODO think about if we still need execution contexts
-//   or if the current_bytecode and just be put in the vm instance
 pub const ExecutionContext = struct {
     current_bytecode: u8,
 };
 
-// TODO this should have semantics in here and not is_immediate
+// TODO
+// this should have semantics in here in a general way, and not .is_immediate
 pub const WordInfo = struct {
     value: union(enum) {
         // the bytecode
@@ -173,38 +172,6 @@ pub const MiniVM = struct {
         // run base file
     }
 
-    // ===
-
-    pub fn onQuit(self: *@This()) Error!void {
-        self.data_stack.clear();
-    }
-
-    pub fn onBye(self: *@This()) Error!void {
-        self.data_stack.clear();
-    }
-
-    pub fn repl(self: *@This()) Error!void {
-        while (!self.should_bye) {
-            self.should_quit = false;
-            // TODO
-            // how to handle if refiller is empty
-            try self.input_source.refill();
-
-            while (!self.should_quit and !self.should_bye) {
-                const word = self.input_source.readNextWord();
-                if (word) |w| {
-                    try self.interpretString(w);
-                } else {
-                    self.should_quit = true;
-                }
-            }
-
-            try self.onQuit();
-        }
-
-        try self.onBye();
-    }
-
     fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
         self.dictionary.compileConstant(name, MemoryLayout.offsetOf(name)) catch unreachable;
     }
@@ -218,60 +185,55 @@ pub const MiniVM = struct {
 
     // ===
 
-    pub fn readByteAndAdvancePC(self: *@This()) mem.MemoryError!u8 {
-        return try self.program_counter.readByteAndAdvance(self.memory);
-    }
+    pub fn repl(self: *@This()) Error!void {
+        while (!self.should_bye) {
+            self.should_quit = false;
+            // TODO
+            // how to handle if refiller is empty
+            try self.input_source.refill();
 
-    pub fn readCellAndAdvancePC(self: *@This()) mem.MemoryError!Cell {
-        return try self.program_counter.readCellAndAdvance(self.memory);
-    }
+            while (!self.should_quit and !self.should_bye) {
+                const word = self.input_source.readNextWord();
+                if (word) |w| {
+                    try self.evaluateString(w);
+                } else {
+                    self.should_quit = true;
+                }
+            }
 
-    pub fn absoluteJump(
-        self: *@This(),
-        addr: Cell,
-        useReturnStack: bool,
-    ) Error!void {
-        if (useReturnStack) {
-            try self.return_stack.push(self.program_counter.fetch());
+            try self.onQuit();
         }
-        self.program_counter.store(addr);
+
+        try self.onBye();
     }
 
-    fn evaluateLoop(self: *@This()) Error!void {
-        // Evalutation strategy:
-        //   1. increment PC, then
-        //   2. evaluate byte at PC-1
-        // this makes return stack and jump logic easier
-        //   because bytecodes can just set the jump location
-        //     directly without having to do any math
-
-        while (self.return_stack.depth() > 0) {
-            const bytecode = try self.readByteAndAdvancePC();
-            const ctx = ExecutionContext{
-                .current_bytecode = bytecode,
-            };
-            try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
-                self,
-                ctx,
-            );
-        }
+    pub fn onQuit(self: *@This()) Error!void {
+        self.data_stack.clear();
     }
 
-    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
-        try self.absoluteJump(cfa_addr, true);
-        try self.evaluateLoop();
-    }
-
-    fn executeBytecode(
-        self: *@This(),
-        bytecode: u8,
-        ctx: ExecutionContext,
-    ) Error!void {
-        try bytecodes.getBytecodeDefinition(bytecode).callback(self, ctx);
+    pub fn onBye(self: *@This()) Error!void {
+        self.data_stack.clear();
     }
 
     // ===
+
+    fn evaluateString(self: *@This(), word: []const u8) Error!void {
+        if (try self.lookupString(word)) |word_info| {
+            const state: CompileState = @enumFromInt(self.state.fetch());
+            const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
+            switch (effective_state) {
+                .interpret => {
+                    try self.interpret(word_info);
+                },
+                .compile => {
+                    try self.compile(word_info);
+                },
+            }
+        } else {
+            std.debug.print("Word not found: {s}\n", .{word});
+            return error.WordNotFound;
+        }
+    }
 
     fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
         if (try self.dictionary.lookup(word)) |definition_addr| {
@@ -304,41 +266,27 @@ pub const MiniVM = struct {
         }
     }
 
-    fn interpretString(self: *@This(), word: []const u8) Error!void {
-        if (try self.lookupString(word)) |word_info| {
-            const state: CompileState = @enumFromInt(self.state.fetch());
-            const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
-            switch (effective_state) {
-                .interpret => {
-                    switch (word_info.value) {
-                        .bytecode => |bytecode| {
-                            const ctx = ExecutionContext{
-                                .current_bytecode = bytecode,
-                            };
-                            try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
-                                self,
-                                ctx,
-                            );
-                        },
-                        .mini_word => |addr| {
-                            try self.executeMiniWord(addr);
-                        },
-                        .number => |value| {
-                            try self.data_stack.push(value);
-                        },
-                    }
-                },
-                .compile => {
-                    try self.compile(word_info);
-                },
-            }
-        } else {
-            std.debug.print("Word not found: {s}\n", .{word});
-            return error.WordNotFound;
+    fn interpret(self: *@This(), word_info: WordInfo) Error!void {
+        switch (word_info.value) {
+            .bytecode => |bytecode| {
+                const ctx = ExecutionContext{
+                    .current_bytecode = bytecode,
+                };
+                try bytecodes.getBytecodeDefinition(bytecode).interpretSemantics(
+                    self,
+                    ctx,
+                );
+            },
+            .mini_word => |addr| {
+                try self.executeMiniWord(addr);
+            },
+            .number => |value| {
+                try self.data_stack.push(value);
+            },
         }
     }
 
-    pub fn compile(self: *@This(), word_info: WordInfo) Error!void {
+    fn compile(self: *@This(), word_info: WordInfo) Error!void {
         switch (word_info.value) {
             .bytecode => |bytecode| {
                 const ctx = ExecutionContext{
@@ -363,7 +311,52 @@ pub const MiniVM = struct {
         }
     }
 
-    // helpers ===
+    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
+        const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
+        try self.absoluteJump(cfa_addr, true);
+        try self.executionLoop();
+    }
+
+    fn executionLoop(self: *@This()) Error!void {
+        // Execution strategy:
+        //   1. increment PC, then
+        //   2. evaluate byte at PC-1
+        // this makes return stack and jump logic easier
+        //   because bytecodes can just set the jump location
+        //     directly without having to do any math
+
+        while (self.return_stack.depth() > 0) {
+            const bytecode = try self.readByteAndAdvancePC();
+            const ctx = ExecutionContext{
+                .current_bytecode = bytecode,
+            };
+            try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
+                self,
+                ctx,
+            );
+        }
+    }
+
+    pub fn absoluteJump(
+        self: *@This(),
+        addr: Cell,
+        useReturnStack: bool,
+    ) Error!void {
+        if (useReturnStack) {
+            try self.return_stack.push(self.program_counter.fetch());
+        }
+        self.program_counter.store(addr);
+    }
+
+    pub fn readByteAndAdvancePC(self: *@This()) mem.MemoryError!u8 {
+        return try self.program_counter.readByteAndAdvance(self.memory);
+    }
+
+    pub fn readCellAndAdvancePC(self: *@This()) mem.MemoryError!Cell {
+        return try self.program_counter.readCellAndAdvance(self.memory);
+    }
+
+    // helpers for bytecodes ===
 
     pub fn readWordAndGetAddress(self: *@This()) Error!struct {
         is_bytecode: bool,
@@ -398,6 +391,7 @@ pub const MiniVM = struct {
         }
     }
 
+    /// pops ( addr len -- ) from the stack and return as a []u8
     pub fn popSlice(self: *@This()) Error![]u8 {
         const len, const addr = try self.data_stack.popMultiple(2);
         return mem.sliceFromAddrAndLen(self.memory, addr, len);
@@ -422,7 +416,7 @@ test "mini" {
     for (0..5) |_| {
         const word = vm.input_source.readNextWord();
         if (word) |w| {
-            try vm.interpretString(w);
+            try vm.evaluateString(w);
         }
     }
 

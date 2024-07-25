@@ -94,3 +94,9 @@ pub fn allocateCellAlignedMemory(
 ) Allocator.Error!CellAlignedMemory {
     return try allocator.allocWithOptions(u8, size, @alignOf(vm.Cell), null);
 }
+
+// ===
+
+test "memory" {
+    // TODO
+}

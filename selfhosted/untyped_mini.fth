@@ -1,3 +1,6 @@
+\ untyped
+\ this is messy and incomplete
+
 : k 1024 * ;
 
 : memmap

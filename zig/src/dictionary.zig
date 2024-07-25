@@ -59,7 +59,7 @@ pub const Dictionary = struct {
         const aligned_here = self.here.fetch();
         self.latest.store(aligned_here);
 
-        try word_header.writeToMemory(vm.mem.sliceFromAddrAndLen(
+        try word_header.writeToMemory(try vm.mem.sliceFromAddrAndLen(
             self._memory,
             aligned_here,
             header_size,

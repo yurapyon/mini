@@ -72,6 +72,7 @@ test "lib-testing" {
     _ = @import("register.zig");
     _ = @import("input_source.zig");
     _ = @import("dictionary.zig");
+    _ = @import("memory.zig");
     _ = @import("mini.zig");
 }
 
