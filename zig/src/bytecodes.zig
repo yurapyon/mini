@@ -1,5 +1,4 @@
 const std = @import("std");
-const mem = std.mem;
 
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
@@ -61,7 +60,13 @@ pub fn lookupBytecodeByName(name: []const u8) ?u8 {
 }
 
 test "bytecode-utils" {
-    // TODO
+    const testing = std.testing;
+
+    // NOTE
+    //   bye is not fixed to be bytecode 0 for any reason
+    //   its just a test of the functionality
+    try testing.expectEqual(0, lookupBytecodeByName("bye"));
+    try testing.expectEqual(null, lookupBytecodeByName("_definetly-not-defined_"));
 }
 
 // ===
@@ -661,19 +666,19 @@ fn bytesToCell(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn cmove(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = mini;
     // TODO
-    // mem.copyForwards()
+    // std.mem.copyForwards()
 }
 
 fn cmoveUp(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = mini;
     // TODO
-    // mem.copyBackwards()
+    // std.mem.copyBackwards()
 }
 
 fn memEq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = mini;
     // TODO
-    // mem.eql
+    // std.mem.eql
 }
 
 fn maybeDup(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {

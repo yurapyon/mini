@@ -17,8 +17,6 @@ const LineByLineRefiller = struct {
 
     fn init(self: *@This(), buffer: []const u8) void {
         self.stream = std.io.fixedBufferStream(buffer);
-        // self.buffer = buffer;
-        // self.buffer_at = 0;
     }
 
     fn refill(self_: *anyopaque) vm.InputError![]const u8 {
@@ -45,17 +43,11 @@ fn runMiniVM(allocator: Allocator) !void {
     var vm_instance: vm.MiniVM = undefined;
     try vm_instance.init(mem);
 
-    try vm_instance.dictionary.compileConstant("asdf", 100);
-
-    // try vm_instance.input_source.setInputBuffer("1 dup 1+ dup 1+ ##.s bye\n");
-    // try vm_instance.repl();
-
     var refiller: LineByLineRefiller = undefined;
     refiller.init(base_file);
 
     vm_instance.should_bye = false;
     vm_instance.should_quit = false;
-    // try vm_instance.input_source.setInputBuffer(base_file);
     vm_instance.input_source.setRefillCallback(
         LineByLineRefiller.refill,
         @ptrCast(&refiller),

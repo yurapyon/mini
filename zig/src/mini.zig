@@ -253,8 +253,7 @@ pub const MiniVM = struct {
                 },
                 .is_immediate = bytecode_definition.is_immediate,
             };
-            // TODO rethrow InvalidBase errors
-        } else if (utils.parseNumber(word, self.base.fetch()) catch null) |value| {
+        } else if (try self.maybeParseNumber(word)) |value| {
             return .{
                 .value = .{
                     .number = @truncate(value),
@@ -298,7 +297,7 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |addr| {
-                const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
+                const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
@@ -312,7 +311,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try mem.calculateCfaAddress(self.memory, addr);
+        const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
         try self.absoluteJump(cfa_addr, true);
         try self.executionLoop();
     }
@@ -356,6 +355,26 @@ pub const MiniVM = struct {
         return try self.program_counter.readCellAndAdvance(self.memory);
     }
 
+    // ===
+
+    fn maybeParseNumber(self: *@This(), word: []const u8) Error!?Cell {
+        const number_or_error = utils.parseNumber(word, self.base.fetch());
+        const maybe_number = number_or_error catch |err| switch (err) {
+            error.InvalidNumber => null,
+            else => return err,
+        };
+        if (maybe_number) |value| {
+            if (value > std.math.maxInt(Cell)) {
+                return null;
+            }
+            // NOTE
+            // intCast instead of truncate
+            return @intCast(value);
+        } else {
+            return null;
+        }
+    }
+
     // helpers for bytecodes ===
 
     pub fn readWordAndGetAddress(self: *@This()) Error!struct {
@@ -376,7 +395,10 @@ pub const MiniVM = struct {
                     .mini_word => |addr| {
                         return .{
                             .is_bytecode = false,
-                            .value = try mem.calculateCfaAddress(self.memory, addr),
+                            .value = try WordHeader.calculateCfaAddress(
+                                self.memory,
+                                addr,
+                            ),
                         };
                     },
                     .number => |_| {

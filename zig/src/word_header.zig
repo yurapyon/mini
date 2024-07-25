@@ -66,6 +66,13 @@ pub const WordHeader = struct {
     pub fn size(self: @This()) u8 {
         return calculateSize(@truncate(self.name.len));
     }
+
+    pub fn calculateCfaAddress(memory: []u8, base_addr: vm.Cell) vm.Error!vm.Cell {
+        try vm.mem.assertMemoryAccess(memory, base_addr);
+        var temp_word_header: WordHeader = undefined;
+        try temp_word_header.initFromMemory(memory[base_addr..]);
+        return base_addr + temp_word_header.size();
+    }
 };
 
 test "word headers" {

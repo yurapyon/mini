@@ -9,7 +9,6 @@ const Register = @import("register.zig").Register;
 /// This is a Forth style dictionary
 ///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
-    // TODO should this be a *vm.Memory pointer?
     _memory: vm.mem.CellAlignedMemory,
     here: Register,
     latest: Register,
