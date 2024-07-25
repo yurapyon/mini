@@ -204,7 +204,7 @@ pub const MiniVM = struct {
         self.should_quit = false;
         self.should_bye = false;
 
-        try self.compileMemoryLocationConstants();
+        self.compileMemoryLocationConstants();
 
         // TODO
         // run base file
@@ -242,8 +242,15 @@ pub const MiniVM = struct {
         try self.onBye();
     }
 
-    pub fn compileMemoryLocationConstants(self: *@This()) Error!void {
-        try self.dictionary.compileConstant("latest", MemoryLayout.offsetOf("latest"));
+    fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
+        self.dictionary.compileConstant(name, MemoryLayout.offsetOf(name)) catch unreachable;
+    }
+
+    fn compileMemoryLocationConstants(self: *@This()) void {
+        self.compileMemoryLocationConstant("here");
+        self.compileMemoryLocationConstant("latest");
+        self.compileMemoryLocationConstant("state");
+        self.compileMemoryLocationConstant("base");
     }
 
     // ===

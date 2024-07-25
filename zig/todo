@@ -1,6 +1,4 @@
-handle signed cells
-
-add an error for out of bounds access of MiniVM.memory
+figure out signed cells
 
 handle case insensitivity
 

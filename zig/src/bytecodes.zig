@@ -3,6 +3,9 @@ const mem = std.mem;
 
 const vm = @import("mini.zig");
 
+// TODO
+// need set-immediate and set-hidden
+
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}

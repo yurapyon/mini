@@ -2,25 +2,27 @@ mini specs ===
 
 memory:
   cell size:     2 bytes
-  address space: 64k bytes
+  address space: 32k bytes
   endianness:    little
   negatives:     twos-compilment
 
 language:
   case-insensitive
+  max word name length: 64
 
 bytecode list:
-  0b00...... 64 core       ( see zig/src/bytecodes.zig )
-  0b010..... 32 optimizing ( see zig/src/bytecodes.zig )
-  0b0110.... 16 currently unimplemented
-  0b0111aaaa aaaaaaaa data (push address+2 and length of data (a) (max len is 4096 bytes))
-  0b1aaaaaaa aaaaaaaa abs jump to (a)
+  0b00...... 64       core       ( see zig/src/bytecodes.zig )
+  0b010..... 32       optimizing ( see zig/src/bytecodes.zig )
+  0b0110.... 16       currently undecided
+  0b0111aaaa aaaaaaaa data       ( push address+2 and length of data (a) (max len is 4096 bytes) )
+  0b1aaaaaaa aaaaaaaa absjump    ( jump to (a), pushing pc+1 to return stack, address space is 32k )
 
 states:
   0x0 interpret
   0x1 compile
-  0x2 mini bytecode
-  0x3 system dependent
+
+max numeric base:
+  36
 
 behavior:
   quit: exits interpret loop
@@ -48,3 +50,6 @@ bytecodes:
       compile:   write bytecode for self and absolute jump to memory
       interpret: write bytecode for self and absolute jump to memory
       execute:   push following addr to return stack and jump to address read from memory
+
+devices:
+  TBD
