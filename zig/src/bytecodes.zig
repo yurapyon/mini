@@ -275,6 +275,7 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 ///   followed by bytecode or cfa_addr
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const result = try mini.readWordAndGetAddress();
+    // TODO maybe dont do this?
     try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
     try mini.data_stack.push(result.value);
 }
@@ -320,10 +321,10 @@ fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    // this currently wont work because the input source buffer memory
-    //   isn't a part of the main vm memory
-    _ = mini;
+    // TODO should try and refill
+    const range = try mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
+    try mini.data_stack.push(range.address);
+    try mini.data_stack.push(range.len);
 }
 
 fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

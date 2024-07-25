@@ -73,7 +73,10 @@ pub const InputSource = struct {
         return char;
     }
 
-    pub fn readNextWord(self: *@This()) vm.InputError!?[]const u8 {
+    pub fn readNextWordRange(self: *@This()) vm.InputError!?struct {
+        address: vm.Cell,
+        len: vm.Cell,
+    } {
         var char = try self.skipWhitespace() orelse return null;
 
         const word_start = self.buffer_at.fetch() - 1;
@@ -87,12 +90,15 @@ pub const InputSource = struct {
         }
 
         const word_end = self.buffer_at.fetch();
+        return .{
+            .address = self.buffer_offset + word_start,
+            .len = word_end - word_start,
+        };
+    }
 
-        return vm.sliceFromAddrAndLen(
-            self.memory,
-            self.buffer_offset + word_start,
-            word_end - word_start,
-        );
+    pub fn readNextWord(self: *@This()) vm.InputError!?[]const u8 {
+        const range = try self.readNextWordRange() orelse return null;
+        return vm.sliceFromAddrAndLen(self.memory, range.address, range.len);
     }
 
     pub fn refill(

@@ -8,4 +8,5 @@ word ; define
 ' [ nip c,
 ' exit nip c,
 
-bye
+\ latest @ make-immediate
+\ 4 dup 1+ dup 1+ ##.s bye
