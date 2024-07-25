@@ -16,8 +16,6 @@ pub fn isWhitespace(char: u8) bool {
 ///   i.e. line-by-line input from a buffer
 //         ability to read from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
-    pub const Error = vm.InputError || Register.Error;
-
     // TODO should this return an optional?
     pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError![]const u8;
     const max_buffer_len = 128;
@@ -39,18 +37,18 @@ pub const InputSource = struct {
     ) Register.Error!void {
         self.memory = memory;
         self.buffer_offset = buffer_offset;
-        self.buffer_len.init(self.memory, buffer_len_offset);
-        self.buffer_at.init(self.memory, buffer_at_offset);
+        try self.buffer_len.init(self.memory, buffer_len_offset);
+        try self.buffer_at.init(self.memory, buffer_at_offset);
 
-        try self.buffer_len.store(0);
-        try self.buffer_at.store(0);
+        self.buffer_len.store(0);
+        self.buffer_at.store(0);
 
         self.refill_fn = null;
         self.refill_userdata = null;
     }
 
     // TODO maybe make this private ?
-    pub fn setInputBuffer(self: *@This(), buffer: []const u8) Error!void {
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) vm.InputError!void {
         if (buffer.len > max_buffer_len) {
             return error.OversizeInputBuffer;
         }
@@ -60,8 +58,8 @@ pub const InputSource = struct {
             buffer.len,
         );
         std.mem.copyForwards(u8, mem_slice, buffer);
-        try self.buffer_at.store(0);
-        try self.buffer_len.store(@truncate(buffer.len));
+        self.buffer_at.store(0);
+        self.buffer_len.store(@truncate(buffer.len));
     }
 
     pub fn setRefillCallback(
@@ -73,57 +71,57 @@ pub const InputSource = struct {
         self.refill_userdata = userdata;
     }
 
-    pub fn readNextChar(self: *@This()) Error!?u8 {
-        const buffer_at = try self.buffer_at.fetch();
-        const buffer_len = try self.buffer_len.fetch();
+    pub fn readNextChar(self: *@This()) ?u8 {
+        const buffer_at = self.buffer_at.fetch();
+        const buffer_len = self.buffer_len.fetch();
         if (buffer_at < buffer_len) {
             const ret = self.memory[self.buffer_offset + buffer_at];
-            try self.buffer_at.storeAdd(1);
+            self.buffer_at.storeAdd(1);
             return ret;
         } else {
             return null;
         }
     }
 
-    fn skipWhitespace(self: *@This()) Error!?u8 {
-        var char = try self.readNextChar() orelse return null;
+    fn skipWhitespace(self: *@This()) ?u8 {
+        var char = self.readNextChar() orelse return null;
         while (isWhitespace(char)) {
-            char = (try self.readNextChar()) orelse return null;
+            char = self.readNextChar() orelse return null;
         }
         return char;
     }
 
-    pub fn readNextWordRange(self: *@This()) Error!?struct {
+    pub fn readNextWordRange(self: *@This()) ?struct {
         address: vm.Cell,
         len: vm.Cell,
     } {
-        var char = try self.skipWhitespace() orelse return null;
+        var char = self.skipWhitespace() orelse return null;
 
-        const word_start = try self.buffer_at.fetch() - 1;
+        const word_start = self.buffer_at.fetch() - 1;
 
         while (true) {
-            char = (try self.readNextChar()) orelse break;
+            char = self.readNextChar() orelse break;
             if (isWhitespace(char)) {
-                try self.buffer_at.storeSubtract(1);
+                self.buffer_at.storeSubtract(1);
                 break;
             }
         }
 
-        const word_end = try self.buffer_at.fetch();
+        const word_end = self.buffer_at.fetch();
         return .{
             .address = self.buffer_offset + word_start,
             .len = word_end - word_start,
         };
     }
 
-    pub fn readNextWord(self: *@This()) Error!?[]const u8 {
-        const range = try self.readNextWordRange() orelse return null;
+    pub fn readNextWord(self: *@This()) ?[]const u8 {
+        const range = self.readNextWordRange() orelse return null;
         return vm.sliceFromAddrAndLen(self.memory, range.address, range.len);
     }
 
     pub fn refill(
         self: *@This(),
-    ) Error!void {
+    ) vm.InputError!void {
         const refill_fn = self.refill_fn orelse return error.CannotRefill;
         const userdata = self.refill_userdata orelse return error.CannotRefill;
         const buffer = try refill_fn(userdata);
@@ -153,15 +151,15 @@ test "input-sources" {
 
     try input_source.setInputBuffer("asdf wowo hellow");
 
-    try testing.expectEqual('a', try input_source.readNextChar());
-    try testing.expectEqual('s', try input_source.readNextChar());
-    try testing.expectEqual('d', try input_source.readNextChar());
-    try testing.expectEqual('f', try input_source.readNextChar());
+    try testing.expectEqual('a', input_source.readNextChar());
+    try testing.expectEqual('s', input_source.readNextChar());
+    try testing.expectEqual('d', input_source.readNextChar());
+    try testing.expectEqual('f', input_source.readNextChar());
 
     try testing.expectEqualSlices(
         u8,
         "wowo",
-        try input_source.readNextWord() orelse return error.OutOfInput,
+        input_source.readNextWord() orelse return error.OutOfInput,
     );
 
     try input_source.refill();
@@ -169,7 +167,7 @@ test "input-sources" {
     try testing.expectEqualSlices(
         u8,
         "refill",
-        try input_source.readNextWord() orelse return error.OutOfInput,
+        input_source.readNextWord() orelse return error.OutOfInput,
     );
 }
 

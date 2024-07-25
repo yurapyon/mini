@@ -290,15 +290,15 @@ fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn rBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.state.store(@intFromEnum(vm.CompileState.interpret));
+    mini.state.store(@intFromEnum(vm.CompileState.interpret));
 }
 
 fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.state.store(@intFromEnum(vm.CompileState.compile));
+    mini.state.store(@intFromEnum(vm.CompileState.compile));
 }
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = mini.readByteAndAdvancePC();
+    const addr = try mini.readByteAndAdvancePC();
     try mini.absoluteJump(addr, false);
 }
 
@@ -322,18 +322,18 @@ fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO should try and refill
-    const range = try mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
+    const range = mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
     try mini.data_stack.push(range.address);
     try mini.data_stack.push(range.len);
 }
 
 fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO this is messy
-    if (try mini.input_source.readNextChar()) |char| {
+    if (mini.input_source.readNextChar()) |char| {
         try mini.data_stack.push(char);
     } else {
         try mini.input_source.refill();
-        if (try mini.input_source.readNextChar()) |char| {
+        if (mini.input_source.readNextChar()) |char| {
             try mini.data_stack.push(char);
         } else {
             return error.Panic;
@@ -354,7 +354,7 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 /// This jumps to the following address in memory without
 ///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = mini.readCellAndAdvancePC();
+    const addr = try mini.readCellAndAdvancePC();
     // TODO this mask should be a constant somewhere
     const masked_addr = addr & 0x7fff;
     try mini.absoluteJump(masked_addr, false);
@@ -384,7 +384,7 @@ fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.readCellAndAdvancePC();
+    const value = try mini.readCellAndAdvancePC();
     try mini.data_stack.push(value);
 }
 
@@ -414,7 +414,7 @@ fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const byte = mini.readByteAndAdvancePC();
+    const byte = try mini.readByteAndAdvancePC();
     try mini.data_stack.push(byte);
 }
 
@@ -723,7 +723,7 @@ fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
     const high = ctx.current_bytecode & 0x0f;
-    const low = mini.readByteAndAdvancePC();
+    const low = try mini.readByteAndAdvancePC();
     const addr = mini.program_counter.fetch();
     const length = @as(vm.Cell, high) << 8 | low;
     try mini.data_stack.push(addr);
@@ -749,7 +749,7 @@ fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
     const high = ctx.current_bytecode & 0x7f;
-    const low = mini.readByteAndAdvancePC();
+    const low = try mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;
     try mini.absoluteJump(addr, true);
 }
@@ -792,7 +792,7 @@ test "bytecodes" {
         },
     );
 
-    try mini.data_stack.clear();
+    mini.data_stack.clear();
 
     try testWords(
         &mini,

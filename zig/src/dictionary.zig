@@ -10,7 +10,7 @@ const Register = @import("register.zig").Register;
 ///   where each definition has a pointer to the previous definition
 pub const Dictionary = struct {
     // TODO should this be a *vm.Memory pointer?
-    memory: vm.Memory,
+    _memory: vm.Memory,
     here: Register,
     latest: Register,
 
@@ -21,20 +21,20 @@ pub const Dictionary = struct {
         memory: vm.Memory,
         here_offset: vm.Cell,
         latest_offset: vm.Cell,
-    ) void {
-        self.memory = memory;
-        self.here.init(memory, here_offset);
-        self.latest.init(memory, latest_offset);
+    ) Register.Error!void {
+        self._memory = memory;
+        try self.here.init(memory, here_offset);
+        try self.latest.init(memory, latest_offset);
     }
 
     pub fn lookup(
         self: *@This(),
         word: []const u8,
     ) vm.Error!?vm.Cell {
-        var latest = try self.latest.fetch();
+        var latest = self.latest.fetch();
         var temp_word_header: WordHeader = undefined;
         while (latest != 0) : (latest = temp_word_header.latest) {
-            try temp_word_header.initFromMemory(self.memory[latest..]);
+            try temp_word_header.initFromMemory(self._memory[latest..]);
             if (!temp_word_header.is_hidden and temp_word_header.nameEquals(word)) {
                 return latest;
             }
@@ -47,7 +47,7 @@ pub const Dictionary = struct {
         name: []const u8,
     ) vm.Error!void {
         const word_header = WordHeader{
-            .latest = try self.latest.fetch(),
+            .latest = self.latest.fetch(),
             .is_immediate = false,
             .is_hidden = false,
             .name = name,
@@ -55,29 +55,29 @@ pub const Dictionary = struct {
 
         const header_size = word_header.size();
 
-        try self.here.alignForward(vm.Cell);
-        const aligned_here = try self.here.fetch();
-        try self.latest.store(aligned_here);
+        self.here.alignForward(vm.Cell);
+        const aligned_here = self.here.fetch();
+        self.latest.store(aligned_here);
 
         try word_header.writeToMemory(
-            self.memory[aligned_here..][0..header_size],
+            self._memory[aligned_here..][0..header_size],
         );
-        try self.here.storeAdd(header_size);
+        self.here.storeAdd(header_size);
 
-        try self.here.alignForward(vm.Cell);
+        self.here.alignForward(vm.Cell);
     }
 
-    pub fn compileLit(self: *@This(), value: vm.Cell) vm.Error!void {
+    pub fn compileLit(self: *@This(), value: vm.Cell) Register.Error!void {
         try self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
         try self.here.comma(value);
     }
 
-    pub fn compileLitC(self: *@This(), value: u8) vm.Error!void {
+    pub fn compileLitC(self: *@This(), value: u8) Register.Error!void {
         try self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
         try self.here.commaC(value);
     }
 
-    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
+    pub fn compileAbsJump(self: *@This(), addr: vm.Cell) Register.Error!void {
         // TODO check addr isnt bigger than 2^15
         const base = bytecodes.base_abs_jump_bytecode;
         const jump = base | (addr & 0x7fff);
@@ -85,7 +85,7 @@ pub const Dictionary = struct {
         try self.here.commaC(@truncate(jump));
     }
 
-    pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
+    pub fn compileData(self: *@This(), data: []u8) Register.Error!void {
         // TODO check data.len isnt bigger than 2^12
         const base = bytecodes.base_data_bytecode;
         const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
@@ -118,15 +118,15 @@ test "dictionary" {
     const dictionary_start = 16;
 
     var dictionary: Dictionary = undefined;
-    dictionary.init(memory, here_offset, latest_offset);
+    try dictionary.init(memory, here_offset, latest_offset);
 
-    try dictionary.here.store(dictionary_start);
-    try dictionary.latest.store(0);
+    dictionary.here.store(dictionary_start);
+    dictionary.latest.store(0);
 
     try dictionary.defineWord("name");
 
     try testing.expectEqual(
-        try dictionary.here.fetch() - dictionary_start,
+        dictionary.here.fetch() - dictionary_start,
         WordHeader.calculateSize(4),
     );
 
@@ -148,7 +148,7 @@ test "dictionary" {
     try wh_b.initFromMemory(memory[dictionary_start..]);
     try testing.expectEqualDeep(wh_a, wh_b);
 
-    const c_latest = try dictionary.latest.fetch();
+    const c_latest = dictionary.latest.fetch();
 
     const wh_c: WordHeader = .{
         .latest = c_latest,
@@ -162,10 +162,10 @@ test "dictionary" {
     try testing.expectEqualSlices(
         u8,
         &[_]u8{ 0x10, 0x00, 0x04, 'w', 'o', 'w', 'o', 0 },
-        memory[(try dictionary.latest.fetch())..][0..8],
+        memory[dictionary.latest.fetch()..][0..8],
     );
 
-    try wh_b.initFromMemory(memory[(try dictionary.latest.fetch())..]);
+    try wh_b.initFromMemory(memory[dictionary.latest.fetch()..]);
     try testing.expectEqualDeep(wh_c, wh_b);
 
     try dictionary.defineWord("hellow");
