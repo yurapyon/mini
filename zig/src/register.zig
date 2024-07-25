@@ -21,28 +21,41 @@ pub const Register = struct {
         return self.offset;
     }
 
-    fn accessCell(self: @This(), addr: usize) *vm.Cell {
-        return @ptrCast(@alignCast(&self.memory[addr]));
+    // fn accessCell(self: @This(), addr: usize) *vm.Cell {
+    //    return @ptrCast(@alignCast(&self.memory[addr]));
+    // }
+
+    fn readCell(self: @This(), addr: usize) vm.Cell {
+        const high_byte = self.memory[addr + 1];
+        const low_byte = self.memory[addr];
+        return (@as(vm.Cell, high_byte) << 8) | low_byte;
+    }
+
+    fn writeCell(self: @This(), addr: usize, value: vm.Cell) void {
+        self.memory[addr + 1] = @truncate(value >> 8);
+        self.memory[addr] = @truncate(value);
     }
 
     pub fn store(self: @This(), value: vm.Cell) void {
-        self.accessCell(self.offset).* = value;
+        self.writeCell(self.offset, value);
     }
 
-    pub fn storeAdd(self: @This(), value: vm.Cell) void {
-        self.accessCell(self.offset).* +%= value;
+    pub fn storeAdd(self: @This(), to_add: vm.Cell) void {
+        const value = self.readCell(self.offset);
+        self.writeCell(self.offset, value +% to_add);
     }
 
-    pub fn storeSubtract(self: @This(), value: vm.Cell) void {
-        self.accessCell(self.offset).* -%= value;
+    pub fn storeSubtract(self: @This(), to_subtract: vm.Cell) void {
+        const value = self.readCell(self.offset);
+        self.writeCell(self.offset, value -% to_subtract);
     }
 
     pub fn fetch(self: @This()) vm.Cell {
-        return self.accessCell(self.offset).*;
+        return self.readCell(self.offset);
     }
 
     pub fn comma(self: @This(), value: vm.Cell) void {
-        self.accessCell(self.fetch()).* = value;
+        self.writeCell(self.fetch(), value);
         self.storeAdd(@sizeOf(vm.Cell));
     }
 

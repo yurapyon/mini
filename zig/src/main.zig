@@ -11,6 +11,30 @@ pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
     return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
 
+const LineByLineRefiller = struct {
+    buffer: @import("input_source.zig").InputSource.MemType,
+    stream: std.io.FixedBufferStream([]const u8),
+
+    fn init(self: *@This(), buffer: []const u8) void {
+        self.stream = std.io.fixedBufferStream(buffer);
+        // self.buffer = buffer;
+        // self.buffer_at = 0;
+    }
+
+    fn refill(self_: *anyopaque) vm.InputError![]const u8 {
+        const self: *LineByLineRefiller = @ptrCast(@alignCast(self_));
+        const slice = self.stream.reader().readUntilDelimiterOrEof(
+            &self.buffer,
+            '\n',
+        ) catch return error.OversizeInputBuffer;
+        if (slice) |slc| {
+            return slc;
+        } else {
+            return error.CannotRefill;
+        }
+    }
+};
+
 fn runMiniVM(allocator: Allocator) !void {
     const mem = try vm.allocateMemory(allocator);
     defer allocator.free(mem);
@@ -18,12 +42,21 @@ fn runMiniVM(allocator: Allocator) !void {
     var vm_instance: vm.MiniVM = undefined;
     try vm_instance.init(mem);
 
-    vm_instance.input_source.setInputBuffer("1 dup 1+ dup 1+ ##.s bye\n");
-    try vm_instance.repl();
+    try vm_instance.dictionary.compileConstant("asdf", 100);
+
+    // try vm_instance.input_source.setInputBuffer("1 dup 1+ dup 1+ ##.s bye\n");
+    // try vm_instance.repl();
+
+    var refiller: LineByLineRefiller = undefined;
+    refiller.init(base_file);
 
     vm_instance.should_bye = false;
     vm_instance.should_quit = false;
-    vm_instance.input_source.setInputBuffer(base_file);
+    // try vm_instance.input_source.setInputBuffer(base_file);
+    vm_instance.input_source.setRefillCallback(
+        LineByLineRefiller.refill,
+        @ptrCast(&refiller),
+    );
     try vm_instance.repl();
 }
 

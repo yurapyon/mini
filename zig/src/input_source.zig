@@ -10,11 +10,14 @@ pub fn isWhitespace(char: u8) bool {
 
 // TODO turn this into a device instead
 
+// TODO could have a Refiller struct
+
 /// Forth-style input:
 ///   i.e. line-by-line input from a buffer
 //         ability to read from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
-    pub const RefillFn = *const fn () vm.InputError![]const u8;
+    // TODO should this return an optional?
+    pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError![]const u8;
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 
@@ -23,6 +26,7 @@ pub const InputSource = struct {
     buffer_len: Register,
     buffer_at: Register,
     refill_fn: ?RefillFn,
+    refill_userdata: ?*anyopaque,
 
     pub fn init(
         self: *@This(),
@@ -40,10 +44,14 @@ pub const InputSource = struct {
         self.buffer_at.store(0);
 
         self.refill_fn = null;
+        self.refill_userdata = null;
     }
 
-    pub fn setInputBuffer(self: *@This(), buffer: []const u8) void {
-        // TODO make sure buffer.len isn't too big
+    // TODO maybe make this private ?
+    pub fn setInputBuffer(self: *@This(), buffer: []const u8) vm.InputError!void {
+        if (buffer.len > max_buffer_len) {
+            return error.OversizeInputBuffer;
+        }
         const mem_slice = vm.sliceFromAddrAndLen(
             self.memory,
             self.buffer_offset,
@@ -52,6 +60,15 @@ pub const InputSource = struct {
         std.mem.copyForwards(u8, mem_slice, buffer);
         self.buffer_at.store(0);
         self.buffer_len.store(@truncate(buffer.len));
+    }
+
+    pub fn setRefillCallback(
+        self: *@This(),
+        refill_fn: RefillFn,
+        userdata: *anyopaque,
+    ) void {
+        self.refill_fn = refill_fn;
+        self.refill_userdata = userdata;
     }
 
     pub fn readNextChar(self: *@This()) vm.InputError!?u8 {
@@ -104,12 +121,10 @@ pub const InputSource = struct {
     pub fn refill(
         self: *@This(),
     ) vm.InputError!void {
-        if (self.refill_fn) |refill_fn| {
-            const buffer = try refill_fn();
-            self.setInputBuffer(buffer);
-        } else {
-            return error.CannotRefill;
-        }
+        const refill_fn = self.refill_fn orelse return error.CannotRefill;
+        const userdata = self.refill_userdata orelse return error.CannotRefill;
+        const buffer = try refill_fn(userdata);
+        try self.setInputBuffer(buffer);
     }
 };
 
@@ -130,9 +145,10 @@ test "input-sources" {
         at_offset,
         len_offset,
     );
-    input_source.refill_fn = testRefill;
+    const refill_str = "refill";
+    input_source.setRefillCallback(testRefill, @ptrCast(@constCast(&@as([]const u8, refill_str))));
 
-    input_source.setInputBuffer("asdf wowo hellow");
+    try input_source.setInputBuffer("asdf wowo hellow");
 
     try testing.expectEqual('a', try input_source.readNextChar());
     try testing.expectEqual('s', try input_source.readNextChar());
@@ -154,6 +170,7 @@ test "input-sources" {
     );
 }
 
-fn testRefill() vm.InputError![]const u8 {
-    return "refill";
+fn testRefill(userdata: *anyopaque) vm.InputError![]const u8 {
+    const str: *[]const u8 = @ptrCast(@alignCast(userdata));
+    return str.*;
 }

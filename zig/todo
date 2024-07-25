@@ -3,3 +3,9 @@ handle signed cells
 add an error for out of bounds access of MiniVM.memory
 
 handle case insensitivity
+
+figure out how refill functions should work
+  its hard to read a file when the input buffer can only be 128 chars
+  need to be able to split things line by line
+
+should use memcpy instead of copyforward for most things

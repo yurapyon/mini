@@ -68,12 +68,12 @@ pub const Dictionary = struct {
     }
 
     pub fn compileLit(self: *@This(), value: vm.Cell) void {
-        self.here.comma(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+        self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
         self.here.comma(value);
     }
 
     pub fn compileLitC(self: *@This(), value: u8) void {
-        self.here.comma(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+        self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
         self.here.commaC(value);
     }
 
@@ -94,6 +94,16 @@ pub const Dictionary = struct {
         for (data) |byte| {
             self.here.commaC(byte);
         }
+    }
+
+    pub fn compileConstant(
+        self: *@This(),
+        name: []const u8,
+        value: vm.Cell,
+    ) vm.Error!void {
+        try self.defineWord(name);
+        self.compileLit(value);
+        self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
     }
 };
 

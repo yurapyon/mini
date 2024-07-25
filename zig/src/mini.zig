@@ -35,6 +35,7 @@ pub const Error = error{
 
 pub const InputError = error{
     UnexpectedEndOfInput,
+    OversizeInputBuffer,
     CannotRefill,
 };
 
@@ -190,6 +191,8 @@ pub const MiniVM = struct {
         self.should_quit = false;
         self.should_bye = false;
 
+        try self.compileMemoryLocationConstants();
+
         // TODO
         // run base file
     }
@@ -208,7 +211,7 @@ pub const MiniVM = struct {
         while (!self.should_bye) {
             self.should_quit = false;
             // TODO
-            // try self.input_source.refill();
+            try self.input_source.refill();
 
             while (!self.should_quit and !self.should_bye) {
                 const word = try self.input_source.readNextWord();
@@ -223,6 +226,10 @@ pub const MiniVM = struct {
         }
 
         try self.onBye();
+    }
+
+    pub fn compileMemoryLocationConstants(self: *@This()) Error!void {
+        try self.dictionary.compileConstant("latest", MemoryLayout.offsetOf("latest"));
     }
 
     // ===
@@ -268,7 +275,7 @@ pub const MiniVM = struct {
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
         const cfa_addr = try calculateCfaAddress(self.memory, addr);
-        try self.absoluteJump(cfa_addr, false);
+        try self.absoluteJump(cfa_addr, true);
         try self.evaluateLoop();
     }
 
@@ -341,6 +348,9 @@ pub const MiniVM = struct {
                     try self.compile(word_info);
                 },
             }
+        } else {
+            std.debug.print("Word not found: {s}\n", .{word});
+            return error.WordNotFound;
         }
     }
 
@@ -420,7 +430,7 @@ test "mini" {
     var vm: MiniVM = undefined;
     try vm.init(mem);
 
-    vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
+    try vm.input_source.setInputBuffer("1 dup 1+ dup 1+\n");
 
     for (0..5) |_| {
         const word = try vm.input_source.readNextWord();
