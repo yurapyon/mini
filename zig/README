@@ -14,7 +14,7 @@ files:
 
   base.mini.fth    - a forth file that will define the 'std library' and most of the language features
 
-  memory.zig       - some memory access utils that also 'throw' errors
+  memory.zig       - some memory access utils that also return error unions
   utils.zig        - other random utils
 
   main.zig         - just hacks out an end-to-end test for now
