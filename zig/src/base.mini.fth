@@ -1,52 +1,27 @@
-word >flags define
-' 2 c, ' + c,
-' exit c,
+word >flags define ] 2 + exit [
 
-word xorc! define
-' tuck c, ' c@ c, ' xor c, ' swap c, ' c! c,
-' exit c,
+word xorc! define ]
+tuck c@ xor swap c! exit
+[
 
-word immediate define
-' litc c, 0b10000000 c,
-' latest ##absjump ' @ c, ' >flags ##absjump
-' xorc! ##absjump
-' exit c,
+word immediate define ]
+0b10000000 latest @ >flags xorc! exit
+[
 
-word hide define
-' litc c, 0b01000000 c,
-' swap c,
-' >flags ##absjump
-' xorc! ##absjump
-' exit c,
+word hide define ]
+0b01000000 swap >flags xorc! exit
+[
 
-word : define
-' word c, ' define c,
-' latest ##absjump ' @ c, ' hide ##absjump
-' ] c,
-' exit c,
+word : define ]
+word define latest @ hide ] exit
+[
 
 word ; define
-' litc c, ' exit c, ' c, c,
-' latest ##absjump ' @ c, ' hide ##absjump
+' litc c, ] exit c,
+latest @ hide [
 ' [ c,
-' exit c,
-
+] exit [
 immediate
-
-: begin
-  here @
-  ; immediate
-
-: until
-  ['] branch0 c,
-  here @ - c, ; immediate
-
-: \
-  begin
-    next-char 10 =
-  until ; immediate
-
-\ does this work
 
 : 2dup over over ;
 : 2drop drop drop ;
