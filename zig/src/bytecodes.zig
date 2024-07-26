@@ -340,7 +340,7 @@ fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     if (mini.input_source.readNextChar()) |char| {
         try mini.data_stack.push(char);
     } else {
-        try mini.input_source.refill();
+        _ = try mini.input_source.refill();
         if (mini.input_source.readNextChar()) |char| {
             try mini.data_stack.push(char);
         } else {
@@ -642,9 +642,6 @@ fn push8(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    // instead of doing all this, could potentially just
-    //   manipulate stack memory as bytes
     const value = try mini.data_stack.pop();
     const low = @as(u8, @truncate(value));
     const high = @as(u8, @truncate(value >> 8));
@@ -653,9 +650,6 @@ fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn bytesToCell(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    // instead of doing all this, could potentially just
-    //   manipulate stack memory as bytes
     const high, const low = try mini.data_stack.popMultiple(2);
     const low_byte = @as(u8, @truncate(low));
     const high_byte = @as(u8, @truncate(high));

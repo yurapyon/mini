@@ -189,7 +189,7 @@ pub const MiniVM = struct {
 
         self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
         self.dictionary.latest.store(0);
-        self.state.store(0);
+        self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
         self.active_device.store(0);
 
@@ -218,16 +218,16 @@ pub const MiniVM = struct {
     pub fn repl(self: *@This()) Error!void {
         while (!self.should_bye) {
             self.should_quit = false;
-            // TODO
-            // how to handle if refiller is empty
-            try self.input_source.refill();
 
-            while (!self.should_quit and !self.should_bye) {
+            var did_refill = try self.input_source.refill();
+
+            while (did_refill and !self.should_quit and !self.should_bye) {
                 const word = self.input_source.readNextWord();
                 if (word) |w| {
                     try self.evaluateString(w);
                 } else {
-                    self.should_quit = true;
+                    did_refill = try self.input_source.refill();
+                    // self.should_quit = !did_refill;
                 }
             }
 

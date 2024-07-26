@@ -7,7 +7,7 @@ const vm = @import("mini.zig");
 //   OutOfBounds errors are only thrown when _memory or _offset is changed
 //     (or from functions that access arbitrary unrelated memory)
 // There are no public functions that allow users to change _memory or _offset after init
-//   so if they go in and modify them on thier own, that's thier problem
+//   and theyre marked private for this reason
 
 /// A register is basically a pointer into VM Memory
 /// It's memory-mapped, rather than being a system pointer
@@ -98,13 +98,8 @@ pub const Register = struct {
         self.storeAdd(1);
     }
 
-    // TODO this can take alignment as a usize
-    pub fn alignForward(self: @This(), comptime Type: type) void {
-        self.store(std.mem.alignForward(
-            Type,
-            self.fetch(),
-            @alignOf(Type),
-        ));
+    pub fn alignForward(self: @This(), alignment: vm.Cell) void {
+        self.store(std.mem.alignForward(vm.Cell, self.fetch(), alignment));
     }
 
     pub fn readByteAndAdvance(self: @This(), memory: []const u8) Error!u8 {
@@ -159,6 +154,6 @@ test "registers" {
     try testing.expectEqual(0x04, here.fetchC());
     here.storeAddC(1);
     try testing.expectEqual(0x05, here.fetchC());
-    here.alignForward(vm.Cell);
+    here.alignForward(@alignOf(vm.Cell));
     try testing.expectEqual(0x06, here.fetchC());
 }

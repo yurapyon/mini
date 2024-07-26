@@ -1,3 +1,4 @@
+
 word : define
 ' word nip c, ' define nip c,
 ' ] nip c,
@@ -8,6 +9,6 @@ word ; define
 ' [ nip c,
 ' exit nip c,
 
-here latest state base ##.s
+here here latest state base ##.s
 
 bye

@@ -80,7 +80,8 @@ pub fn Stack(comptime count_: usize) type {
             if (max_idx >= self.depth()) {
                 return error.StackUnderflow;
             }
-            // TODO could probably catch unreachable on this if we have stack overflow checking
+            // TODO
+            // could probably 'catch unreachable' on this if we have stack overflow checking
             return self.unsafeSwapValues(@intCast(a_idx), @intCast(b_idx));
         }
 

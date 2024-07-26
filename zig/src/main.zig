@@ -19,7 +19,7 @@ const LineByLineRefiller = struct {
         self.stream = std.io.fixedBufferStream(buffer);
     }
 
-    fn refill(self_: *anyopaque) vm.InputError![]const u8 {
+    fn refill(self_: *anyopaque) vm.InputError!?[]const u8 {
         const self: *LineByLineRefiller = @ptrCast(@alignCast(self_));
         const slice = self.stream.reader().readUntilDelimiterOrEof(
             &self.buffer,
@@ -28,7 +28,7 @@ const LineByLineRefiller = struct {
         if (slice) |slc| {
             return slc;
         } else {
-            return error.CannotRefill;
+            return null;
         }
     }
 };
@@ -55,7 +55,9 @@ fn runMiniVM(allocator: Allocator) !void {
     try vm_instance.repl();
 }
 
-pub fn main() !void {}
+pub fn main() !void {
+    try runMiniVM(std.heap.c_allocator);
+}
 
 test "lib-testing" {
     _ = @import("stack.zig");

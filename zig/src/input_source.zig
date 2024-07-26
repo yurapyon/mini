@@ -17,7 +17,7 @@ pub fn isWhitespace(char: u8) bool {
 //         ability to read from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
     // TODO should this return an optional?
-    pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError![]const u8;
+    pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError!?[]const u8;
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 
@@ -126,11 +126,16 @@ pub const InputSource = struct {
 
     pub fn refill(
         self: *@This(),
-    ) (vm.InputError || vm.mem.MemoryError)!void {
+    ) (vm.InputError || vm.mem.MemoryError)!bool {
         const refill_fn = self.refill_fn orelse return error.CannotRefill;
         const userdata = self.refill_userdata orelse return error.CannotRefill;
         const buffer = try refill_fn(userdata);
-        try self.setInputBuffer(buffer);
+        if (buffer) |buf| {
+            try self.setInputBuffer(buf);
+            return true;
+        } else {
+            return false;
+        }
     }
 };
 

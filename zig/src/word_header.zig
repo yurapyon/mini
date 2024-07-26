@@ -3,6 +3,8 @@ const std = @import("std");
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
+// TODO this api is kindof messy
+
 /// Struct representing a MiniVM word definition
 ///   this is not bit-for-bit equivalent to the definition in Forth memory
 ///   this is just a normal Zig struct

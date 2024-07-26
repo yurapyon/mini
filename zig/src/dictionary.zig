@@ -54,7 +54,7 @@ pub const Dictionary = struct {
 
         const header_size = word_header.size();
 
-        self.here.alignForward(vm.Cell);
+        self.here.alignForward(@alignOf(vm.Cell));
         const aligned_here = self.here.fetch();
         self.latest.store(aligned_here);
 
@@ -65,7 +65,7 @@ pub const Dictionary = struct {
         ));
         self.here.storeAdd(header_size);
 
-        self.here.alignForward(vm.Cell);
+        self.here.alignForward(@alignOf(vm.Cell));
     }
 
     pub fn compileLit(self: *@This(), value: vm.Cell) Register.Error!void {
