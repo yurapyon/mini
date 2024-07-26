@@ -103,6 +103,10 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
         return error.InvalidBase;
     }
 
+    if (str.len == 0) {
+        return 0;
+    }
+
     var is_negative: bool = false;
     var read_at: usize = 0;
     var acc: usize = 0;
@@ -115,7 +119,7 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
     }
 
     var effective_base = base;
-    if (str.len > 2) {
+    if (str.len >= 3) {
         if (std.mem.eql(u8, "0x", str[0..2])) {
             effective_base = 16;
             read_at += 2;
@@ -156,6 +160,7 @@ test "parse number" {
     try testing.expectEqual(845402850256, try parseNumber("asdf1234", 36));
 
     try testing.expectEqual(5, try parseNumber("11111", 1));
+    try testing.expectEqual(0, try parseNumber("", 1));
 }
 
 /// Case insensitive string compare
