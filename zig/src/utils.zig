@@ -99,7 +99,7 @@ pub const ParseNumberError = error{
 };
 
 pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
-    if (base <= 1 or base > 36) {
+    if (base < 1 or base > 36) {
         return error.InvalidBase;
     }
 
@@ -154,6 +154,8 @@ test "parse number" {
     ));
     try testing.expectEqual(10, try parseNumber("+10", 10));
     try testing.expectEqual(845402850256, try parseNumber("asdf1234", 36));
+
+    try testing.expectEqual(5, try parseNumber("11111", 1));
 }
 
 /// Case insensitive string compare
