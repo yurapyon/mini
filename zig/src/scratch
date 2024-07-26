@@ -9,3 +9,18 @@ word immediate define
 ' swap nip c, ' c! nip c,
 ' exit nip c,
 
+
+word hide define
+' litc 0b01000000 c,
+' swap c,
+' >flags ##absjump
+' orc! ##absjump
+' exit c,
+
+word show define
+' litc 0b10111111 c,
+' swap c,
+' >flags ##absjump
+' andc! ##absjump
+' exit c,
+

@@ -11,6 +11,9 @@ const utils = @import("utils.zig");
 //   when interpreted would compile a li/litc
 //   like how ##absjump and ##data do it
 
+// TODO need a 'word-info' word like tick that tells you
+//   if a word is a bytecode or a definition
+
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
@@ -285,11 +288,8 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     return error.Panic;
 }
 
-/// Pushes whether word is bytecode or not
-///   followed by bytecode or cfa_addr
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const result = try mini.readWordAndGetAddress();
-    try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
     try mini.data_stack.push(result.value);
 }
 
@@ -312,7 +312,10 @@ fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.readByteAndAdvancePC();
-    try mini.absoluteJump(addr, false);
+    const pc = mini.program_counter.fetch();
+    // TODO this has to be relative
+    try mini.absoluteJump(pc +% addr, false);
+    // try mini.absoluteJump(addr, false);
 }
 
 fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {

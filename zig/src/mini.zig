@@ -278,6 +278,7 @@ pub const MiniVM = struct {
                 },
             }
         } else {
+            // TODO printWordNotFound fn
             std.debug.print("Word not found: {s}\n", .{word});
             return error.WordNotFound;
         }
@@ -373,7 +374,7 @@ pub const MiniVM = struct {
         useReturnStack: bool,
     ) Error!void {
         if (useReturnStack) {
-            try self.return_stack.push(self.program_counter.fetch());
+            self.return_stack.push(self.program_counter.fetch()) catch |err| return returnStackErrorFromStackError(err);
         }
         self.program_counter.store(addr);
     }
@@ -413,26 +414,31 @@ pub const MiniVM = struct {
         value: Cell,
     } {
         const word = self.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
-        const word_info = try self.lookupString(word) orelse return error.WordNotFound;
-        switch (word_info.value) {
-            .bytecode => |bytecode| {
-                return .{
-                    .is_bytecode = true,
-                    .value = bytecode,
-                };
-            },
-            .mini_word => |addr| {
-                return .{
-                    .is_bytecode = false,
-                    .value = try WordHeader.calculateCfaAddress(
-                        self.memory,
-                        addr,
-                    ),
-                };
-            },
-            .number => |_| {
-                return error.WordNotFound;
-            },
+        if (try self.lookupString(word)) |word_info| {
+            switch (word_info.value) {
+                .bytecode => |bytecode| {
+                    return .{
+                        .is_bytecode = true,
+                        .value = bytecode,
+                    };
+                },
+                .mini_word => |addr| {
+                    return .{
+                        .is_bytecode = false,
+                        .value = try WordHeader.calculateCfaAddress(
+                            self.memory,
+                            addr,
+                        ),
+                    };
+                },
+                .number => |_| {
+                    std.debug.print("Word not found: {s}\n", .{word});
+                    return error.WordNotFound;
+                },
+            }
+        } else {
+            std.debug.print("Word not found: {s}\n", .{word});
+            return error.WordNotFound;
         }
     }
 
