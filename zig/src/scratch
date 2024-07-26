@@ -24,3 +24,19 @@ word show define
 ' andc! ##absjump
 ' exit c,
 
+
+: begin
+  here @
+  ; immediate
+
+: until
+  ['] branch0 c,
+  here @ - c, ; immediate
+
+: \
+  begin
+    next-char 10 =
+  until ; immediate
+
+\ does this work
+

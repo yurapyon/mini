@@ -123,6 +123,9 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
         if (std.mem.eql(u8, "0x", str[0..2])) {
             effective_base = 16;
             read_at += 2;
+        } else if (std.mem.eql(u8, "0d", str[0..2])) {
+            effective_base = 10;
+            read_at += 2;
         } else if (std.mem.eql(u8, "0b", str[0..2])) {
             effective_base = 2;
             read_at += 2;
@@ -148,6 +151,7 @@ test "parse number" {
     const testing = @import("std").testing;
 
     try testing.expectEqual(0, try parseNumber("0", 10));
+    try testing.expectEqual(10, try parseNumber("0d10", 36));
     try testing.expectEqual(16, try parseNumber("10", 16));
     try testing.expectEqual(16, try parseNumber("0x10", 10));
     try testing.expectEqual(8, try parseNumber("1000", 2));

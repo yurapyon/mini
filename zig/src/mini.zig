@@ -140,15 +140,38 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
+// TODO currenly unused, should format more nicely
 fn printMemoryStat(comptime name: []const u8) void {
     std.debug.print("{s}: {}\n", .{ name, MemoryLayout.offsetOf(name) });
 }
 
+// TODO currenly unused, should format more nicely
 fn printMemoryStats() void {
     printMemoryStat("here");
     printMemoryStat("latest");
     printMemoryStat("state");
     printMemoryStat("base");
+}
+
+// NOTE no plans to allow for users to add aliases from mini
+const AliasDefinition = struct {
+    alias: []const u8,
+    word: []const u8,
+};
+
+const aliases = [_]AliasDefinition{
+    .{ .alias = "true", .word = "0xffff" },
+    .{ .alias = "false", .word = "0" },
+};
+
+fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
+    // TODO lookup table utils ?
+    for (aliases) |alias_definition| {
+        if (utils.stringsEqual(alias_definition.alias, word_or_alias)) {
+            return alias_definition.word;
+        }
+    }
+    return null;
 }
 
 /// MiniVM
@@ -208,8 +231,6 @@ pub const MiniVM = struct {
         self.should_bye = false;
 
         self.compileMemoryLocationConstants();
-
-        printMemoryStats();
 
         // TODO
         // run base file
@@ -284,7 +305,8 @@ pub const MiniVM = struct {
         }
     }
 
-    fn lookupString(self: *@This(), word: []const u8) Error!?WordInfo {
+    fn lookupString(self: *@This(), word_or_alias: []const u8) Error!?WordInfo {
+        const word = maybeFindAlias(word_or_alias) orelse word_or_alias;
         // TODO would be nice if lookups couldnt error
         if (try self.dictionary.lookup(word)) |definition_addr| {
             return try WordInfo.fromMiniWord(self.memory, definition_addr);

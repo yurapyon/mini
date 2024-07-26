@@ -12,12 +12,15 @@ pub fn isWhitespace(char: u8) bool {
 
 // TODO could have a Refiller struct
 
+// TODO need to add a \n terminator
+
 /// Forth-style input:
 ///   i.e. line-by-line input from a buffer
 //         ability to read from stdin if no buffer is supplied (TODO)
 pub const InputSource = struct {
     // TODO should this return an optional?
     pub const RefillFn = *const fn (userdata: *anyopaque) vm.InputError!?[]const u8;
+    // TODO could make this 80 instead of 128
     const max_buffer_len = 128;
     pub const MemType = [max_buffer_len]u8;
 

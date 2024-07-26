@@ -311,10 +311,10 @@ fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.readByteAndAdvancePC();
+    const jump_count = try mini.readByteAndAdvancePC();
     const pc = mini.program_counter.fetch();
     // TODO this has to be relative
-    try mini.absoluteJump(pc +% addr, false);
+    try mini.absoluteJump(pc +% jump_count, false);
     // try mini.absoluteJump(addr, false);
 }
 
@@ -322,6 +322,8 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     const condition = try mini.data_stack.pop();
     if (!vm.isTruthy(condition)) {
         return try branch(mini, ctx);
+    } else {
+        _ = try mini.readByteAndAdvancePC();
     }
 }
 
@@ -714,6 +716,10 @@ fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 // ===
+
+// TODO
+// think about absjump, and data,
+// should compile semantics for these pop off of the stack? or do something else
 
 pub const base_data_bytecode = 0b01110000;
 

@@ -1,21 +1,10 @@
 word >flags define ] 2 + exit [
+word xorc! define ] tuck c@ xor swap c! exit [
 
-word xorc! define ]
-tuck c@ xor swap c! exit
-[
+word immediate define ] 0b10000000 latest @ >flags xorc! exit [
+word hide define ] 0b01000000 swap >flags xorc! exit [
 
-word immediate define ]
-0b10000000 latest @ >flags xorc! exit
-[
-
-word hide define ]
-0b01000000 swap >flags xorc! exit
-[
-
-word : define ]
-word define latest @ hide ] exit
-[
-
+word : define ] word define latest @ hide ] exit [
 word ; define
 ' litc c, ] exit c,
 latest @ hide [
