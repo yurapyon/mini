@@ -3,9 +3,9 @@ zig implementation ==
 files:
   mini.zig         - brings all the vm's components together and defines some types
 
-  stack.zig        - the stack
-  dictionary.zig   - forth words are defined into here
-  word_header.zig  - helper struct for writing definitions to the dictionary
+  stack.zig        - stack structure used for both the data and return stack
+  dictionary.zig   - manages the 'here' & 'latest' registers to compile words to forth memory
+  word_header.zig  - helper for structuring definitions
   input_source.zig - manages line-by-line input and input buffer
   register.zig     - memory-mapped 'pointer' into forth memory
   devices/         - this will have implementations of 'devices' which will handle io/ffi
@@ -15,7 +15,7 @@ files:
   base.mini.fth    - a forth file that will define the 'std library' and most of the language features
 
   memory.zig       - some memory access utils that also return error unions
-  utils.zig        - other random utils
+  utils.zig        - other utils: number parser, comptime utils, lowercase string compare
 
   main.zig         - just hacks out an end-to-end test for now
 
