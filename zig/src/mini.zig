@@ -140,6 +140,17 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
+fn printMemoryStat(comptime name: []const u8) void {
+    std.debug.print("{s}: {}\n", .{ name, MemoryLayout.offsetOf(name) });
+}
+
+fn printMemoryStats() void {
+    printMemoryStat("here");
+    printMemoryStat("latest");
+    printMemoryStat("state");
+    printMemoryStat("base");
+}
+
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
@@ -162,8 +173,8 @@ pub const MiniVM = struct {
         self.memory = memory;
         try self.dictionary.init(
             self.memory,
-            MemoryLayout.offsetOf("latest"),
             MemoryLayout.offsetOf("here"),
+            MemoryLayout.offsetOf("latest"),
         );
 
         try self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
@@ -198,6 +209,8 @@ pub const MiniVM = struct {
 
         self.compileMemoryLocationConstants();
 
+        printMemoryStats();
+
         // TODO
         // run base file
     }
@@ -227,7 +240,6 @@ pub const MiniVM = struct {
                     try self.evaluateString(w);
                 } else {
                     did_refill = try self.input_source.refill();
-                    // self.should_quit = !did_refill;
                 }
             }
 
@@ -239,6 +251,9 @@ pub const MiniVM = struct {
 
     pub fn onQuit(self: *@This()) Error!void {
         self.data_stack.clear();
+        // TODO
+        // set refiller to cmd line input
+        self.should_bye = true;
     }
 
     pub fn onBye(self: *@This()) Error!void {

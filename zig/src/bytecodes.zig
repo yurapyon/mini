@@ -6,6 +6,11 @@ const utils = @import("utils.zig");
 // TODO
 // need set-immediate and set-hidden
 
+// TODO
+//   might be nice if lit and litc,
+//   when interpreted would compile a li/litc
+//   like how ##absjump and ##data do it
+
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
@@ -119,8 +124,8 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("'", tick),
     constructBasicImmediateBytecode("[']", bracketTick),
-    constructBasicImmediateBytecode("]", rBracket),
-    constructBasicBytecode("[", lBracket),
+    constructBasicBytecode("]", rBracket),
+    constructBasicImmediateBytecode("[", lBracket),
 
     constructBasicBytecode("find", find),
     constructBasicBytecode("word", nextWord),
@@ -298,11 +303,11 @@ fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn rBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.state.store(@intFromEnum(vm.CompileState.interpret));
+    mini.state.store(@intFromEnum(vm.CompileState.compile));
 }
 
 fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.state.store(@intFromEnum(vm.CompileState.compile));
+    mini.state.store(@intFromEnum(vm.CompileState.interpret));
 }
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -750,6 +755,7 @@ fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
+    // seems to work
     const high = ctx.current_bytecode & 0x7f;
     const low = try mini.readByteAndAdvancePC();
     const addr = @as(vm.Cell, high) << 8 | low;

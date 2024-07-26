@@ -78,23 +78,25 @@ pub const Dictionary = struct {
         try self.here.commaC(value);
     }
 
+    // TODO write tests for these
     pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
         if (addr > std.math.maxInt(u15)) {
             return error.InvalidAddress;
         }
 
-        const base = bytecodes.base_abs_jump_bytecode;
+        const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
         const jump = base | (addr & 0x7fff);
         try self.here.commaC(@truncate(jump >> 8));
         try self.here.commaC(@truncate(jump));
     }
 
+    // TODO write tests for these
     pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
         if (data.len > std.math.maxInt(u12)) {
             return error.InvalidAddress;
         }
 
-        const base = bytecodes.base_data_bytecode;
+        const base = @as(vm.Cell, bytecodes.base_data_bytecode) << 8;
         const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
         try self.here.commaC(@truncate(data_len >> 8));
         try self.here.commaC(@truncate(data_len));

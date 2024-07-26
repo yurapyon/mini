@@ -1,0 +1,11 @@
+
+
+word immediate define
+' ##.s nip c,
+' latest nip ##absjump
+' 2 nip c, ' + nip c,
+' dup nip c,
+' c@ nip c, ' lit nip c, 0b10000000 , ' or nip c,
+' swap nip c, ' c! nip c,
+' exit nip c,
+
