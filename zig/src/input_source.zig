@@ -175,7 +175,7 @@ test "input-sources" {
         input_source.readNextWord() orelse return error.OutOfInput,
     );
 
-    try input_source.refill();
+    _ = try input_source.refill();
 
     try testing.expectEqualSlices(
         u8,
@@ -184,7 +184,7 @@ test "input-sources" {
     );
 }
 
-fn testRefill(userdata: *anyopaque) vm.InputError![]const u8 {
+fn testRefill(userdata: *anyopaque) vm.InputError!?[]const u8 {
     const str: *[]const u8 = @ptrCast(@alignCast(userdata));
     return str.*;
 }
