@@ -77,6 +77,11 @@ pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) MemoryError![]
     return memory[addr..][0..len];
 }
 
+pub fn constSliceFromAddrAndLen(memory: []const u8, addr: usize, len: usize) MemoryError![]const u8 {
+    try assertMemoryAccess(memory, addr);
+    return memory[addr..][0..len];
+}
+
 // ===
 
 // NOTE

@@ -1,16 +1,21 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const utils = @import("utils.zig");
 
 const bytecodes = @import("bytecodes.zig");
 const Register = @import("register.zig").Register;
 
 const base_terminator = 0b10000000;
 
+const TerminatorReadError = error{
+    Overflow,
+} || vm.mem.MemoryError;
+
 fn readUntilTerminator(
     memory: []const u8,
     str_start: vm.Cell,
-) error{ Overflow, OutOfBounds }!vm.Cell {
+) TerminatorReadError!vm.Cell {
     var str_at = str_start;
     while (str_at < memory.len) {
         if (memory[str_at] >= base_terminator) {
@@ -25,18 +30,21 @@ fn compareStringUntilTerminator(
     memory: []const u8,
     str_start: vm.Cell,
     to_compare: []const u8,
-) ?vm.Cell {
-    var i: usize = 0;
-    while (i < to_compare.len) : (i += 1) {
-        // TODO this has to be a checked read
-        const mem_char = memory[str_start + i];
-        if (mem_char != to_compare[i]) {
-            return null;
-        } else if (mem_char >= base_terminator) {
-            // TODO
-        }
+) TerminatorReadError!?vm.Cell {
+    // NOTE
+    // to make this easy,
+    //   just going to get a slice by reading until the terminator
+    // then comparing the slices
+    // it's possible to write an optimized version that only has to loop once
+    //   but thats just O(n) vs O(2n) and not a big deal
+    const str_end = try readUntilTerminator(memory, str_start);
+    const str_len = str_end - str_start;
+    const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
+    if (utils.stringsEqual(str, to_compare)) {
+        return str_end;
+    } else {
+        return null;
     }
-    return str_start + i;
 }
 
 /// This is a Forth style dictionary
@@ -73,7 +81,13 @@ pub fn Dictionary(
                     self.memory,
                     latest + @sizeOf(vm.Cell),
                     word,
-                );
+                ) catch |err| switch (err) {
+                    // this won't happen with toTerminator
+                    //   because we check name length when defining words
+                    error.Overflow => unreachable,
+                    else => |e| return e,
+                };
+
                 if (terminator_addr) |addr| {
                     // TODO read terminator
                     const terminator = (try vm.mem.cellAt(self.memory, addr)).*;
@@ -96,7 +110,8 @@ pub fn Dictionary(
                 self.memory,
                 addr + @sizeOf(vm.Cell),
             ) catch |err| switch (err) {
-                // this won't happen with toCfa because we check name length when defining words
+                // this won't happen with toTerminator
+                //   because we check name length when defining words
                 error.Overflow => unreachable,
                 else => |e| return e,
             };
@@ -209,20 +224,11 @@ test "dictionary" {
         memory[dictionary_start..][0..7],
     );
 
-    //     try dictionary.defineWord("hellow");
-    //
-    //     try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
-    //     try testing.expectEqual(
-    //         dictionary_start + WordHeader.calculateSize(4),
-    //         try dictionary.lookup("wowo"),
-    //     );
-    //     try testing.expectEqual(
-    //         null,
-    //         try dictionary.lookup("wow"),
-    //     );
-    //     try testing.expectEqual(
-    //         dictionary_start + (WordHeader.calculateSize(4) * 2),
-    //         try dictionary.lookup("hellow"),
-    //     );
-    //
+    try dictionary.defineWord("hellow");
+
+    try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
+    try testing.expectEqual(
+        null,
+        try dictionary.lookup("wow"),
+    );
 }
