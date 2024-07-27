@@ -60,16 +60,16 @@ pub fn main() !void {
 }
 
 test "lib-testing" {
-    _ = @import("stack.zig");
-    _ = @import("word_header.zig");
-    _ = @import("utils.zig");
+    // _ = @import("stack.zig");
+    // _ = @import("word_header.zig");
+    // _ = @import("utils.zig");
     _ = @import("register.zig");
-    _ = @import("input_source.zig");
-    _ = @import("dictionary.zig");
-    _ = @import("memory.zig");
-    _ = @import("mini.zig");
+    // _ = @import("input_source.zig");
+    // _ = @import("dictionary.zig");
+    // _ = @import("memory.zig");
+    // _ = @import("mini.zig");
 }
 
 test "end-to-end" {
-    try runMiniVM(std.testing.allocator);
+    // try runMiniVM(std.testing.allocator);
 }

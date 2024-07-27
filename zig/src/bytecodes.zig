@@ -289,6 +289,8 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // read next word
+    // lookupWordAndGetAddress
     const result = try mini.readWordAndGetAddress();
     try mini.data_stack.push(result.value);
 }
@@ -327,6 +329,8 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     }
 }
 
+// TODO this should use the same function as tick/bracketTick and account for aliases
+// find should give you the type
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = try mini.popSlice();
     if (try mini.dictionary.lookup(word)) |definition_addr| {
