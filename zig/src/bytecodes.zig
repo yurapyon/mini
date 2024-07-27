@@ -4,15 +4,9 @@ const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
 // TODO
-// need set-immediate and set-hidden
-
-// TODO
-//   might be nice if lit and litc,
-//   when interpreted would compile a li/litc
-//   like how ##absjump and ##data do it
-
-// TODO need a 'word-info' word like tick that tells you
-//   if a word is a bytecode or a definition
+// might be nice if lit and litc
+//   when interpreted would compile a lit/litc
+//   like how ##absjump and ##data work
 
 // ===
 
@@ -329,8 +323,9 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     }
 }
 
-// TODO this should use the same function as tick/bracketTick and account for aliases
-// find should give you the type
+// TODO
+// this should use the same lookup function as tick/bracketTick and account for aliases
+// find should push the type of the word, either mini-word or bytecode
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = try mini.popSlice();
     if (try mini.dictionary.lookup(word)) |definition_addr| {
@@ -722,7 +717,7 @@ fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 // ===
 
 // TODO
-// think about absjump, and data,
+// think about 'absjump,' and 'data,'
 // should compile semantics for these pop off of the stack? or do something else
 
 pub const base_data_bytecode = 0b01110000;

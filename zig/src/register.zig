@@ -5,7 +5,6 @@ const vm = @import("mini.zig");
 const Range = @import("range.zig");
 
 /// A register is basically a pointer into VM Memory
-/// The memory the register is stored in is passed in for all functions
 /// Won't crash as long as offset is within memory
 ///   This is checked for on init
 pub fn Register(comptime offset_: vm.Cell) type {
@@ -57,7 +56,7 @@ pub fn Register(comptime offset_: vm.Cell) type {
             (vm.mem.cellAt(self.memory, offset) catch unreachable).* -%= value;
         }
 
-        /// May error if self.fetch() is not cell aligned and within write_to
+        /// Will error if self.fetch() is not cell aligned and within write_to
         pub fn comma(
             self: @This(),
             write_to: vm.mem.CellAlignedMemory,
@@ -99,7 +98,7 @@ pub fn Register(comptime offset_: vm.Cell) type {
             byte.* +%= value;
         }
 
-        /// May error if self.fetch() is not within write_to
+        /// Will error if self.fetch() is not within write_to
         pub fn commaC(
             self: @This(),
             write_to: []u8,
@@ -110,6 +109,7 @@ pub fn Register(comptime offset_: vm.Cell) type {
             self.storeAdd(1);
         }
 
+        /// Will error if self.fetch() is not within write_to
         pub fn commaByteAlignedCell(
             self: @This(),
             write_to: []u8,
@@ -119,7 +119,7 @@ pub fn Register(comptime offset_: vm.Cell) type {
             self.storeAdd(@sizeOf(vm.Cell));
         }
 
-        /// May error if self.fetch() is not within read_from
+        /// Will error if self.fetch() is not within read_from
         pub fn readByteAndAdvance(
             self: @This(),
             read_from: []const u8,
@@ -129,7 +129,7 @@ pub fn Register(comptime offset_: vm.Cell) type {
             return try vm.mem.checkedRead(read_from, addr);
         }
 
-        /// May error if self.fetch()+1 is not within read_from
+        /// Will error if self.fetch()+1 is not within read_from
         pub fn readCellAndAdvance(
             self: @This(),
             read_from: []const u8,

@@ -21,7 +21,7 @@ comptime {
     }
 }
 
-pub const max_memory_size = 64 * 1024;
+pub const max_memory_size = 32 * 1024;
 
 pub const Error = error{
     Panic,
@@ -467,6 +467,9 @@ pub const MiniVM = struct {
 };
 
 test "mini" {
+    // TODO
+    // write more tests for execution and interpreting
+    //   this code could maybe be more testable in general
     const testing = std.testing;
     const stack = @import("Stack.zig");
 

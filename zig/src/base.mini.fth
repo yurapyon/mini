@@ -10,14 +10,29 @@ word ; define
 latest @ hide [
 ' [ c,
 ] exit [
-
 immediate
+
+: begin
+  here @
+  ; immediate
+
+: until
+  ['] branch0 c,
+  here @ - c, ; immediate
 
 : 2dup over over ;
 : 2drop drop drop ;
 : 2over 3 pick 3 pick ;
 : 3dup 2 pick 2 pick 2 pick ;
 : 3drop drop 2drop ;
+
+: asdf
+  begin
+  ##.s
+  false
+  until ;
+
+asdf
 
 1 2 2dup ##.s
 
