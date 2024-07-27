@@ -2,24 +2,10 @@ const std = @import("std");
 
 const vm = @import("mini.zig");
 
-// Error handling strategy:
-// For the sake of not having the entire codebase be full of 'try'
-//   OutOfBounds errors are only thrown when _memory or _offset is changed
-//     (or from functions that access arbitrary unrelated memory)
-// There are no public functions that allow users to change _memory or _offset after init
-//   and theyre marked private for this reason
-
 /// A register is basically a pointer into VM Memory
-/// It's memory-mapped, rather than being a system pointer
-///   so, an offset of 0 means memory[0]
+/// The memory the register is stored in is passed in for all functions
 pub const Register = struct {
-    pub const Error = vm.mem.MemoryError;
-
     offset: vm.Cell,
-
-    pub fn address(self: @This()) void {
-        return self._offset;
-    }
 
     /// Won't crash as long as self.offset is aligned and within memory
     pub fn store(
@@ -63,7 +49,7 @@ pub const Register = struct {
         memory: vm.mem.CellAlignedMemory,
         write_to: vm.mem.CellAlignedMemory,
         value: vm.Cell,
-    ) Error!void {
+    ) vm.mem.MemoryError!void {
         (try vm.mem.cellAt(write_to, self.fetch(memory))).* = value;
         self.storeAdd(memory, @sizeOf(vm.Cell));
     }
@@ -108,7 +94,7 @@ pub const Register = struct {
         memory: vm.mem.CellAlignedMemory,
         write_to: []u8,
         value: u8,
-    ) Error!void {
+    ) vm.mem.MemoryError!void {
         const byte = try vm.mem.checkedAccess(write_to, self.fetch(memory));
         byte.* = value;
         self.storeAdd(memory, 1);
@@ -120,7 +106,7 @@ pub const Register = struct {
         self: @This(),
         memory: vm.mem.CellAlignedMemory,
         read_from: []const u8,
-    ) Error!u8 {
+    ) vm.mem.MemoryError!u8 {
         const addr = self.fetch(memory);
         self.storeAdd(memory, 1);
         return try vm.mem.checkedRead(read_from, addr);
@@ -132,7 +118,7 @@ pub const Register = struct {
         self: *@This(),
         memory: vm.mem.CellAlignedMemory,
         read_from: []const u8,
-    ) Error!vm.Cell {
+    ) vm.mem.MemoryError!vm.Cell {
         const low = try self.readByteAndAdvance(memory, read_from);
         const high = try self.readByteAndAdvance(memory, read_from);
         return @as(vm.Cell, high) << 8 | low;
