@@ -3,6 +3,8 @@ const std = @import("std");
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
+const WordHeader = @import("word_header.zig").WordHeader;
+
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
@@ -296,7 +298,15 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
     const result = try mini.lookupStringAndGetAddress(word);
-    try mini.data_stack.push(result.value);
+    if (result.is_bytecode) {
+        try mini.data_stack.push(result.value);
+    } else {
+        const cfa_addr = try WordHeader.calculateCfaAddress(
+            mini.memory,
+            result.value,
+        );
+        try mini.data_stack.push(cfa_addr);
+    }
 }
 
 fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -305,7 +315,11 @@ fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     if (result.is_bytecode) {
         try mini.dictionary.compileLitC(@truncate(result.value));
     } else {
-        try mini.dictionary.compileLit(result.value);
+        const cfa_addr = try WordHeader.calculateCfaAddress(
+            mini.memory,
+            result.value,
+        );
+        try mini.dictionary.compileLit(cfa_addr);
     }
 }
 
@@ -335,8 +349,6 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     }
 }
 
-// TODO test this
-//      need strings on the stack
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = try mini.popSlice();
     const result_or_error = mini.lookupStringAndGetAddress(word);

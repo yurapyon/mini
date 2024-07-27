@@ -24,6 +24,10 @@ immediate
 
 \ does this work
 
+word heloo find
+word begin find
+word exit find ##.s
+
 : loop
   0
   begin

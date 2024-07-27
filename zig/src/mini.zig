@@ -444,10 +444,7 @@ pub const MiniVM = struct {
                 .mini_word => |addr| {
                     return .{
                         .is_bytecode = false,
-                        .value = try WordHeader.calculateCfaAddress(
-                            self.memory,
-                            addr,
-                        ),
+                        .value = addr,
                     };
                 },
                 .number => |_| {

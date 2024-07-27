@@ -9,3 +9,7 @@ for adding mini-word semantics, more flags may be needed
 for functions that can return errors
   as long as they won't be called within bytecodes (or as refiller functions)
   they can be more general
+
+better errors in console when vm crashes
+  need to keep track of 'last executed string'
+  maybe have a debug mode flag
