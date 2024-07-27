@@ -10,3 +10,5 @@ figure out if things like registers/dictionaries
 word headers technically dont need both a terminator and a namelen
 could potentially just use one byte for flags and one for name len
 for adding mini-word semantics, more flags may be needed
+
+make some errors more general when they wont be being called from bytecodes

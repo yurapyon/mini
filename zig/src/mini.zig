@@ -59,23 +59,20 @@ pub const CompileState = enum(Cell) {
     compile,
 };
 
-const DataStack = Stack(32);
-const ReturnStack = Stack(32);
-
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
     data_stack_top: Cell,
-    data_stack: DataStack.MemType,
+    data_stack: [32]Cell,
     return_stack_top: Cell,
-    return_stack: ReturnStack.MemType,
+    return_stack: [32]Cell,
     here: Cell,
     latest: Cell,
     state: Cell,
     base: Cell,
     active_device: Cell,
-    input_buffer: InputSource.MemType,
-    input_buffer_len: Cell,
     input_buffer_at: Cell,
+    input_buffer_len: Cell,
+    input_buffer: [128]u8,
     dictionary_start: u0,
 }, Cell);
 
@@ -178,51 +175,49 @@ fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
     memory: mem.CellAlignedMemory,
-    dictionary: Dictionary,
-    data_stack: DataStack,
-    return_stack: ReturnStack,
-    input_source: InputSource,
-    devices: Devices,
 
-    program_counter: Register,
-    state: Register,
-    base: Register,
-    active_device: Register,
+    program_counter: Register(MemoryLayout.offsetOf("program_counter")),
+    data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
+        .start = MemoryLayout.offsetOf("data_stack"),
+        .end = MemoryLayout.offsetOf("return_stack_top"),
+    }),
+    return_stack: Stack(MemoryLayout.offsetOf("return_stack_top"), .{
+        .start = MemoryLayout.offsetOf("return_stack"),
+        .end = MemoryLayout.offsetOf("here"),
+    }),
+    dictionary: Dictionary(
+        MemoryLayout.offsetOf("here"),
+        MemoryLayout.offsetOf("latest"),
+    ),
+    state: Register(MemoryLayout.offsetOf("state")),
+    base: Register(MemoryLayout.offsetOf("base")),
+    active_device: Register(MemoryLayout.offsetOf("active_device")),
+    input_source: InputSource(
+        MemoryLayout.offsetOf("input_buffer_at"),
+        MemoryLayout.offsetOf("input_buffer_len"),
+    ),
+    devices: Devices,
 
     should_quit: bool,
     should_bye: bool,
 
     pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
         self.memory = memory;
-        try self.dictionary.init(
+        try self.program_counter.init(self.memory);
+        try self.data_stack.initInOneMemoryBlock(self.memory);
+        try self.return_stack.initInOneMemoryBlock(self.memory);
+        try self.dictionary.initInOneMemoryBlock(
             self.memory,
-            MemoryLayout.offsetOf("here"),
-            MemoryLayout.offsetOf("latest"),
+            MemoryLayout.offsetOf("dictionary_start"),
         );
-
-        try self.program_counter.init(self.memory, MemoryLayout.offsetOf("program_counter"));
-        try self.data_stack.init(
-            self.memory,
-            MemoryLayout.offsetOf("data_stack_top"),
-            MemoryLayout.offsetOf("data_stack"),
-        );
-        try self.return_stack.init(
-            self.memory,
-            MemoryLayout.offsetOf("return_stack_top"),
-            MemoryLayout.offsetOf("return_stack"),
-        );
-        try self.state.init(self.memory, MemoryLayout.offsetOf("state"));
-        try self.base.init(self.memory, MemoryLayout.offsetOf("base"));
-        try self.active_device.init(self.memory, MemoryLayout.offsetOf("active_device"));
-        try self.input_source.init(
+        try self.base.init(self.memory);
+        try self.state.init(self.memory);
+        try self.active_device.init(self.memory);
+        try self.input_source.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
-            MemoryLayout.offsetOf("input_buffer_len"),
-            MemoryLayout.offsetOf("input_buffer_at"),
         );
 
-        self.dictionary.here.store(MemoryLayout.offsetOf("dictionary_start"));
-        self.dictionary.latest.store(0);
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
         self.active_device.store(0);

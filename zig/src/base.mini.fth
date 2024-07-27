@@ -10,6 +10,7 @@ word ; define
 latest @ hide [
 ' [ c,
 ] exit [
+
 immediate
 
 : 2dup over over ;
@@ -19,5 +20,7 @@ immediate
 : 3drop drop 2drop ;
 
 1 2 2dup ##.s
+
+1234 latest @ >flags tuck c@ ##.s
 
 bye

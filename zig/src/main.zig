@@ -12,7 +12,7 @@ pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
 }
 
 const LineByLineRefiller = struct {
-    buffer: @import("input_source.zig").InputSource.MemType,
+    buffer: [128]u8,
     stream: std.io.FixedBufferStream([]const u8),
 
     fn init(self: *@This(), buffer: []const u8) void {

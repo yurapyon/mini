@@ -9,6 +9,7 @@ const vm = @import("mini.zig");
 // The exception is for bytecodes like 'lit',
 //   the data that follows may be byte aligned
 
+// TODO can probably rename this to Error
 pub const MemoryError = error{
     MisalignedAddress,
     OutOfBounds,
@@ -24,7 +25,7 @@ pub fn assertCellMemoryAccess(memory: []const u8, addr: usize) MemoryError!void 
     if (!std.mem.isAligned(addr, @alignOf(vm.Cell))) {
         return error.MisalignedAddress;
     }
-    try assertMemoryAccess(memory, addr);
+    try assertMemoryAccess(memory, addr + 1);
 }
 
 // TODO maybe rename this byteAt
@@ -77,6 +78,12 @@ pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) MemoryError![]
 
 // ===
 
+// NOTE
+// It would be nice to just use []vm.Cell's everywhere, rather than this funny type.
+//   As long as u16 arrays are contiguous in memory that would be fine.
+// The problem is that a []vm.Cell uses the native endianness, where an aligned []u8 will not
+
+// TODO CellAlignedConstMemory
 pub const CellAlignedMemory = []align(@alignOf(vm.Cell)) u8;
 
 pub fn allocateCellAlignedMemory(
