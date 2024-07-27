@@ -15,102 +15,126 @@ const vm = @import("mini.zig");
 pub const Register = struct {
     pub const Error = vm.mem.MemoryError;
 
-    // NOTE
-    // If these two fields were instead a vm.Cell pointer,
-    //   you wouldnt be able to have comma() readByteAndAdvance() etc
-    _memory: vm.mem.CellAlignedMemory,
-    _offset: vm.Cell,
-
-    pub fn init(
-        self: *@This(),
-        memory: vm.mem.CellAlignedMemory,
-        offset: vm.Cell,
-    ) Error!void {
-        if (offset >= memory.len) {
-            return error.OutOfBounds;
-        }
-        self._memory = memory;
-        self._offset = offset;
-    }
+    offset: vm.Cell,
 
     pub fn address(self: @This()) void {
         return self._offset;
     }
 
-    pub fn store(self: @This(), value: vm.Cell) void {
-        // TODO do we really need this to be byte aligned?
-        vm.mem.writeByteAlignedCell(
-            self._memory,
-            self._offset,
-            value,
-        ) catch unreachable;
+    /// Won't crash as long as self.offset is aligned and within memory
+    pub fn store(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        value: vm.Cell,
+    ) void {
+        (vm.mem.cellAt(memory, self.offset) catch unreachable).* = value;
     }
 
-    pub fn fetch(self: @This()) vm.Cell {
-        // TODO do we really need this to be byte aligned?
-        return vm.mem.readByteAlignedCell(
-            self._memory,
-            self._offset,
-        ) catch unreachable;
+    /// Won't crash as long as self.offset is aligned and within memory
+    pub fn fetch(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+    ) vm.Cell {
+        return (vm.mem.cellAt(memory, self.offset) catch unreachable).*;
     }
 
-    pub fn storeAdd(self: @This(), to_add: vm.Cell) void {
-        const value = self.fetch();
-        self.store(value +% to_add);
+    /// Won't crash as long as self.offset is aligned and within memory
+    pub fn storeAdd(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        value: vm.Cell,
+    ) void {
+        (vm.mem.cellAt(memory, self.offset) catch unreachable).* +%= value;
     }
 
-    pub fn storeSubtract(self: @This(), to_subtract: vm.Cell) void {
-        const value = self.fetch();
-        self.store(value -% to_subtract);
+    /// Won't crash as long as self.offset is aligned and within memory
+    pub fn storeSubtract(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        value: vm.Cell,
+    ) void {
+        (vm.mem.cellAt(memory, self.offset) catch unreachable).* -%= value;
     }
 
-    pub fn comma(self: @This(), value: vm.Cell) Error!void {
-        // TODO do we really need this to be byte aligned?
-        // i think this is the main reason for it
-        try vm.mem.writeByteAlignedCell(self._memory, self.fetch(), value);
-        self.storeAdd(@sizeOf(vm.Cell));
+    /// May error if self.fetch() is not cell aligned and within write_to
+    /// Won't crash as long as self.offset is cell aligned and within memory
+    pub fn comma(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        write_to: vm.mem.CellAlignedMemory,
+        value: vm.Cell,
+    ) Error!void {
+        (try vm.mem.cellAt(write_to, self.fetch(memory))).* = value;
+        self.storeAdd(memory, @sizeOf(vm.Cell));
     }
 
-    pub fn storeC(self: @This(), value: u8) void {
+    /// Won't crash as long as self.offset is cell aligned and within memory
+    pub fn alignForward(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        alignment: vm.Cell,
+    ) void {
+        self.store(memory, std.mem.alignForward(vm.Cell, self.fetch(memory), alignment));
+    }
+
+    /// Won't crash as long as self.offset is within memory
+    pub fn storeC(self: @This(), memory: []u8, value: u8) void {
         const byte = vm.mem.checkedAccess(
-            self._memory,
-            self._offset,
+            memory,
+            self.offset,
         ) catch unreachable;
         byte.* = value;
     }
 
-    pub fn fetchC(self: @This()) u8 {
+    /// Won't crash as long as self.offset is within memory
+    pub fn fetchC(self: @This(), memory: []u8) u8 {
         const byte = vm.mem.checkedRead(
-            self._memory,
-            self._offset,
+            memory,
+            self.offset,
         ) catch unreachable;
         return byte;
     }
 
-    pub fn storeAddC(self: @This(), value: u8) void {
-        const byte = vm.mem.checkedAccess(self._memory, self._offset) catch unreachable;
+    /// Won't crash as long as self.offset is within memory
+    pub fn storeAddC(self: @This(), memory: []u8, value: u8) void {
+        const byte = vm.mem.checkedAccess(memory, self.offset) catch unreachable;
         byte.* +%= value;
     }
 
-    pub fn commaC(self: @This(), value: u8) Error!void {
-        const byte = try vm.mem.checkedAccess(self._memory, self.fetch());
+    /// May error if self.fetch() is not within write_to
+    /// Won't crash as long as self.offset is within memory
+    pub fn commaC(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        write_to: []u8,
+        value: u8,
+    ) Error!void {
+        const byte = try vm.mem.checkedAccess(write_to, self.fetch(memory));
         byte.* = value;
-        self.storeAdd(1);
+        self.storeAdd(memory, 1);
     }
 
-    pub fn alignForward(self: @This(), alignment: vm.Cell) void {
-        self.store(std.mem.alignForward(vm.Cell, self.fetch(), alignment));
+    /// May error if self.fetch() is not within read_from
+    /// Won't crash as long as self.offset is within memory
+    pub fn readByteAndAdvance(
+        self: @This(),
+        memory: vm.mem.CellAlignedMemory,
+        read_from: []const u8,
+    ) Error!u8 {
+        const addr = self.fetch(memory);
+        self.storeAdd(memory, 1);
+        return try vm.mem.checkedRead(read_from, addr);
     }
 
-    pub fn readByteAndAdvance(self: @This(), memory: []const u8) Error!u8 {
-        const addr = self.fetch();
-        self.storeAdd(1);
-        return try vm.mem.checkedRead(memory, addr);
-    }
-
-    pub fn readCellAndAdvance(self: *@This(), memory: []const u8) Error!vm.Cell {
-        const low = try self.readByteAndAdvance(memory);
-        const high = try self.readByteAndAdvance(memory);
+    /// May error if self.fetch()+1 is not within read_from
+    /// Won't crash as long as self.offset is within memory
+    pub fn readCellAndAdvance(
+        self: *@This(),
+        memory: vm.mem.CellAlignedMemory,
+        read_from: []const u8,
+    ) Error!vm.Cell {
+        const low = try self.readByteAndAdvance(memory, read_from);
+        const high = try self.readByteAndAdvance(memory, read_from);
         return @as(vm.Cell, high) << 8 | low;
     }
 };
@@ -124,36 +148,33 @@ test "registers" {
     );
     defer testing.allocator.free(memory);
 
-    var reg_a: Register = undefined;
-    var reg_b: Register = undefined;
-    try reg_a.init(memory, 0);
-    try reg_b.init(memory, 2);
+    const reg_a = Register{ .offset = 0 };
+    const reg_b = Register{ .offset = 2 };
 
-    reg_a.store(0xdead);
-    reg_b.store(0xbeef);
+    reg_a.store(memory, 0xdead);
+    reg_b.store(memory, 0xbeef);
     try testing.expectEqualSlices(u8, &[_]u8{ 0xad, 0xde, 0xef, 0xbe }, memory[0..4]);
 
-    reg_a.storeAdd(0x1111);
-    reg_b.storeAdd(0x2222);
+    reg_a.storeAdd(memory, 0x1111);
+    reg_b.storeAdd(memory, 0x2222);
     try testing.expectEqualSlices(u8, &[_]u8{ 0xbe, 0xef, 0x11, 0xe1 }, memory[0..4]);
 
-    try testing.expectEqual(0xefbe, reg_a.fetch());
+    try testing.expectEqual(0xefbe, reg_a.fetch(memory));
 
-    var here: Register = undefined;
-    try here.init(memory, 0);
-    here.store(2);
-    try here.comma(0xadde);
-    try here.comma(0xefbe);
+    const here = Register{ .offset = 0 };
+    here.store(memory, 2);
+    try here.comma(memory, memory, 0xadde);
+    try here.comma(memory, memory, 0xefbe);
     try testing.expectEqualSlices(u8, &[_]u8{ 0x06, 0x00, 0xde, 0xad, 0xbe, 0xef }, memory[0..6]);
 
-    here.storeC(2);
-    try here.commaC(0xab);
-    try here.commaC(0xcd);
+    here.storeC(memory, 2);
+    try here.commaC(memory, memory, 0xab);
+    try here.commaC(memory, memory, 0xcd);
     try testing.expectEqualSlices(u8, &[_]u8{ 0x04, 0x00, 0xab, 0xcd, 0xbe, 0xef }, memory[0..6]);
 
-    try testing.expectEqual(0x04, here.fetchC());
-    here.storeAddC(1);
-    try testing.expectEqual(0x05, here.fetchC());
-    here.alignForward(@alignOf(vm.Cell));
-    try testing.expectEqual(0x06, here.fetchC());
+    try testing.expectEqual(0x04, here.fetchC(memory));
+    here.storeAddC(memory, 1);
+    try testing.expectEqual(0x05, here.fetchC(memory));
+    here.alignForward(memory, @alignOf(vm.Cell));
+    try testing.expectEqual(0x06, here.fetchC(memory));
 }
