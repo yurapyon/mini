@@ -141,6 +141,7 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
             else => return error.InvalidNumber,
         };
         if (digit > effective_base) return error.InvalidNumber;
+        // TODO what to do for really long numbers that will cause acc to overflow
         acc = acc * effective_base + digit;
     }
 
@@ -162,6 +163,11 @@ test "parse number" {
     ));
     try testing.expectEqual(10, try parseNumber("+10", 10));
     try testing.expectEqual(845402850256, try parseNumber("asdf1234", 36));
+
+    try testing.expectEqual(
+        @as(usize, @bitCast(@as(isize, -10))),
+        try parseNumber("-10", 10),
+    );
 
     try testing.expectEqual(5, try parseNumber("11111", 1));
     try testing.expectEqual(0, try parseNumber("", 1));

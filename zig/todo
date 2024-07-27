@@ -1,5 +1,3 @@
-figure out signed cells
-
 figure out how refill functions should work
   its hard to read a file when the input buffer can only be 128 chars
   need to be able to split things line by line

@@ -283,8 +283,9 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // read next word
-    // lookupWordAndGetAddress
+    // TODO reimplement like this when find() is updated
+    // read next word()
+    // lookupWordAndGetAddress()
     const result = try mini.readWordAndGetAddress();
     try mini.data_stack.push(result.value);
 }
@@ -307,11 +308,12 @@ fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const jump_count = try mini.readByteAndAdvancePC();
     const pc = mini.program_counter.fetch();
-    // TODO this has to be relative
-    try mini.absoluteJump(pc +% jump_count, false);
-    // try mini.absoluteJump(addr, false);
+    const byte_jump = try mini.readByteAndAdvancePC();
+    const signed_byte_jump = @as(i8, @bitCast(byte_jump));
+    const signed_cell_jump = @as(vm.SignedCell, @intCast(signed_byte_jump));
+    const cell_jump = @as(vm.Cell, @bitCast(signed_cell_jump));
+    try mini.absoluteJump(pc +% cell_jump, false);
 }
 
 fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
@@ -462,29 +464,27 @@ fn eq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn lt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    // NOTE, the actual operator is '>' because stack order is ( b a )
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
+    const b, const a = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
 }
 
 fn lteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    // NOTE, the actual operator is '>=' because stack order is ( b a )
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
+    const b, const a = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
 }
 
 fn plus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a +% b);
 }
 
 fn minus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a -% b);
 }
 
 fn multiply(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a *% b);
 }
 
@@ -503,10 +503,9 @@ fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO need to figure out signed int handling
     const value = try mini.data_stack.pop();
-    _ = value;
-    // try mini.data_stack.push(-value);
+    const signed_value = @as(vm.SignedCell, @bitCast(value));
+    try mini.data_stack.push(@bitCast(-signed_value));
 }
 
 fn lshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -520,17 +519,17 @@ fn rshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn miniAnd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a & b);
 }
 
 fn miniOr(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a | b);
 }
 
 fn xor(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
+    const b, const a = try mini.data_stack.popMultiple(2);
     try mini.data_stack.push(a ^ b);
 }
 
@@ -591,15 +590,13 @@ fn eq0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn gt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    // NOTE, the actual operator is '<' because stack order is ( b a )
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
+    const b, const a = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
 }
 
 fn gteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    // NOTE, the actual operator is '<=' because stack order is ( b a )
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
+    const b, const a = try mini.data_stack.popMultiple(2);
+    try mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
 }
 
 fn storeHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -837,6 +834,30 @@ test "bytecodes" {
             .{
                 .word = "tuck",
                 .stack = &[_]u16{ 4, 3, 4 },
+            },
+        },
+    );
+
+    mini.data_stack.clear();
+
+    try testWords(
+        &mini,
+        &[_]VmWordTest{
+            .{
+                .word = "1",
+                .stack = &[_]u16{1},
+            },
+            .{
+                .word = "2",
+                .stack = &[_]u16{ 1, 2 },
+            },
+            .{
+                .word = "-",
+                .stack = &[_]u16{@bitCast(@as(vm.SignedCell, -1))},
+            },
+            .{
+                .word = "negate",
+                .stack = &[_]u16{@bitCast(@as(vm.SignedCell, 1))},
             },
         },
     );

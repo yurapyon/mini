@@ -128,6 +128,7 @@ pub const WordInfo = struct {
 };
 
 pub const Cell = u16;
+pub const SignedCell = i16;
 
 pub fn fromBool(comptime Type: type, value: bool) Type {
     return if (value) ~@as(Type, 0) else 0;
@@ -413,12 +414,10 @@ pub const MiniVM = struct {
             else => return err,
         };
         if (maybe_number) |value| {
-            if (value > std.math.maxInt(Cell)) {
-                return null;
-            }
             // NOTE
-            // intCast instead of truncate
-            return @intCast(value);
+            // We are truncating here
+            //   if a number is too big it will just get wrapped % 2^16
+            return @truncate(value);
         } else {
             return null;
         }
