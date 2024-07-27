@@ -19,7 +19,7 @@ const utils = @import("utils.zig");
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
 
 fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    try mini.dictionary.here.commaC(ctx.current_bytecode);
+    try mini.dictionary.here.commaC(mini.dictionary.memory, ctx.current_bytecode);
 }
 
 fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -402,7 +402,7 @@ fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    try mini.dictionary.here.comma(value);
+    try mini.dictionary.here.comma(mini.dictionary.memory, value);
 }
 
 fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -432,7 +432,7 @@ fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    try mini.dictionary.here.commaC(@truncate(value));
+    try mini.dictionary.here.commaC(mini.dictionary.memory, @truncate(value));
 }
 
 fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

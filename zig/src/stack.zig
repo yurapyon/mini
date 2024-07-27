@@ -15,6 +15,9 @@ pub fn Stack(
 ) type {
     return struct {
         comptime {
+            if (range.start >= range.end) {
+                @compileError("Invalid stack range");
+            }
             if (!range.alignedTo(@alignOf(vm.Cell))) {
                 @compileError("Stack range must be vm.Cell aligned");
             }
@@ -23,8 +26,20 @@ pub fn Stack(
         pub const range = range_;
         pub const MemType = [range.sizeExclusive()]u8;
 
-        top: Register(top_offset),
         memory: vm.mem.CellAlignedMemory,
+        top: Register(top_offset),
+
+        pub fn initInOneMemoryBlock(
+            self: *@This(),
+            memory: vm.mem.CellAlignedMemory,
+        ) vm.mem.MemoryError!void {
+            self.memory = memory;
+            try self.top.init(self.memory);
+            if (range.start >= self.memory.len or range.end >= self.memory.len) {
+                return error.OutOfBounds;
+            }
+            self.clear();
+        }
 
         pub fn depth(self: @This()) vm.Cell {
             const top = self.top.fetch();
@@ -151,14 +166,9 @@ test "stack" {
     );
     defer testing.allocator.free(memory);
 
-    var stack = Stack(0, .{ .start = 2, .end = 32 }){
-        .top = .{
-            .memory = memory,
-        },
-        .memory = memory,
-    };
+    var stack: Stack(0, .{ .start = 2, .end = 32 }) = undefined;
+    try stack.initInOneMemoryBlock(memory);
 
-    stack.clear();
     try testing.expectEqual(0, stack.depth());
 
     try stack.push(0);

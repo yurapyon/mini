@@ -12,7 +12,7 @@ pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
 }
 
 const LineByLineRefiller = struct {
-    buffer: @import("input_source.zig").InputSource.MemType,
+    buffer: [128]u8,
     stream: std.io.FixedBufferStream([]const u8),
 
     fn init(self: *@This(), buffer: []const u8) void {
@@ -60,16 +60,16 @@ pub fn main() !void {
 }
 
 test "lib-testing" {
-    // _ = @import("stack.zig");
-    // _ = @import("word_header.zig");
-    // _ = @import("utils.zig");
+    _ = @import("stack.zig");
+    _ = @import("word_header.zig");
+    _ = @import("utils.zig");
     _ = @import("register.zig");
-    // _ = @import("input_source.zig");
-    // _ = @import("dictionary.zig");
-    // _ = @import("memory.zig");
-    // _ = @import("mini.zig");
+    _ = @import("input_source.zig");
+    _ = @import("dictionary.zig");
+    _ = @import("memory.zig");
+    _ = @import("mini.zig");
 }
 
 test "end-to-end" {
-    // try runMiniVM(std.testing.allocator);
+    try runMiniVM(std.testing.allocator);
 }

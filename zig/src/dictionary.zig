@@ -13,9 +13,22 @@ pub fn Dictionary(
     comptime latest_offset: vm.Cell,
 ) type {
     return struct {
+        memory: vm.mem.CellAlignedMemory,
         here: Register(here_offset),
         latest: Register(latest_offset),
-        memory: vm.mem.CellAlignedMemory,
+
+        pub fn initInOneMemoryBlock(
+            self: *@This(),
+            memory: vm.mem.CellAlignedMemory,
+            // TODO could probably make this comptime
+            dictionary_start: vm.Cell,
+        ) vm.mem.MemoryError!void {
+            self.memory = memory;
+            try self.here.init(self.memory);
+            try self.latest.init(self.memory);
+            self.here.store(dictionary_start);
+            self.latest.store(0);
+        }
 
         pub fn lookup(
             self: *@This(),
@@ -59,14 +72,14 @@ pub fn Dictionary(
             self.here.alignForward(@alignOf(vm.Cell));
         }
 
-        pub fn compileLit(self: *@This(), value: vm.Cell) Register.Error!void {
-            try self.here.commaC(bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-            try self.here.comma(value);
+        pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {
+            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("lit") orelse unreachable);
+            try self.here.commaByteAlignedCell(self.memory, value);
         }
 
-        pub fn compileLitC(self: *@This(), value: u8) Register.Error!void {
-            try self.here.commaC(bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-            try self.here.commaC(value);
+        pub fn compileLitC(self: *@This(), value: u8) vm.mem.MemoryError!void {
+            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("litc") orelse unreachable);
+            try self.here.commaC(self.memory, value);
         }
 
         // TODO write tests for these
@@ -77,8 +90,7 @@ pub fn Dictionary(
 
             const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
             const jump = base | (addr & 0x7fff);
-            try self.here.commaC(@truncate(jump >> 8));
-            try self.here.commaC(@truncate(jump));
+            try self.here.commaByteAlignedCell(self.memory, jump);
         }
 
         // TODO write tests for these
@@ -89,10 +101,10 @@ pub fn Dictionary(
 
             const base = @as(vm.Cell, bytecodes.base_data_bytecode) << 8;
             const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
-            try self.here.commaC(@truncate(data_len >> 8));
-            try self.here.commaC(@truncate(data_len));
+            try self.here.commaC(self.memory, @truncate(data_len >> 8));
+            try self.here.commaC(self.memory, @truncate(data_len));
             for (data) |byte| {
-                try self.here.commaC(byte);
+                try self.here.commaC(self.memory, byte);
             }
         }
 
@@ -103,7 +115,7 @@ pub fn Dictionary(
         ) vm.Error!void {
             try self.defineWord(name);
             try self.compileLit(value);
-            try self.here.commaC(bytecodes.lookupBytecodeByName("exit") orelse unreachable);
+            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("exit") orelse unreachable);
         }
     };
 }
@@ -121,14 +133,11 @@ test "dictionary" {
     const latest_offset = 2;
     const dictionary_start = 16;
 
-    var dictionary = Dictionary(here_offset, latest_offset){
-        .here = .{ .memory = memory },
-        .latest = .{ .memory = memory },
-        .memory = memory,
-    };
-
-    dictionary.here.store(dictionary_start);
-    dictionary.latest.store(0);
+    var dictionary: Dictionary(here_offset, latest_offset) = undefined;
+    try dictionary.initInOneMemoryBlock(
+        memory,
+        dictionary_start,
+    );
 
     try dictionary.defineWord("name");
 

@@ -7,6 +7,7 @@ const Range = @import("range.zig");
 /// A register is basically a pointer into VM Memory
 /// The memory the register is stored in is passed in for all functions
 /// Won't crash as long as offset is within memory
+///   This is checked for on init
 pub fn Register(comptime offset_: vm.Cell) type {
     return struct {
         comptime {
@@ -19,10 +20,21 @@ pub fn Register(comptime offset_: vm.Cell) type {
 
         memory: vm.mem.CellAlignedMemory,
 
+        pub fn init(
+            self: *@This(),
+            memory: vm.mem.CellAlignedMemory,
+        ) vm.mem.MemoryError!void {
+            if (offset >= memory.len) {
+                return error.OutOfBounds;
+            }
+            self.memory = memory;
+        }
+
         pub fn store(
             self: @This(),
             value: vm.Cell,
         ) void {
+            std.debug.print("{} {}\n", .{ self.memory.len, offset });
             (vm.mem.cellAt(self.memory, offset) catch unreachable).* = value;
         }
 
@@ -97,6 +109,15 @@ pub fn Register(comptime offset_: vm.Cell) type {
             const byte = try vm.mem.checkedAccess(write_to, self.fetch());
             byte.* = value;
             self.storeAdd(1);
+        }
+
+        pub fn commaByteAlignedCell(
+            self: @This(),
+            write_to: []u8,
+            value: vm.Cell,
+        ) vm.mem.MemoryError!void {
+            try vm.mem.writeByteAlignedCell(write_to, self.fetch(), value);
+            self.storeAdd(@sizeOf(vm.Cell));
         }
 
         /// May error if self.fetch() is not within read_from
