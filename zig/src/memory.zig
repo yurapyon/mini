@@ -81,9 +81,9 @@ pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) MemoryError![]
 // NOTE
 // It would be nice to just use []vm.Cell's everywhere, rather than this funny type.
 //   As long as u16 arrays are contiguous in memory that would technically be fine.
-// The problem is that a []vm.Cell uses the native endianness, where an aligned []u8 will not
+// I think though that just specifying the alignment puts less constraints on the type?
+// Memory is more often used as a []u8
 
-// TODO CellAlignedConstMemory
 pub const CellAlignedMemory = []align(@alignOf(vm.Cell)) u8;
 
 pub fn allocateCellAlignedMemory(

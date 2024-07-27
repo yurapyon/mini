@@ -96,6 +96,7 @@ test "layouts" {
 pub const ParseNumberError = error{
     InvalidNumber,
     InvalidBase,
+    Overflow,
 };
 
 pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
@@ -141,8 +142,7 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
             else => return error.InvalidNumber,
         };
         if (digit > effective_base) return error.InvalidNumber;
-        // TODO what to do for really long numbers that will cause acc to overflow
-        acc = acc * effective_base + digit;
+        acc = try std.math.add(usize, acc * effective_base, digit);
     }
 
     return if (is_negative) 0 -% acc else acc;

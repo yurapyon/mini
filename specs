@@ -56,17 +56,17 @@ bytecodes:
       compile:   do something
       interpret: do the same thing as above
       execute:   do the same thing as above
-    execute only (branch, branch0, tailcall, lit, litc):
+    literal (branch, branch0, tailcall, lit, litc):
       compile:   error
-      interpret: error
+      interpret: compile self then compile top-of-stack
       execute:   do something
-    ##data:
-      compile:   write bytecode for self and data from the stack to memory
-      interpret: write bytecode for self and data from the stack to memory
+    data:
+      compile:   error
+      interpret: compile bytecode for self and data from stack to memory
       execute:   push address of data and len to stack
-    ##absjump:
-      compile:   write bytecode for self and absolute jump to memory
-      interpret: write bytecode for self and absolute jump to memory
+    absjump:
+      compile:   error
+      interpret: compile bytecode for self and absolute jump from top-of-stack to memory
       execute:   push following addr to return stack and jump to address read from memory
 
 non-standard forth words:
@@ -79,8 +79,8 @@ non-standard forth words:
   here+!     - ( value addr -- ) store-add to 'here'
   here@      - ( addr -- value ) fetch from 'here'
 
-  0          - ( -- 0 )      0 == 'false'
-  0xffff     - ( -- 0xffff ) 0xffff == 'true'
+  0          - ( -- 0 )
+  0xffff     - ( -- 0xffff )
   1          - ( -- 1 )
   2          - ( -- 2 )
   4          - ( -- 4 )
@@ -90,8 +90,8 @@ non-standard forth words:
   bytes>cell - ( low-byte high-byte -- cell )
 
   ##.s       - ( -- )          print the stack from zig
-  ##data     - ( addr len -- ) compile data block at memory[addr..len] into memory
-  ##absjump  - ( addr -- )     compile address into memory as an absolute jump
+  data       - ( addr len -- ) compile data block at memory[addr..len] into memory
+  absjump    - ( addr -- )     compile address into memory as an absolute jump
 
 memory layout:
   0     cell field >program_counter

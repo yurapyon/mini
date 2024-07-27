@@ -6,7 +6,7 @@ word hide define ] 0b01000000 swap >flags xorc! exit [
 
 word : define ] word define latest @ hide ] exit [
 word ; define
-' litc c, ] exit c,
+' exit litc ] c,
 latest @ hide [
 ' [ c,
 ] exit [
@@ -20,6 +20,10 @@ immediate
   ['] branch0 c,
   here @ - c, ; immediate
 
+: \ begin next-char 10 = until ; immediate
+
+\ does this work
+
 : loop
   0
   begin
@@ -29,6 +33,8 @@ immediate
   until
   drop
   ;
+
+
 
 
 loop

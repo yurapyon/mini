@@ -172,6 +172,11 @@ fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
     return null;
 }
 
+fn maybeLookupAliasedBytecode(word_or_alias: []const u8) ?u8 {
+    const word = maybeFindAlias(word_or_alias) orelse word_or_alias;
+    return bytecodes.lookupBytecodeByName(word);
+}
+
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
@@ -301,14 +306,13 @@ pub const MiniVM = struct {
         }
     }
 
-    fn lookupString(self: *@This(), word_or_alias: []const u8) Error!?WordInfo {
-        const word = maybeFindAlias(word_or_alias) orelse word_or_alias;
+    fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
-        if (try self.dictionary.lookup(word)) |definition_addr| {
+        if (try self.dictionary.lookup(str)) |definition_addr| {
             return try WordInfo.fromMiniWord(self.memory, definition_addr);
-        } else if (bytecodes.lookupBytecodeByName(word)) |bytecode| {
+        } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
-        } else if (try self.maybeParseNumber(word)) |value| {
+        } else if (try self.maybeParseNumber(str)) |value| {
             return WordInfo.fromNumber(value);
         } else {
             return null;
@@ -425,12 +429,11 @@ pub const MiniVM = struct {
 
     // helpers for bytecodes ===
 
-    pub fn readWordAndGetAddress(self: *@This()) Error!struct {
+    pub fn lookupStringAndGetAddress(self: *@This(), str: []const u8) Error!struct {
         is_bytecode: bool,
         value: Cell,
     } {
-        const word = self.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
-        if (try self.lookupString(word)) |word_info| {
+        if (try self.lookupString(str)) |word_info| {
             switch (word_info.value) {
                 .bytecode => |bytecode| {
                     return .{
@@ -448,12 +451,12 @@ pub const MiniVM = struct {
                     };
                 },
                 .number => |_| {
-                    std.debug.print("Word not found: {s}\n", .{word});
+                    std.debug.print("Word not found: {s}\n", .{str});
                     return error.WordNotFound;
                 },
             }
         } else {
-            std.debug.print("Word not found: {s}\n", .{word});
+            std.debug.print("Word not found: {s}\n", .{str});
             return error.WordNotFound;
         }
     }

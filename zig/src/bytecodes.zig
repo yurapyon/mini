@@ -3,17 +3,24 @@ const std = @import("std");
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
-// TODO
-// might be nice if lit and litc
-//   when interpreted would compile a lit/litc
-//   like how ##absjump and ##data work
-
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
 
 fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     try mini.dictionary.here.commaC(mini.dictionary.memory, ctx.current_bytecode);
+}
+
+fn compileSelfThenToS(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    try compileSelf(mini, ctx);
+    const value = try mini.data_stack.pop();
+    try mini.dictionary.here.comma(mini.dictionary.memory, value);
+}
+
+fn compileSelfThenToSC(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    try compileSelf(mini, ctx);
+    const value = try mini.data_stack.pop();
+    try mini.dictionary.here.commaC(mini.dictionary.memory, @truncate(value));
 }
 
 fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -99,14 +106,18 @@ fn constructBasicImmediateBytecode(
     };
 }
 
-fn constructExecuteOnlyBytecode(
+fn constructLiteralBytecode(
     name: []const u8,
     callback: vm.BytecodeFn,
+    compile_mode: enum { cell, byte },
 ) BytecodeDefinition {
     return .{
         .name = name,
         .compileSemantics = cannotCompile,
-        .interpretSemantics = cannotInterpret,
+        .interpretSemantics = switch (compile_mode) {
+            .cell => compileSelfThenToS,
+            .byte => compileSelfThenToSC,
+        },
         .executeSemantics = callback,
         .is_immediate = false,
     };
@@ -129,23 +140,23 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("next-char", nextChar),
     constructBasicBytecode("define", define),
 
-    constructExecuteOnlyBytecode("branch", branch),
-    constructExecuteOnlyBytecode("branch0", branch0),
+    constructLiteralBytecode("branch", branch, .byte),
+    constructLiteralBytecode("branch0", branch0, .byte),
     constructBasicBytecode("execute", execute),
-    constructExecuteOnlyBytecode("tailcall", tailcall),
+    constructLiteralBytecode("tailcall", tailcall, .cell),
 
     // ===
     constructBasicBytecode("!", store),
     constructBasicBytecode("+!", storeAdd),
     constructBasicBytecode("@", fetch),
     constructBasicBytecode(",", comma),
-    constructExecuteOnlyBytecode("lit", lit),
+    constructLiteralBytecode("lit", lit, .cell),
 
     constructBasicBytecode("c!", storeC),
     constructBasicBytecode("+c!", storeAddC),
     constructBasicBytecode("c@", fetchC),
     constructBasicBytecode("c,", commaC),
-    constructExecuteOnlyBytecode("litc", litC),
+    constructLiteralBytecode("litc", litC, .byte),
 
     constructBasicBytecode(">r", toR),
     constructBasicBytecode("r>", fromR),
@@ -283,15 +294,14 @@ fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO reimplement like this when find() is updated
-    // read next word()
-    // lookupWordAndGetAddress()
-    const result = try mini.readWordAndGetAddress();
+    const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
+    const result = try mini.lookupStringAndGetAddress(word);
     try mini.data_stack.push(result.value);
 }
 
 fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const result = try mini.readWordAndGetAddress();
+    const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
+    const result = try mini.lookupStringAndGetAddress(word);
     if (result.is_bytecode) {
         try mini.dictionary.compileLitC(@truncate(result.value));
     } else {
@@ -325,18 +335,23 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     }
 }
 
-// TODO
-// this should use the same lookup function as tick/bracketTick and account for aliases
-// find should push the type of the word, either mini-word or bytecode
+// TODO test this
+//      need strings on the stack
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = try mini.popSlice();
-    if (try mini.dictionary.lookup(word)) |definition_addr| {
-        try mini.data_stack.push(definition_addr);
-        try mini.data_stack.push(vm.fromBool(vm.Cell, true));
-    } else {
-        try mini.data_stack.push(0);
-        try mini.data_stack.push(vm.fromBool(vm.Cell, false));
-    }
+    const result_or_error = mini.lookupStringAndGetAddress(word);
+    const result = result_or_error catch |err| switch (err) {
+        error.WordNotFound => {
+            try mini.data_stack.push(0);
+            try mini.data_stack.push(0);
+            try mini.data_stack.push(vm.fromBool(vm.Cell, false));
+            return;
+        },
+        else => return err,
+    };
+    try mini.data_stack.push(result.value);
+    try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, true));
 }
 
 fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -713,18 +728,14 @@ fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 // ===
 
-// TODO
-// think about 'absjump,' and 'data,'
-// should compile semantics for these pop off of the stack? or do something else
-
 pub const base_data_bytecode = 0b01110000;
 
 const data_definition = BytecodeDefinition{
-    .name = "##data",
-    .compileSemantics = dataCompile,
+    .name = "data",
+    .compileSemantics = cannotCompile,
     .interpretSemantics = dataCompile,
     .executeSemantics = dataExecute,
-    .is_immediate = true,
+    .is_immediate = false,
 };
 
 fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -746,11 +757,11 @@ fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 pub const base_abs_jump_bytecode = 0b10000000;
 
 const abs_jump_definition = BytecodeDefinition{
-    .name = "##absjump",
-    .compileSemantics = absjumpCompile,
+    .name = "absjump",
+    .compileSemantics = cannotCompile,
     .interpretSemantics = absjumpCompile,
     .executeSemantics = absjumpExecute,
-    .is_immediate = true,
+    .is_immediate = false,
 };
 
 fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

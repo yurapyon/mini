@@ -12,8 +12,6 @@ pub fn isWhitespace(char: u8) bool {
 
 // TODO could have a Refiller struct
 
-// TODO need to add a \n terminator
-
 /// Forth-style input:
 ///   i.e. line-by-line input from a buffer
 //         ability to read from stdin if no buffer is supplied (TODO)
@@ -60,7 +58,7 @@ pub fn InputSource(comptime buffer_at_offset: vm.Cell, comptime buffer_len_offse
                 self._buffer_offset,
                 buffer.len,
             );
-            std.mem.copyForwards(u8, mem_slice, buffer);
+            @memcpy(mem_slice, buffer);
             self.buffer_at.store(0);
             self.buffer_len.store(@truncate(buffer.len));
         }

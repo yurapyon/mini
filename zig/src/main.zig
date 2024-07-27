@@ -12,7 +12,9 @@ pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
 }
 
 const LineByLineRefiller = struct {
-    buffer: [128]u8,
+    // NOTE
+    // 127 because of the terminator that will be added in the input buffer
+    buffer: [127]u8,
     stream: std.io.FixedBufferStream([]const u8),
 
     fn init(self: *@This(), buffer: []const u8) void {
@@ -22,11 +24,12 @@ const LineByLineRefiller = struct {
     fn refill(self_: *anyopaque) vm.InputError!?[]const u8 {
         const self: *LineByLineRefiller = @ptrCast(@alignCast(self_));
         const slice = self.stream.reader().readUntilDelimiterOrEof(
-            &self.buffer,
+            self.buffer[0 .. self.buffer.len - 1],
             '\n',
         ) catch return error.OversizeInputBuffer;
         if (slice) |slc| {
-            return slc;
+            self.buffer[slc.len] = '\n';
+            return self.buffer[0..(slc.len + 1)];
         } else {
             return null;
         }
