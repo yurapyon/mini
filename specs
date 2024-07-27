@@ -93,5 +93,21 @@ non-standard forth words:
   ##data     - ( addr len -- ) compile data block at memory[addr..len] into memory
   ##absjump  - ( addr -- )     compile address into memory as an absolute jump
 
+memory layout:
+  0     cell field >program_counter
+        cell field >data_stack_top
+    32 cells field >data_stack
+        cell field >return_stack_top
+    32 cells field >return_stack
+        cell field >here
+        cell field >latest
+        cell field >state
+        cell field >base
+        cell field >active_device
+        cell field >input_buffer_at
+        cell field >input_buffer_len
+         128 field >input_buffer
+  constant dictionary_start
+
 devices:
   TBD
