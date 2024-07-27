@@ -75,6 +75,7 @@ pub fn Dictionary(
         pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {
             try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("lit") orelse unreachable);
             try self.here.commaByteAlignedCell(self.memory, value);
+            // try self.here.comma(self.memory, value);
         }
 
         pub fn compileLitC(self: *@This(), value: u8) vm.mem.MemoryError!void {

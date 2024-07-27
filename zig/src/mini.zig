@@ -203,14 +203,15 @@ pub const MiniVM = struct {
 
     pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
         self.memory = memory;
+        try self.program_counter.init(self.memory);
+        try self.data_stack.initInOneMemoryBlock(self.memory);
+        try self.return_stack.initInOneMemoryBlock(self.memory);
         try self.dictionary.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("dictionary_start"),
         );
-        try self.program_counter.init(self.memory);
-        try self.data_stack.initInOneMemoryBlock(self.memory);
-        try self.return_stack.initInOneMemoryBlock(self.memory);
         try self.base.init(self.memory);
+        try self.state.init(self.memory);
         try self.active_device.init(self.memory);
         try self.input_source.initInOneMemoryBlock(
             self.memory,
@@ -284,6 +285,7 @@ pub const MiniVM = struct {
             //   CompileState should be non-exhaustive and throw an error if it isn't interpret or compile
             const state: CompileState = @enumFromInt(self.state.fetch());
             const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
+            std.debug.print("{} {s}\n", .{ effective_state, word });
             switch (effective_state) {
                 .interpret => {
                     try self.interpret(word_info);

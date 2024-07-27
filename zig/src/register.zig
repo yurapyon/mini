@@ -34,7 +34,6 @@ pub fn Register(comptime offset_: vm.Cell) type {
             self: @This(),
             value: vm.Cell,
         ) void {
-            std.debug.print("{} {}\n", .{ self.memory.len, offset });
             (vm.mem.cellAt(self.memory, offset) catch unreachable).* = value;
         }
 
