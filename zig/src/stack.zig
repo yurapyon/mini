@@ -9,7 +9,10 @@ pub const StackError = error{
 } || vm.mem.MemoryError;
 
 /// Stack
-pub fn Stack(comptime top_offset: vm.Cell, comptime range_: Range) type {
+pub fn Stack(
+    comptime top_offset: vm.Cell,
+    comptime range_: Range,
+) type {
     return struct {
         comptime {
             if (!range.alignedTo(@alignOf(vm.Cell))) {
