@@ -8,8 +8,8 @@ system:
 
 language:
   case-insensitive
-  max word name length: 64
-  max numeric base:     36
+  max word name length: 2^16
+  max numeric base: 36
 
 states:
   0x0 interpret
@@ -21,24 +21,19 @@ repl behavior:
 
 word definition layout:
   cell aligned
-  0      16      32    ...
-  |-------|---|---|---|...\0  | data ...
-  ^       ^   ^           ^   ^
-  |       |   name...     |   padding to @alignOf(Cell)
-  |       flags&name_len  terminator
-  addr of previous definition
+  0               16      24      x       x+8
+  |previous-------|name---|.......|\>127--|code...
 
-  flags & name len is
-  is_immediate(1), is_hidden(1), name_len(6)
-
-  name_len is a u6
-    this means the max name length is 64 chars
-    this also means the max size of a header is:
-      3 + 1 + 64 = 70 bytes
-      ^   ^   ^
-      |   |   name
-      |   terminator
-      latest&flags&len
+  terminator is a byte >127
+  terminator bits:
+    0: 1
+    1: immediate
+    2: hidden
+    3: TBD
+    4: TBD
+    5: TBD
+    6: TBD
+    7: TBD
 
 bytecodes:
   list:

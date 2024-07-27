@@ -21,6 +21,7 @@ comptime {
     }
 }
 
+// error.NumberOverflow instead of just using the builtin error.Overflow
 pub const max_memory_size = 32 * 1024;
 
 pub const Error = error{
@@ -46,6 +47,7 @@ pub const SemanticsError = error{
     CannotCompile,
 };
 
+// TODO this isnt working right
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
         error.StackOverflow => error.ReturnStackOverflow,

@@ -69,12 +69,14 @@ pub fn Register(comptime offset_: vm.Cell) type {
         pub fn alignForward(
             self: @This(),
             alignment: vm.Cell,
-        ) void {
-            self.store(std.mem.alignForward(
+        ) vm.Cell {
+            const new_addr = std.mem.alignForward(
                 vm.Cell,
                 self.fetch(),
                 alignment,
-            ));
+            );
+            self.store(new_addr);
+            return new_addr;
         }
 
         pub fn storeC(self: @This(), value: u8) void {
@@ -179,6 +181,7 @@ test "registers" {
     try testing.expectEqual(0x04, here.fetchC());
     here.storeAddC(1);
     try testing.expectEqual(0x05, here.fetchC());
-    here.alignForward(@alignOf(vm.Cell));
+    const aligned_here = here.alignForward(@alignOf(vm.Cell));
     try testing.expectEqual(0x06, here.fetchC());
+    try testing.expectEqual(0x06, aligned_here);
 }
