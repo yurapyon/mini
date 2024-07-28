@@ -62,24 +62,22 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : align   here @ aligned here ! ;
 
 : >cfa >terminator 1+ ;
-\ : literal ['] lit c, bytesLE, ; immediate
 
-: somewhere, ['] lit c, here @  0 c, 0 c, ; immediate
-: over-here! here @ swap bytesLE! ; immediate
-
-: create
-  word define align
-  [compile] somewhere, ['] exit c, 0 c, ['] exit c,
-  [compile] over-here! ;
+: something,  ['] lit c, here @  0 c, 0 c, ;
+: this!       here @ swap bytesLE! ;
+: do-nothing, ['] exit c, 0 c, ;
 
 : >body    aligned 6 + ;
 : >does    >body 3 - ;
 : do-this! latest @ >cfa >does absjump! ;
 
+: create
+  word define align
+  something, do-nothing, ['] exit c, this! ;
+
 : does>
   state @ if
-    [compile] somewhere, ['] do-this! absjump, ['] exit c,
-    [compile] over-here!
+    something, ['] do-this! absjump, ['] exit c, this!
   else
     here @ do-this!
     latest @ hide
