@@ -4,86 +4,39 @@ word hide      define ] 0b00100000 swap >terminator xorc! [ ' exit c,
 word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
-: begin
-  here@
-  ; immediate
+: bytes, cell>bytes swap c, c, ;
+: bytesBE, cell>bytes c, c, ;
 
-: until
-  ['] branch0 c,
-  here@ - c,
-  ; immediate
+: mkabsjump 0x8000 or ;
+: absjump, mkabsjump bytesBE, ;
+
+: [compile] ' absjump, ; immediate
+
+: mark-offset, here@ 0 c, ;
+: backward-offset here@ - ;
+: store-offset here@ over - swap c! ;
+
+: if   ['] branch0 c, mark-offset, ; immediate
+: else ['] branch  c, mark-offset, swap store-offset ; immediate
+: then store-offset ; immediate
+
+: begin here@ ; immediate
+: until ['] branch0 c, backward-offset c, ; immediate
+: again ['] branch  c, backward-offset c, ; immediate
+
+: while  [compile] if ; immediate
+: repeat swap [compile] again [compile] then ; immediate
 
 : \
   begin
     next-char 10 =
   until ; immediate
 
-: if
-  \ on 0, you want to branch to the 'then' or the 'else'
-  \ compile a branch0 without an offset
-  \   but push the addr to write the calculated offset
-  ['] branch0 c,
-  here@ 0 c, ; immediate
+\ we have comments now wahoo
 
-: else
-  \ finish off the body of the 'if (true)' block
-  \   with a branch that skips to the 'then'
-  \ ( branch-offset-addr )
-  ['] branch c,
-  here@ 0 c,
-  swap
-  \ then update the if's 'branch0' to jump here if it branches
-  here@ over -
-  swap c! ; immediate
-
-: then
-  \ ( branch-offset-addr )
-  here@ over -
-  swap c! ; immediate
-
-\ ===
-
-\ TODO document these things
-: again
-  ['] branch c,
-  here@ - c, ; immediate
-
-: while
-  ['] branch0 c,
-  here@ 0 c,
-  ; immediate
-
-: repeat
-  ['] branch c,
-  swap
-  here@ - c,
-  over here@ -
-  swap ! ; immediate
-
-\ TODO unwrap isnt super great
-: unwrap 0= if panic then ;
-
-: >cfa >terminator 1+ ;
-
-: find-word find unwrap unwrap ;
-
-: bytes, cell>bytes swap c, c, ;
-: bytesBE, cell>bytes c, c, ;
-: bytes!
-  \ ( value addr )
-  over 8 rshift over 1+
-  \ ( low addr high addr+1 )
-  c! c! ;
-: bytesBE!
-  over 8 rshift over c! 1+ c! ;
-
-: mkabsjump 0x8000 or ;
-: absjump, mkabsjump bytesBE, ;
+: bytes! over 8 rshift over 1+ c! c! ;
+: bytesBE! over 8 rshift over c! 1+ c! ;
 : absjump! swap mkabsjump swap bytesBE! ;
-
-: [compile]
-  word find-word >cfa absjump,
-  ; immediate
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
