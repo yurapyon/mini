@@ -68,18 +68,25 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : create
   word define align
-  here@ 6 +
-  [compile] literal ['] exit c, 0 c, ['] exit c, ;
+  \ address after the 'exit 0 exit' part
+  \   expects that the 'exit 0' bytes may be overridden by does>
+  here@ 6 + [compile] literal
+  ['] exit c, 0 c, ['] exit c, ;
 
 : >body           aligned 6 + ;
 : >does-register  >body 3 - ;
 : redirect-latest latest @ >cfa >does-register absjump! ;
 
+: does>i here@ redirect-latest latest @ hide ] ;
+
 : does>
-  \ address of code that follows the does>
-  here@ 6 +
-  [compile] literal ['] redirect-latest absjump, ['] exit c,
-  ; immediate
+  state @ if
+    \ address of code that follows the does>
+    here@ 6 + [compile] literal
+    ['] redirect-latest absjump, ['] exit c,
+  else
+     does>i
+  then ; immediate
 
 : constant
   create ,
@@ -89,6 +96,10 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   \ compiles the 'currently being defined' xt as a tailcall
   \ latest @ >cfa tailcall
   ; immediate
+
+\ create hello 123 ,
+\ does> @ 2 + ;
+\ hello
 
 15 constant x
 x ' x >body ##.s drop drop
