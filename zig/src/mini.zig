@@ -34,7 +34,7 @@ pub const Error = error{
     ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
-} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || MathError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -53,6 +53,8 @@ pub const WordError = error{
     WordNameInvalid,
 };
 
+pub const MathError = error{ Overflow, DivisionByZero, NegativeDenominator };
+
 // TODO this isnt working right
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
@@ -69,12 +71,12 @@ pub const CompileState = enum(Cell) {
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
-    data_stack_top: Cell,
-    data_stack: [32]Cell,
-    data_stack_end: u0,
     return_stack_top: Cell,
     return_stack: [32]Cell,
     return_stack_end: u0,
+    data_stack_top: Cell,
+    data_stack: [32]Cell,
+    data_stack_end: u0,
     here: Cell,
     latest: Cell,
     state: Cell,
@@ -153,6 +155,7 @@ const AliasDefinition = struct {
 const aliases = [_]AliasDefinition{
     .{ .alias = "true", .word = "0xffff" },
     .{ .alias = "false", .word = "0" },
+    .{ .alias = "allot", .word = "here+!" },
 };
 
 fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
@@ -176,13 +179,13 @@ pub const MiniVM = struct {
     memory: mem.CellAlignedMemory,
 
     program_counter: Register(MemoryLayout.offsetOf("program_counter")),
-    data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
-        .start = MemoryLayout.offsetOf("data_stack"),
-        .end = MemoryLayout.offsetOf("data_stack_end"),
-    }),
     return_stack: Stack(MemoryLayout.offsetOf("return_stack_top"), .{
         .start = MemoryLayout.offsetOf("return_stack"),
         .end = MemoryLayout.offsetOf("return_stack_end"),
+    }),
+    data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
+        .start = MemoryLayout.offsetOf("data_stack"),
+        .end = MemoryLayout.offsetOf("data_stack_end"),
     }),
     dictionary: Dictionary(
         MemoryLayout.offsetOf("here"),
@@ -202,9 +205,15 @@ pub const MiniVM = struct {
 
     pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
         self.memory = memory;
+
+        const panic_byte = bytecodes.lookupBytecodeByName("panic") orelse unreachable;
+        for (self.memory) |*byte| {
+            byte.* = panic_byte;
+        }
+
         try self.program_counter.init(self.memory);
-        try self.data_stack.initInOneMemoryBlock(self.memory);
         try self.return_stack.initInOneMemoryBlock(self.memory);
+        try self.data_stack.initInOneMemoryBlock(self.memory);
         try self.dictionary.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("dictionary_start"),
@@ -235,6 +244,7 @@ pub const MiniVM = struct {
     }
 
     fn compileMemoryLocationConstants(self: *@This()) void {
+        // TODO might be nice to have a 'dictionary start' constant
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
         self.compileMemoryLocationConstant("state");

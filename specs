@@ -38,38 +38,36 @@ word definition layout:
 
 bytecodes:
   list:
-    0b00...... 64       core       ( see zig/src/bytecodes.zig )
-    0b010..... 32       optimizing ( see zig/src/bytecodes.zig )
-    0b0110.... 16       currently undecided
-    0b0111aaaa aaaaaaaa data       ( push address+2 and length of data (a) (max len is 4096 bytes) )
-    0b1aaaaaaa aaaaaaaa absjump    ( jump to (a), pushing pc+1 to return stack, address space is 32k )
+    0b0....... 128      core    ( see zig/src/bytecodes.zig )
+    0b0111.... 16       debug   ( system dependent )
+    0b1aaaaaaa aaaaaaaa absjump ( jump to (a), pushing pc+1 to return stack, address space is 32k )
   semantics:
     most bytecodes:
       compile:   write bytecode for self to memory
       interpret: do something
       execute:   do the same thing as above
-    immediate (bracketTick, rBracket):
+    immediate (['], ]):
       compile:   do something
       interpret: do the same thing as above
       execute:   do the same thing as above
-    literal (branch, branch0, tailcall, lit, litc):
+    tag (exit, branch, branch0, tailcall, lit, litc, data):
       compile:   error
-      interpret: compile self then compile top-of-stack
+      interpret: error
       execute:   do something
-    data:
-      compile:   error
-      interpret: compile bytecode for self and data from stack to memory
-      execute:   push address of data and len to stack
-    absjump:
-      compile:   error
-      interpret: compile bytecode for self and absolute jump from top-of-stack to memory
+    (absjump):
+      compile:   n/a
+      interpret: n/a
       execute:   push following addr to return stack and jump to address read from memory
 
 non-standard forth words:
+  panic      -
+
   seldev     - ( id -- )         select device to send commands to
   d!         - ( value addr -- ) store to current device
   d+!        - ( value addr -- ) store-add to current device
-  d@         - ( addr -- value ) fetch to current device
+  d@         - ( addr -- value ) fetch from current device
+
+  next-char  -
 
   here!      - ( value addr -- ) store to 'here'
   here+!     - ( value addr -- ) store-add to 'here'
@@ -85,16 +83,12 @@ non-standard forth words:
   cell>bytes - ( cell -- low-byte high-byte )
   bytes>cell - ( low-byte high-byte -- cell )
 
-  ##.s       - ( -- )          print the stack from zig
-  data       - ( addr len -- ) compile data block at memory[addr..len] into memory
-  absjump    - ( addr -- )     compile address into memory as an absolute jump
-
 memory layout:
   0     cell field >program_counter
-        cell field >data_stack_top
-    32 cells field >data_stack
         cell field >return_stack_top
     32 cells field >return_stack
+        cell field >data_stack_top
+    32 cells field >data_stack
         cell field >here
         cell field >latest
         cell field >state
