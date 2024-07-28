@@ -140,15 +140,28 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   create ,
   does> @ ;
 
-10 constant xxx
 
-##.s
-
-xxx
-
-##.s
 
 bye
+
+: +field
+  over + swap
+  create ,
+  does> @ + ;
+
+: field
+  over aligned
+  flip drop
+  +field ;
+
+: enum
+  dup constant 1+ ;
+
+: flag
+  dup constant 1 lshift ;
+
+\ TODO values, variables
+\ TODO strings
 
 \ should this file have to end with 'bye' or 'quit' ?
 
@@ -156,67 +169,10 @@ bye
 \ unless...
 \ including files can be done with devices
 
-\ these are useful but you need 'create'
-
-: +field ( start this-size "name" -- end )
-  over + swap
-  create ,
-  does> @ + ;
-
-: field ( start this-size "name" -- end-aligned )
-  over aligned   ( start this-size aligned-start )
-  flip drop      ( aligned-start this-size )
-  +field ;
-
-\ TODO this should be [compile] +field
-: cfield +field ;
-
-: ffield ( start this-size "name" -- end-aligned )
-  over faligned   ( start this-size aligned-start )
-  flip drop       ( aligned-start this-size )
-  +field ;
-
-: enum ( value "name" -- value+1 )
-  dup constant 1+ ;
-
-\ todo use lshift
-: flag ( value "name" -- value<<1 )
-  dup constant 2* ;
-
-\ ===
-
-:noname
-  1 2 3 ##.s
-  ;
-
-execute
-
-\ : create
-  \ word define
-  \ here@ 4 + lit
-  \ ['] exit c, ;
-
-here@
-\ create something
-here@
+10 constant xxx
+##.s
+xxx
 ##.s
 
 bye
 
-: loop
-  0
-  begin
-    ##.s
-    1+
-    dup 10 =
-  until
-  drop
-  ;
-
-
-
-
-loop
-
-
-bye
