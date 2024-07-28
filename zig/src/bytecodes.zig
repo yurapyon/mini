@@ -123,6 +123,8 @@ fn constructLiteralBytecode(
 comptime {
     if (lookup_table.len > 0b01110000) {
         @compileError("Too many bytecodes....");
+    } else if (lookup_table.len < 0b01110000) {
+        @compileError("Not enough bytecodes....");
     }
 }
 
