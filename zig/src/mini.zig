@@ -248,6 +248,7 @@ pub const MiniVM = struct {
     }
 
     fn compileMemoryLocationConstants(self: *@This()) void {
+        // TODO might be nice to have a 'dictionary start' constant
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
         self.compileMemoryLocationConstant("state");

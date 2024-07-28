@@ -354,7 +354,7 @@ fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
         else => return err,
     };
     try mini.data_stack.push(result.value);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, result.is_bytecode));
+    try mini.data_stack.push(vm.fromBool(vm.Cell, !result.is_bytecode));
     try mini.data_stack.push(vm.fromBool(vm.Cell, true));
 }
 
