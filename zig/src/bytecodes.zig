@@ -108,17 +108,14 @@ fn constructBasicImmediateBytecode(
 
 fn constructLiteralBytecode(
     name: []const u8,
-    callback: vm.BytecodeFn,
-    compile_mode: enum { cell, byte },
+    executeCallback: vm.BytecodeFn,
+    compileSelfCallback: vm.BytecodeFn,
 ) BytecodeDefinition {
     return .{
         .name = name,
-        .compileSemantics = cannotCompile,
-        .interpretSemantics = switch (compile_mode) {
-            .cell => compileSelfThenToS,
-            .byte => compileSelfThenToSC,
-        },
-        .executeSemantics = callback,
+        .compileSemantics = compileSelfCallback,
+        .interpretSemantics = compileSelfCallback,
+        .executeSemantics = executeCallback,
         .is_immediate = false,
     };
 }
@@ -140,23 +137,23 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("next-char", nextChar),
     constructBasicBytecode("define", define),
 
-    constructLiteralBytecode("branch", branch, .byte),
-    constructLiteralBytecode("branch0", branch0, .byte),
+    constructLiteralBytecode("branch", branch, compileSelfThenToSC),
+    constructLiteralBytecode("branch0", branch0, compileSelfThenToSC),
     constructBasicBytecode("execute", execute),
-    constructLiteralBytecode("tailcall", tailcall, .cell),
+    constructLiteralBytecode("tailcall", tailcall, compileSelfThenToS),
 
     // ===
     constructBasicBytecode("!", store),
     constructBasicBytecode("+!", storeAdd),
     constructBasicBytecode("@", fetch),
     constructBasicBytecode(",", comma),
-    constructLiteralBytecode("lit", lit, .cell),
+    constructLiteralBytecode("lit", lit, compileSelfThenToS),
 
     constructBasicBytecode("c!", storeC),
     constructBasicBytecode("+c!", storeAddC),
     constructBasicBytecode("c@", fetchC),
     constructBasicBytecode("c,", commaC),
-    constructLiteralBytecode("litc", litC, .byte),
+    constructLiteralBytecode("litc", litC, compileSelfThenToSC),
 
     constructBasicBytecode(">r", toR),
     constructBasicBytecode("r>", fromR),
@@ -255,8 +252,8 @@ const lookup_table = [_]BytecodeDefinition{
     // ===
     constructBasicBytecode("##.s", printStack),
     constructBasicBytecode("##break", miniBreakpoint),
-    .{},
-    .{},
+    constructBasicBytecode("absjump", buildAbsJump),
+    constructBasicBytecode("data", buildData),
 
     .{},
     .{},
@@ -740,22 +737,25 @@ fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = 2 + 2;
 }
 
+fn buildAbsJump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const cfa_addr = try mini.data_stack.pop();
+    try mini.dictionary.compileAbsJump(cfa_addr);
+}
+
+fn buildData(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const data = try mini.popSlice();
+    try mini.dictionary.compileData(data);
+}
+
 // ===
 
 pub const base_data_bytecode = 0b01110000;
 
 const data_definition = BytecodeDefinition{
-    .name = "data",
     .compileSemantics = cannotCompile,
-    .interpretSemantics = dataCompile,
+    .interpretSemantics = cannotInterpret,
     .executeSemantics = dataExecute,
-    .is_immediate = false,
 };
-
-fn dataCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const data = try mini.popSlice();
-    try mini.dictionary.compileData(data);
-}
 
 fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
@@ -771,17 +771,10 @@ fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 pub const base_abs_jump_bytecode = 0b10000000;
 
 const abs_jump_definition = BytecodeDefinition{
-    .name = "absjump",
     .compileSemantics = cannotCompile,
-    .interpretSemantics = absjumpCompile,
+    .interpretSemantics = cannotInterpret,
     .executeSemantics = absjumpExecute,
-    .is_immediate = false,
 };
-
-fn absjumpCompile(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const cfa_addr = try mini.data_stack.pop();
-    try mini.dictionary.compileAbsJump(cfa_addr);
-}
 
 fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     // TODO verify this works
