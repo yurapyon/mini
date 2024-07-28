@@ -93,45 +93,30 @@ pub const ExecutionContext = struct {
     current_bytecode: u8,
 };
 
-// TODO
-// this should have semantics in here in a general way, and not .is_immediate
-pub const WordInfo = struct {
-    value: union(enum) {
-        // the definition address
-        mini_word: Cell,
-        // the bytecode
-        bytecode: u8,
-        // the number
-        number: Cell,
+pub const WordInfo = union(enum) {
+    // TODO have to come up with a uniform name to refer to 'mini word's
+    mini_word: struct {
+        definition_addr: Cell,
+        is_immediate: bool,
     },
-    is_immediate: bool,
+    bytecode: u8,
+    number: Cell,
 
     fn fromMiniWord(definition_addr: Cell, terminator: dictionary.TerminatorInfo) Error!@This() {
         return .{
-            .value = .{
-                .mini_word = definition_addr,
+            .mini_word = .{
+                .definition_addr = definition_addr,
+                .is_immediate = terminator.is_immediate,
             },
-            .is_immediate = terminator.is_immediate,
         };
     }
 
     fn fromBytecode(bytecode: u8) @This() {
-        const bytecode_definition = bytecodes.getBytecodeDefinition(bytecode);
-        return .{
-            .value = .{
-                .bytecode = bytecode,
-            },
-            .is_immediate = bytecode_definition.is_immediate,
-        };
+        return .{ .bytecode = bytecode };
     }
 
     fn fromNumber(value: Cell) @This() {
-        return .{
-            .value = .{
-                .number = value,
-            },
-            .is_immediate = false,
-        };
+        return .{ .number = value };
     }
 };
 
@@ -302,8 +287,7 @@ pub const MiniVM = struct {
             // this enumFromInt can crash
             //   CompileState should be non-exhaustive and throw an error if it isn't interpret or compile
             const state: CompileState = @enumFromInt(self.state.fetch());
-            const effective_state = if (word_info.is_immediate) CompileState.interpret else state;
-            switch (effective_state) {
+            switch (state) {
                 .interpret => {
                     try self.interpret(word_info);
                 },
@@ -333,7 +317,7 @@ pub const MiniVM = struct {
     }
 
     fn interpret(self: *@This(), word_info: WordInfo) Error!void {
-        switch (word_info.value) {
+        switch (word_info) {
             .bytecode => |bytecode| {
                 const ctx = ExecutionContext{
                     .current_bytecode = bytecode,
@@ -343,8 +327,8 @@ pub const MiniVM = struct {
                     ctx,
                 );
             },
-            .mini_word => |addr| {
-                try self.executeMiniWord(addr);
+            .mini_word => |mini_word| {
+                try self.executeMiniWord(mini_word.definition_addr);
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -353,7 +337,7 @@ pub const MiniVM = struct {
     }
 
     fn compile(self: *@This(), word_info: WordInfo) Error!void {
-        switch (word_info.value) {
+        switch (word_info) {
             .bytecode => |bytecode| {
                 const ctx = ExecutionContext{
                     .current_bytecode = bytecode,
@@ -363,9 +347,13 @@ pub const MiniVM = struct {
                     ctx,
                 );
             },
-            .mini_word => |addr| {
-                const cfa_addr = try self.dictionary.toCfa(addr);
-                try self.dictionary.compileAbsJump(cfa_addr);
+            .mini_word => |mini_word| {
+                if (mini_word.is_immediate) {
+                    try self.executeMiniWord(mini_word.definition_addr);
+                } else {
+                    const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
+                    try self.dictionary.compileAbsJump(cfa_addr);
+                }
             },
             .number => |value| {
                 if (value > std.math.maxInt(u8)) {
@@ -457,18 +445,20 @@ pub const MiniVM = struct {
         is_bytecode: bool,
         value: Cell,
     } {
+        // NOTE
+        // in this case lookupString could have a early return to not try and parse numbers
         if (try self.lookupString(str)) |word_info| {
-            switch (word_info.value) {
+            switch (word_info) {
                 .bytecode => |bytecode| {
                     return .{
                         .is_bytecode = true,
                         .value = bytecode,
                     };
                 },
-                .mini_word => |addr| {
+                .mini_word => |mini_word| {
                     return .{
                         .is_bytecode = false,
-                        .value = addr,
+                        .value = mini_word.definition_addr,
                     };
                 },
                 .number => |_| {
