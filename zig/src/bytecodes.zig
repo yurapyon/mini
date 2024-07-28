@@ -280,8 +280,8 @@ const lookup_table = [_]BytecodeDefinition{
     //===
     constructBasicBytecode("##.s", printStack),
     constructBasicBytecode("##break", miniBreakpoint),
-    .{},
-    .{},
+    constructBasicBytecode("##type", printString),
+    constructBasicBytecode("##cr", printNewline),
 
     .{},
     .{},
@@ -781,6 +781,16 @@ fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = 2 + 2;
+}
+
+fn printString(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const len, const addr = try mini.data_stack.popMultiple(2);
+    const str = try vm.mem.constSliceFromAddrAndLen(mini.memory, addr, len);
+    std.debug.print("{s}", .{str});
+}
+
+fn printNewline(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    std.debug.print("\n", .{});
 }
 
 // ===

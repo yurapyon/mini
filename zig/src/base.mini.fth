@@ -100,6 +100,37 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 15 constant x
 x ' x >body ##.s drop drop
 
+: char word drop c@ ;
+: [char] ['] litc c, char c, ; immediate
+
+: "? [char] " = ;
+
+: string,
+  next-char drop
+  begin next-char dup "? 0= while c, repeat
+  drop ;
+
+: len! here @ over - 3 - swap c! ;
+
+: small-thing, ['] litc c, here @ 0 c, ;
+
+\ NOTE
+\ go... can only be a byte, thus strings can only be 255 chars
+\   to make the jump longer you have to compile a tailcall
+\ here @ do-nothing,
+\ tailcall!
+
+: s"
+  something, small-thing, ['] branch go...,
+  rot this! string, go-here! len!
+  ; immediate
+
+: stringy s" hello" ;
+
+stringy ##type ##cr
+
+\ need ##type and ##.
+
 bye
 
 : +field
