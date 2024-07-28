@@ -80,8 +80,8 @@ non-standard forth words:
   4          - ( -- 4 )
   8          - ( -- 8 )
 
-  cell>bytes - ( cell -- low-byte high-byte )
-  bytes>cell - ( low-byte high-byte -- cell )
+  cell>bytes - ( cell -- high-byte low-byte )
+  bytes>cell - ( high-byte low-byte -- cell )
 
 memory layout:
   0     cell field >program_counter

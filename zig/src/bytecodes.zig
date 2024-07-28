@@ -6,7 +6,12 @@ const utils = @import("utils.zig");
 //
 
 // TODO
-// define 'bytes,' as bytecode ? its 'cell>bytes c, c,'
+// possible new bytecodes
+//   bytes, ?
+//   bytes! ?
+//   -aligned
+//   -align ?
+//   / mod u/ umod ?
 
 // ===
 
@@ -349,6 +354,9 @@ fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const pc = mini.program_counter.fetch();
     const byte_jump = try mini.readByteAndAdvancePC();
     const signed_byte_jump = @as(i8, @bitCast(byte_jump));
+    // NOTE
+    // this intCast is from i8 to SignedCell
+    // this is to preserve negativity
     const signed_cell_jump = @as(vm.SignedCell, @intCast(signed_byte_jump));
     const cell_jump = @as(vm.Cell, @bitCast(signed_cell_jump));
     try mini.absoluteJump(pc +% cell_jump, false);
@@ -713,12 +721,12 @@ fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
     const high = @as(u8, @truncate(value >> 8));
     const low = @as(u8, @truncate(value));
-    try mini.data_stack.push(low);
     try mini.data_stack.push(high);
+    try mini.data_stack.push(low);
 }
 
 fn bytesToCell(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const high, const low = try mini.data_stack.popMultiple(2);
+    const low, const high = try mini.data_stack.popMultiple(2);
     const low_byte = @as(u8, @truncate(low));
     const high_byte = @as(u8, @truncate(high));
     const value = low_byte | (@as(vm.Cell, high_byte) << 8);

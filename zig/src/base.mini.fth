@@ -4,8 +4,9 @@ word hide      define ] 0b00100000 swap >terminator xorc! [ ' exit c,
 word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
-: bytes, cell>bytes swap c, c, ;
-: bytesBE, cell>bytes c, c, ;
+: bytes,   c, c, ;
+: bytesLE, cell>bytes bytes, ;
+: bytesBE, cell>bytes swap bytes, ;
 
 : mkabsjump 0x8000 or ;
 : absjump, mkabsjump bytesBE, ;
@@ -27,15 +28,14 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : while  [compile] if ; immediate
 : repeat swap [compile] again [compile] then ; immediate
 
-: \
-  begin
-    next-char 10 =
-  until ; immediate
+: \ begin next-char 10 = until ; immediate
 
 \ we have comments now wahoo
 
-: bytes! over 8 rshift over 1+ c! c! ;
-: bytesBE! over 8 rshift over c! 1+ c! ;
+: bytes!   tuck c! 1+ c! ;
+: bytesLE! swap cell>bytes rot bytes! ;
+: bytesBE! swap cell>bytes swap rot bytes! ;
+
 : absjump! swap mkabsjump swap bytesBE! ;
 
 : binary 2 base ! ;
@@ -43,11 +43,6 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : hex 16 base ! ;
 
 : :noname 0 0 define here@ ] ;
-
-: recurse
-  \ compiles the 'currently being defined' xt as a tailcall
-  \ latest @ >cfa tailcall
-  ; immediate
 
 : 2dup over over ;
 : 2drop drop drop ;
@@ -58,42 +53,45 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : cell 2 ;
 : cells cell * ;
 
-: u/ u/mod nip ;
+: u/   u/mod nip ;
 : umod u/mod drop ;
-: / /mod nip ;
-: mod /mod drop ;
+: /    /mod nip ;
+: mod  /mod drop ;
 
-: aligned-to
-  2dup mod
-  ?dup if - + else drop then ;
+: -aligned 2dup mod ?dup if - + else drop then ;
+: -align   here@ swap -aligned here! ;
+: aligned  cell -aligned ;
+: align    cell -align ;
 
-: align-to
-  here@ swap aligned-to here! ;
-
-: aligned cell aligned-to ;
-
-: align cell align-to ;
+: >cfa >terminator 1+ ;
+: literal ['] lit c, bytesLE, ; immediate
 
 : create
   word define align
-  ['] lit c, here@ 5 + bytes, ['] exit c, 0 c, ['] exit c, ;
+  here@ 6 +
+  [compile] literal ['] exit c, 0 c, ['] exit c, ;
 
-: >body aligned 6 + ;
-: >does-register >body 3 - ;
+: >body           aligned 6 + ;
+: >does-register  >body 3 - ;
 : redirect-latest latest @ >cfa >does-register absjump! ;
 
 : does>
   \ address of code that follows the does>
   here@ 6 +
-  ['] lit c, bytes, ['] redirect-latest absjump,
-  ['] exit c,
+  [compile] literal ['] redirect-latest absjump, ['] exit c,
   ; immediate
 
 : constant
   create ,
   does> @ ;
 
+: recurse
+  \ compiles the 'currently being defined' xt as a tailcall
+  \ latest @ >cfa tailcall
+  ; immediate
 
+15 constant x
+x ' x >body ##.s drop drop
 
 bye
 
@@ -121,11 +119,6 @@ bye
 \ including files needs an interpreter
 \ unless...
 \ including files can be done with devices
-
-10 constant xxx
-##.s
-xxx
-##.s
 
 bye
 
