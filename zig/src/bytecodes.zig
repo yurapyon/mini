@@ -120,6 +120,12 @@ fn constructLiteralBytecode(
     };
 }
 
+comptime {
+    if (lookup_table.len > 0b01110000) {
+        @compileError("Too many bytecodes....");
+    }
+}
+
 const lookup_table = [_]BytecodeDefinition{
     // ===
     constructBasicBytecode("bye", bye),
@@ -191,7 +197,7 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
-    constructBasicBytecode(">terminator", toTerminator),
+    .{},
     .{},
 
     .{},
@@ -254,8 +260,8 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("##break", miniBreakpoint),
     constructBasicBytecode("absjump", buildAbsJump),
     constructBasicBytecode("data", buildData),
+    constructBasicBytecode(">terminator", toTerminator),
 
-    .{},
     .{},
     .{},
     .{},
