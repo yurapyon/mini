@@ -9,22 +9,28 @@ goals:
     easy to implement/port vm
   usable on microcontrollers
     small memory footprint
-  io
-    graphics
-    mouse/keyboard input
-    filesystem access
-  self-hosted version
-    it would be fun
-  system images
-    saving/loading dictionaries as binary
 
-maybe:
-  good performance
-  io
-    audio
-  interactive
-    nice repl
-    built-in editor
+features:
+  the vm functions (maybe)
+
+roadmap:
+  planned:
+    io
+      graphics
+      mouse/keyboard input
+      filesystem access
+    self-hosted version
+      it would be fun
+    system images
+      saving/loading dictionaries as binary
+  maybe:
+    good performance
+    io
+      audio
+    interactive
+      nice repl
+      built-in editor
+    'Forth for the web'
 
 you need:
   zig
