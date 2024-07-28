@@ -262,8 +262,12 @@ test "dictionary" {
     try dictionary.defineWord("hellow");
 
     try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
-    try testing.expectEqual(
-        null,
-        try dictionary.lookup("wow"),
-    );
+    try testing.expectEqual(null, try dictionary.lookup("wow"));
+
+    const noname_addr = dictionary.here.alignForward(@alignOf(vm.Cell));
+    try dictionary.defineWord("");
+    try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
+    try testing.expectEqual(null, try dictionary.lookup("wow"));
+
+    try testing.expectEqual(noname_addr, try dictionary.lookup(""));
 }

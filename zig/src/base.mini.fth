@@ -55,46 +55,99 @@ word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
   ; immediate
 
 : repeat
-  ['] branch ,
+  ['] branch c,
   swap
-  here@ - ,
+  here@ - c,
   over here@ -
   swap ! ; immediate
 
+\ TODO unwrap isnt super great
 : unwrap 0= if panic then ;
+
 : >cfa >terminator 1+ ;
+
 : find-word find unwrap unwrap ;
 
+\ TODO test this
 : [compile]
-  word find-word >cfa absjump
+  \ TODO this needs the absjump PR
+  \ word find-word >cfa absjump
   ; immediate
-
-here @ ##.s
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
 : hex 16 base ! ;
 
+: :noname 0 0 define here @ ] ;
 
-
-
-: thing if 0 else 1 then ;
-
-1 thing ##.s
-
-bye
-
-
+: recurse
+  \ compiles the 'currently being defined' xt as a tailcall
+  \ latest @ >cfa tailcall
+  ; immediate
 
 : 2dup over over ;
 : 2drop drop drop ;
+\ todo test these
 : 2over 3 pick 3 pick ;
 : 3dup 2 pick 2 pick 2 pick ;
 : 3drop drop 2drop ;
-: flip swap rot ;
 
 : cells 2 * ;
 
+bye
+
+\ should this file have to end with 'bye' or 'quit' ?
+
+\ including files needs an interpreter
+\ unless...
+\ including files can be done with devices
+
+\ these are useful but you need 'create'
+
+: +field ( start this-size "name" -- end )
+  over + swap
+  create ,
+  does> @ + ;
+
+: field ( start this-size "name" -- end-aligned )
+  over aligned   ( start this-size aligned-start )
+  flip drop      ( aligned-start this-size )
+  +field ;
+
+\ TODO this should be [compile] +field
+: cfield +field ;
+
+: ffield ( start this-size "name" -- end-aligned )
+  over faligned   ( start this-size aligned-start )
+  flip drop       ( aligned-start this-size )
+  +field ;
+
+: enum ( value "name" -- value+1 )
+  dup constant 1+ ;
+
+\ todo use lshift
+: flag ( value "name" -- value<<1 )
+  dup constant 2* ;
+
+\ ===
+
+:noname
+  1 2 3 ##.s
+  ;
+
+execute
+
+\ : create
+  \ word define
+  \ here@ 4 + lit
+  \ ['] exit c, ;
+
+here@
+\ create something
+here@
+##.s
+
+bye
 
 : loop
   0

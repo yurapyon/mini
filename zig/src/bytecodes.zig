@@ -384,6 +384,9 @@ fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.dictionary.defineWord(word);
 }
 
+// NOTE
+// this only works for forth words
+// should a version of this be made that workds for bytecodes?
 fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.absoluteJump(addr, true);

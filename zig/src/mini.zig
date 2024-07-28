@@ -166,6 +166,7 @@ const AliasDefinition = struct {
 const aliases = [_]AliasDefinition{
     .{ .alias = "true", .word = "0xffff" },
     .{ .alias = "false", .word = "0" },
+    .{ .alias = "allot", .word = "here+!" },
 };
 
 fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
