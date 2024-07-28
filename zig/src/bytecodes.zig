@@ -3,6 +3,28 @@ const std = @import("std");
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
+//
+
+// TODO
+// define 'bytes,' as bytecode ? its 'cell>bytes c, c,'
+
+// ===
+
+pub const base_abs_jump_bytecode = 0b10000000;
+
+const abs_jump_definition = BytecodeDefinition{
+    .compileSemantics = cannotCompile,
+    .interpretSemantics = cannotInterpret,
+    .executeSemantics = executeAbsJump,
+};
+
+fn executeAbsJump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    const high = ctx.current_bytecode & 0x7f;
+    const low = try mini.readByteAndAdvancePC();
+    const addr = @as(vm.Cell, high) << 8 | low;
+    try mini.absoluteJump(addr, true);
+}
+
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
@@ -11,24 +33,12 @@ fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     try mini.dictionary.here.commaC(mini.dictionary.memory, ctx.current_bytecode);
 }
 
-fn compileSelfThenToS(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    try compileSelf(mini, ctx);
-    const value = try mini.data_stack.pop();
-    try mini.dictionary.here.comma(mini.dictionary.memory, value);
-}
-
-fn compileSelfThenToSC(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    try compileSelf(mini, ctx);
-    const value = try mini.data_stack.pop();
-    try mini.dictionary.here.commaC(mini.dictionary.memory, @truncate(value));
+fn cannotCompile(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    return error.CannotCompile;
 }
 
 fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     return error.CannotInterpret;
-}
-
-fn cannotCompile(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    return error.CannotCompile;
 }
 
 const BytecodeDefinition = struct {
@@ -36,28 +46,18 @@ const BytecodeDefinition = struct {
     compileSemantics: vm.BytecodeFn = nop,
     interpretSemantics: vm.BytecodeFn = nop,
     executeSemantics: vm.BytecodeFn = nop,
-    is_immediate: bool = false,
 };
 
 pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
     return switch (bytecode) {
-        // TODO probably shouldnt hardcode these values
-        inline 0b00000000...0b01101111 => |byte| {
-            const id = byte & 0x7f;
-            return lookup_table[id];
+        inline 0...(base_abs_jump_bytecode - 1) => |byte| {
+            return lookup_table[byte];
         },
-        inline 0b01110000...0b01111111 => data_definition,
-        inline 0b10000000...0b11111111 => abs_jump_definition,
+        else => abs_jump_definition,
     };
 }
 
 pub fn lookupBytecodeByName(name: []const u8) ?u8 {
-    if (utils.stringsEqual(name, data_definition.name)) {
-        return base_data_bytecode;
-    }
-    if (utils.stringsEqual(name, abs_jump_definition.name)) {
-        return base_abs_jump_bytecode;
-    }
     for (lookup_table, 0..) |named_callback, i| {
         const eql = utils.stringsEqual(named_callback.name, name);
         if (eql) {
@@ -89,7 +89,6 @@ fn constructBasicBytecode(
         .compileSemantics = compileSelf,
         .interpretSemantics = callback,
         .executeSemantics = callback,
-        .is_immediate = false,
     };
 }
 
@@ -102,28 +101,25 @@ fn constructBasicImmediateBytecode(
         .compileSemantics = callback,
         .interpretSemantics = callback,
         .executeSemantics = callback,
-        .is_immediate = true,
     };
 }
 
-fn constructLiteralBytecode(
+fn constructTagBytecode(
     name: []const u8,
     executeCallback: vm.BytecodeFn,
-    compileSelfCallback: vm.BytecodeFn,
 ) BytecodeDefinition {
     return .{
         .name = name,
-        .compileSemantics = compileSelfCallback,
-        .interpretSemantics = compileSelfCallback,
+        .compileSemantics = cannotCompile,
+        .interpretSemantics = cannotInterpret,
         .executeSemantics = executeCallback,
-        .is_immediate = false,
     };
 }
 
 comptime {
-    if (lookup_table.len > 0b01110000) {
+    if (lookup_table.len > base_abs_jump_bytecode) {
         @compileError("Too many bytecodes....");
-    } else if (lookup_table.len < 0b01110000) {
+    } else if (lookup_table.len < base_abs_jump_bytecode) {
         @compileError("Not enough bytecodes....");
     }
 }
@@ -132,7 +128,7 @@ const lookup_table = [_]BytecodeDefinition{
     // ===
     constructBasicBytecode("bye", bye),
     constructBasicBytecode("quit", quit),
-    constructBasicBytecode("exit", exit),
+    constructTagBytecode("exit", exit),
     constructBasicBytecode("panic", panic),
 
     constructBasicBytecode("'", tick),
@@ -142,26 +138,26 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("find", find),
     constructBasicBytecode("word", nextWord),
-    constructBasicBytecode("next-char", nextChar),
+    constructBasicBytecode(">terminator", toTerminator),
     constructBasicBytecode("define", define),
 
-    constructLiteralBytecode("branch", branch, compileSelfThenToSC),
-    constructLiteralBytecode("branch0", branch0, compileSelfThenToSC),
+    constructTagBytecode("branch", branch),
+    constructTagBytecode("branch0", branch0),
     constructBasicBytecode("execute", execute),
-    constructLiteralBytecode("tailcall", tailcall, compileSelfThenToS),
+    constructTagBytecode("tailcall", tailcall),
 
     // ===
     constructBasicBytecode("!", store),
     constructBasicBytecode("+!", storeAdd),
     constructBasicBytecode("@", fetch),
     constructBasicBytecode(",", comma),
-    constructLiteralBytecode("lit", lit, compileSelfThenToS),
+    constructTagBytecode("lit", lit),
 
     constructBasicBytecode("c!", storeC),
     constructBasicBytecode("+c!", storeAddC),
     constructBasicBytecode("c@", fetchC),
     constructBasicBytecode("c,", commaC),
-    constructLiteralBytecode("litc", litC, compileSelfThenToSC),
+    constructTagBytecode("litc", litC),
 
     constructBasicBytecode(">r", toR),
     constructBasicBytecode("r>", fromR),
@@ -199,8 +195,9 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
-    .{},
-    .{},
+
+    constructTagBytecode("data", data),
+    constructBasicBytecode("next-char", nextChar),
 
     .{},
     .{},
@@ -258,12 +255,33 @@ const lookup_table = [_]BytecodeDefinition{
     .{},
 
     // ===
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    //===
     constructBasicBytecode("##.s", printStack),
     constructBasicBytecode("##break", miniBreakpoint),
-    constructBasicBytecode("absjump", buildAbsJump),
-    constructBasicBytecode("data", buildData),
-    constructBasicBytecode(">terminator", toTerminator),
+    .{},
+    .{},
 
+    .{},
     .{},
     .{},
     .{},
@@ -611,6 +629,13 @@ fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.nrot();
 }
 
+fn data(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const length = try mini.readCellAndAdvancePC();
+    try mini.data_stack.push(length);
+    try mini.data_stack.push(mini.program_counter.fetch());
+    mini.program_counter.storeAdd(length);
+}
+
 fn toTerminator(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const definition_addr = try mini.data_stack.pop();
     const terminator_addr = try mini.dictionary.toTerminator(definition_addr);
@@ -682,8 +707,8 @@ fn push8(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
-    const low = @as(u8, @truncate(value));
     const high = @as(u8, @truncate(value >> 8));
+    const low = @as(u8, @truncate(value));
     try mini.data_stack.push(low);
     try mini.data_stack.push(high);
 }
@@ -746,54 +771,6 @@ fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     _ = 2 + 2;
-}
-
-fn buildAbsJump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const cfa_addr = try mini.data_stack.pop();
-    try mini.dictionary.compileAbsJump(cfa_addr);
-}
-
-fn buildData(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const data = try mini.popSlice();
-    try mini.dictionary.compileData(data);
-}
-
-// ===
-
-pub const base_data_bytecode = 0b01110000;
-
-const data_definition = BytecodeDefinition{
-    .compileSemantics = cannotCompile,
-    .interpretSemantics = cannotInterpret,
-    .executeSemantics = dataExecute,
-};
-
-fn dataExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    // TODO verify this works
-    const high = ctx.current_bytecode & 0x0f;
-    const low = try mini.readByteAndAdvancePC();
-    const addr = mini.program_counter.fetch();
-    const length = @as(vm.Cell, high) << 8 | low;
-    try mini.data_stack.push(addr);
-    try mini.data_stack.push(length);
-    mini.program_counter.storeAdd(length);
-}
-
-pub const base_abs_jump_bytecode = 0b10000000;
-
-const abs_jump_definition = BytecodeDefinition{
-    .compileSemantics = cannotCompile,
-    .interpretSemantics = cannotInterpret,
-    .executeSemantics = absjumpExecute,
-};
-
-fn absjumpExecute(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    // TODO verify this works
-    // seems to work
-    const high = ctx.current_bytecode & 0x7f;
-    const low = try mini.readByteAndAdvancePC();
-    const addr = @as(vm.Cell, high) << 8 | low;
-    try mini.absoluteJump(addr, true);
 }
 
 // ===

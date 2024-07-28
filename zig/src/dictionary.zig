@@ -195,25 +195,25 @@ pub fn Dictionary(
             }
 
             const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
-            const jump = base | (addr & 0x7fff);
+            const jump = base | addr;
             try self.here.commaC(self.memory, @truncate(jump >> 8));
             try self.here.commaC(self.memory, @truncate(jump));
         }
 
-        // TODO write tests for these
-        pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
-            if (data.len > std.math.maxInt(u12)) {
-                return error.InvalidAddress;
-            }
-
-            const base = @as(vm.Cell, bytecodes.base_data_bytecode) << 8;
-            const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
-            try self.here.commaC(self.memory, @truncate(data_len >> 8));
-            try self.here.commaC(self.memory, @truncate(data_len));
-            for (data) |byte| {
-                try self.here.commaC(self.memory, byte);
-            }
-        }
+        // TODO this is out of date but might be a nice helper function for the vm
+        //         pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
+        //             if (data.len > std.math.maxInt(u12)) {
+        //                 return error.InvalidAddress;
+        //             }
+        //
+        //             const base = @as(vm.Cell, bytecodes.base_data_bytecode) << 8;
+        //             const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
+        //             try self.here.commaC(self.memory, @truncate(data_len >> 8));
+        //             try self.here.commaC(self.memory, @truncate(data_len));
+        //             for (data) |byte| {
+        //                 try self.here.commaC(self.memory, byte);
+        //             }
+        //         }
 
         pub fn compileConstant(
             self: *@This(),

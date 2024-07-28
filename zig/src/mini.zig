@@ -69,12 +69,12 @@ pub const CompileState = enum(Cell) {
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
-    data_stack_top: Cell,
-    data_stack: [32]Cell,
-    data_stack_end: u0,
     return_stack_top: Cell,
     return_stack: [32]Cell,
     return_stack_end: u0,
+    data_stack_top: Cell,
+    data_stack: [32]Cell,
+    data_stack_end: u0,
     here: Cell,
     latest: Cell,
     state: Cell,
@@ -177,13 +177,13 @@ pub const MiniVM = struct {
     memory: mem.CellAlignedMemory,
 
     program_counter: Register(MemoryLayout.offsetOf("program_counter")),
-    data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
-        .start = MemoryLayout.offsetOf("data_stack"),
-        .end = MemoryLayout.offsetOf("data_stack_end"),
-    }),
     return_stack: Stack(MemoryLayout.offsetOf("return_stack_top"), .{
         .start = MemoryLayout.offsetOf("return_stack"),
         .end = MemoryLayout.offsetOf("return_stack_end"),
+    }),
+    data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
+        .start = MemoryLayout.offsetOf("data_stack"),
+        .end = MemoryLayout.offsetOf("data_stack_end"),
     }),
     dictionary: Dictionary(
         MemoryLayout.offsetOf("here"),

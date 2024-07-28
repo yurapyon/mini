@@ -1,8 +1,8 @@
-word xorc!     define ] tuck c@ xor swap c! exit [
-word immediate define ] 0b01000000 latest @ >terminator xorc! exit [
-word hide      define ] 0b00100000 swap >terminator xorc! exit [
-word :         define ] word define latest @ hide ] exit [
-word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
+word xorc!     define ] tuck c@ xor swap c! [ ' exit c,
+word immediate define ] 0b01000000 latest @ >terminator xorc! [ ' exit c,
+word hide      define ] 0b00100000 swap >terminator xorc! [ ' exit c,
+word :         define ] word define latest @ hide ] [ ' exit c,
+word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : begin
   here@
@@ -17,8 +17,6 @@ word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
   begin
     next-char 10 =
   until ; immediate
-
-\ we have comments now wahoo
 
 : if
   \ on 0, you want to branch to the 'then' or the 'else'
@@ -45,6 +43,7 @@ word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
 
 \ ===
 
+\ TODO document these things
 : again
   ['] branch c,
   here@ - c, ; immediate
@@ -68,17 +67,29 @@ word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
 
 : find-word find unwrap unwrap ;
 
-\ TODO test this
+: bytes, cell>bytes swap c, c, ;
+: bytesBE, cell>bytes c, c, ;
+: bytes!
+  \ ( value addr )
+  over 8 rshift over 1+
+  \ ( low addr high addr+1 )
+  c! c! ;
+: bytesBE!
+  over 8 rshift over c! 1+ c! ;
+
+: mkabsjump 0x8000 or ;
+: absjump, mkabsjump bytesBE, ;
+: absjump! swap mkabsjump swap bytesBE! ;
+
 : [compile]
-  \ TODO this needs the absjump PR
-  \ word find-word >cfa absjump
+  word find-word >cfa absjump,
   ; immediate
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
 : hex 16 base ! ;
 
-: :noname 0 0 define here @ ] ;
+: :noname 0 0 define here@ ] ;
 
 : recurse
   \ compiles the 'currently being defined' xt as a tailcall
@@ -87,12 +98,65 @@ word ;         define ' exit litc ] c, latest @ hide [ ' [ c, ] exit [ immediate
 
 : 2dup over over ;
 : 2drop drop drop ;
-\ todo test these
 : 2over 3 pick 3 pick ;
 : 3dup 2 pick 2 pick 2 pick ;
 : 3drop drop 2drop ;
 
 : cells 2 * ;
+
+: create
+  word define
+  \ note this hs to be aligned at the end
+  ['] lit c, here@ 5 + bytes, ['] exit c, 0 c, 0 c, ;
+
+: >body 6 + ;
+: >does-register >body 3 - ;
+: redirect-latest latest @ >cfa >does-register ##.s absjump! ;
+
+: show drop 10 ;
+
+create hello
+\ here@
+\ hello
+\ ##.s
+\ 2drop
+
+
+' show redirect-latest
+latest @ >cfa >does-register c@
+latest @ >cfa >does-register 1+ c@ ##.s
+
+##.s
+hello
+##.s
+
+bye
+
+: does>
+  \ lit(addr of does> in currently compiling word)
+  ['] lit c, here@ 1 - ##.s bytes,
+  ['] redirect-latest absjump,
+  ['] [ c,
+  ['] exit c,
+  ; immediate
+
+: constant
+  create , [ here@ ]
+  does> @ ;
+
+\ ##.s
+
+10 constant xxx
+
+\ ##.s
+
+xxx
+
+\ ##.s
+
+
+
+
 
 bye
 
