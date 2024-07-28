@@ -5,7 +5,6 @@ const Allocator = std.mem.Allocator;
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/devices.zig").Devices;
 const Stack = @import("stack.zig").Stack;
-const WordHeader = @import("word_header.zig").WordHeader;
 const Register = @import("register.zig").Register;
 const InputSource = @import("input_source.zig").InputSource;
 const Dictionary = @import("dictionary.zig").Dictionary;
@@ -85,6 +84,15 @@ pub const ExecutionContext = struct {
     current_bytecode: u8,
 };
 
+const TerminatorInfo = packed struct(u8) {
+    // TODO is there a way to have unnamed fields?
+    // or eplicitly set the offset?
+    terminator_indicator: u1,
+    is_immediate: bool,
+    is_hidden: bool,
+    padding: u5,
+};
+
 // TODO
 // this should have semantics in here in a general way, and not .is_immediate
 pub const WordInfo = struct {
@@ -98,14 +106,15 @@ pub const WordInfo = struct {
     },
     is_immediate: bool,
 
-    fn fromMiniWord(memory: mem.CellAlignedMemory, definition_addr: Cell) Error!@This() {
-        var temp_word_header: WordHeader = undefined;
-        try temp_word_header.initFromMemory(memory[definition_addr..]);
+    // TODO probably move some stuff around so this can take memory as a []u8 rather than a dictionary
+    // or could take terminator value
+    fn fromMiniWord(definition_addr: Cell, terminator: u8) Error!@This() {
+        const terminator_info = @as(TerminatorInfo, @bitCast(terminator));
         return .{
             .value = .{
                 .mini_word = definition_addr,
             },
-            .is_immediate = temp_word_header.is_immediate,
+            .is_immediate = terminator_info.is_immediate,
         };
     }
 
@@ -311,7 +320,11 @@ pub const MiniVM = struct {
     fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
         if (try self.dictionary.lookup(str)) |definition_addr| {
-            return try WordInfo.fromMiniWord(self.memory, definition_addr);
+            const terminator_addr = try self.dictionary.toTerminator(definition_addr);
+            // NOTE
+            // next array access guaranteed to be ok
+            const terminator = self.dictionary.memory[terminator_addr];
+            return try WordInfo.fromMiniWord(definition_addr, terminator);
         } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
@@ -353,7 +366,7 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |addr| {
-                const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
+                const cfa_addr = try self.dictionary.toCfa(addr);
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
@@ -367,7 +380,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
+        const cfa_addr = try self.dictionary.toCfa(addr);
         try self.absoluteJump(cfa_addr, true);
         try self.executionLoop();
     }

@@ -64,7 +64,6 @@ pub fn main() !void {
 
 test "lib-testing" {
     _ = @import("stack.zig");
-    _ = @import("word_header.zig");
     _ = @import("utils.zig");
     _ = @import("register.zig");
     _ = @import("input_source.zig");

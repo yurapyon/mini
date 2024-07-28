@@ -102,7 +102,7 @@ pub fn Dictionary(
             return null;
         }
 
-        fn toTerminator(
+        pub fn toTerminator(
             self: @This(),
             addr: vm.Cell,
         ) vm.mem.MemoryError!vm.Cell {
@@ -116,6 +116,13 @@ pub fn Dictionary(
                 else => |e| return e,
             };
             return terminator_addr;
+        }
+
+        pub fn toCfa(
+            self: @This(),
+            addr: vm.Cell,
+        ) vm.mem.MemoryError!vm.Cell {
+            return (try self.toTerminator(addr)) + 1;
         }
 
         pub fn defineWord(

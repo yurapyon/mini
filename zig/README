@@ -5,7 +5,6 @@ files:
 
   stack.zig        - stack structure used for both the data and return stack
   dictionary.zig   - manages the 'here' & 'latest' registers to compile words to forth memory
-  word_header.zig  - helper for structuring definitions
   input_source.zig - manages line-by-line input and input buffer
   register.zig     - memory-mapped 'pointer' into forth memory
   devices/         - this will have implementations of 'devices' which will handle io/ffi

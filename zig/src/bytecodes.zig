@@ -3,8 +3,6 @@ const std = @import("std");
 const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
-const WordHeader = @import("word_header.zig").WordHeader;
-
 // ===
 
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
@@ -196,7 +194,7 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
-    .{},
+    constructBasicBytecode(">terminator", toTerminator),
     .{},
 
     .{},
@@ -301,10 +299,7 @@ fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     if (result.is_bytecode) {
         try mini.data_stack.push(result.value);
     } else {
-        const cfa_addr = try WordHeader.calculateCfaAddress(
-            mini.memory,
-            result.value,
-        );
+        const cfa_addr = try mini.dictionary.toCfa(result.value);
         try mini.data_stack.push(cfa_addr);
     }
 }
@@ -315,10 +310,7 @@ fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     if (result.is_bytecode) {
         try mini.dictionary.compileLitC(@truncate(result.value));
     } else {
-        const cfa_addr = try WordHeader.calculateCfaAddress(
-            mini.memory,
-            result.value,
-        );
+        const cfa_addr = try mini.dictionary.toCfa(result.value);
         try mini.dictionary.compileLit(cfa_addr);
     }
 }
@@ -609,6 +601,12 @@ fn rot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.nrot();
+}
+
+fn toTerminator(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const definition_addr = try mini.data_stack.pop();
+    const terminator_addr = try mini.dictionary.toTerminator(definition_addr);
+    try mini.data_stack.push(terminator_addr);
 }
 
 fn eq0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
