@@ -95,7 +95,7 @@ pub const ExecutionContext = struct {
     // NOTE
     // this needs to be here because bytecode's compilation semantics need to know
     //   which bytecode to compile, and during compilation this can't be calculated based
-    //   off th PC lcoation
+    //   off the PC lcoation
     current_bytecode: u8,
 };
 
@@ -408,8 +408,6 @@ pub const MiniVM = struct {
             const ctx = ExecutionContext{
                 .current_bytecode = bytecode,
             };
-            // TODO the current bytecode is always PC - 1
-            // could just write mini.getCurrentBytecode() ?
             try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
                 self,
                 ctx,
