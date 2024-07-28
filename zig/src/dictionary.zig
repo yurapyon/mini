@@ -1,10 +1,65 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const utils = @import("utils.zig");
 
 const bytecodes = @import("bytecodes.zig");
-const WordHeader = @import("word_header.zig").WordHeader;
 const Register = @import("register.zig").Register;
+
+const base_terminator = 0b10000000;
+
+const TerminatorReadError = error{
+    Overflow,
+} || vm.mem.MemoryError;
+
+fn readUntilTerminator(
+    memory: []const u8,
+    str_start: vm.Cell,
+) TerminatorReadError!vm.Cell {
+    var str_at = str_start;
+    while (str_at < memory.len) {
+        const byte = memory[str_at];
+        if ((byte & base_terminator) > 0) {
+            return str_at;
+        }
+        str_at = try std.math.add(vm.Cell, str_at, 1);
+    }
+    return error.OutOfBounds;
+}
+
+fn compareStringUntilTerminator(
+    memory: []const u8,
+    str_start: vm.Cell,
+    to_compare: []const u8,
+) TerminatorReadError!?vm.Cell {
+    // NOTE
+    // to make this easy,
+    //   just going to get a slice by reading until the terminator
+    // then comparing the slices
+    // it's possible to write an optimized version that only has to loop once
+    //   but thats just O(n) vs O(2n) and not a big deal
+    const str_end = try readUntilTerminator(memory, str_start);
+    const str_len = str_end - str_start;
+    const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
+    if (utils.stringsEqual(str, to_compare)) {
+        return str_end;
+    } else {
+        return null;
+    }
+}
+
+pub const TerminatorInfo = packed struct(u8) {
+    // TODO is there a way to have unnamed fields?
+    // or explicitly set the offset?
+    padding: u5,
+    is_hidden: bool,
+    is_immediate: bool,
+    terminator_indicator: u1,
+
+    pub fn fromByte(terminator_byte: u8) @This() {
+        return @bitCast(terminator_byte);
+    }
+};
 
 /// This is a Forth style dictionary
 ///   where each definition has a pointer to the previous definition
@@ -31,45 +86,96 @@ pub fn Dictionary(
         }
 
         pub fn lookup(
-            self: *@This(),
+            self: @This(),
             word: []const u8,
         ) vm.Error!?vm.Cell {
             var latest = self.latest.fetch();
-            var temp_word_header: WordHeader = undefined;
-            while (latest != 0) : (latest = temp_word_header.latest) {
-                try temp_word_header.initFromMemory(self.memory[latest..]);
-                if (!temp_word_header.is_hidden and temp_word_header.nameEquals(word)) {
-                    return latest;
+            while (latest != 0) {
+                const terminator_addr = compareStringUntilTerminator(
+                    self.memory,
+                    latest + @sizeOf(vm.Cell),
+                    word,
+                ) catch |err| switch (err) {
+                    // this won't happen with toTerminator
+                    //   because we check name length when defining words
+                    error.Overflow => unreachable,
+                    else => |e| return e,
+                };
+
+                if (terminator_addr) |addr| {
+                    const terminator_byte = try vm.mem.checkedRead(self.memory, addr);
+                    const terminator = TerminatorInfo.fromByte(terminator_byte);
+                    if (!terminator.is_hidden) {
+                        return latest;
+                    }
                 }
+                latest = (try vm.mem.cellAt(self.memory, latest)).*;
             }
             return null;
+        }
+
+        pub fn toTerminator(
+            self: @This(),
+            addr: vm.Cell,
+        ) vm.mem.MemoryError!vm.Cell {
+            const terminator_addr = readUntilTerminator(
+                self.memory,
+                addr + @sizeOf(vm.Cell),
+            ) catch |err| switch (err) {
+                // this won't happen with toTerminator
+                //   because we check name length when defining words
+                error.Overflow => unreachable,
+                else => |e| return e,
+            };
+            return terminator_addr;
+        }
+
+        pub fn toCfa(
+            self: @This(),
+            addr: vm.Cell,
+        ) vm.mem.MemoryError!vm.Cell {
+            return (try self.toTerminator(addr)) + 1;
+        }
+
+        pub fn getTerminator(
+            self: @This(),
+            addr: vm.Cell,
+        ) vm.mem.MemoryError!TerminatorInfo {
+            // NOTE
+            // the next array access is ok because we've already checked
+            //   for out of bounds errors in toTerminator
+            const terminator_byte = self.memory[try self.toTerminator(addr)];
+            return TerminatorInfo.fromByte(terminator_byte);
         }
 
         pub fn defineWord(
             self: *@This(),
             name: []const u8,
         ) vm.Error!void {
-            const word_header = WordHeader{
-                .latest = self.latest.fetch(),
-                .is_immediate = false,
-                .is_hidden = false,
-                .name = name,
-            };
+            for (name) |ch| {
+                if (ch >= base_terminator) {
+                    return error.WordNameInvalid;
+                }
+            }
 
-            const header_size = word_header.size();
-
-            self.here.alignForward(@alignOf(vm.Cell));
-            const aligned_here = self.here.fetch();
+            const previous_word_addr = self.latest.fetch();
+            const aligned_here = self.here.alignForward(@alignOf(vm.Cell));
+            try self.here.comma(self.memory, previous_word_addr);
             self.latest.store(aligned_here);
 
-            try word_header.writeToMemory(try vm.mem.sliceFromAddrAndLen(
+            if (name.len > std.math.maxInt(vm.Cell)) {
+                return error.WordNameTooLong;
+            }
+            const cell_name_len = @as(vm.Cell, @intCast(name.len));
+            const name_location = try vm.mem.sliceFromAddrAndLen(
                 self.memory,
-                aligned_here,
-                header_size,
-            ));
-            self.here.storeAdd(header_size);
+                self.here.fetch(),
+                cell_name_len,
+            );
+            @memcpy(name_location, name);
 
-            self.here.alignForward(@alignOf(vm.Cell));
+            self.here.storeAdd(cell_name_len);
+            try self.here.commaC(self.memory, base_terminator);
         }
 
         pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {
@@ -144,60 +250,20 @@ test "dictionary" {
 
     try testing.expectEqual(
         dictionary.here.fetch() - dictionary_start,
-        WordHeader.calculateSize(4),
+        ((try dictionary.toTerminator(dictionary_start)) - dictionary_start) + 1,
     );
 
     try testing.expectEqualSlices(
         u8,
-        &[_]u8{ 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e', 0 },
-        memory[dictionary_start..][0..8],
+        &[_]u8{ 0x00, 0x00, 'n', 'a', 'm', 'e', base_terminator },
+        memory[dictionary_start..][0..7],
     );
-
-    const wh_a: WordHeader = .{
-        .latest = 0,
-        .is_immediate = false,
-        .is_hidden = false,
-        .name = "name",
-    };
-
-    var wh_b: WordHeader = undefined;
-
-    try wh_b.initFromMemory(memory[dictionary_start..]);
-    try testing.expectEqualDeep(wh_a, wh_b);
-
-    const c_latest = dictionary.latest.fetch();
-
-    const wh_c: WordHeader = .{
-        .latest = c_latest,
-        .is_immediate = false,
-        .is_hidden = false,
-        .name = "wowo",
-    };
-
-    try dictionary.defineWord("wowo");
-
-    try testing.expectEqualSlices(
-        u8,
-        &[_]u8{ 0x10, 0x00, 0x04, 'w', 'o', 'w', 'o', 0 },
-        memory[dictionary.latest.fetch()..][0..8],
-    );
-
-    try wh_b.initFromMemory(memory[dictionary.latest.fetch()..]);
-    try testing.expectEqualDeep(wh_c, wh_b);
 
     try dictionary.defineWord("hellow");
 
     try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
     try testing.expectEqual(
-        dictionary_start + WordHeader.calculateSize(4),
-        try dictionary.lookup("wowo"),
-    );
-    try testing.expectEqual(
         null,
         try dictionary.lookup("wow"),
-    );
-    try testing.expectEqual(
-        dictionary_start + (WordHeader.calculateSize(4) * 2),
-        try dictionary.lookup("hellow"),
     );
 }

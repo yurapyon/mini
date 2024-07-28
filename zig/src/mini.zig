@@ -5,9 +5,9 @@ const Allocator = std.mem.Allocator;
 const bytecodes = @import("bytecodes.zig");
 const Devices = @import("devices/devices.zig").Devices;
 const Stack = @import("stack.zig").Stack;
-const WordHeader = @import("word_header.zig").WordHeader;
 const Register = @import("register.zig").Register;
 const InputSource = @import("input_source.zig").InputSource;
+const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 
@@ -21,6 +21,9 @@ comptime {
     }
 }
 
+// TODO
+// make an error, error.NumberOverflow instead of just using the builtin error.Overflow
+
 pub const max_memory_size = 32 * 1024;
 
 pub const Error = error{
@@ -29,11 +32,9 @@ pub const Error = error{
     StackUnderflow,
     ReturnStackOverflow,
     ReturnStackUnderflow,
-    WordNotFound,
-    WordNameTooLong,
     InvalidProgramCounter,
     InvalidAddress,
-} || mem.MemoryError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -46,6 +47,13 @@ pub const SemanticsError = error{
     CannotCompile,
 };
 
+pub const WordError = error{
+    WordNotFound,
+    WordNameTooLong,
+    WordNameInvalid,
+};
+
+// TODO this isnt working right
 pub fn returnStackErrorFromStackError(err: Error) Error {
     return switch (err) {
         error.StackOverflow => error.ReturnStackOverflow,
@@ -96,14 +104,12 @@ pub const WordInfo = struct {
     },
     is_immediate: bool,
 
-    fn fromMiniWord(memory: mem.CellAlignedMemory, definition_addr: Cell) Error!@This() {
-        var temp_word_header: WordHeader = undefined;
-        try temp_word_header.initFromMemory(memory[definition_addr..]);
+    fn fromMiniWord(definition_addr: Cell, terminator: dictionary.TerminatorInfo) Error!@This() {
         return .{
             .value = .{
                 .mini_word = definition_addr,
             },
-            .is_immediate = temp_word_header.is_immediate,
+            .is_immediate = terminator.is_immediate,
         };
     }
 
@@ -309,7 +315,8 @@ pub const MiniVM = struct {
     fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
         if (try self.dictionary.lookup(str)) |definition_addr| {
-            return try WordInfo.fromMiniWord(self.memory, definition_addr);
+            const terminator = try self.dictionary.getTerminator(definition_addr);
+            return try WordInfo.fromMiniWord(definition_addr, terminator);
         } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
@@ -351,7 +358,7 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |addr| {
-                const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
+                const cfa_addr = try self.dictionary.toCfa(addr);
                 try self.dictionary.compileAbsJump(cfa_addr);
             },
             .number => |value| {
@@ -365,7 +372,7 @@ pub const MiniVM = struct {
     }
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try WordHeader.calculateCfaAddress(self.memory, addr);
+        const cfa_addr = try self.dictionary.toCfa(addr);
         try self.absoluteJump(cfa_addr, true);
         try self.executionLoop();
     }
