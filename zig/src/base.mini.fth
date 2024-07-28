@@ -102,61 +102,51 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : 3dup 2 pick 2 pick 2 pick ;
 : 3drop drop 2drop ;
 
-: cells 2 * ;
+: cell 2 ;
+: cells cell * ;
+
+: u/ u/mod nip ;
+: umod u/mod drop ;
+: / /mod nip ;
+: mod /mod drop ;
+
+: aligned-to
+  2dup mod
+  ?dup if - + else drop then ;
+
+: align-to
+  here@ swap aligned-to here! ;
+
+: aligned cell aligned-to ;
+
+: align cell align-to ;
 
 : create
-  word define
-  \ note this hs to be aligned at the end
-  ['] lit c, here@ 5 + bytes, ['] exit c, 0 c, 0 c, ;
+  word define align
+  ['] lit c, here@ 5 + bytes, ['] exit c, 0 c, ['] exit c, ;
 
-: >body 6 + ;
+: >body aligned 6 + ;
 : >does-register >body 3 - ;
-: redirect-latest latest @ >cfa >does-register ##.s absjump! ;
-
-: show drop 10 ;
-
-create hello
-\ here@
-\ hello
-\ ##.s
-\ 2drop
-
-
-' show redirect-latest
-latest @ >cfa >does-register c@
-latest @ >cfa >does-register 1+ c@ ##.s
-
-##.s
-hello
-##.s
-
-bye
+: redirect-latest latest @ >cfa >does-register absjump! ;
 
 : does>
-  \ lit(addr of does> in currently compiling word)
-  ['] lit c, here@ 1 - ##.s bytes,
-  ['] redirect-latest absjump,
-  ['] [ c,
+  \ address of code that follows the does>
+  here@ 6 +
+  ['] lit c, bytes, ['] redirect-latest absjump,
   ['] exit c,
   ; immediate
 
 : constant
-  create , [ here@ ]
+  create ,
   does> @ ;
-
-\ ##.s
 
 10 constant xxx
 
-\ ##.s
+##.s
 
 xxx
 
-\ ##.s
-
-
-
-
+##.s
 
 bye
 

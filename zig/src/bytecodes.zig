@@ -71,10 +71,7 @@ pub fn lookupBytecodeByName(name: []const u8) ?u8 {
 test "bytecode-utils" {
     const testing = std.testing;
 
-    // NOTE
-    //   bye is not fixed to be bytecode 0 for any reason
-    //   its just a test of the functionality
-    try testing.expectEqual(0, lookupBytecodeByName("bye"));
+    try testing.expectEqual(0, lookupBytecodeByName("panic"));
     try testing.expectEqual(null, lookupBytecodeByName("_definetly-not-defined_"));
 }
 
@@ -126,10 +123,12 @@ comptime {
 
 const lookup_table = [_]BytecodeDefinition{
     // ===
+    // NOTE
+    // panic is bytecode '0' so that you can just zero the memory to inialize it
+    constructBasicBytecode("panic", panic),
     constructBasicBytecode("bye", bye),
     constructBasicBytecode("quit", quit),
     constructTagBytecode("exit", exit),
-    constructBasicBytecode("panic", panic),
 
     constructBasicBytecode("'", tick),
     constructBasicImmediateBytecode("[']", bracketTick),
@@ -534,17 +533,21 @@ fn multiply(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn divMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    // not currenly clear wether this bytecode is needed or not
-    _ = mini;
+    const b, const a = try mini.data_stack.popMultiple(2);
+    const signed_a = @as(vm.SignedCell, @bitCast(a));
+    const signed_b = @as(vm.SignedCell, @bitCast(b));
+    const quotient = try std.math.divTrunc(vm.SignedCell, signed_a, signed_b);
+    const remainder = try std.math.mod(vm.SignedCell, signed_a, signed_b);
+    try mini.data_stack.push(@bitCast(remainder));
+    try mini.data_stack.push(@bitCast(quotient));
 }
 
 fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    const q = @divTrunc(b, a);
-    const mod = @mod(b, a);
-    try mini.data_stack.push(mod);
-    try mini.data_stack.push(q);
+    const b, const a = try mini.data_stack.popMultiple(2);
+    const quotient = try std.math.divTrunc(vm.Cell, a, b);
+    const remainder = try std.math.mod(vm.Cell, a, b);
+    try mini.data_stack.push(remainder);
+    try mini.data_stack.push(quotient);
 }
 
 fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -740,7 +743,7 @@ fn memEq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn maybeDup(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const condition = try mini.data_stack.pop();
+    const condition = try mini.data_stack.peek();
     if (vm.isTruthy(condition)) {
         try dup(mini, ctx);
     }

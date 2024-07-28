@@ -34,7 +34,7 @@ pub const Error = error{
     ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
-} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || MathError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -52,6 +52,8 @@ pub const WordError = error{
     WordNameTooLong,
     WordNameInvalid,
 };
+
+pub const MathError = error{ Overflow, DivisionByZero, NegativeDenominator };
 
 // TODO this isnt working right
 pub fn returnStackErrorFromStackError(err: Error) Error {
@@ -203,6 +205,12 @@ pub const MiniVM = struct {
 
     pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
         self.memory = memory;
+
+        const panic_byte = bytecodes.lookupBytecodeByName("panic") orelse unreachable;
+        for (self.memory) |*byte| {
+            byte.* = panic_byte;
+        }
+
         try self.program_counter.init(self.memory);
         try self.data_stack.initInOneMemoryBlock(self.memory);
         try self.return_stack.initInOneMemoryBlock(self.memory);
