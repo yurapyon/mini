@@ -13,17 +13,17 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : [compile] ' absjump, ; immediate
 
-: mark-offset, here@ 0 c, ;
-: backward-offset here@ - ;
-: store-offset here@ over - swap c! ;
+: go...,   c, here@ 0 c, ;
+: go-back, c, here@ - c, ;
+: go-here  here@ over - swap c! ;
 
-: if   ['] branch0 c, mark-offset, ; immediate
-: else ['] branch  c, mark-offset, swap store-offset ; immediate
-: then store-offset ; immediate
+: if   ['] branch0 go..., ; immediate
+: else ['] branch  go..., swap go-here ; immediate
+: then go-here ; immediate
 
 : begin here@ ; immediate
-: until ['] branch0 c, backward-offset c, ; immediate
-: again ['] branch  c, backward-offset c, ; immediate
+: until ['] branch0 go-back, ; immediate
+: again ['] branch  go-back, ; immediate
 
 : while  [compile] if ; immediate
 : repeat swap [compile] again [compile] then ; immediate
