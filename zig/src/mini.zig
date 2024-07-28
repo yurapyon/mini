@@ -212,8 +212,8 @@ pub const MiniVM = struct {
         }
 
         try self.program_counter.init(self.memory);
-        try self.data_stack.initInOneMemoryBlock(self.memory);
         try self.return_stack.initInOneMemoryBlock(self.memory);
+        try self.data_stack.initInOneMemoryBlock(self.memory);
         try self.dictionary.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("dictionary_start"),
