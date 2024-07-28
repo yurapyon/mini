@@ -9,8 +9,6 @@ const utils = @import("utils.zig");
 // possible new bytecodes
 //   bytes, ?
 //   bytes! ?
-//   -aligned
-//   -align ?
 //   / mod u/ umod ?
 
 // ===
@@ -218,10 +216,6 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode(">", gt),
     constructBasicBytecode(">=", gteq),
 
-    constructBasicBytecode("here!", storeHere),
-    constructBasicBytecode("here+!", storeAddHere),
-    constructBasicBytecode("here@", fetchHere),
-
     constructBasicBytecode("1+", plus1),
     constructBasicBytecode("1-", minus1),
 
@@ -236,17 +230,21 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("cell>bytes", cellToBytes),
     constructBasicBytecode("bytes>cell", bytesToCell),
 
-    // ===
     constructBasicBytecode("cmove", cmove),
     constructBasicBytecode("cmove>", cmoveUp),
     constructBasicBytecode("mem=", memEq),
 
+    // ===
     constructBasicBytecode("?dup", maybeDup),
 
     constructBasicBytecode("nip", nip),
     constructBasicBytecode("flip", flip),
     constructBasicBytecode("tuck", tuck),
     constructBasicBytecode("over", over),
+
+    .{},
+    .{},
+    .{},
 
     .{},
     .{},

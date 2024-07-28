@@ -69,10 +69,6 @@ non-standard forth words:
 
   next-char  - ( -- char )       read the next char from the input buffer
 
-  here!      - ( value addr -- ) store to 'here'
-  here+!     - ( value addr -- ) store-add to 'here'
-  here@      - ( addr -- value ) fetch from 'here'
-
   0          - ( -- 0 )
   0xffff     - ( -- 0xffff )
   1          - ( -- 1 )

@@ -13,15 +13,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : [compile] ' absjump, ; immediate
 
-: go...,   c, here@ 0 c, ;
-: go-back, c, here@ - c, ;
-: go-here  here@ over - swap c! ;
+: go...,   c, here @ 0 c, ;
+: go-back, c, here @ - c, ;
+: go-here! here @ over - swap c! ;
 
 : if   ['] branch0 go..., ; immediate
-: else ['] branch  go..., swap go-here ; immediate
-: then go-here ; immediate
+: else ['] branch  go..., swap go-here! ; immediate
+: then go-here! ; immediate
 
-: begin here@ ; immediate
+: begin here @ ; immediate
 : until ['] branch0 go-back, ; immediate
 : again ['] branch  go-back, ; immediate
 
@@ -42,7 +42,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : decimal 10 base ! ;
 : hex 16 base ! ;
 
-: :noname 0 0 define here@ ] ;
+: :noname 0 0 define here @ ] ;
 
 : 2dup over over ;
 : 2drop drop drop ;
@@ -58,10 +58,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : /    /mod nip ;
 : mod  /mod drop ;
 
-: -aligned 2dup mod ?dup if - + else drop then ;
-: -align   here@ swap -aligned here! ;
-: aligned  cell -aligned ;
-: align    cell -align ;
+: aligned dup cell mod + ;
+: align   here @ aligned here ! ;
 
 : >cfa >terminator 1+ ;
 : literal ['] lit c, bytesLE, ; immediate
@@ -70,19 +68,19 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   word define align
   \ address after the 'exit 0 exit' part
   \   expects that the 'exit 0' bytes may be overridden by does>
-  here@ 6 + [compile] literal
+  here @ 6 + [compile] literal
   ['] exit c, 0 c, ['] exit c, ;
 
 : >body           aligned 6 + ;
 : >does-register  >body 3 - ;
 : redirect-latest latest @ >cfa >does-register absjump! ;
 
-: does>i here@ redirect-latest latest @ hide ] ;
+: does>i here @ redirect-latest latest @ hide ] ;
 
 : does>
   state @ if
     \ address of code that follows the does>
-    here@ 6 + [compile] literal
+    here @ 6 + [compile] literal
     ['] redirect-latest absjump, ['] exit c,
   else
      does>i
