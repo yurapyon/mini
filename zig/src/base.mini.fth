@@ -18,8 +18,15 @@ immediate
   ['] branch0 c,
   here @ - c, ; immediate
 
-##break
 : \ begin next-char 10 = until ; immediate
+
+: something r0 @ ;
+
+: another-thing something ;
+
+something ' something another-thing
+##.s
+drop drop drop
 
 \ does this work
 

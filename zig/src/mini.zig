@@ -71,8 +71,10 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     program_counter: Cell,
     data_stack_top: Cell,
     data_stack: [32]Cell,
+    data_stack_end: u0,
     return_stack_top: Cell,
     return_stack: [32]Cell,
+    return_stack_end: u0,
     here: Cell,
     latest: Cell,
     state: Cell,
@@ -191,11 +193,11 @@ pub const MiniVM = struct {
     program_counter: Register(MemoryLayout.offsetOf("program_counter")),
     data_stack: Stack(MemoryLayout.offsetOf("data_stack_top"), .{
         .start = MemoryLayout.offsetOf("data_stack"),
-        .end = MemoryLayout.offsetOf("return_stack_top"),
+        .end = MemoryLayout.offsetOf("data_stack_end"),
     }),
     return_stack: Stack(MemoryLayout.offsetOf("return_stack_top"), .{
         .start = MemoryLayout.offsetOf("return_stack"),
-        .end = MemoryLayout.offsetOf("here"),
+        .end = MemoryLayout.offsetOf("return_stack_end"),
     }),
     dictionary: Dictionary(
         MemoryLayout.offsetOf("here"),
@@ -252,6 +254,10 @@ pub const MiniVM = struct {
         self.compileMemoryLocationConstant("latest");
         self.compileMemoryLocationConstant("state");
         self.compileMemoryLocationConstant("base");
+        self.dictionary.compileConstant(
+            "r0",
+            MemoryLayout.offsetOf("return_stack"),
+        ) catch unreachable;
     }
 
     // ===
@@ -373,7 +379,16 @@ pub const MiniVM = struct {
 
     fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
         const cfa_addr = try self.dictionary.toCfa(addr);
-        try self.absoluteJump(cfa_addr, true);
+        // NOTE
+        // this puts some 'dummy data' on the return stack
+        // the 'dummy data' is actually the xt currently being executed
+        //   and can be accessed with `r0 @` from forth
+        // i think its more clear to write it out this way
+        //   rather than using the absoluteJump function below
+        self.return_stack.push(cfa_addr) catch |err| {
+            return returnStackErrorFromStackError(err);
+        };
+        self.program_counter.store(cfa_addr);
         try self.executionLoop();
     }
 
@@ -403,7 +418,9 @@ pub const MiniVM = struct {
         useReturnStack: bool,
     ) Error!void {
         if (useReturnStack) {
-            self.return_stack.push(self.program_counter.fetch()) catch |err| return returnStackErrorFromStackError(err);
+            self.return_stack.push(self.program_counter.fetch()) catch |err| {
+                return returnStackErrorFromStackError(err);
+            };
         }
         self.program_counter.store(addr);
     }
