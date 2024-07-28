@@ -92,6 +92,10 @@ pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void
 
 /// Passed to bytecode callbacks when they are called
 pub const ExecutionContext = struct {
+    // NOTE
+    // this needs to be here because bytecode's compilation semantics need to know
+    //   which bytecode to compile, and during compilation this can't be calculated based
+    //   off th PC lcoation
     current_bytecode: u8,
 };
 
@@ -174,7 +178,8 @@ fn maybeLookupAliasedBytecode(word_or_alias: []const u8) ?u8 {
 }
 
 /// MiniVM
-/// brings together execution, stacks, dictionary, input, devices
+/// the main interpreter
+/// also brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
     memory: mem.CellAlignedMemory,
 
@@ -403,6 +408,8 @@ pub const MiniVM = struct {
             const ctx = ExecutionContext{
                 .current_bytecode = bytecode,
             };
+            // TODO the current bytecode is always PC - 1
+            // could just write mini.getCurrentBytecode() ?
             try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
                 self,
                 ctx,

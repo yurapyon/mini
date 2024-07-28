@@ -1,3 +1,5 @@
+here@
+
 word xorc!     define ] tuck c@ xor swap c! [ ' exit c,
 word immediate define ] 0b01000000 latest @ >terminator xorc! [ ' exit c,
 word hide      define ] 0b00100000 swap >terminator xorc! [ ' exit c,
@@ -140,7 +142,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   create ,
   does> @ ;
 
-
+here@
+swap -
+##.s
 
 bye
 
