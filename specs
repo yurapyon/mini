@@ -9,7 +9,7 @@ system:
 language:
   case-insensitive
   max input line length: 128 chars
-  max word name length:  max input line length
+  max word name length:  2^16 (limited by input buffer length)
   max numeric base:      36
 
 states:
@@ -38,7 +38,7 @@ word definition layout:
 
 bytecodes:
   list:
-    0b0....... 128      core    ( see zig/src/bytecodes.zig )
+    0b0....... 112      core    ( see zig/src/bytecodes.zig )
     0b0111.... 16       debug   ( system dependent )
     0b1aaaaaaa aaaaaaaa absjump ( jump to (a), pushing pc+1 to return stack, address space is 32k )
   semantics:
@@ -60,14 +60,14 @@ bytecodes:
       execute:   push following addr to return stack and jump to address read from memory
 
 non-standard forth words:
-  panic      -
+  panic      - ( -- )            die
 
   seldev     - ( id -- )         select device to send commands to
   d!         - ( value addr -- ) store to current device
   d+!        - ( value addr -- ) store-add to current device
   d@         - ( addr -- value ) fetch from current device
 
-  next-char  -
+  next-char  - ( -- char )       read the next char from the input buffer
 
   here!      - ( value addr -- ) store to 'here'
   here+!     - ( value addr -- ) store-add to 'here'
