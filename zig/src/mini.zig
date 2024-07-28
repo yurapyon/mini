@@ -7,6 +7,7 @@ const Devices = @import("devices/devices.zig").Devices;
 const Stack = @import("stack.zig").Stack;
 const Register = @import("register.zig").Register;
 const InputSource = @import("input_source.zig").InputSource;
+const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 
@@ -84,15 +85,6 @@ pub const ExecutionContext = struct {
     current_bytecode: u8,
 };
 
-const TerminatorInfo = packed struct(u8) {
-    // TODO is there a way to have unnamed fields?
-    // or eplicitly set the offset?
-    terminator_indicator: u1,
-    is_immediate: bool,
-    is_hidden: bool,
-    padding: u5,
-};
-
 // TODO
 // this should have semantics in here in a general way, and not .is_immediate
 pub const WordInfo = struct {
@@ -106,15 +98,12 @@ pub const WordInfo = struct {
     },
     is_immediate: bool,
 
-    // TODO probably move some stuff around so this can take memory as a []u8 rather than a dictionary
-    // or could take terminator value
-    fn fromMiniWord(definition_addr: Cell, terminator: u8) Error!@This() {
-        const terminator_info = @as(TerminatorInfo, @bitCast(terminator));
+    fn fromMiniWord(definition_addr: Cell, terminator: dictionary.TerminatorInfo) Error!@This() {
         return .{
             .value = .{
                 .mini_word = definition_addr,
             },
-            .is_immediate = terminator_info.is_immediate,
+            .is_immediate = terminator.is_immediate,
         };
     }
 
@@ -320,10 +309,7 @@ pub const MiniVM = struct {
     fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
         if (try self.dictionary.lookup(str)) |definition_addr| {
-            const terminator_addr = try self.dictionary.toTerminator(definition_addr);
-            // NOTE
-            // next array access guaranteed to be ok
-            const terminator = self.dictionary.memory[terminator_addr];
+            const terminator = try self.dictionary.getTerminator(definition_addr);
             return try WordInfo.fromMiniWord(definition_addr, terminator);
         } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);

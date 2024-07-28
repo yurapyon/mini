@@ -47,6 +47,19 @@ fn compareStringUntilTerminator(
     }
 }
 
+pub const TerminatorInfo = packed struct(u8) {
+    // TODO is there a way to have unnamed fields?
+    // or explicitly set the offset?
+    terminator_indicator: u1,
+    is_immediate: bool,
+    is_hidden: bool,
+    padding: u5,
+
+    pub fn fromByte(terminator_byte: u8) @This() {
+        return @bitCast(terminator_byte);
+    }
+};
+
 /// This is a Forth style dictionary
 ///   where each definition has a pointer to the previous definition
 pub fn Dictionary(
@@ -89,15 +102,14 @@ pub fn Dictionary(
                 };
 
                 if (terminator_addr) |addr| {
-                    // TODO read terminator
-                    const terminator = (try vm.mem.cellAt(self.memory, addr)).*;
-                    _ = terminator;
-                    if (true) {
+                    const terminator_byte = try vm.mem.checkedRead(self.memory, addr);
+                    const terminator = TerminatorInfo.fromByte(terminator_byte);
+                    if (!terminator.is_hidden) {
                         return latest;
                     }
                 }
-                // TODO maybe write register.deref();
-                latest = try vm.mem.checkedRead(self.memory, latest);
+                // TODO probably write register.deref();
+                latest = (try vm.mem.cellAt(self.memory, latest)).*;
             }
             return null;
         }
@@ -123,6 +135,17 @@ pub fn Dictionary(
             addr: vm.Cell,
         ) vm.mem.MemoryError!vm.Cell {
             return (try self.toTerminator(addr)) + 1;
+        }
+
+        pub fn getTerminator(
+            self: @This(),
+            addr: vm.Cell,
+        ) vm.mem.MemoryError!TerminatorInfo {
+            // NOTE
+            // the next array access is ok because we've already checked
+            //   for out of bounds errors in toTerminator
+            const terminator_byte = self.memory[try self.toTerminator(addr)];
+            return TerminatorInfo.fromByte(terminator_byte);
         }
 
         pub fn defineWord(
