@@ -18,8 +18,8 @@ fn readUntilTerminator(
 ) TerminatorReadError!vm.Cell {
     var str_at = str_start;
     while (str_at < memory.len) {
-        // TODO rather than >= could just check the bit is set
-        if (memory[str_at] >= base_terminator) {
+        const byte = memory[str_at];
+        if ((byte & base_terminator) > 0) {
             return str_at;
         }
         str_at = try std.math.add(vm.Cell, str_at, 1);
@@ -109,7 +109,6 @@ pub fn Dictionary(
                         return latest;
                     }
                 }
-                // TODO probably write register.deref();
                 latest = (try vm.mem.cellAt(self.memory, latest)).*;
             }
             return null;
@@ -153,6 +152,12 @@ pub fn Dictionary(
             self: *@This(),
             name: []const u8,
         ) vm.Error!void {
+            for (name) |ch| {
+                if (ch >= base_terminator) {
+                    return error.WordNameInvalid;
+                }
+            }
+
             const previous_word_addr = self.latest.fetch();
             const aligned_here = self.here.alignForward(@alignOf(vm.Cell));
             try self.here.comma(self.memory, previous_word_addr);
@@ -167,7 +172,6 @@ pub fn Dictionary(
                 self.here.fetch(),
                 cell_name_len,
             );
-            // TODO should check here that all the u8's in name are <127
             @memcpy(name_location, name);
 
             self.here.storeAdd(cell_name_len);

@@ -21,7 +21,9 @@ comptime {
     }
 }
 
-// error.NumberOverflow instead of just using the builtin error.Overflow
+// TODO
+// make an error, error.NumberOverflow instead of just using the builtin error.Overflow
+
 pub const max_memory_size = 32 * 1024;
 
 pub const Error = error{
@@ -30,11 +32,9 @@ pub const Error = error{
     StackUnderflow,
     ReturnStackOverflow,
     ReturnStackUnderflow,
-    WordNotFound,
-    WordNameTooLong,
     InvalidProgramCounter,
     InvalidAddress,
-} || mem.MemoryError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
+} || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || Allocator.Error;
 
 pub const InputError = error{
     UnexpectedEndOfInput,
@@ -45,6 +45,12 @@ pub const InputError = error{
 pub const SemanticsError = error{
     CannotInterpret,
     CannotCompile,
+};
+
+pub const WordError = error{
+    WordNotFound,
+    WordNameTooLong,
+    WordNameInvalid,
 };
 
 // TODO this isnt working right

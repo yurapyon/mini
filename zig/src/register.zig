@@ -56,6 +56,13 @@ pub fn Register(comptime offset_: vm.Cell) type {
             (vm.mem.cellAt(self.memory, offset) catch unreachable).* -%= value;
         }
 
+        pub fn deref(
+            self: @This(),
+            memory: vm.mem.CellAlignedMemory,
+        ) vm.mem.MemoryError!vm.Cell {
+            return (try vm.mem.cellAt(memory, self.fetch())).*;
+        }
+
         /// Will error if self.fetch() is not cell aligned and within write_to
         pub fn comma(
             self: @This(),
@@ -121,6 +128,8 @@ pub fn Register(comptime offset_: vm.Cell) type {
             self.storeAdd(@sizeOf(vm.Cell));
         }
 
+        // TODO rename to derefByte & derefCell
+
         /// Will error if self.fetch() is not within read_from
         pub fn readByteAndAdvance(
             self: @This(),
@@ -184,4 +193,9 @@ test "registers" {
     const aligned_here = here.alignForward(@alignOf(vm.Cell));
     try testing.expectEqual(0x06, here.fetchC());
     try testing.expectEqual(0x06, aligned_here);
+
+    here.store(2);
+    try here.comma(memory, 0xbeef);
+    here.storeSubtract(2);
+    try testing.expectEqual(0xbeef, try here.deref(memory));
 }
