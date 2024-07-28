@@ -18,6 +18,7 @@ fn readUntilTerminator(
 ) TerminatorReadError!vm.Cell {
     var str_at = str_start;
     while (str_at < memory.len) {
+        // TODO rather than >= could just check the bit is set
         if (memory[str_at] >= base_terminator) {
             return str_at;
         }
@@ -50,10 +51,10 @@ fn compareStringUntilTerminator(
 pub const TerminatorInfo = packed struct(u8) {
     // TODO is there a way to have unnamed fields?
     // or explicitly set the offset?
-    terminator_indicator: u1,
-    is_immediate: bool,
-    is_hidden: bool,
     padding: u5,
+    is_hidden: bool,
+    is_immediate: bool,
+    terminator_indicator: u1,
 
     pub fn fromByte(terminator_byte: u8) @This() {
         return @bitCast(terminator_byte);
@@ -170,7 +171,7 @@ pub fn Dictionary(
             @memcpy(name_location, name);
 
             self.here.storeAdd(cell_name_len);
-            try self.here.commaC(self.memory, 0b10000000);
+            try self.here.commaC(self.memory, base_terminator);
         }
 
         pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {

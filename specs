@@ -9,7 +9,7 @@ system:
 language:
   case-insensitive
   max word name length: 2^16
-  max numeric base: 36
+  max numeric base:     36
 
 states:
   0x0 interpret
