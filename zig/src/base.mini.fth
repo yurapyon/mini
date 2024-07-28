@@ -62,28 +62,28 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : align   here @ aligned here ! ;
 
 : >cfa >terminator 1+ ;
-: literal ['] lit c, bytesLE, ; immediate
+\ : literal ['] lit c, bytesLE, ; immediate
+
+: somewhere, ['] lit c, here @  0 c, 0 c, ; immediate
+: over-here! here @ swap bytesLE! ; immediate
 
 : create
   word define align
-  \ address after the 'exit 0 exit' part
-  \   expects that the 'exit 0' bytes may be overridden by does>
-  here @ 6 + [compile] literal
-  ['] exit c, 0 c, ['] exit c, ;
+  [compile] somewhere, ['] exit c, 0 c, ['] exit c,
+  [compile] over-here! ;
 
-: >body           aligned 6 + ;
-: >does-register  >body 3 - ;
-: redirect-latest latest @ >cfa >does-register absjump! ;
-
-: does>i here @ redirect-latest latest @ hide ] ;
+: >body    aligned 6 + ;
+: >does    >body 3 - ;
+: do-this! latest @ >cfa >does absjump! ;
 
 : does>
   state @ if
-    \ address of code that follows the does>
-    here @ 6 + [compile] literal
-    ['] redirect-latest absjump, ['] exit c,
+    [compile] somewhere, ['] do-this! absjump, ['] exit c,
+    [compile] over-here!
   else
-     does>i
+    here @ do-this!
+    latest @ hide
+    ]
   then ; immediate
 
 : constant
