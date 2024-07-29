@@ -21,13 +21,10 @@ repl behavior:
   bye: system dependent
 
 word definition layout:
-  cell aligned
-  0               16      24      x       x+8
-  |previous-------|name---|.......|\>127--|code...
+  odd length name
+  prealign0               16      24              x       x+8
+  |?......|previous-------|name...|.......|.......|>127---|code...
 
-<<<<<<< Updated upstream
-  terminator is a byte >127
-=======
   even length name
   prealign0               16      24              x       x+8
   |?......|previous-------|name...|.......|\0-----|>127---|code...
@@ -35,11 +32,10 @@ word definition layout:
   the name field may be zero terminated to align the entire header to u16s
 
   terminator is a byte >=128
->>>>>>> Stashed changes
   terminator bits:
     0: 1
-    1: immediate
-    2: hidden
+    1: is-immediate
+    2: is-hidden
     3: TBD
     4: TBD
     5: TBD

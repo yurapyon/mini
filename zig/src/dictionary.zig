@@ -19,12 +19,20 @@ fn readUntilTerminator(
     var str_at = str_start;
     while (str_at < memory.len) {
         const byte = memory[str_at];
-        if ((byte & base_terminator) > 0) {
+        if ((byte & 0b10000000) > 0) {
             return str_at;
         }
         str_at = try std.math.add(vm.Cell, str_at, 1);
     }
     return error.OutOfBounds;
+}
+
+fn maybeCutoffZeroTerminator(string: []const u8) []const u8 {
+    if (string.len > 0 and string[string.len - 1] == 0) {
+        return string[0..(string.len - 1)];
+    } else {
+        return string;
+    }
 }
 
 fn compareStringUntilTerminator(
@@ -41,7 +49,9 @@ fn compareStringUntilTerminator(
     const str_end = try readUntilTerminator(memory, str_start);
     const str_len = str_end - str_start;
     const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
-    if (utils.stringsEqual(str, to_compare)) {
+
+    const lookup = maybeCutoffZeroTerminator(str);
+    if (utils.stringsEqual(lookup, to_compare)) {
         return str_end;
     } else {
         return null;
@@ -148,6 +158,11 @@ pub fn Dictionary(
             return TerminatorInfo.fromByte(terminator_byte);
         }
 
+        // TODO should this throw memory errors?
+        fn alignSelf(self: *@This()) void {
+            _ = self.here.alignForward(@alignOf(vm.Cell));
+        }
+
         pub fn defineWord(
             self: *@This(),
             name: []const u8,
@@ -158,23 +173,22 @@ pub fn Dictionary(
                 }
             }
 
+            self.alignSelf();
+
+            const definition_start = self.here.fetch();
             const previous_word_addr = self.latest.fetch();
-            const aligned_here = self.here.alignForward(@alignOf(vm.Cell));
+
+            self.latest.store(definition_start);
             try self.here.comma(self.memory, previous_word_addr);
-            self.latest.store(aligned_here);
 
-            if (name.len > std.math.maxInt(vm.Cell)) {
-                return error.WordNameTooLong;
+            try self.here.commaString(name);
+
+            const header_size = name.len + 3;
+            const need_to_align = (definition_start + header_size) % 2 == 1;
+            if (need_to_align) {
+                try self.here.commaC(self.memory, 0);
             }
-            const cell_name_len = @as(vm.Cell, @intCast(name.len));
-            const name_location = try vm.mem.sliceFromAddrAndLen(
-                self.memory,
-                self.here.fetch(),
-                cell_name_len,
-            );
-            @memcpy(name_location, name);
 
-            self.here.storeAdd(cell_name_len);
             try self.here.commaC(self.memory, base_terminator);
         }
 
