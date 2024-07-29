@@ -238,6 +238,10 @@ pub fn Dictionary(
             try self.compileLit(value);
             try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("exit") orelse unreachable);
         }
+
+        pub fn iterator(self: *@This()) utils.LinkedListIterator {
+            return utils.LinkedListIterator.from(self.memory, self.latest.fetch());
+        }
     };
 }
 

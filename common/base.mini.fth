@@ -16,10 +16,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : xt,       mkabsjump >big, ;
 : xt!       >r mkabsjump r> >big! ;
 
-: this       here @ swap ;
-: how-far    this - ;
-: this!      this >little! ;
-: over-here! this xt! ;
+: this-here  here @ swap ;
+: how-far    this-here - ;
+: this-here! this-here >little! ;
 
 : idk,       0 c, ;
 : idunno,    0 0 bytes, ;
@@ -28,21 +27,22 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : go-now,       ['] tailcall c, xt, ;
 : go-somewhere, ['] tailcall c, here @ idunno, ;
+: go-here!      this-here xt! ;
 
-: jump,       ['] branch  c, here @ idk, ;
-: jump?,      ['] branch0 c, here @ idk, ;
-: right-here! dup how-far swap c! ;
-: back!       tuck - swap c! ;
+: jump,      ['] branch  c, here @ idk, ;
+: jump?,     ['] branch0 c, here @ idk, ;
+: jump-here! dup how-far swap c! ;
+: back!      tuck - swap c! ;
 
 : if   jump?, ; immediate
-: else jump, swap right-here! ; immediate
-: then right-here! ; immediate
+: else jump, swap jump-here! ; immediate
+: then jump-here! ; immediate
 
 : begin here @ ; immediate
 : until jump?, back! ; immediate
 : again jump,  back! ; immediate
 : while jump?, ; immediate
-: repeat swap jump, back! right-here! ; immediate
+: repeat swap jump, back! jump-here! ; immediate
 
 : char   word drop c@ ;
 : [char] ['] litc c, char c, ; immediate
@@ -100,8 +100,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : allot here +! ;
 
-: create   word define something, doesnt, ['] exit c, this! ;
-: does>    something, ['] does-this! xt, ['] exit c, this! ; immediate
+: create   word define something, doesnt, ['] exit c, this-here! ;
+: does>    something, ['] does-this! xt, ['] exit c, this-here! ; immediate
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
@@ -121,8 +121,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   drop ;
 
 \ ( -- len-ptr tailcall-ptr )
-: data, something, something, go-somewhere, rot this! ;
-: s" data, swap here @ string, how-far swap ! over-here! ; immediate
+: data, something, something, go-somewhere, rot this-here! ;
+: s" data, swap here @ string, how-far swap ! go-here! ; immediate
 
 : hi s" hello" ;
 

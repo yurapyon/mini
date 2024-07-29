@@ -13,6 +13,7 @@ files:
 
   base.mini.fth    - a forth file that will define the 'std library' and most of the language features
 
+  vm_utils.zig     - utils directly relevant to the VM, ie printing memory or the stack
   memory.zig       - some memory access utils that also return error unions
   utils.zig        - other utils: number parser, comptime utils, lowercase string compare
 

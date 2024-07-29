@@ -3,7 +3,7 @@ const Allocator = std.mem.Allocator;
 
 const vm = @import("mini.zig");
 
-const base_file = @embedFile("base.mini.fth");
+const base_file = @embedFile("common/base.mini.fth");
 
 pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
@@ -56,6 +56,13 @@ fn runMiniVM(allocator: Allocator) !void {
         @ptrCast(&refiller),
     );
     try vm_instance.repl();
+
+    var iter = vm_instance.dictionary.iterator();
+    var value = try iter.next();
+    while (value) |v| {
+        std.debug.print("{}\n", .{v});
+        value = try iter.next();
+    }
 }
 
 pub fn main() !void {
