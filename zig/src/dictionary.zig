@@ -158,10 +158,11 @@ pub fn Dictionary(
                 }
             }
 
+            const previous_here = self.here.fetch();
             const previous_word_addr = self.latest.fetch();
-            const aligned_here = self.here.alignForward(@alignOf(vm.Cell));
+
+            self.latest.store(previous_here);
             try self.here.comma(self.memory, previous_word_addr);
-            self.latest.store(aligned_here);
 
             if (name.len > std.math.maxInt(vm.Cell)) {
                 return error.WordNameTooLong;
@@ -173,8 +174,13 @@ pub fn Dictionary(
                 cell_name_len,
             );
             @memcpy(name_location, name);
-
             self.here.storeAdd(cell_name_len);
+
+            const header_size = name.len + 3;
+            const need_to_align = (previous_here + header_size) % 2 == 1;
+            if (need_to_align) {
+                try self.here.commaC(0);
+            }
             try self.here.commaC(self.memory, base_terminator);
         }
 
