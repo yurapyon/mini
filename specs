@@ -21,20 +21,27 @@ repl behavior:
   bye: system dependent
 
 word definition layout:
-  cell aligned
-  0               16      24      x       x+8
-  |previous-------|name---|.......|\>127--|code...
+  odd length name
+  prealign0               16      24              x       x+8
+  |?......|previous-------|name...|.......|.......|>127---|code...
 
-  terminator is a byte >127
+  even length name
+  prealign0               16      24              x       x+8
+  |?......|previous-------|name...|.......10000000|>127---|code...
+
+  terminator is a byte >=128
+  an extra terminator may be added if the definition needs to be aligned
+    the lsb of this terminator will not be set,
+      where for other terminators in general it will be
   terminator bits:
     0: 1
-    1: immediate
-    2: hidden
+    1: is-immediate
+    2: is-hidden
     3: TBD
     4: TBD
     5: TBD
     6: TBD
-    7: TBD
+    7: is-not-for-alignment
 
 bytecodes:
   list:

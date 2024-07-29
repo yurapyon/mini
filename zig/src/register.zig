@@ -149,6 +149,24 @@ pub fn Register(comptime offset_: vm.Cell) type {
             const high = try self.readByteAndAdvance(read_from);
             return @as(vm.Cell, high) << 8 | low;
         }
+
+        /// Will error if self.fetch()+string.len is not within read_from
+        pub fn commaString(
+            self: @This(),
+            string: []const u8,
+        ) vm.Error!void {
+            if (string.len > std.math.maxInt(vm.Cell)) {
+                // TODO rename this to StringTooLong or something
+                return error.WordNameTooLong;
+            }
+            const dest = try vm.mem.sliceFromAddrAndLen(
+                self.memory,
+                self.fetch(),
+                string.len,
+            );
+            @memcpy(dest, string);
+            self.storeAdd(@intCast(string.len));
+        }
     };
 }
 

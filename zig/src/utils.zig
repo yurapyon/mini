@@ -173,13 +173,19 @@ test "parse number" {
     try testing.expectEqual(0, try parseNumber("", 1));
 }
 
+// TODO i think we'll never care about terminators in strings so could maybe just ignore them always
 /// Case insensitive string compare
-pub fn stringsEqual(a: []const u8, b: []const u8) bool {
+pub fn stringsEqual(a: []const u8, b: []const u8, ignore_terminators: bool) bool {
     if (a.len != b.len) {
         return false;
     }
 
     for (a, b) |a_ch, b_ch| {
+        const a_is_terminator = (a_ch & 0b10000000) > 0;
+        const b_is_terminator = (b_ch & 0b10000000) > 0;
+        if (ignore_terminators and a_is_terminator or b_is_terminator) {
+            continue;
+        }
         if (std.ascii.toLower(a_ch) != std.ascii.toLower(b_ch)) {
             return false;
         }

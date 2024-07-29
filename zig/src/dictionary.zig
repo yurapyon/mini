@@ -6,12 +6,17 @@ const utils = @import("utils.zig");
 const bytecodes = @import("bytecodes.zig");
 const Register = @import("register.zig").Register;
 
-const base_terminator = 0b10000000;
+const base_terminator = 0b10000001;
+const alignment_terminator = 0b10000000;
 
 const TerminatorReadError = error{
     Overflow,
 } || vm.mem.MemoryError;
 
+// NOTE TODO
+// this could have better error checking
+// we implicitly expect that the next char will be the normal terminator
+//   unless the next memory addr is out of bounds
 fn readUntilTerminator(
     memory: []const u8,
     str_start: vm.Cell,
@@ -19,8 +24,12 @@ fn readUntilTerminator(
     var str_at = str_start;
     while (str_at < memory.len) {
         const byte = memory[str_at];
-        if ((byte & base_terminator) > 0) {
-            return str_at;
+        if ((byte & 0b10000000) > 0) {
+            if ((byte & 0b00000001) > 0) {
+                return str_at;
+            } else {
+                return str_at + 1;
+            }
         }
         str_at = try std.math.add(vm.Cell, str_at, 1);
     }
@@ -41,7 +50,7 @@ fn compareStringUntilTerminator(
     const str_end = try readUntilTerminator(memory, str_start);
     const str_len = str_end - str_start;
     const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
-    if (utils.stringsEqual(str, to_compare)) {
+    if (utils.stringsEqual(str, to_compare, false)) {
         return str_end;
     } else {
         return null;
@@ -148,6 +157,11 @@ pub fn Dictionary(
             return TerminatorInfo.fromByte(terminator_byte);
         }
 
+        // TODO should this throw memory errors?
+        fn alignSelf(self: *@This()) void {
+            _ = self.here.alignForward(@alignOf(vm.Cell));
+        }
+
         pub fn defineWord(
             self: *@This(),
             name: []const u8,
@@ -158,28 +172,20 @@ pub fn Dictionary(
                 }
             }
 
-            const previous_here = self.here.fetch();
+            self.alignSelf();
+
+            const definition_start = self.here.fetch();
             const previous_word_addr = self.latest.fetch();
 
-            self.latest.store(previous_here);
+            self.latest.store(definition_start);
             try self.here.comma(self.memory, previous_word_addr);
 
-            if (name.len > std.math.maxInt(vm.Cell)) {
-                return error.WordNameTooLong;
-            }
-            const cell_name_len = @as(vm.Cell, @intCast(name.len));
-            const name_location = try vm.mem.sliceFromAddrAndLen(
-                self.memory,
-                self.here.fetch(),
-                cell_name_len,
-            );
-            @memcpy(name_location, name);
-            self.here.storeAdd(cell_name_len);
+            try self.here.commaString(name);
 
             const header_size = name.len + 3;
-            const need_to_align = (previous_here + header_size) % 2 == 1;
+            const need_to_align = (definition_start + header_size) % 2 == 1;
             if (need_to_align) {
-                try self.here.commaC(0);
+                try self.here.commaC(self.memory, alignment_terminator);
             }
             try self.here.commaC(self.memory, base_terminator);
         }
