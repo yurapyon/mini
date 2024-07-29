@@ -13,17 +13,19 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : [compile] ' absjump, ; immediate
 
-: go...,   c, here @ 0 c, ;
-: go-back, c, here @ - c, ;
-: go-here! here @ over - swap c! ;
+: must-go,  ['] branch  c, here @ ;
+: maybe-go, ['] branch0 c, here @ ;
+: idk,      0 c, ;
+: to-here!  here @ over - swap c! ;
+: back,     - c, ;
 
-: if   ['] branch0 go..., ; immediate
-: else ['] branch  go..., swap go-here! ; immediate
-: then go-here! ; immediate
+: if   maybe-go, idk, ; immediate
+: else must-go,  idk, swap to-here! ; immediate
+: then to-here! ; immediate
 
 : begin here @ ; immediate
-: until ['] branch0 go-back, ; immediate
-: again ['] branch  go-back, ; immediate
+: until maybe-go, back, ; immediate
+: again must-go,  back, ; immediate
 
 : while  [compile] if ; immediate
 : repeat swap [compile] again [compile] then ; immediate
@@ -37,6 +39,13 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : bytesBE! swap cell>bytes swap rot bytes! ;
 
 : absjump! swap mkabsjump swap bytesBE! ;
+
+: something, ['] lit  c, here @ 0 c, 0 c, ;
+: smthng,    ['] litc c, here @ 0 c, ;
+: this       here @ swap ;
+: this!      this bytesLE! ;
+: ths!       this c! ;
+: how-far    this - ;
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
@@ -63,13 +72,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : >cfa >terminator 1+ ;
 
-: something,  ['] lit c, here @  0 c, 0 c, ;
-: this!       here @ swap bytesLE! ;
-: do-nothing, ['] exit c, 0 c, ;
+\ ===
 
-: >body    aligned 6 + ;
-: >does    >body 3 - ;
-: do-this! latest @ >cfa >does absjump! ;
+: >body       aligned 6 + ;
+: >does       >body 3 - ;
+: do-nothing, ['] exit c, 0 c, ;
+: do-this!    latest @ >cfa >does absjump! ;
 
 : create
   word define align
@@ -84,21 +92,14 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
     ]
   then ; immediate
 
-: constant
-  create ,
-  does> @ ;
+\ ===
+
+: constant create , does> @ ;
 
 : recurse
   \ compiles the 'currently being defined' xt as a tailcall
   \ latest @ >cfa tailcall
   ; immediate
-
-\ create hello 123 ,
-\ does> @ 2 + ;
-\ hello
-
-15 constant x
-x ' x >body ##.s drop drop
 
 : char word drop c@ ;
 : [char] ['] litc c, char c, ; immediate
@@ -110,26 +111,22 @@ x ' x >body ##.s drop drop
   begin next-char dup "? 0= while c, repeat
   drop ;
 
-: len! here @ over - 3 - swap c! ;
-
-: small-thing, ['] litc c, here @ 0 c, ;
-
 \ NOTE
 \ go... can only be a byte, thus strings can only be 255 chars
 \   to make the jump longer you have to compile a tailcall
 \ here @ do-nothing,
 \ tailcall!
-
 : s"
-  something, small-thing, ['] branch go...,
-  rot this! string, go-here! len!
+  something, smthng, must-go, idk, >r
+  swap this!
+  here @ string, this - swap c!
+  r> to-here!
   ; immediate
 
 : stringy s" hello" ;
 
+stringy ##.s
 stringy ##type ##cr
-
-\ need ##type and ##.
 
 bye
 
