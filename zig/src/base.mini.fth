@@ -8,44 +8,60 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : bytesLE, cell>bytes bytes, ;
 : bytesBE, cell>bytes swap bytes, ;
 
+: bytes!   tuck c! 1+ c! ;
+: bytesLE! >r cell>bytes r> bytes! ;
+: bytesBE! >r cell>bytes swap r> bytes! ;
+
 : mkabsjump 0x8000 or ;
-: absjump, mkabsjump bytesBE, ;
+: absjump,  mkabsjump bytesBE, ;
+: absjump!  >r mkabsjump r> bytesBE! ;
 
 : [compile] ' absjump, ; immediate
 
-: must-go,  ['] branch  c, here @ ;
-: maybe-go, ['] branch0 c, here @ ;
-: idk,      0 c, ;
-: to-here!  here @ over - swap c! ;
-: back,     - c, ;
+: this    here @ swap ;
+: howback here @ - ;
+: howfar  this - ;
 
-: if   maybe-go, idk, ; immediate
-: else must-go,  idk, swap to-here! ; immediate
+: idk,    0 c, ;
+: smthng, ['] litc c, here @ idk, ;
+
+: idunno,    idk, idk, ;
+: something, ['] lit c, here @ idunno, ;
+: this!      this bytesLE! ;
+
+: jump,    ['] branch  c, here @ idk, ;
+: jump0,   ['] branch0 c, here @ idk, ;
+: to-here! dup howfar swap c! ;
+: back!    tuck - swap c! ;
+
+: if   jump0, ; immediate
+: else jump, swap to-here! ; immediate
 : then to-here! ; immediate
 
 : begin here @ ; immediate
-: until maybe-go, back, ; immediate
-: again must-go,  back, ; immediate
+: until jump0, back! ; immediate
+: again jump,  back! ; immediate
 
 : while  [compile] if ; immediate
 : repeat swap [compile] again [compile] then ; immediate
 
+: char   word drop c@ ;
+: [char] ['] litc c, char c, ; immediate
+
 : \ begin next-char 10 = until ; immediate
 
-\ we have comments now wahoo
+: is()
+  dup [char] ( = if  drop 1 [ ' exit c, ] then
+      [char] ) = if      -1 [ ' exit c, ] then
+  0 ;
 
-: bytes!   tuck c! 1+ c! ;
-: bytesLE! swap cell>bytes rot bytes! ;
-: bytesBE! swap cell>bytes swap rot bytes! ;
-
-: absjump! swap mkabsjump swap bytesBE! ;
-
-: something, ['] lit  c, here @ 0 c, 0 c, ;
-: smthng,    ['] litc c, here @ 0 c, ;
-: this       here @ swap ;
-: this!      this bytesLE! ;
-: ths!       this c! ;
-: how-far    this - ;
+: (
+  1
+  begin
+    next-char is() +
+    dup 0=
+  until
+  drop ; immediate
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
@@ -67,22 +83,35 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : /    /mod nip ;
 : mod  /mod drop ;
 
+: within     ( val min max -- t/f )
+  >r over r> ( val min val max )
+  < -rot >= and ;
+
+: min ( a b -- min ) 2dup > if swap then drop ;
+: max ( a b -- max ) 2dup < if swap then drop ;
+: clamp ( val min max -- clamped ) rot min max ;
+
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
 : >cfa >terminator 1+ ;
+: last latest @ >cfa ;
 
 \ ===
 
 : >body       aligned 6 + ;
 : >does       >body 3 - ;
-: do-nothing, ['] exit c, 0 c, ;
-: do-this!    latest @ >cfa >does absjump! ;
+: do-nothing, ['] exit c, idk, ;
+: do-this!    last >does absjump! ;
+
+: allot here +! ;
 
 : create
   word define align
   something, do-nothing, ['] exit c, this! ;
 
+: does> something, ['] do-this! absjump, ['] exit c, this! ; immediate
+( _
 : does>
   state @ if
     something, ['] do-this! absjump, ['] exit c, this!
@@ -91,44 +120,41 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
     latest @ hide
     ]
   then ; immediate
-
-\ ===
+  )
 
 : constant create , does> @ ;
+: enum     dup constant 1+ ;
+: flag     dup constant 1 lshift ;
+: variable create cell allot ;
+
+\ ===
 
 : recurse
   \ compiles the 'currently being defined' xt as a tailcall
   \ latest @ >cfa tailcall
   ; immediate
 
-: char word drop c@ ;
-: [char] ['] litc c, char c, ; immediate
-
 : "? [char] " = ;
 
 : string,
   next-char drop
-  begin next-char dup "? 0= while c, repeat
+  begin
+    next-char dup "? 0=
+  while
+    c,
+  repeat
   drop ;
 
-\ NOTE
-\ go... can only be a byte, thus strings can only be 255 chars
-\   to make the jump longer you have to compile a tailcall
-\ here @ do-nothing,
-\ tailcall!
-: s"
-  something, smthng, must-go, idk, >r
-  swap this!
-  here @ string, this - swap c!
-  r> to-here!
-  ; immediate
+\ jump, only works with i8s, or 127 chars
+\   for fullsized data,
+\     you'd need to be able to compile tailcalls
+\ ( -- jump-ptr len-ptr )
+: datac, something, smthng, jump, rot this! swap ;
+: s" datac, here @ string, howfar swap c! to-here! ; immediate
 
-: stringy s" hello" ;
-
-stringy ##.s
-stringy ##type ##cr
-
-bye
+\ : hi s" hello" ;
+\
+\ hi ##type ##cr
 
 : +field
   over + swap
@@ -140,11 +166,21 @@ bye
   flip drop
   +field ;
 
-: enum
-  dup constant 1+ ;
+0 cell field >a
+  cell field >b
+  cell field >c
+constant size
 
-: flag
-  dup constant 1 lshift ;
+size ##.s
+
+0 >a
+0 >b
+0 >c
+size ##.s
+
+
+bye
+
 
 \ TODO values, variables
 \ TODO strings
