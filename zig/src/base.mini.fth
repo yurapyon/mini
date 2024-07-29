@@ -94,11 +94,6 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
-0 aligned
-1 aligned
-2 aligned
-##.s
-
 : >cfa >terminator 1+ ;
 : last latest @ >cfa ;
 
@@ -127,22 +122,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   then ; immediate
   )
 
-: constant create , ; \ does> @ ;
-\ : enum     dup constant 1+ ;
-\ : flag     dup constant 1 lshift ;
-\ : variable create cell allot ;
+: constant create , does> @ ;
+: enum     dup constant 1+ ;
+: flag     dup constant 1 lshift ;
+: variable create cell allot ;
 
 \ ===
-
-
-\ : doesiit create , does> @ ;
-
-1 constant wowxo
-
-wowxo
-##.s
-
-bye
 
 : recurse
   \ compiles the 'currently being defined' xt as a tailcall
@@ -186,8 +171,6 @@ bye
   cell field >b
   cell field >c
 constant size
-
-size ##.s
 
 0 >a
 0 >b

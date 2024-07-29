@@ -66,8 +66,8 @@ pub fn cellAt(memory: []u8, addr: vm.Cell) MemoryError!*vm.Cell {
 }
 
 // TODO this and the next function have pretty similar names
-pub fn sliceAt(memory: []u8, addr: vm.Cell, len: vm.Cell) MemoryError![]vm.Cell {
-    const last_addr = addr + len - 1;
+pub fn sliceAt(memory: CellAlignedMemory, addr: vm.Cell, len: vm.Cell) MemoryError![]vm.Cell {
+    const last_addr = addr + ((len - 1) * @sizeOf(vm.Cell));
     try assertCellMemoryAccess(memory, last_addr);
     const ptr: [*]vm.Cell = @ptrCast(@alignCast(&memory[addr]));
     return ptr[0..len];

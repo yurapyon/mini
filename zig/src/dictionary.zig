@@ -6,16 +6,12 @@ const utils = @import("utils.zig");
 const bytecodes = @import("bytecodes.zig");
 const Register = @import("register.zig").Register;
 
-const base_terminator = 0b10000001;
+const base_terminator = 0b10000000;
 
 const TerminatorReadError = error{
     Overflow,
 } || vm.mem.MemoryError;
 
-// NOTE TODO
-// this could have better error checking
-// we implicitly expect that the next char will be the normal terminator
-//   unless the next memory addr is out of bounds
 fn readUntilTerminator(
     memory: []const u8,
     str_start: vm.Cell,
