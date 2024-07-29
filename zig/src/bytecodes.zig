@@ -62,7 +62,7 @@ pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
 
 pub fn lookupBytecodeByName(name: []const u8) ?u8 {
     for (lookup_table, 0..) |named_callback, i| {
-        const eql = utils.stringsEqual(named_callback.name, name, false);
+        const eql = utils.stringsEqual(named_callback.name, name);
         if (eql) {
             return @truncate(i);
         }

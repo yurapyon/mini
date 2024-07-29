@@ -137,10 +137,10 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 \ : doesiit create , does> @ ;
 
-1 constant wiowo
+1 constant wowxo
 
-wiowo
-
+wowxo
+##.s
 
 bye
 

@@ -160,7 +160,7 @@ const aliases = [_]AliasDefinition{
 fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
     // TODO lookup table utils ?
     for (aliases) |alias_definition| {
-        if (utils.stringsEqual(alias_definition.alias, word_or_alias, false)) {
+        if (utils.stringsEqual(alias_definition.alias, word_or_alias)) {
             return alias_definition.word;
         }
     }

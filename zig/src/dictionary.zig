@@ -7,7 +7,6 @@ const bytecodes = @import("bytecodes.zig");
 const Register = @import("register.zig").Register;
 
 const base_terminator = 0b10000001;
-const alignment_terminator = 0b10000000;
 
 const TerminatorReadError = error{
     Overflow,
@@ -25,15 +24,19 @@ fn readUntilTerminator(
     while (str_at < memory.len) {
         const byte = memory[str_at];
         if ((byte & 0b10000000) > 0) {
-            if ((byte & 0b00000001) > 0) {
-                return str_at;
-            } else {
-                return str_at + 1;
-            }
+            return str_at;
         }
         str_at = try std.math.add(vm.Cell, str_at, 1);
     }
     return error.OutOfBounds;
+}
+
+fn maybeCutoffZeroTerminator(string: []const u8) []const u8 {
+    if (string.len > 0 and string[string.len - 1] == 0) {
+        return string[0..(string.len - 1)];
+    } else {
+        return string;
+    }
 }
 
 fn compareStringUntilTerminator(
@@ -50,7 +53,9 @@ fn compareStringUntilTerminator(
     const str_end = try readUntilTerminator(memory, str_start);
     const str_len = str_end - str_start;
     const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
-    if (utils.stringsEqual(str, to_compare, false)) {
+
+    const lookup = maybeCutoffZeroTerminator(str);
+    if (utils.stringsEqual(lookup, to_compare)) {
         return str_end;
     } else {
         return null;
@@ -185,8 +190,9 @@ pub fn Dictionary(
             const header_size = name.len + 3;
             const need_to_align = (definition_start + header_size) % 2 == 1;
             if (need_to_align) {
-                try self.here.commaC(self.memory, alignment_terminator);
+                try self.here.commaC(self.memory, 0);
             }
+
             try self.here.commaC(self.memory, base_terminator);
         }
 

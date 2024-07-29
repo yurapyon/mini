@@ -27,12 +27,11 @@ word definition layout:
 
   even length name
   prealign0               16      24              x       x+8
-  |?......|previous-------|name...|.......10000000|>127---|code...
+  |?......|previous-------|name...|.......00000000|>127---|code...
+
+  the name field may be zero terminated to align the entire header to u16s
 
   terminator is a byte >=128
-  an extra terminator may be added if the definition needs to be aligned
-    the lsb of this terminator will not be set,
-      where for other terminators in general it will be
   terminator bits:
     0: 1
     1: is-immediate
