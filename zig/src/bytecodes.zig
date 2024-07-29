@@ -10,6 +10,7 @@ const utils = @import("utils.zig");
 //   bytes, ?
 //   bytes! ?
 //   / mod u/ umod ?
+//     could define these as bytecodes then /mod and u/mod be forth words
 
 // ===
 
@@ -198,6 +199,7 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
 
+    // TODO unnecessary
     constructTagBytecode("data", data),
     constructBasicBytecode("next-char", nextChar),
 
@@ -421,12 +423,14 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.absoluteJump(addr, true);
 }
 
+// TODO this should read jumps the same way absjump does
 /// This jumps to the following address in memory without
 ///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.readCellAndAdvancePC();
+    const swapped_addr = @byteSwap(addr);
     // TODO this mask should be a constant somewhere
-    const masked_addr = addr & 0x7fff;
+    const masked_addr = swapped_addr & 0x7fff;
     try mini.absoluteJump(masked_addr, false);
 }
 
@@ -639,6 +643,7 @@ fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.nrot();
 }
 
+// TODO unnecessary
 fn data(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const length = try mini.readCellAndAdvancePC();
     try mini.data_stack.push(length);

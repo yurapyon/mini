@@ -5,45 +5,44 @@ word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : bytes,   c, c, ;
-: bytesLE, cell>bytes bytes, ;
-: bytesBE, cell>bytes swap bytes, ;
+: >little, cell>bytes bytes, ;
+: >big,    cell>bytes swap bytes, ;
 
 : bytes!   tuck c! 1+ c! ;
-: bytesLE! >r cell>bytes r> bytes! ;
-: bytesBE! >r cell>bytes swap r> bytes! ;
+: >little! >r cell>bytes r> bytes! ;
+: >big!    >r cell>bytes swap r> bytes! ;
 
 : mkabsjump 0x8000 or ;
-: absjump,  mkabsjump bytesBE, ;
-: absjump!  >r mkabsjump r> bytesBE! ;
+: xt,       mkabsjump >big, ;
+: xt!       >r mkabsjump r> >big! ;
 
-: [compile] ' absjump, ; immediate
+: this       here @ swap ;
+: how-far    this - ;
+: this!      this >little! ;
+: over-here! this xt! ;
 
-: this    here @ swap ;
-: howback here @ - ;
-: howfar  this - ;
-
-: idk,    0 c, ;
-: smthng, ['] litc c, here @ idk, ;
-
-: idunno,    idk, idk, ;
+: idk,       0 c, ;
+: idunno,    0 0 bytes, ;
+: smthng,    ['] litc c, here @ idk, ;
 : something, ['] lit c, here @ idunno, ;
-: this!      this bytesLE! ;
 
-: jump,    ['] branch  c, here @ idk, ;
-: jump0,   ['] branch0 c, here @ idk, ;
-: to-here! dup howfar swap c! ;
-: back!    tuck - swap c! ;
+: go-now,       ['] tailcall c, xt, ;
+: go-somewhere, ['] tailcall c, here @ idunno, ;
 
-: if   jump0, ; immediate
-: else jump, swap to-here! ; immediate
-: then to-here! ; immediate
+: jump,       ['] branch  c, here @ idk, ;
+: jump?,      ['] branch0 c, here @ idk, ;
+: right-here! dup how-far swap c! ;
+: back!       tuck - swap c! ;
+
+: if   jump?, ; immediate
+: else jump, swap right-here! ; immediate
+: then right-here! ; immediate
 
 : begin here @ ; immediate
-: until jump0, back! ; immediate
+: until jump?, back! ; immediate
 : again jump,  back! ; immediate
-
-: while  [compile] if ; immediate
-: repeat swap [compile] again [compile] then ; immediate
+: while jump?, ; immediate
+: repeat swap jump, back! right-here! ; immediate
 
 : char   word drop c@ ;
 : [char] ['] litc c, char c, ; immediate
@@ -55,17 +54,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
       [char] ) = if      -1 [ ' exit c, ] then
   0 ;
 
-: (
-  1
-  begin
-    next-char is() +
-    dup 0=
-  until
-  drop ; immediate
-
-: binary 2 base ! ;
-: decimal 10 base ! ;
-: hex 16 base ! ;
+: ( 1 begin next-char is() + dup 0= until drop ; immediate
 
 : :noname 0 0 define here @ ] ;
 
@@ -78,61 +67,47 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : cell 2 ;
 : cells cell * ;
 
+: binary 2 base ! ;
+: decimal 10 base ! ;
+: hex 16 base ! ;
+
 : u/   u/mod nip ;
 : umod u/mod drop ;
 : /    /mod nip ;
 : mod  /mod drop ;
 
-: within     ( val min max -- t/f )
-  >r over r> ( val min val max )
-  < -rot >= and ;
+: min 2dup > if swap then drop ;
+: max 2dup < if swap then drop ;
 
-: min ( a b -- min ) 2dup > if swap then drop ;
-: max ( a b -- max ) 2dup < if swap then drop ;
-: clamp ( val min max -- clamped ) rot min max ;
+\ ( value min max -- value )
+: clamp rot min max ;
+: within[] 2 pick >r clamp r> = ;
+: within[) 1- within[] ;
 
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
-: >cfa >terminator 1+ ;
-: last latest @ >cfa ;
+: >cfa    >terminator 1+ ;
+: last    latest @ >cfa ;
+: recurse last go-now, ; immediate
 
 \ ===
 
-: >body       aligned 6 + ;
-: >does       >body 3 - ;
-: do-nothing, ['] exit c, idk, ;
-: do-this!    last >does absjump! ;
+: >body      6 + ;
+: >does      >body 3 - ;
+: doesnt,    ['] exit c, idk, ;
+: does-this! last >does xt! ;
 
 : allot here +! ;
 
-: create
-  word define
-  something, do-nothing, ['] exit c, this! ;
-
-: does> something, ['] do-this! absjump, ['] exit c, this! ; immediate
-( _
-: does>
-  state @ if
-    something, ['] do-this! absjump, ['] exit c, this!
-  else
-    here @ do-this!
-    latest @ hide
-    ]
-  then ; immediate
-  )
-
+: create   word define something, doesnt, ['] exit c, this! ;
+: does>    something, ['] does-this! xt, ['] exit c, this! ; immediate
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
 : variable create cell allot ;
 
 \ ===
-
-: recurse
-  \ compiles the 'currently being defined' xt as a tailcall
-  \ latest @ >cfa tailcall
-  ; immediate
 
 : "? [char] " = ;
 
@@ -145,16 +120,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   repeat
   drop ;
 
-\ jump, only works with i8s, or 127 chars
-\   for fullsized data,
-\     you'd need to be able to compile tailcalls
-\ ( -- jump-ptr len-ptr )
-: datac, something, smthng, jump, rot this! swap ;
-: s" datac, here @ string, howfar swap c! to-here! ; immediate
+\ ( -- len-ptr tailcall-ptr )
+: data, something, something, go-somewhere, rot this! ;
+: s" data, swap here @ string, how-far swap ! over-here! ; immediate
 
-\ : hi s" hello" ;
-\
-\ hi ##type ##cr
+: hi s" hello" ;
+
+hi ##type ##cr
+
+bye
 
 
 : +field

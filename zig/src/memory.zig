@@ -67,21 +67,30 @@ pub fn cellAt(memory: []u8, addr: vm.Cell) MemoryError!*vm.Cell {
 
 // TODO this and the next function have pretty similar names
 pub fn sliceAt(memory: CellAlignedMemory, addr: vm.Cell, len: vm.Cell) MemoryError![]vm.Cell {
-    const last_addr = addr + ((len - 1) * @sizeOf(vm.Cell));
-    try assertCellMemoryAccess(memory, last_addr);
+    try assertCellMemoryAccess(memory, addr);
+    if (len > 0) {
+        const last_addr = addr + ((len - 1) * @sizeOf(vm.Cell));
+        try assertCellMemoryAccess(memory, last_addr);
+    }
     const ptr: [*]vm.Cell = @ptrCast(@alignCast(&memory[addr]));
     return ptr[0..len];
 }
 
 pub fn sliceFromAddrAndLen(memory: []u8, addr: usize, len: usize) MemoryError![]u8 {
-    const last_addr = addr + len - 1;
-    try assertMemoryAccess(memory, last_addr);
+    try assertMemoryAccess(memory, addr);
+    if (len > 0) {
+        const last_addr = addr + len - 1;
+        try assertMemoryAccess(memory, last_addr);
+    }
     return memory[addr..][0..len];
 }
 
 pub fn constSliceFromAddrAndLen(memory: []const u8, addr: usize, len: usize) MemoryError![]const u8 {
-    const last_addr = addr + len - 1;
-    try assertMemoryAccess(memory, last_addr);
+    try assertMemoryAccess(memory, addr);
+    if (len > 0) {
+        const last_addr = addr + len - 1;
+        try assertMemoryAccess(memory, last_addr);
+    }
     return memory[addr..][0..len];
 }
 
