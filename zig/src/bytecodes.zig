@@ -126,7 +126,6 @@ comptime {
 }
 
 const lookup_table = [_]BytecodeDefinition{
-    // ===
     // NOTE
     // panic is bytecode '0' so that you can just zero the memory to inialize it
     constructBasicBytecode("panic", panic),
@@ -150,6 +149,7 @@ const lookup_table = [_]BytecodeDefinition{
     constructTagBytecode("tailcall", tailcall),
 
     // ===
+
     constructBasicBytecode("!", store),
     constructBasicBytecode("+!", storeAdd),
     constructBasicBytecode("@", fetch),
@@ -166,17 +166,26 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("r>", fromR),
     constructBasicBytecode("r@", Rfetch),
 
+    constructBasicBytecode("d!", storeD),
+    constructBasicBytecode("d+!", storeAddD),
+    constructBasicBytecode("d@", fetchD),
+
     constructBasicBytecode("=", eq),
     constructBasicBytecode("<", lt),
     constructBasicBytecode("<=", lteq),
+    constructBasicBytecode("0=", eq0),
+    constructBasicBytecode(">", gt),
+    constructBasicBytecode(">=", gteq),
 
-    // ===
     constructBasicBytecode("+", plus),
     constructBasicBytecode("-", minus),
     constructBasicBytecode("*", multiply),
     constructBasicBytecode("/mod", divMod),
     constructBasicBytecode("u/mod", uDivMod),
     constructBasicBytecode("negate", negate),
+
+    constructBasicBytecode("1+", plus1),
+    constructBasicBytecode("1-", minus1),
 
     constructBasicBytecode("lshift", lshift),
     constructBasicBytecode("rshift", rshift),
@@ -185,49 +194,20 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("xor", xor),
     constructBasicBytecode("invert", invert),
 
-    constructBasicBytecode("seldev", selDev),
-    constructBasicBytecode("d!", storeD),
-    constructBasicBytecode("d+!", storeAddD),
-    constructBasicBytecode("d@", fetchD),
-
-    // ===
     constructBasicBytecode("dup", dup),
     constructBasicBytecode("drop", drop),
     constructBasicBytecode("swap", swap),
     constructBasicBytecode("pick", pick),
-
+    constructBasicBytecode("nip", nip),
+    constructBasicBytecode("flip", flip),
+    constructBasicBytecode("tuck", tuck),
+    constructBasicBytecode("over", over),
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
+    constructBasicBytecode("?dup", maybeDup),
 
     constructBasicBytecode("next-char", nextChar),
-
     constructTagBytecode("ext", ext),
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    // ===
-    constructBasicBytecode("0=", eq0),
-    constructBasicBytecode(">", gt),
-    constructBasicBytecode(">=", gteq),
-
-    constructBasicBytecode("1+", plus1),
-    constructBasicBytecode("1-", minus1),
-
-    constructBasicBytecode("0", push0),
-    constructBasicBytecode("0xffff", pushFFFF),
-
-    constructBasicBytecode("1", push1),
-    constructBasicBytecode("2", push2),
-    constructBasicBytecode("4", push4),
-    constructBasicBytecode("8", push8),
 
     constructBasicBytecode("cell>bytes", cellToBytes),
     constructBasicBytecode("bytes>cell", bytesToCell),
@@ -236,29 +216,6 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("cmove>", cmoveUp),
     constructBasicBytecode("mem=", memEq),
 
-    // ===
-    constructBasicBytecode("?dup", maybeDup),
-
-    constructBasicBytecode("nip", nip),
-    constructBasicBytecode("flip", flip),
-    constructBasicBytecode("tuck", tuck),
-    constructBasicBytecode("over", over),
-
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    // ===
     .{},
     .{},
     .{},
@@ -279,7 +236,6 @@ const lookup_table = [_]BytecodeDefinition{
     .{},
     .{},
 
-    //===
     .{},
     .{},
     .{},
@@ -297,6 +253,39 @@ const lookup_table = [_]BytecodeDefinition{
 
     .{},
     .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
+    .{},
+    .{},
+    .{},
+    .{},
+
     .{},
     .{},
 };
@@ -718,6 +707,7 @@ fn push8(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.push(8);
 }
 
+// TODO could rename these next two to split and join
 fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
     const high = @as(u8, @truncate(value >> 8));

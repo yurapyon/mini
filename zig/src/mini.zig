@@ -146,6 +146,7 @@ fn printMemoryStats() void {
     printMemoryStat("base");
 }
 
+// TODO keep aliases for now but they might not be necessary
 // NOTE no plans to allow for users to add aliases from mini
 const AliasDefinition = struct {
     alias: []const u8,
@@ -153,8 +154,8 @@ const AliasDefinition = struct {
 };
 
 const aliases = [_]AliasDefinition{
-    .{ .alias = "true", .word = "0xffff" },
-    .{ .alias = "false", .word = "0" },
+    // .{ .alias = "true", .word = "0xffff" },
+    // .{ .alias = "false", .word = "0" },
 };
 
 fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {

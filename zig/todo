@@ -21,3 +21,5 @@ it might be nice to not have to worry about alignment from forth
 figure out how to not pass the memory around as a slice
   either use ptr to VM
   or have CellAlignedMEmory be a struct and pass a ptr to it
+
+d!, d@ etc could have thier own memory space that starts at 0 ?
