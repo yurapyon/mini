@@ -777,6 +777,7 @@ fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.over();
 }
 
+// TODO move this into VM utils
 fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     std.debug.print("stack ==\n", .{});
     for (try mini.data_stack.asSlice(), 0..) |cell, i| {

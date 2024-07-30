@@ -187,3 +187,32 @@ pub fn stringsEqual(a: []const u8, b: []const u8) bool {
 
     return true;
 }
+
+// ===
+
+// TODO write some tests
+pub const LinkedListIterator = struct {
+    const vm = @import("mini.zig");
+
+    memory: vm.mem.CellAlignedMemory,
+    last_addr: vm.Cell,
+
+    pub fn from(
+        memory: vm.mem.CellAlignedMemory,
+        first_addr: vm.Cell,
+    ) @This() {
+        return .{
+            .memory = memory,
+            .last_addr = first_addr,
+        };
+    }
+
+    pub fn next(self: *@This()) !?vm.Cell {
+        if (self.last_addr == 0) {
+            return null;
+        }
+        const ret = self.last_addr;
+        self.last_addr = (try vm.mem.cellAt(self.memory, self.last_addr)).*;
+        return ret;
+    }
+};

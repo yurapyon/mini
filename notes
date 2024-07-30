@@ -1,0 +1,5 @@
+'[compile]' and 'literal' are confusing
+  things you might want to use [compile] with
+    should have non-immediate helper functions
+  compiling literals (anything with tags) should be done using
+    ' tag c, or ['] tag c, etc and shouldnt be too obfuscated
