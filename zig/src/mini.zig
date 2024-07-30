@@ -85,6 +85,7 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     input_buffer: [128]u8,
+    devices: [16][16]u8,
     dictionary_start: u0,
 }, Cell);
 
