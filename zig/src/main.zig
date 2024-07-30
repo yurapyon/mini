@@ -57,7 +57,7 @@ fn runMiniVM(allocator: Allocator) !void {
     );
     try vm_instance.repl();
 
-    try @import("vm_utils.zig").printMemory(&vm_instance);
+    // try @import("vm_utils.zig").printMemory(&vm_instance);
 }
 
 pub fn main() !void {
