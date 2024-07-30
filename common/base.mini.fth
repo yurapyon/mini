@@ -47,11 +47,13 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : char   word drop c@ ;
 : [char] ['] litc c, char c, ; immediate
 
+: exit, ['] exit c, ;
+
 : \ begin next-char 10 = until ; immediate
 
 : is()
-  dup [char] ( = if  drop 1 [ ' exit c, ] then
-      [char] ) = if      -1 [ ' exit c, ] then
+  dup [char] ( = if  drop 1 [ exit, ] then
+      [char] ) = if      -1 [ exit, ] then
   0 ;
 
 : ( 1 begin next-char is() + dup 0= until drop ; immediate
@@ -95,13 +97,13 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : >body      6 + ;
 : >does      >body 3 - ;
-: doesnt,    ['] exit c, idk, ;
+: doesnt,    exit, idk, ;
 : does-this! last >does xt! ;
 
 : allot here +! ;
 
-: create   word define something, doesnt, ['] exit c, this-here! ;
-: does>    something, ['] does-this! xt, ['] exit c, this-here! ; immediate
+: create   word define something, doesnt, exit, this-here! ;
+: does>    something, ['] does-this! xt, exit, this-here! ; immediate
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
@@ -109,12 +111,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 \ ===
 
-: "? [char] " = ;
+: string-end? [char] " = ;
 
 : string,
   next-char drop
   begin
-    next-char dup "? 0=
+    next-char dup string-end? 0=
   while
     c,
   repeat
@@ -127,22 +129,22 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : +field over + swap create , does> @ + ;
 : field  over aligned flip drop +field ;
 
-0 1 field >a
-  1 +field >b
-  cell field >c
-constant size
+: ext, ['] ext c, >little, ;
 
-0 >a
-0 >b
-0 >c
-size ##.s
+: ##.s    [ 0x0000 ext, ] ;
+: ##break [ 0x0001 ext, ] ;
+: ##type  [ 0x0002 ext, ] ;
+: ##cr    [ 0x0003 ext, ] ;
+: ##mem   [ 0x0004 ext, ] ;
 
+word hello ##type ##cr
+##mem
+
+\ : banner s" : mini ;" ##type ##cr ;
+
+\ banner
 
 bye
-
-
-\ TODO values, variables
-\ TODO strings
 
 \ should this file have to end with 'bye' or 'quit' ?
 
