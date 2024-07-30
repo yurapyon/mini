@@ -199,9 +199,9 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
 
-    // TODO unnecessary
-    constructTagBytecode("data", data),
     constructBasicBytecode("next-char", nextChar),
+
+    constructTagBytecode("ext", ext),
 
     .{},
     .{},
@@ -280,10 +280,10 @@ const lookup_table = [_]BytecodeDefinition{
     .{},
 
     //===
-    constructBasicBytecode("##.s", printStack),
-    constructBasicBytecode("##break", miniBreakpoint),
-    constructBasicBytecode("##type", printString),
-    constructBasicBytecode("##cr", printNewline),
+    .{},
+    .{},
+    .{},
+    .{},
 
     .{},
     .{},
@@ -643,12 +643,10 @@ fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.nrot();
 }
 
-// TODO unnecessary
-fn data(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const length = try mini.readCellAndAdvancePC();
-    try mini.data_stack.push(length);
-    try mini.data_stack.push(mini.program_counter.fetch());
-    mini.program_counter.storeAdd(length);
+fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    const shortcode = try mini.readCellAndAdvancePC();
+    const exts = @import("ext_bytecodes.zig");
+    try exts.executeExt(shortcode, mini, ctx);
 }
 
 fn toTerminator(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -775,28 +773,6 @@ fn tuck(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.over();
-}
-
-// TODO move this into VM utils
-fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    std.debug.print("stack ==\n", .{});
-    for (try mini.data_stack.asSlice(), 0..) |cell, i| {
-        std.debug.print("{}: {}\n", .{ i, cell });
-    }
-}
-
-fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = 2 + 2;
-}
-
-fn printString(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const len, const addr = try mini.data_stack.popMultiple(2);
-    const str = try vm.mem.constSliceFromAddrAndLen(mini.memory, addr, len);
-    std.debug.print("{s}", .{str});
-}
-
-fn printNewline(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    std.debug.print("\n", .{});
 }
 
 // ===

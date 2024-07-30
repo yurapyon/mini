@@ -1,5 +1,26 @@
-'[compile]' and 'literal' are confusing
-  things you might want to use [compile] with
-    should have non-immediate helper functions
-  compiling literals (anything with tags) should be done using
-    ' tag c, or ['] tag c, etc and shouldnt be too obfuscated
+immediate:
+  '[compile]' and 'literal' are confusing
+    things you might want to use [compile] with
+      should have non-immediate helper functions
+    compiling literals (anything with tags) should be done using
+      ' tag c, or ['] tag c, etc and shouldnt be too obfuscated
+  'immediate' == 'syntax'
+    define compile helpers, but only expose them through syntax
+    this keeps the language from beinging too 'macro'y
+
+programs shouldnt expect to have the same base-file/stdlib
+  the bytecodes are fixed
+  the language is defined at runtime
+
+ext:
+  among other things, the reason to use a tag for ext's is that
+    the system can determine at compile time if it supports the ext or not
+    all behavior that would be available with an ext bytecode
+      that pops off the stack is available with an ext tag,
+      barring the ability to interpret the ext with the interpreter
+    ext words will have to be defined to be called,
+      and compiling ext's may often look like:
+      [ ' ext c, 0x1234 cell>bytes c, c, ]
+    binary system images can be searched for ext's and know what functions are being called
+
+  ext stands for 'external xt' :)
