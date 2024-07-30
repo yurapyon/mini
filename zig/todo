@@ -17,3 +17,7 @@ better errors in console when vm crashes
 can the vm and interpreter/compiler be more separate?
 
 it might be nice to not have to worry about alignment from forth
+
+figure out how to not pass the memory around as a slice
+  either use ptr to VM
+  or have CellAlignedMEmory be a struct and pass a ptr to it

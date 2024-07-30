@@ -1,12 +1,13 @@
 mini specs ===
 
-system:
+vm:
   cell size:     2 bytes
   address space: 32k bytes
   endianness:    little
   negatives:     twos-compilment
 
 language:
+  untyped
   case-insensitive
   max input line length: 128 chars
   max word name length:  2^16 (limited by input buffer length)

@@ -57,12 +57,7 @@ fn runMiniVM(allocator: Allocator) !void {
     );
     try vm_instance.repl();
 
-    var iter = vm_instance.dictionary.iterator();
-    var value = try iter.next();
-    while (value) |v| {
-        std.debug.print("{}\n", .{v});
-        value = try iter.next();
-    }
+    try @import("vm_utils.zig").printMemory(&vm_instance);
 }
 
 pub fn main() !void {

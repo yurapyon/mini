@@ -211,8 +211,8 @@ pub const LinkedListIterator = struct {
         if (self.last_addr == 0) {
             return null;
         }
-        const ret = (try vm.mem.cellAt(self.memory, self.last_addr)).*;
-        self.last_addr = ret;
+        const ret = self.last_addr;
+        self.last_addr = (try vm.mem.cellAt(self.memory, self.last_addr)).*;
         return ret;
     }
 };

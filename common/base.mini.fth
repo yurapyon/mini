@@ -124,25 +124,11 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : data, something, something, go-somewhere, rot this-here! ;
 : s" data, swap here @ string, how-far swap ! go-here! ; immediate
 
-: hi s" hello" ;
+: +field over + swap create , does> @ + ;
+: field  over aligned flip drop +field ;
 
-hi ##type ##cr
-
-bye
-
-
-: +field
-  over + swap
-  create ,
-  does> @ + ;
-
-: field
-  over aligned
-  flip drop
-  +field ;
-
-0 cell field >a
-  cell field >b
+0 1 field >a
+  1 +field >b
   cell field >c
 constant size
 
