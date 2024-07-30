@@ -9,15 +9,17 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : exit,  ['] exit c, ;
 : jump,  ['] branch  c, ;
 : jump?, ['] branch0 c, ;
-: now,   ['] tailcall c, ;
+: go,    ['] tailcall c, ;
 : push,  ['] lit  c, ;
 : pushc, ['] litc c, ;
 : ext,   ['] ext c, ;
 
-: nothing,  0 c, 0 c, ;
-: nothingc, 0 c, ;
-: later,    here @ nothing, ;
-: laterc,   here @ nothingc, ;
+: nothing,   0 c, 0 c, ;
+: nothingc,  0 c, ;
+: later,     here @ nothing, ;
+: laterc,    here @ nothingc, ;
+: something, push, later, ;
+: somewhere, go, later, ;
 
 : c!+ tuck c! 1+ ;
 
@@ -94,15 +96,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : :noname 0 0 define here @ ] ;
 : >cfa    >terminator 1+ ;
 : last    latest @ >cfa ;
-: recurse last now, xt, ; immediate
+: recurse go, last xt, ; immediate
 
 \ ===
 
 : >body      6 + ;
 : >does      >body 3 - ;
 : does-this! last >does xt! ;
-: create   word define push, later, just-exit, exit, this-here! ;
-: does>    push, later, ['] does-this! xt, exit, this-here! ; immediate
+: create     word define something, just-exit, exit, this-here! ;
+: does>      something, ['] does-this! xt, exit, this-here! ; immediate
 
 : allot here +! ;
 : constant create , does> @ ;
@@ -123,8 +125,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   repeat
   drop ;
 
-\ ( -- len-ptr tailcall-ptr )
-: data, push, later, push, later, now, later, rot this-here! ;
+: data, something, something, somewhere, rot this-here! ;
 : s" data, swap here @ string, how-far swap ! go-here! ; immediate
 
 : mkfield create , does> @ + ;
