@@ -61,7 +61,7 @@ bytecodes:
       compile:   do something
       interpret: do the same thing as above
       execute:   do the same thing as above
-    tag (exit, branch, branch0, tailcall, lit, litc, data):
+    tag (exit, branch, branch0, tailcall, lit, litc, ext):
       compile:   error
       interpret: error
       execute:   do something

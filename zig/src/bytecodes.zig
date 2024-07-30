@@ -120,7 +120,7 @@ fn constructTagBytecode(
 comptime {
     if (lookup_table.len > base_abs_jump_bytecode) {
         @compileError("Too many bytecodes....");
-    } else if (lookup_table.len < base_abs_jump_bytecode - 1) {
+    } else if (lookup_table.len < base_abs_jump_bytecode) {
         @compileError("Not enough bytecodes....");
     }
 }
@@ -199,12 +199,11 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("rot", rot),
     constructBasicBytecode("-rot", nrot),
 
-    // TODO 'data' is unnecessary
-    constructTagBytecode("data", data),
     constructBasicBytecode("next-char", nextChar),
 
     constructTagBytecode("ext", ext),
 
+    .{},
     .{},
     .{},
     .{},
@@ -642,14 +641,6 @@ fn rot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.nrot();
-}
-
-// TODO unnecessary
-fn data(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const length = try mini.readCellAndAdvancePC();
-    try mini.data_stack.push(length);
-    try mini.data_stack.push(mini.program_counter.fetch());
-    mini.program_counter.storeAdd(length);
 }
 
 fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
