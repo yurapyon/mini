@@ -3,7 +3,7 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const bytecodes = @import("bytecodes.zig");
-const Devices = @import("devices/devices.zig").Devices;
+const Devices = @import("devices.zig").Devices;
 const Stack = @import("stack.zig").Stack;
 const Register = @import("register.zig").Register;
 const InputSource = @import("input_source.zig").InputSource;
@@ -85,7 +85,7 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     input_buffer: [128]u8,
-    devices: [16][16]u8,
+    devices: [256]u8,
     dictionary_start: u0,
 }, Cell);
 
@@ -199,7 +199,7 @@ pub const MiniVM = struct {
         MemoryLayout.offsetOf("input_buffer_at"),
         MemoryLayout.offsetOf("input_buffer_len"),
     ),
-    devices: Devices,
+    devices: Devices(MemoryLayout.offsetOf("devices")),
 
     should_quit: bool,
     should_bye: bool,
@@ -400,14 +400,19 @@ pub const MiniVM = struct {
         //     directly without having to do any math
 
         while (self.return_stack.depth() > 0) {
-            const bytecode = try self.readByteAndAdvancePC();
-            const ctx = ExecutionContext{
-                .current_bytecode = bytecode,
-            };
-            try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
-                self,
-                ctx,
-            );
+            const maybe_call = try self.devices.poll();
+            if (maybe_call) |addr| {
+                try self.return_stack.push(addr);
+            } else {
+                const bytecode = try self.readByteAndAdvancePC();
+                const ctx = ExecutionContext{
+                    .current_bytecode = bytecode,
+                };
+                try bytecodes.getBytecodeDefinition(bytecode).executeSemantics(
+                    self,
+                    ctx,
+                );
+            }
         }
     }
 
