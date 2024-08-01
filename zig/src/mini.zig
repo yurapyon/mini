@@ -21,6 +21,25 @@ comptime {
     }
 }
 
+const VMCallbacks = struct {
+    // return a boolean saying whether VM should
+    //   continue with its default behavior after calling the callback
+    const CallbackFn = *const fn (mini: *MiniVM, userdata: ?*anyopaque) Error!bool;
+
+    userdata: ?*anyopaque = null,
+    onQuit: CallbackFn = nop,
+    onBye: CallbackFn = nop,
+    // TODO these potentially could take an ExecutionContext
+    // which is to say maybe that could just be stored as part of the vm
+    onExecuteLoop: CallbackFn = nop,
+    onExecuteBytecode: CallbackFn = nop,
+    onExit: CallbackFn = nop,
+
+    fn nop(_: *MiniVM, _: ?*anyopaque) Error!bool {
+        return true;
+    }
+};
+
 // TODO
 // make an error, error.NumberOverflow instead of just using the builtin error.Overflow
 
@@ -204,7 +223,9 @@ pub const MiniVM = struct {
     should_quit: bool,
     should_bye: bool,
 
-    pub fn init(self: *@This(), memory: mem.CellAlignedMemory) !void {
+    callbacks: VMCallbacks,
+
+    pub fn init(self: *@This(), memory: mem.CellAlignedMemory, callbacks: VMCallbacks) !void {
         self.memory = memory;
 
         const panic_byte = bytecodes.lookupBytecodeByName("panic") orelse unreachable;
@@ -234,10 +255,12 @@ pub const MiniVM = struct {
         self.should_quit = false;
         self.should_bye = false;
 
+        self.callbacks = callbacks;
+
         self.compileMemoryLocationConstants();
 
         // TODO
-        // run base file
+        // run base file ?
     }
 
     fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
@@ -280,14 +303,21 @@ pub const MiniVM = struct {
     }
 
     pub fn onQuit(self: *@This()) Error!void {
-        self.data_stack.clear();
-        // TODO
-        // set refiller to cmd line input
-        self.should_bye = true;
+        const should_continue = try self.callbacks.onQuit(self, self.callbacks.userdata);
+        if (should_continue) {
+            self.data_stack.clear();
+            // TODO
+            // set refiller to cmd line input
+            // TODO remove next line when bye/quit logic is figured out
+            self.should_bye = true;
+        }
     }
 
     pub fn onBye(self: *@This()) Error!void {
-        self.data_stack.clear();
+        const should_continue = try self.callbacks.onBye(self, self.callbacks.userdata);
+        if (should_continue) {
+            self.data_stack.clear();
+        }
     }
 
     // ===
@@ -399,11 +429,12 @@ pub const MiniVM = struct {
         //   because bytecodes can just set the jump location
         //     directly without having to do any math
 
+        // TODO should we care about this return?
+        _ = try self.callbacks.onExecuteLoop(self, self.callbacks.userdata);
+
         while (self.return_stack.depth() > 0) {
-            const maybe_call = try self.devices.poll();
-            if (maybe_call) |addr| {
-                try self.return_stack.push(addr);
-            } else {
+            const should_continue = try self.callbacks.onExecuteBytecode(self, self.callbacks.userdata);
+            if (should_continue) {
                 const bytecode = try self.readByteAndAdvancePC();
                 const ctx = ExecutionContext{
                     .current_bytecode = bytecode,

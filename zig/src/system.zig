@@ -1,5 +1,5 @@
 const std = @import("std");
-const Allocator = std.Allocator;
+const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 
 const vm = @import("mini.zig");
@@ -10,7 +10,7 @@ pub const System = struct {
     vm_memory: vm.mem.CellAlignedMemory,
     vm_thread: ?Thread,
 
-    should_exit: bool,
+    should_exit: std.atomic.Value(bool),
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
         self.allocator = allocator;
@@ -23,7 +23,7 @@ pub const System = struct {
 
         self.vm_thread = null;
 
-        self.should_exit = false;
+        self.should_exit = @TypeOf(self.should_exit).init(false);
     }
 
     pub fn deinit(self: @This()) void {
@@ -33,7 +33,7 @@ pub const System = struct {
     // ===
 
     pub fn start(self: *@This()) !void {
-        self.vm_thread = try Thread.spawn(.{}, runVM, self.vm_memory);
+        self.vm_thread = try Thread.spawn(.{}, runVM, .{ self, self.vm_memory });
     }
 
     pub fn stop(self: *@This()) void {
@@ -44,28 +44,43 @@ pub const System = struct {
     }
 
     pub fn mainLoop(self: *@This()) !void {
-        while (!self.should_exit) {
+        while (!self.should_exit.load(.unordered)) {
             // 1/60
-            std.time.nanosleep(16000000);
+            std.time.sleep(16000000);
         }
+    }
+
+    fn runVM(self: *@This(), memory: vm.mem.CellAlignedMemory) !void {
+        var vm_instance: vm.MiniVM = undefined;
+        try vm_instance.init(memory, .{
+            .userdata = self,
+            .onBye = callbacks.onBye,
+        });
+
+        var refiller: LineByLineRefiller = undefined;
+        refiller.init(base_file);
+
+        vm_instance.should_bye = false;
+        vm_instance.should_quit = false;
+        vm_instance.input_source.setRefillCallback(
+            LineByLineRefiller.refill,
+            @ptrCast(&refiller),
+        );
+        try vm_instance.repl();
     }
 };
 
-fn runVM(memory: vm.mem.CellAlignedMemory) !void {
-    var vm_instance: vm.MiniVM = undefined;
-    try vm_instance.init(memory);
+const callbacks = struct {
+    fn onBye(_: *vm.MiniVM, maybe_self: ?*anyopaque) vm.Error!bool {
+        if (maybe_self) |self_| {
+            const self = @as(*System, @ptrCast(@alignCast(self_)));
 
-    var refiller: LineByLineRefiller = undefined;
-    refiller.init(base_file);
-
-    vm_instance.should_bye = false;
-    vm_instance.should_quit = false;
-    vm_instance.input_source.setRefillCallback(
-        LineByLineRefiller.refill,
-        @ptrCast(&refiller),
-    );
-    try vm_instance.repl();
-}
+            std.debug.print("byebye\n", .{});
+            self.should_exit.store(true, .unordered);
+        }
+        return true;
+    }
+};
 
 const base_file = @embedFile("common/base.mini.fth");
 

@@ -293,8 +293,11 @@ fn quit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn exit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.return_stack.pop();
-    try mini.absoluteJump(addr, false);
+    const should_continue = try mini.callbacks.onExit(mini, mini.callbacks.userdata);
+    if (should_continue) {
+        const addr = try mini.return_stack.pop();
+        try mini.absoluteJump(addr, false);
+    }
 }
 
 fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
