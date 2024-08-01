@@ -117,15 +117,7 @@ fn constructTagBytecode(
     };
 }
 
-comptime {
-    if (lookup_table.len > base_abs_jump_bytecode) {
-        @compileError("Too many bytecodes....");
-    } else if (lookup_table.len < base_abs_jump_bytecode) {
-        @compileError("Not enough bytecodes....");
-    }
-}
-
-const lookup_table = [_]BytecodeDefinition{
+const lookup_table = [128]BytecodeDefinition{
     // NOTE
     // panic is bytecode '0' so that you can just zero the memory to inialize it
     constructBasicBytecode("panic", panic),
@@ -301,8 +293,11 @@ fn quit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn exit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.return_stack.pop();
-    try mini.absoluteJump(addr, false);
+    const should_continue = try mini.callbacks.onExit(mini, mini.callbacks.userdata);
+    if (should_continue) {
+        const addr = try mini.return_stack.pop();
+        try mini.absoluteJump(addr, false);
+    }
 }
 
 fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -586,24 +581,16 @@ fn invert(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.push(~value);
 }
 
-fn selDev(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO
-    _ = mini;
-}
-
 fn storeD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
+    try mini.devices.store(0xbeef);
 }
 
 fn storeAddD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
+    try mini.devices.storeAdd(0xbeef);
 }
 
 fn fetchD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
+    _ = try mini.devices.fetch(0xbeef);
 }
 
 fn dup(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
