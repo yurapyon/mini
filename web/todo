@@ -1,0 +1,13 @@
+the plan:
+  use typescript for:
+    system
+    interpreter
+    compiler
+
+  and hand-coded wasm for:
+    executor
+    bytecodes
+
+  maybe at some point it would be cool to have everything in wasm,
+    or just the interpreter and compiler
+  for now its not worth it and may even be better to write that stuff in typescript first
