@@ -14,3 +14,7 @@ the plan:
   maybe at some point it would be cool to have everything in wasm,
     or just the interpreter and compiler
   for now its not worth it and may even be better to write that stuff in typescript first
+
+this is alot the same as the Zig implementation
+  but the io setup will be very different
+    and when/if we move to using WASM for the executor that will change things alot

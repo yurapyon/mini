@@ -1,5 +1,4 @@
 import { Memory } from "./Memory";
-import { VM } from "./VM";
 
 export class Register {
   memory: Memory;
