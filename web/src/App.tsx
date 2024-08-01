@@ -1,9 +1,11 @@
-import type { Component } from 'solid-js';
+import type { Component } from "solid-js";
 
-import logo from './logo.svg';
-import styles from './App.module.css';
+import logo from "./logo.svg";
+import styles from "./App.module.css";
+import { MEMORY_LAYOUT, showMemoryLayout } from "./lib/constants";
 
 const App: Component = () => {
+  showMemoryLayout(MEMORY_LAYOUT);
   return (
     <div class={styles.App}>
       <header class={styles.header}>

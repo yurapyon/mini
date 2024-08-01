@@ -7,6 +7,9 @@ the plan:
   and hand-coded wasm for:
     executor
     bytecodes
+    stack
+    register
+    dictionary
 
   maybe at some point it would be cool to have everything in wasm,
     or just the interpreter and compiler
