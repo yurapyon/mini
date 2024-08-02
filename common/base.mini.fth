@@ -6,20 +6,21 @@ word hide      define ]          2 flipt! [ ' exit c,
 word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
-: exit,  ['] exit c, ;
-: jump,  ['] branch  c, ;
-: jump?, ['] branch0 c, ;
-: go,    ['] tailcall c, ;
-: push,  ['] lit  c, ;
-: pushc, ['] litc c, ;
-: ext,   ['] ext c, ;
+: exit, ['] exit c, ;
+: br,   ['] branch  c, ;
+: ?br,  ['] branch0 c, ;
+: jump, ['] tailcall c, ;
+: lit,  ['] lit  c, ;
+: litc, ['] litc c, ;
+: ext,  ['] ext c, ;
 
-: nothing,   0 c, 0 c, ;
-: nothingc,  0 c, ;
-: later,     here @ nothing, ;
-: laterc,    here @ nothingc, ;
-: something, push, later, ;
-: somewhere, go, later, ;
+: blank,     0 c, 0 c, ;
+: blankc,    0 c, ;
+: later,     here @ blank, ;
+: laterc,    here @ blankc, ;
+: something, lit, later, ;
+: somewhere, jump, later, ;
+: return,    exit, blankc, ;
 
 : c!+ tuck c! 1+ ;
 
@@ -33,27 +34,26 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : mkabsjump  0x8000 or ;
 : xt,        mkabsjump cell,b ;
 : xt!        swap mkabsjump swap cell!b ;
-: just-exit, exit, nothingc, ;
 
-: this-here  here @ swap ;
-: how-far    this-here - ;
-: this-here! this-here cell!l ;
-: go-here!   this-here xt! ;
-: jump-here! dup how-far swap c! ;
+: this       here @ swap ;
+: how-far    this - ;
+: this!      this cell!l ;
+: jump-mark! this xt! ;
+: br-mark!   dup how-far swap c! ;
 : back,      how-far negate c, ;
 
-: if   jump?, laterc, ; immediate
-: else jump,  laterc, swap jump-here! ; immediate
-: then jump-here! ; immediate
+: if   ?br, laterc, ; immediate
+: else br,  laterc, swap br-mark! ; immediate
+: then br-mark! ; immediate
 
 : begin here @ ; immediate
-: until jump?, back, ; immediate
-: again jump,  back, ; immediate
-: while jump?, laterc, ; immediate
-: repeat swap jump, back, jump-here! ; immediate
+: until ?br, back, ; immediate
+: again br,  back, ; immediate
+: while ?br, laterc, ; immediate
+: repeat swap br, back, br-mark! ; immediate
 
 : char   word drop c@ ;
-: [char] pushc, char c, ; immediate
+: [char] litc, char c, ; immediate
 
 : \ begin next-char 10 = until ; immediate
 
@@ -96,15 +96,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : :noname 0 0 define here @ ] ;
 : >cfa    >terminator 1+ ;
 : last    latest @ >cfa ;
-: recurse go, last xt, ; immediate
+: recurse jump, last xt, ; immediate
 
 \ ===
 
-: >body      6 + ;
-: >does      >body 3 - ;
-: does-this! last >does xt! ;
-: create     word define something, just-exit, exit, this-here! ;
-: does>      something, ['] does-this! xt, exit, this-here! ; immediate
+: >body  6 + ;
+: >does  >body 3 - ;
+: does!  last >does xt! ;
+: create word define something, return, exit, this! ;
+: does>  something, ['] does! xt, exit, this! ; immediate
 
 : allot here +! ;
 : constant create , does> @ ;
@@ -112,25 +112,25 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : flag     dup constant 1 lshift ;
 : variable create cell allot ;
 
+: idxer    create , does> @ + ;
+: +field   over idxer + ;
+: field    swap aligned swap +field ;
+
 \ ===
 
-: string-end? [char] " = ;
+: str-end? [char] " = ;
 
 : string,
   next-char drop
   begin
-    next-char dup string-end? 0=
+    next-char dup str-end? 0=
   while
     c,
   repeat
   drop ;
 
-: data, something, something, somewhere, rot this-here! ;
-: s" data, swap here @ string, how-far swap ! go-here! ; immediate
-
-: mkfield create , does> @ + ;
-: +field over mkfield + ;
-: field  swap aligned swap +field ;
+: header, something, something, somewhere, rot this! ;
+: s"      header, swap here @ string, how-far swap ! jump-mark! ; immediate
 
 0 cell field >one
   cell field >two
