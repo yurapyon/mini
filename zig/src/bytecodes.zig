@@ -14,24 +14,6 @@ const utils = @import("utils.zig");
 
 // ===
 
-pub const base_abs_jump_bytecode = 0b10000000;
-
-const abs_jump_definition = BytecodeDefinition{
-    .compileSemantics = cannotCompile,
-    .interpretSemantics = cannotInterpret,
-    .executeSemantics = executeAbsJump,
-};
-
-fn executeAbsJump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // const high = ctx.current_bytecode & 0x7f;
-    // const low = try mini.readByteAndAdvancePC();
-    // const addr = @as(vm.Cell, high) << 8 | low;
-    const addr = try mini.readCellAndAdvancePC();
-    try mini.absoluteJump(addr, true);
-}
-
-// ===
-
 fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
 
 fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
@@ -55,10 +37,10 @@ const BytecodeDefinition = struct {
 
 pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
     return switch (bytecode) {
-        inline 0...(base_abs_jump_bytecode - 1) => |byte| {
+        inline 0...(lookup_table.len - 1) => |byte| {
             return lookup_table[byte];
         },
-        else => abs_jump_definition,
+        else => unreachable,
     };
 }
 
@@ -118,7 +100,7 @@ fn constructTagBytecode(
     };
 }
 
-const lookup_table = [128]BytecodeDefinition{
+const lookup_table = [_]BytecodeDefinition{
     // NOTE
     // panic is bytecode '0' so that you can just zero the memory to inialize it
     constructBasicBytecode("panic", panic),
@@ -138,8 +120,13 @@ const lookup_table = [128]BytecodeDefinition{
 
     constructTagBytecode("branch", branch),
     constructTagBytecode("branch0", branch0),
-    constructBasicBytecode("execute", execute),
-    constructTagBytecode("tailcall", tailcall),
+    .{
+        .name = "execute",
+        .compileSemantics = executeCompileInterpret,
+        .interpretSemantics = executeCompileInterpret,
+        .executeSemantics = executeExecute,
+    },
+    constructTagBytecode("jump", jump),
 
     // ===
 
@@ -209,79 +196,8 @@ const lookup_table = [128]BytecodeDefinition{
     constructBasicBytecode("cmove>", cmoveUp),
     constructBasicBytecode("mem=", memEq),
 
-    constructTagBytecode("call", executeAbsJump),
-
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
-    .{},
-    .{},
-
-    .{},
-    .{},
+    constructTagBytecode("call", call),
+    constructBasicBytecode("nop", nop),
 };
 
 // ===
@@ -406,19 +322,20 @@ fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 // TODO
 // should a version of this be made that works for bytecodes?
 // TODO this doesnt work from the interpreter, you have to explicitly run an exec loop
-fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+fn executeExecute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.absoluteJump(addr, true);
 }
 
-// TODO this should read jumps the same way absjump does
+fn executeCompileInterpret(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+    try executeExecute(mini, ctx);
+    try mini.executionLoop();
+}
+
 /// This jumps to the following address in memory without
 ///   pushing anything to the return stack
-fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+fn jump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.readCellAndAdvancePC();
-    // const swapped_addr = @byteSwap(addr);
-    // TODO this mask should be a constant somewhere
-    // const masked_addr = swapped_addr & 0x7fff;
     try mini.absoluteJump(addr, false);
 }
 
@@ -754,6 +671,11 @@ fn tuck(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.over();
+}
+
+fn call(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const addr = try mini.readCellAndAdvancePC();
+    try mini.absoluteJump(addr, true);
 }
 
 // ===

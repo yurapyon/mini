@@ -9,7 +9,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : exit, ['] exit c, ;
 : br,   ['] branch  c, ;
 : ?br,  ['] branch0 c, ;
-: jump, ['] tailcall c, ;
+: jump, ['] jump c, ;
 : call, ['] call c, ;
 : lit,  ['] lit  c, ;
 : litc, ['] litc c, ;
@@ -98,7 +98,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : >body  6 + ;
 : >does  >body 3 - ;
-: does!  last >does ['] tailcall swap c!+ cell! ;
+: does!  last >does ['] jump swap c!+ cell! ;
 : create word define something, return, this! ;
 : does>  something, ['] does! xt-call, exit, this! ; immediate
 
@@ -108,9 +108,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : flag     dup constant 1 lshift ;
 : variable create cell allot ;
 
-: idxer    create , does> @ + ;
-: +field   over idxer + ;
-: field    swap aligned swap +field ;
+: idxer  create , does> @ + ;
+: +field over idxer + ;
+: field  swap aligned swap +field ;
 
 \ ===
 
@@ -128,6 +128,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 \ you can define different string routines
 \ then set them to a callback
 \ then string, calls them
+\ TODO look into ASSIGN from polyforth
 : header, something, something, somewhere, rot this! ;
 : s"      header, swap here @ string, dist swap ! this! ; immediate
 
@@ -152,6 +153,8 @@ thisthing
 :dyn can-redefine 4 5 6 ##.s drop drop drop ;
 
 thisthing
+
+' thisthing execute
 
 ##.s
 

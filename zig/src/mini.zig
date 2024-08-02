@@ -406,8 +406,7 @@ pub const MiniVM = struct {
         }
     }
 
-    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try self.dictionary.toCfa(addr);
+    pub fn executeCfa(self: *@This(), cfa_addr: Cell) Error!void {
         // NOTE
         // this puts some 'dummy data' on the return stack
         // the 'dummy data' is actually the xt currently being executed
@@ -421,7 +420,13 @@ pub const MiniVM = struct {
         try self.executionLoop();
     }
 
-    fn executionLoop(self: *@This()) Error!void {
+    // TODO can probably refactor this
+    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
+        const cfa_addr = try self.dictionary.toCfa(addr);
+        try self.executeCfa(cfa_addr);
+    }
+
+    pub fn executionLoop(self: *@This()) Error!void {
         // Execution strategy:
         //   1. increment PC, then
         //   2. evaluate byte at PC-1
