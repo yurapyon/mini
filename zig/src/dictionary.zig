@@ -117,6 +117,8 @@ pub fn Dictionary(
                     const terminator = TerminatorInfo.fromByte(terminator_byte);
                     if (!terminator.is_hidden) {
                         return latest;
+                    } else {
+                        // TODO print warning when you find a hidden word :)
                     }
                 }
                 latest = (try vm.mem.cellAt(self.memory, latest)).*;
@@ -202,32 +204,10 @@ pub fn Dictionary(
             try self.here.commaC(self.memory, value);
         }
 
-        // TODO write tests for these
         pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
-            if (addr > std.math.maxInt(u15)) {
-                return error.InvalidAddress;
-            }
-
-            const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
-            const jump = base | addr;
-            try self.here.commaC(self.memory, @truncate(jump >> 8));
-            try self.here.commaC(self.memory, @truncate(jump));
+            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("call") orelse unreachable);
+            try self.here.commaByteAlignedCell(self.memory, addr);
         }
-
-        // TODO this is out of date but might be a nice helper function for the vm
-        //         pub fn compileData(self: *@This(), data: []u8) vm.Error!void {
-        //             if (data.len > std.math.maxInt(u12)) {
-        //                 return error.InvalidAddress;
-        //             }
-        //
-        //             const base = @as(vm.Cell, bytecodes.base_data_bytecode) << 8;
-        //             const data_len = base | @as(vm.Cell, @truncate(data.len & 0x0fff));
-        //             try self.here.commaC(self.memory, @truncate(data_len >> 8));
-        //             try self.here.commaC(self.memory, @truncate(data_len));
-        //             for (data) |byte| {
-        //                 try self.here.commaC(self.memory, byte);
-        //             }
-        //         }
 
         pub fn compileConstant(
             self: *@This(),
