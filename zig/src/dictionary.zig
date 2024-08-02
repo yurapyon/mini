@@ -202,17 +202,21 @@ pub fn Dictionary(
             try self.here.commaC(self.memory, value);
         }
 
-        // TODO write tests for these
         pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
-            if (addr > std.math.maxInt(u15)) {
-                return error.InvalidAddress;
-            }
-
-            const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
-            const jump = base | addr;
-            try self.here.commaC(self.memory, @truncate(jump >> 8));
-            try self.here.commaC(self.memory, @truncate(jump));
+            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("call") orelse unreachable);
+            try self.here.commaByteAlignedCell(self.memory, addr);
         }
+
+        //         pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
+        //             if (addr > std.math.maxInt(u15)) {
+        //                 return error.InvalidAddress;
+        //             }
+        //
+        //             const base = @as(vm.Cell, bytecodes.base_abs_jump_bytecode) << 8;
+        //             const jump = base | addr;
+        //             try self.here.commaC(self.memory, @truncate(jump >> 8));
+        //             try self.here.commaC(self.memory, @truncate(jump));
+        //         }
 
         // TODO this is out of date but might be a nice helper function for the vm
         //         pub fn compileData(self: *@This(), data: []u8) vm.Error!void {

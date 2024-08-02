@@ -1,5 +1,3 @@
-here @
-
 word ##.s      define ' ext c, 0 c, 0 c, ' exit c,
 word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
 word flipt!    define ] 0x80 swap rshift swap >terminator flipb! [ ' exit c,
@@ -12,6 +10,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : br,   ['] branch  c, ;
 : ?br,  ['] branch0 c, ;
 : jump, ['] tailcall c, ;
+: call, ['] call c, ;
 : lit,  ['] lit  c, ;
 : litc, ['] litc c, ;
 : ext,  ['] ext c, ;
@@ -22,7 +21,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : (later)c,  here @ blankc, ;
 : something, lit, (later), ;
 : somewhere, jump, (later), ;
-: return,    exit, blankc, ;
+: return,    exit, blank, ;
 
 : c!+ tuck c! 1+ ;
 
@@ -33,14 +32,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : cell!l swap cell>b rot c!+ c! ;
 : cell!b swap cell>l rot c!+ c! ;
 
-: mkabsjump  0x8000 or ;
-: xt,        mkabsjump cell,b ;
-: xt!        swap mkabsjump swap cell!b ;
-
 : this       here @ swap ;
 : how-far    this - ;
 : this!      this cell!l ;
-: jump-mark! this xt! ;
 : br-mark!   dup how-far swap c! ;
 : back,      how-far negate c, ;
 
@@ -58,6 +52,10 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : [char] litc, char c, ; immediate
 
 : \ begin next-char 10 = until ; immediate
+
+\ : mkabsjump  0x8000 or ;
+\ : xt,        mkabsjump cell,b ;
+\ : xt!        swap mkabsjump swap cell!b ;
 
 : is()
   dup [char] ( = if  drop 1 [ exit, ] then
@@ -98,21 +96,27 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : :noname 0 0 define here @ ] ;
 : >cfa    >terminator 1+ ;
 : last    latest @ >cfa ;
-: recurse jump, last xt, ; immediate
+: recurse jump, last cell,l ; immediate
 
 \ ===
 
-: >body  6 + ;
-: >does  >body 3 - ;
-: does!  last >does xt! ;
-: create word define something, return, exit, this! ;
-: does>  something, ['] does! xt, exit, this! ; immediate
+: >body  8 + ;
+: >does  >body 5 - ;
+: does!  last >does ['] call swap c!+ cell!l ;
+: create word define something, return, exit, align this! ;
+: does>  something, call, ['] does! cell,l exit, this! ; immediate
+
+##.s
 
 : allot here +! ;
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
 : variable create cell allot ;
+
+100 constant x
+x
+##.s
 
 : idxer    create , does> @ + ;
 : +field   over idxer + ;
@@ -131,13 +135,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   repeat
   drop ;
 
+\ you can define different string routines
+\ then set them to a callback
+\ then string, calls them
+
 : header, something, something, somewhere, rot this! ;
-: s"      header, swap here @ string, how-far swap ! jump-mark! ; immediate
-
-how-far ##.s
-
-
-
+: s"      header, swap here @ string, how-far swap ! this! ; immediate
 
 0 cell field >one
   cell field >two
@@ -155,14 +158,14 @@ size
 : ##type  [ 0x0002 ext, ] ;
 : ##cr    [ 0x0003 ext, ] ;
 : ##mem   [ 0x0004 ext, ] ;
-##.s
 
-: next, here @ 2 + xt, ;
+: next, here @ 2 + cell,l ;
 : :dyn word define jump, next, latest @ hide ] ;
-: setdyn ' 1+ xt! ;
+: setdyn ' 1+ cell!l ;
 
 :dyn frame 1 2 3 ##.s drop drop drop ;
 
+##.s
 frame
 
 :noname 4 5 6 ##.s drop drop drop ;

@@ -22,10 +22,11 @@ const abs_jump_definition = BytecodeDefinition{
     .executeSemantics = executeAbsJump,
 };
 
-fn executeAbsJump(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const high = ctx.current_bytecode & 0x7f;
-    const low = try mini.readByteAndAdvancePC();
-    const addr = @as(vm.Cell, high) << 8 | low;
+fn executeAbsJump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    // const high = ctx.current_bytecode & 0x7f;
+    // const low = try mini.readByteAndAdvancePC();
+    // const addr = @as(vm.Cell, high) << 8 | low;
+    const addr = try mini.readCellAndAdvancePC();
     try mini.absoluteJump(addr, true);
 }
 
@@ -208,7 +209,8 @@ const lookup_table = [128]BytecodeDefinition{
     constructBasicBytecode("cmove>", cmoveUp),
     constructBasicBytecode("mem=", memEq),
 
-    .{},
+    constructTagBytecode("call", executeAbsJump),
+
     .{},
     .{},
     .{},
@@ -412,10 +414,10 @@ fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 ///   pushing anything to the return stack
 fn tailcall(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.readCellAndAdvancePC();
-    const swapped_addr = @byteSwap(addr);
+    // const swapped_addr = @byteSwap(addr);
     // TODO this mask should be a constant somewhere
-    const masked_addr = swapped_addr & 0x7fff;
-    try mini.absoluteJump(masked_addr, false);
+    // const masked_addr = swapped_addr & 0x7fff;
+    try mini.absoluteJump(addr, false);
 }
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
