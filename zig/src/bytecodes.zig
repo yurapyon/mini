@@ -321,7 +321,6 @@ fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 // this only works for forth words
 // TODO
 // should a version of this be made that works for bytecodes?
-// TODO this doesnt work from the interpreter, you have to explicitly run an exec loop
 fn executeExecute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.absoluteJump(addr, true);
