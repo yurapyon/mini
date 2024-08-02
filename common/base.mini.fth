@@ -1,3 +1,5 @@
+here @
+
 word ##.s      define ' ext c, 0 c, 0 c, ' exit c,
 word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
 word flipt!    define ] 0x80 swap rshift swap >terminator flipb! [ ' exit c,
@@ -16,10 +18,10 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;
-: later,     here @ blank, ;
-: laterc,    here @ blankc, ;
-: something, lit, later, ;
-: somewhere, jump, later, ;
+: (later),   here @ blank, ;
+: (later)c,  here @ blankc, ;
+: something, lit, (later), ;
+: somewhere, jump, (later), ;
 : return,    exit, blankc, ;
 
 : c!+ tuck c! 1+ ;
@@ -42,14 +44,14 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : br-mark!   dup how-far swap c! ;
 : back,      how-far negate c, ;
 
-: if   ?br, laterc, ; immediate
-: else br,  laterc, swap br-mark! ; immediate
+: if   ?br, (later)c, ; immediate
+: else br,  (later)c, swap br-mark! ; immediate
 : then br-mark! ; immediate
 
 : begin here @ ; immediate
 : until ?br, back, ; immediate
 : again br,  back, ; immediate
-: while ?br, laterc, ; immediate
+: while ?br, (later)c, ; immediate
 : repeat swap br, back, br-mark! ; immediate
 
 : char   word drop c@ ;
@@ -132,6 +134,11 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : header, something, something, somewhere, rot this! ;
 : s"      header, swap here @ string, how-far swap ! jump-mark! ; immediate
 
+how-far ##.s
+
+
+
+
 0 cell field >one
   cell field >two
 constant size
@@ -143,11 +150,26 @@ size
 ##.s
 
 : ext, ['] ext c, cell,l ;
-: ##.s    [ 0x0001 ext, ] ;
+: ##.s    [ 0x0000 ext, ] ;
 : ##break [ 0x0001 ext, ] ;
 : ##type  [ 0x0002 ext, ] ;
 : ##cr    [ 0x0003 ext, ] ;
 : ##mem   [ 0x0004 ext, ] ;
+##.s
+
+: next, here @ 2 + xt, ;
+: :dyn word define jump, next, latest @ hide ] ;
+: setdyn ' 1+ xt! ;
+
+:dyn frame 1 2 3 ##.s drop drop drop ;
+
+frame
+
+:noname 4 5 6 ##.s drop drop drop ;
+setdyn frame
+
+frame
+
 
 word hello ##type ##cr
 ##mem
