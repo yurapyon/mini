@@ -358,12 +358,13 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 }
 
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const word = try mini.popSlice();
+    const len, const addr = try mini.data_stack.popMultiple(2);
+    const word = try vm.mem.sliceFromAddrAndLen(mini.memory, addr, len);
     const result_or_error = mini.lookupStringAndGetAddress(word);
     const result = result_or_error catch |err| switch (err) {
         error.WordNotFound => {
-            try mini.data_stack.push(0);
-            try mini.data_stack.push(0);
+            try mini.data_stack.push(addr);
+            try mini.data_stack.push(len);
             try mini.data_stack.push(vm.fromBool(vm.Cell, false));
             return;
         },
@@ -404,6 +405,7 @@ fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 // this only works for forth words
 // TODO
 // should a version of this be made that works for bytecodes?
+// TODO this doesnt work from the interpreter, you have to explicitly run an exec loop
 fn execute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.data_stack.pop();
     try mini.absoluteJump(addr, true);

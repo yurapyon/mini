@@ -117,6 +117,8 @@ pub fn Dictionary(
                     const terminator = TerminatorInfo.fromByte(terminator_byte);
                     if (!terminator.is_hidden) {
                         return latest;
+                    } else {
+                        // TODO print warning when you find a hidden word :)
                     }
                 }
                 latest = (try vm.mem.cellAt(self.memory, latest)).*;

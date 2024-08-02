@@ -492,7 +492,7 @@ pub const MiniVM = struct {
         is_bytecode: bool,
         value: Cell,
     } {
-        // NOTE
+        // NOTE TODO
         // in this case lookupString could have a early return to not try and parse numbers
         if (try self.lookupString(str)) |word_info| {
             switch (word_info) {
