@@ -198,6 +198,7 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructTagBytecode("call", call),
     constructBasicBytecode("nop", nop),
+    constructBasicBytecode("refill", refill),
 };
 
 // ===
@@ -675,6 +676,11 @@ fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn call(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const addr = try mini.readCellAndAdvancePC();
     try mini.absoluteJump(addr, true);
+}
+
+fn refill(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    const did_refill = try mini.input_source.refill();
+    try mini.data_stack.push(vm.fromBool(vm.Cell, did_refill));
 }
 
 // ===

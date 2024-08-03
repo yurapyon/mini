@@ -6,70 +6,8 @@ const utils = @import("utils.zig");
 const bytecodes = @import("bytecodes.zig");
 const Register = @import("register.zig").Register;
 
-const base_terminator = 0b10000000;
-
-const TerminatorReadError = error{
-    Overflow,
-} || vm.mem.MemoryError;
-
-fn readUntilTerminator(
-    memory: []const u8,
-    str_start: vm.Cell,
-) TerminatorReadError!vm.Cell {
-    var str_at = str_start;
-    while (str_at < memory.len) {
-        const byte = memory[str_at];
-        if ((byte & 0b10000000) > 0) {
-            return str_at;
-        }
-        str_at = try std.math.add(vm.Cell, str_at, 1);
-    }
-    return error.OutOfBounds;
-}
-
-fn maybeCutoffZeroTerminator(string: []const u8) []const u8 {
-    if (string.len > 0 and string[string.len - 1] == 0) {
-        return string[0..(string.len - 1)];
-    } else {
-        return string;
-    }
-}
-
-fn compareStringUntilTerminator(
-    memory: []const u8,
-    str_start: vm.Cell,
-    to_compare: []const u8,
-) TerminatorReadError!?vm.Cell {
-    // NOTE
-    // to make this easy,
-    //   just going to get a slice by reading until the terminator
-    // then comparing the slices
-    // it's possible to write an optimized version that only has to loop once
-    //   but thats just O(n) vs O(2n) and not a big deal
-    const str_end = try readUntilTerminator(memory, str_start);
-    const str_len = str_end - str_start;
-    const str = try vm.mem.constSliceFromAddrAndLen(memory, str_start, str_len);
-
-    const lookup = maybeCutoffZeroTerminator(str);
-    if (utils.stringsEqual(lookup, to_compare)) {
-        return str_end;
-    } else {
-        return null;
-    }
-}
-
-pub const TerminatorInfo = packed struct(u8) {
-    // TODO is there a way to have unnamed fields?
-    // or explicitly set the offset?
-    padding: u5,
-    is_hidden: bool,
-    is_immediate: bool,
-    terminator_indicator: u1,
-
-    pub fn fromByte(terminator_byte: u8) @This() {
-        return @bitCast(terminator_byte);
-    }
-};
+// TODO rename this somehow
+const t = @import("terminator.zig");
 
 /// This is a Forth style dictionary
 ///   where each definition has a pointer to the previous definition
@@ -101,7 +39,7 @@ pub fn Dictionary(
         ) vm.Error!?vm.Cell {
             var latest = self.latest.fetch();
             while (latest != 0) {
-                const terminator_addr = compareStringUntilTerminator(
+                const terminator_addr = t.compareStringUntilTerminator(
                     self.memory,
                     latest + @sizeOf(vm.Cell),
                     word,
@@ -114,7 +52,7 @@ pub fn Dictionary(
 
                 if (terminator_addr) |addr| {
                     const terminator_byte = try vm.mem.checkedRead(self.memory, addr);
-                    const terminator = TerminatorInfo.fromByte(terminator_byte);
+                    const terminator = t.TerminatorInfo.fromByte(terminator_byte);
                     if (!terminator.is_hidden) {
                         return latest;
                     } else {
@@ -130,7 +68,7 @@ pub fn Dictionary(
             self: @This(),
             addr: vm.Cell,
         ) vm.mem.MemoryError!vm.Cell {
-            const terminator_addr = readUntilTerminator(
+            const terminator_addr = t.readUntilTerminator(
                 self.memory,
                 addr + @sizeOf(vm.Cell),
             ) catch |err| switch (err) {
@@ -152,12 +90,12 @@ pub fn Dictionary(
         pub fn getTerminator(
             self: @This(),
             addr: vm.Cell,
-        ) vm.mem.MemoryError!TerminatorInfo {
+        ) vm.mem.MemoryError!t.TerminatorInfo {
             // NOTE
             // the next array access is ok because we've already checked
             //   for out of bounds errors in toTerminator
             const terminator_byte = self.memory[try self.toTerminator(addr)];
-            return TerminatorInfo.fromByte(terminator_byte);
+            return t.TerminatorInfo.fromByte(terminator_byte);
         }
 
         // TODO should this throw memory errors?
@@ -170,7 +108,7 @@ pub fn Dictionary(
             name: []const u8,
         ) vm.Error!void {
             for (name) |ch| {
-                if (ch >= base_terminator) {
+                if (ch >= t.base_terminator) {
                     return error.WordNameInvalid;
                 }
             }
@@ -191,7 +129,7 @@ pub fn Dictionary(
                 try self.here.commaC(self.memory, 0);
             }
 
-            try self.here.commaC(self.memory, base_terminator);
+            try self.here.commaC(self.memory, t.base_terminator);
         }
 
         pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {
@@ -204,6 +142,7 @@ pub fn Dictionary(
             try self.here.commaC(self.memory, value);
         }
 
+        // TODO rename this
         pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
             try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("call") orelse unreachable);
             try self.here.commaByteAlignedCell(self.memory, addr);
@@ -253,7 +192,7 @@ test "dictionary" {
 
     try testing.expectEqualSlices(
         u8,
-        &[_]u8{ 0x00, 0x00, 'n', 'a', 'm', 'e', base_terminator },
+        &[_]u8{ 0x00, 0x00, 'n', 'a', 'm', 'e', t.base_terminator },
         memory[dictionary_start..][0..7],
     );
 

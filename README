@@ -7,11 +7,9 @@ goals:
   easy
     easy to write/read mini code
     easy to implement/port vm
-  usable on microcontrollers
-    small memory footprint
-
-features:
-  the vm functions
+  small memory footprint
+  system images
+    saving/loading dictionaries as binary
 
 roadmap:
   planned:
@@ -21,18 +19,41 @@ roadmap:
       filesystem access
     self-hosted version
       it would be fun
-    system images
-      saving/loading dictionaries as binary
   maybe:
-    good performance
     io
       audio
+
+\ ======
+
+: (tbd name) ;
+
+virtual computer
+
+goals:
+  retro emulation
+    emulate limited graphics/audio hardware
+  achronistic
+    help with loading data into projects
+    help with visualizing memory
+  art tool
+    usable for making motion graphics/video art
+  cross platform
+    web and OSX versions are in progress
+
+roadmap:
+  planned:
+    interactive
+      edit memory directly and in real time
+  maybe:
+    good performance
     interactive
       nice repl
       built-in editor
-    'Forth for the web'
+
+\ ======
 
 you need:
   zig
+  npm
 
 MIT
