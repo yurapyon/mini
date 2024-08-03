@@ -45,7 +45,7 @@ const VMCallbacks = struct {
 // TODO
 // make an error, error.NumberOverflow instead of just using the builtin error.Overflow
 
-pub const max_memory_size = 32 * 1024;
+pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
     Panic,
