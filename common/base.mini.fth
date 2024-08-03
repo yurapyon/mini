@@ -6,6 +6,8 @@ word hide      define ]          2 flipt! [ ' exit c,
 word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
+: \ source >in ! drop ; immediate
+
 : exit, ['] exit c, ;
 : br,   ['] branch  c, ;
 : ?br,  ['] branch0 c, ;
@@ -51,14 +53,11 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : char   word drop c@ ;
 : [char] litc, char c, ; immediate
 
-: \ begin next-char 10 = until ; immediate
+: +-()
+  dup [char] ( = if  drop 1+ [ exit, ] then
+      [char] ) = if       1- [ exit, ] then ;
 
-: is()
-  dup [char] ( = if  drop 1 [ exit, ] then
-      [char] ) = if      -1 [ exit, ] then
-  0 ;
-
-: ( 1 begin next-char is() + dup 0= until drop ; immediate
+: ( 1 begin next-char +-() dup 0= until drop ; immediate
 
 : 2dup over over ;
 : 2drop drop drop ;
@@ -158,7 +157,10 @@ thisthing
 
 ' thisthing execute
 
+
 ##.s
+
+source ##.s
 
 
 bye

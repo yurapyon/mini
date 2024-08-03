@@ -240,6 +240,21 @@ pub const MiniVM = struct {
             "d0",
             MemoryLayout.offsetOf("dictionary_start"),
         ) catch unreachable;
+        self.dictionary.compileConstant(
+            ">in",
+            MemoryLayout.offsetOf("input_buffer_at"),
+        ) catch unreachable;
+        self.compileSourceWord();
+    }
+
+    fn compileSourceWord(self: *@This()) void {
+        self.dictionary.defineWord("source") catch unreachable;
+        self.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer")) catch unreachable;
+        self.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer_len")) catch unreachable;
+        const fetch_bytecode = bytecodes.lookupBytecodeByName("@") orelse unreachable;
+        self.dictionary.here.commaC(self.dictionary.memory, fetch_bytecode) catch unreachable;
+        const exit_bytecode = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
+        self.dictionary.here.commaC(self.dictionary.memory, exit_bytecode) catch unreachable;
     }
 
     // ===

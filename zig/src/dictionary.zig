@@ -142,6 +142,7 @@ pub fn Dictionary(
             try self.here.commaC(self.memory, value);
         }
 
+        // TODO rename this
         pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
             try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("call") orelse unreachable);
             try self.here.commaByteAlignedCell(self.memory, addr);
