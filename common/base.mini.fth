@@ -137,7 +137,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : ##break [ 0x0001 ext, ] ;
 : ##type  [ 0x0002 ext, ] ;
 : ##cr    [ 0x0003 ext, ] ;
-: ##mem   [ 0x0004 ext, ] ;
+: ##.d    [ 0x0004 ext, ] ;
+
+##.d
 
 : dyn, define next, ;
 : dyn! >cfa 1+ this! ;

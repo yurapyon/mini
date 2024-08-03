@@ -10,6 +10,8 @@ const InputSource = @import("input_source.zig").InputSource;
 const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
+// TODO rename somehow
+const t = @import("terminator.zig");
 
 pub const mem = @import("memory.zig");
 
@@ -124,7 +126,7 @@ pub const WordInfo = union(enum) {
     bytecode: u8,
     number: Cell,
 
-    fn fromMiniWord(definition_addr: Cell, terminator: dictionary.TerminatorInfo) Error!@This() {
+    fn fromMiniWord(definition_addr: Cell, terminator: t.TerminatorInfo) Error!@This() {
         return .{
             .mini_word = .{
                 .definition_addr = definition_addr,
@@ -164,33 +166,6 @@ fn printMemoryStats() void {
     printMemoryStat("latest");
     printMemoryStat("state");
     printMemoryStat("base");
-}
-
-// TODO keep aliases for now but they might not be necessary
-// NOTE no plans to allow for users to add aliases from mini
-const AliasDefinition = struct {
-    alias: []const u8,
-    word: []const u8,
-};
-
-const aliases = [_]AliasDefinition{
-    // .{ .alias = "true", .word = "0xffff" },
-    // .{ .alias = "false", .word = "0" },
-};
-
-fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
-    // TODO lookup table utils ?
-    for (aliases) |alias_definition| {
-        if (utils.stringsEqual(alias_definition.alias, word_or_alias)) {
-            return alias_definition.word;
-        }
-    }
-    return null;
-}
-
-fn maybeLookupAliasedBytecode(word_or_alias: []const u8) ?u8 {
-    const word = maybeFindAlias(word_or_alias) orelse word_or_alias;
-    return bytecodes.lookupBytecodeByName(word);
 }
 
 /// MiniVM
@@ -348,7 +323,7 @@ pub const MiniVM = struct {
         if (try self.dictionary.lookup(str)) |definition_addr| {
             const terminator = try self.dictionary.getTerminator(definition_addr);
             return try WordInfo.fromMiniWord(definition_addr, terminator);
-        } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
+        } else if (bytecodes.lookupBytecodeByName(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
             return WordInfo.fromNumber(value);
@@ -514,12 +489,12 @@ pub const MiniVM = struct {
                     };
                 },
                 .number => |_| {
-                    std.debug.print("Word not found: {s}\n", .{str});
+                    // std.debug.print("Word not found: {s}\n", .{str});
                     return error.WordNotFound;
                 },
             }
         } else {
-            std.debug.print("Word not found: {s}\n", .{str});
+            // std.debug.print("Word not found: {s}\n", .{str});
             return error.WordNotFound;
         }
     }
