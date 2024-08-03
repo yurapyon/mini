@@ -15,10 +15,7 @@ pub fn executeExt(
     }
 }
 
-const ExtFn = *const fn (
-    mini: *vm.MiniVM,
-    ctx: vm.ExecutionContext,
-) vm.Error!void;
+const ExtFn = vm.BytecodeFn;
 
 const ext_lookup = [_]ExtFn{
     printStack,

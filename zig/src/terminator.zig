@@ -9,6 +9,7 @@ const TerminatorReadError = error{
     Overflow,
 } || vm.mem.MemoryError;
 
+/// starting at str_start, return the address of the next terminator
 pub fn readUntilTerminator(
     memory: []const u8,
     str_start: vm.Cell,

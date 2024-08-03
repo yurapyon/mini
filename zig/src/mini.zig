@@ -55,6 +55,7 @@ pub const Error = error{
     ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
+    InvalidCompileState,
 } || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || MathError || Allocator.Error;
 
 pub const InputError = error{
@@ -88,6 +89,7 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
+    _,
 };
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
@@ -102,7 +104,6 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     latest: Cell,
     state: Cell,
     base: Cell,
-    active_device: Cell,
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     input_buffer: [128]u8,
@@ -155,19 +156,6 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-// TODO currenly unused, should format more nicely
-fn printMemoryStat(comptime name: []const u8) void {
-    std.debug.print("{s}: {}\n", .{ name, MemoryLayout.offsetOf(name) });
-}
-
-// TODO currenly unused, should format more nicely
-fn printMemoryStats() void {
-    printMemoryStat("here");
-    printMemoryStat("latest");
-    printMemoryStat("state");
-    printMemoryStat("base");
-}
-
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
@@ -188,7 +176,6 @@ pub const MiniVM = struct {
     ),
     state: Register(MemoryLayout.offsetOf("state")),
     base: Register(MemoryLayout.offsetOf("base")),
-    active_device: Register(MemoryLayout.offsetOf("active_device")),
     input_source: InputSource(
         MemoryLayout.offsetOf("input_buffer_at"),
         MemoryLayout.offsetOf("input_buffer_len"),
@@ -217,7 +204,6 @@ pub const MiniVM = struct {
         );
         try self.base.init(self.memory);
         try self.state.init(self.memory);
-        try self.active_device.init(self.memory);
         try self.input_source.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
@@ -225,7 +211,6 @@ pub const MiniVM = struct {
 
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
-        self.active_device.store(0);
 
         self.should_quit = false;
         self.should_bye = false;
@@ -243,7 +228,6 @@ pub const MiniVM = struct {
     }
 
     fn compileMemoryLocationConstants(self: *@This()) void {
-        // TODO might be nice to have a 'dictionary start' constant
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
         self.compileMemoryLocationConstant("state");
@@ -251,6 +235,10 @@ pub const MiniVM = struct {
         self.dictionary.compileConstant(
             "r0",
             MemoryLayout.offsetOf("return_stack"),
+        ) catch unreachable;
+        self.dictionary.compileConstant(
+            "d0",
+            MemoryLayout.offsetOf("dictionary_start"),
         ) catch unreachable;
     }
 
@@ -299,9 +287,6 @@ pub const MiniVM = struct {
 
     fn evaluateString(self: *@This(), word: []const u8) Error!void {
         if (try self.lookupString(word)) |word_info| {
-            // TODO
-            // this enumFromInt can crash
-            //   CompileState should be non-exhaustive and throw an error if it isn't interpret or compile
             const state: CompileState = @enumFromInt(self.state.fetch());
             switch (state) {
                 .interpret => {
@@ -310,6 +295,7 @@ pub const MiniVM = struct {
                 .compile => {
                     try self.compile(word_info);
                 },
+                else => return error.InvalidCompileState,
             }
         } else {
             // TODO printWordNotFound fn
@@ -344,7 +330,8 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |mini_word| {
-                try self.executeMiniWord(mini_word.definition_addr);
+                const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
+                try self.executeCfa(cfa_addr);
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -364,10 +351,10 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |mini_word| {
+                const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
                 if (mini_word.is_immediate) {
-                    try self.executeMiniWord(mini_word.definition_addr);
+                    try self.executeCfa(cfa_addr);
                 } else {
-                    const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
                     try self.dictionary.compileAbsJump(cfa_addr);
                 }
             },
@@ -393,12 +380,6 @@ pub const MiniVM = struct {
         };
         self.program_counter.store(cfa_addr);
         try self.executionLoop();
-    }
-
-    // TODO can probably refactor this
-    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try self.dictionary.toCfa(addr);
-        try self.executeCfa(cfa_addr);
     }
 
     pub fn executionLoop(self: *@This()) Error!void {
@@ -489,12 +470,10 @@ pub const MiniVM = struct {
                     };
                 },
                 .number => |_| {
-                    // std.debug.print("Word not found: {s}\n", .{str});
                     return error.WordNotFound;
                 },
             }
         } else {
-            // std.debug.print("Word not found: {s}\n", .{str});
             return error.WordNotFound;
         }
     }

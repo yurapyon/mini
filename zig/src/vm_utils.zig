@@ -17,7 +17,6 @@ pub fn printWordBody(
 pub fn printDictionary(mini: *vm.MiniVM) !void {
     var dictionary_iter = mini.dictionary.iterator();
 
-    // const current_latest = mini.dictionary.latest.fetch();
     var previous_addr = mini.dictionary.here.fetch();
 
     while (try dictionary_iter.next()) |addr| {
@@ -46,4 +45,17 @@ pub fn printDictionary(mini: *vm.MiniVM) !void {
 
         previous_addr = addr;
     }
+}
+
+// TODO currenly unused, should format more nicely
+fn printMemoryStat(comptime name: []const u8) void {
+    std.debug.print("{s}: {}\n", .{ name, vm.MemoryLayout.offsetOf(name) });
+}
+
+// TODO currenly unused, should format more nicely
+fn printMemoryStats() void {
+    printMemoryStat("here");
+    printMemoryStat("latest");
+    printMemoryStat("state");
+    printMemoryStat("base");
 }
