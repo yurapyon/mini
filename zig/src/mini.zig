@@ -10,6 +10,8 @@ const InputSource = @import("input_source.zig").InputSource;
 const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
+// TODO rename somehow
+const t = @import("terminator.zig");
 
 pub const mem = @import("memory.zig");
 
@@ -43,7 +45,7 @@ const VMCallbacks = struct {
 // TODO
 // make an error, error.NumberOverflow instead of just using the builtin error.Overflow
 
-pub const max_memory_size = 32 * 1024;
+pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
     Panic,
@@ -53,6 +55,7 @@ pub const Error = error{
     ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
+    InvalidCompileState,
 } || mem.MemoryError || WordError || InputError || SemanticsError || utils.ParseNumberError || MathError || Allocator.Error;
 
 pub const InputError = error{
@@ -86,6 +89,7 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
+    _,
 };
 
 pub const MemoryLayout = utils.MemoryLayout(struct {
@@ -100,7 +104,6 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     latest: Cell,
     state: Cell,
     base: Cell,
-    active_device: Cell,
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     input_buffer: [128]u8,
@@ -124,7 +127,7 @@ pub const WordInfo = union(enum) {
     bytecode: u8,
     number: Cell,
 
-    fn fromMiniWord(definition_addr: Cell, terminator: dictionary.TerminatorInfo) Error!@This() {
+    fn fromMiniWord(definition_addr: Cell, terminator: t.TerminatorInfo) Error!@This() {
         return .{
             .mini_word = .{
                 .definition_addr = definition_addr,
@@ -153,46 +156,6 @@ pub fn isTruthy(value: anytype) bool {
     return value != 0;
 }
 
-// TODO currenly unused, should format more nicely
-fn printMemoryStat(comptime name: []const u8) void {
-    std.debug.print("{s}: {}\n", .{ name, MemoryLayout.offsetOf(name) });
-}
-
-// TODO currenly unused, should format more nicely
-fn printMemoryStats() void {
-    printMemoryStat("here");
-    printMemoryStat("latest");
-    printMemoryStat("state");
-    printMemoryStat("base");
-}
-
-// TODO keep aliases for now but they might not be necessary
-// NOTE no plans to allow for users to add aliases from mini
-const AliasDefinition = struct {
-    alias: []const u8,
-    word: []const u8,
-};
-
-const aliases = [_]AliasDefinition{
-    // .{ .alias = "true", .word = "0xffff" },
-    // .{ .alias = "false", .word = "0" },
-};
-
-fn maybeFindAlias(word_or_alias: []const u8) ?[]const u8 {
-    // TODO lookup table utils ?
-    for (aliases) |alias_definition| {
-        if (utils.stringsEqual(alias_definition.alias, word_or_alias)) {
-            return alias_definition.word;
-        }
-    }
-    return null;
-}
-
-fn maybeLookupAliasedBytecode(word_or_alias: []const u8) ?u8 {
-    const word = maybeFindAlias(word_or_alias) orelse word_or_alias;
-    return bytecodes.lookupBytecodeByName(word);
-}
-
 /// MiniVM
 /// brings together execution, stacks, dictionary, input, devices
 pub const MiniVM = struct {
@@ -213,7 +176,6 @@ pub const MiniVM = struct {
     ),
     state: Register(MemoryLayout.offsetOf("state")),
     base: Register(MemoryLayout.offsetOf("base")),
-    active_device: Register(MemoryLayout.offsetOf("active_device")),
     input_source: InputSource(
         MemoryLayout.offsetOf("input_buffer_at"),
         MemoryLayout.offsetOf("input_buffer_len"),
@@ -242,7 +204,6 @@ pub const MiniVM = struct {
         );
         try self.base.init(self.memory);
         try self.state.init(self.memory);
-        try self.active_device.init(self.memory);
         try self.input_source.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
@@ -250,7 +211,6 @@ pub const MiniVM = struct {
 
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
-        self.active_device.store(0);
 
         self.should_quit = false;
         self.should_bye = false;
@@ -268,7 +228,6 @@ pub const MiniVM = struct {
     }
 
     fn compileMemoryLocationConstants(self: *@This()) void {
-        // TODO might be nice to have a 'dictionary start' constant
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
         self.compileMemoryLocationConstant("state");
@@ -277,6 +236,25 @@ pub const MiniVM = struct {
             "r0",
             MemoryLayout.offsetOf("return_stack"),
         ) catch unreachable;
+        self.dictionary.compileConstant(
+            "d0",
+            MemoryLayout.offsetOf("dictionary_start"),
+        ) catch unreachable;
+        self.dictionary.compileConstant(
+            ">in",
+            MemoryLayout.offsetOf("input_buffer_at"),
+        ) catch unreachable;
+        self.compileSourceWord();
+    }
+
+    fn compileSourceWord(self: *@This()) void {
+        self.dictionary.defineWord("source") catch unreachable;
+        self.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer")) catch unreachable;
+        self.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer_len")) catch unreachable;
+        const fetch_bytecode = bytecodes.lookupBytecodeByName("@") orelse unreachable;
+        self.dictionary.here.commaC(self.dictionary.memory, fetch_bytecode) catch unreachable;
+        const exit_bytecode = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
+        self.dictionary.here.commaC(self.dictionary.memory, exit_bytecode) catch unreachable;
     }
 
     // ===
@@ -324,9 +302,6 @@ pub const MiniVM = struct {
 
     fn evaluateString(self: *@This(), word: []const u8) Error!void {
         if (try self.lookupString(word)) |word_info| {
-            // TODO
-            // this enumFromInt can crash
-            //   CompileState should be non-exhaustive and throw an error if it isn't interpret or compile
             const state: CompileState = @enumFromInt(self.state.fetch());
             switch (state) {
                 .interpret => {
@@ -335,6 +310,7 @@ pub const MiniVM = struct {
                 .compile => {
                     try self.compile(word_info);
                 },
+                else => return error.InvalidCompileState,
             }
         } else {
             // TODO printWordNotFound fn
@@ -348,7 +324,7 @@ pub const MiniVM = struct {
         if (try self.dictionary.lookup(str)) |definition_addr| {
             const terminator = try self.dictionary.getTerminator(definition_addr);
             return try WordInfo.fromMiniWord(definition_addr, terminator);
-        } else if (maybeLookupAliasedBytecode(str)) |bytecode| {
+        } else if (bytecodes.lookupBytecodeByName(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
             return WordInfo.fromNumber(value);
@@ -369,7 +345,8 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |mini_word| {
-                try self.executeMiniWord(mini_word.definition_addr);
+                const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
+                try self.executeCfa(cfa_addr);
             },
             .number => |value| {
                 try self.data_stack.push(value);
@@ -389,10 +366,10 @@ pub const MiniVM = struct {
                 );
             },
             .mini_word => |mini_word| {
+                const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
                 if (mini_word.is_immediate) {
-                    try self.executeMiniWord(mini_word.definition_addr);
+                    try self.executeCfa(cfa_addr);
                 } else {
-                    const cfa_addr = try self.dictionary.toCfa(mini_word.definition_addr);
                     try self.dictionary.compileAbsJump(cfa_addr);
                 }
             },
@@ -418,12 +395,6 @@ pub const MiniVM = struct {
         };
         self.program_counter.store(cfa_addr);
         try self.executionLoop();
-    }
-
-    // TODO can probably refactor this
-    fn executeMiniWord(self: *@This(), addr: Cell) Error!void {
-        const cfa_addr = try self.dictionary.toCfa(addr);
-        try self.executeCfa(cfa_addr);
     }
 
     pub fn executionLoop(self: *@This()) Error!void {
@@ -514,12 +485,10 @@ pub const MiniVM = struct {
                     };
                 },
                 .number => |_| {
-                    std.debug.print("Word not found: {s}\n", .{str});
                     return error.WordNotFound;
                 },
             }
         } else {
-            std.debug.print("Word not found: {s}\n", .{str});
             return error.WordNotFound;
         }
     }

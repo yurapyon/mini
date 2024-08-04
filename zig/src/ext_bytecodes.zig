@@ -1,6 +1,7 @@
 const std = @import("std");
 
 const vm = @import("mini.zig");
+const vm_utils = @import("vm_utils.zig");
 
 pub fn executeExt(
     shortcode: vm.Cell,
@@ -14,16 +15,14 @@ pub fn executeExt(
     }
 }
 
-const ExtFn = *const fn (
-    mini: *vm.MiniVM,
-    ctx: vm.ExecutionContext,
-) vm.Error!void;
+const ExtFn = vm.BytecodeFn;
 
 const ext_lookup = [_]ExtFn{
     printStack,
     miniBreakpoint,
     printString,
     printNewline,
+    printDictionary,
 };
 
 fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -47,4 +46,6 @@ fn printNewline(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     std.debug.print("\n", .{});
 }
 
-// TODO memory debug functions can be in here too wahoo
+fn printDictionary(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+    try vm_utils.printDictionary(mini);
+}

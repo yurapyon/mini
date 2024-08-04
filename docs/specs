@@ -2,7 +2,7 @@ mini specs ===
 
 vm:
   cell size:     2 bytes
-  address space: 32k bytes
+  address space: 64k bytes
   endianness:    little
   negatives:     twos-compilment
 
@@ -45,47 +45,45 @@ word definition layout:
 
 program execution:
   behavior of the program counter is well defined and will be the same across systems
-    this means ie that execution of 'ext' can only move the PC to PC+2
+    this means i.e. that execution of 'ext' can only move the PC to PC+2
     this is to keep programs portable
 
 bytecodes:
-  list:
-    0b0....... 128      core    ( see zig/src/bytecodes.zig )
-    0b1aaaaaaa aaaaaaaa absjump ( jump to (a), pushing pc+1 to return stack, address space is 32k )
   semantics:
     most bytecodes:
       compile:   write bytecode for self to memory
       interpret: do something
-      execute:   do the same thing as above
+      execute:   same thing as above
     immediate (['], ]):
       compile:   do something
-      interpret: do the same thing as above
-      execute:   do the same thing as above
-    tag (exit, branch, branch0, tailcall, lit, litc, ext):
+      interpret: same thing as above
+      execute:   same thing as above
+    tag (exit, branch, branch0, jump, call, lit, litc, ext):
       compile:   error
       interpret: error
       execute:   do something
-    (absjump):
-      compile:   n/a
-      interpret: n/a
-      execute:   push following addr to return stack and jump to address read from memory
+    execute:
+      compile:   pop xt from stack, start an execute loop
+      interpret: same as above
+      execute:   pop xt from stack, call it
+  tags:
+    exit:    pop from return stack and assign to PC
+    branch:  relative jump
+    branch0: conditional relative jump
+    jump:    absolute jump, doesn't return
+    cell:    absolute jump, will return
+    lit:     push next cell in memory to stack
+    litc:    push next byte in memory to stack
+    ext:     call system bytecode
 
 non-standard forth words:
   panic      - ( -- )            die
 
-  seldev     - ( id -- )         select device to send commands to
-  d!         - ( value addr -- ) store to current device
-  d+!        - ( value addr -- ) store-add to current device
-  d@         - ( addr -- value ) fetch from current device
+  d!         - ( value addr -- ) store to device
+  d+!        - ( value addr -- ) store-add to device
+  d@         - ( addr -- value ) fetch from device
 
   next-char  - ( -- char )       read the next char from the input buffer
-
-  0          - ( -- 0 )
-  0xffff     - ( -- 0xffff )
-  1          - ( -- 1 )
-  2          - ( -- 2 )
-  4          - ( -- 4 )
-  8          - ( -- 8 )
 
   cell>bytes - ( cell -- high-byte low-byte )
   bytes>cell - ( high-byte low-byte -- cell )
@@ -100,12 +98,11 @@ memory layout:
         cell field >latest
         cell field >state
         cell field >base
-        cell field >active_device
         cell field >input_buffer_at
         cell field >input_buffer_len
          128 field >input_buffer
+     16 * 16 field >devices
   constant dictionary_start
 
 devices:
-  TBD
-  they will be a fixed size and be in memory, similar to uxn
+  16 devices of 16 bytes each
