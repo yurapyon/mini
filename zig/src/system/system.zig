@@ -2,7 +2,8 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 
-const vm = @import("mini.zig");
+const vm = @import("../mini.zig");
+const c = @import("c.zig");
 
 pub const System = struct {
     allocator: Allocator,
@@ -24,9 +25,12 @@ pub const System = struct {
         self.vm_thread = null;
 
         self.should_exit = @TypeOf(self.should_exit).init(false);
+
+        try c.initGraphics();
     }
 
     pub fn deinit(self: @This()) void {
+        c.deinitGraphics();
         self.allocator.free(self.vm_memory);
     }
 
@@ -45,6 +49,11 @@ pub const System = struct {
 
     pub fn mainLoop(self: *@This()) !void {
         while (!self.should_exit.load(.unordered)) {
+
+            // c.glClear(c.GL_COLOR_BUFFER_BIT);
+            // c.glfwSwapBuffers(window);
+            // c.glfwPollEvents();
+
             // 1/60
             std.time.sleep(16000000);
         }
@@ -82,7 +91,7 @@ const callbacks = struct {
     }
 };
 
-const base_file = @embedFile("common/base.mini.fth");
+const base_file = @embedFile("../common/base.mini.fth");
 
 const LineByLineRefiller = struct {
     buffer: [128]u8,

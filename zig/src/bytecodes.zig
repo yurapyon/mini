@@ -146,10 +146,6 @@ const lookup_table = [_]BytecodeDefinition{
     constructBasicBytecode("r>", fromR),
     constructBasicBytecode("r@", Rfetch),
 
-    constructBasicBytecode("d!", storeD),
-    constructBasicBytecode("d+!", storeAddD),
-    constructBasicBytecode("d@", fetchD),
-
     constructBasicBytecode("=", eq),
     constructBasicBytecode("<", lt),
     constructBasicBytecode("<=", lteq),
@@ -500,18 +496,6 @@ fn xor(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn invert(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
     try mini.data_stack.push(~value);
-}
-
-fn storeD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.devices.store(0xbeef);
-}
-
-fn storeAddD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.devices.storeAdd(0xbeef);
-}
-
-fn fetchD(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = try mini.devices.fetch(0xbeef);
 }
 
 fn dup(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {

@@ -56,7 +56,7 @@ pub fn Dictionary(
                     if (!terminator.is_hidden) {
                         return latest;
                     } else {
-                        // TODO print warning when you find a hidden word :)
+                        std.debug.print("hidden word skipped: {s}\n", .{word});
                     }
                 }
                 latest = (try vm.mem.cellAt(self.memory, latest)).*;
