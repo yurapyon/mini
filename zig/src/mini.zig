@@ -12,8 +12,6 @@ const utils = @import("utils.zig");
 // TODO rename somehow
 const t = @import("terminator.zig");
 
-const Devices = @import("system/devices.zig").Devices;
-
 pub const mem = @import("memory.zig");
 
 comptime {
@@ -108,7 +106,6 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     input_buffer: [128]u8,
-    devices: [256]u8,
     dictionary_start: u0,
 }, Cell);
 
@@ -158,7 +155,7 @@ pub fn isTruthy(value: anytype) bool {
 }
 
 /// MiniVM
-/// brings together execution, stacks, dictionary, input, devices
+/// brings together execution, stacks, dictionary, input
 pub const MiniVM = struct {
     memory: mem.CellAlignedMemory,
 
@@ -181,7 +178,6 @@ pub const MiniVM = struct {
         MemoryLayout.offsetOf("input_buffer_at"),
         MemoryLayout.offsetOf("input_buffer_len"),
     ),
-    devices: Devices(MemoryLayout.offsetOf("devices")),
 
     should_quit: bool,
     should_bye: bool,

@@ -36,14 +36,9 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    // exe.addIncludePath(.{ .cwd_relative = "/usr/local/include" });
-
-    // exe.addLibraryPath(.{ .cwd_relative = "/usr/lib" });
     exe.linkSystemLibrary("c");
     exe.linkSystemLibrary("glfw3");
     exe.linkFramework("OpenGL");
-    // exe.linkSystemLibrary("glew");
-    // exe.linkSystemLibrary("opengl");
 
     // This declares intent for the executable to be installed into the
     // standard location when the user invokes the "install" step (the default
