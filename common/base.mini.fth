@@ -100,6 +100,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : within[] 2 pick >r clamp r> = ;
 : within[) 1- within[] ;
 
+: allot here +! ;
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
@@ -116,15 +117,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : create word define something, return, this! ;
 : does>  something, ['] does! xt-call, exit, this! ; immediate
 
-: allot here +! ;
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
-: variable create cell allot ;
 
-: addrer create , does> @ + ;
-: +field over addrer + ;
-: field  swap aligned swap +field ;
+: offsetter create , does> @ + ;
+: +field    over offsetter + ;
+: field     swap aligned swap +field ;
+
+: variable create cell allot ;
 
 \ ===
 
@@ -148,21 +149,41 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 \ ===
 
-: ext, ['] ext c, cell, ;
-: ##.s    [ 0x0000 ext, ] ;
-: ##break [ 0x0001 ext, ] ;
-: ##type  [ 0x0002 ext, ] ;
-: ##cr    [ 0x0003 ext, ] ;
-: ##.d    [ 0x0004 ext, ] ;
-
-\ ===
-
 : dyn, define next, ;
 : dyn! >cfa 1+ this! ;
 : :dyn
   word find if drop dyn! else dyn, then
   latest @ hide ] ;
 
+\ ===
+
 \ TODO
 \ should this file have to end with 'bye' or 'quit' ?
+bye
+
+variable ahere
+0 ahere !
+
+: a! ;
+: a@ ;
+
+: a, ahere ! 1 ahere +! ;
+
+: label ahere @ constant ;
+
+: `br, ;
+: `?br, ;
+: `(later), ahere @ 0 a, ;
+
+: `this  ahere @ swap ;
+: `dist  `this - ;
+: `dist! dup `dist swap a! ;
+: `back, `dist negate a, ;
+
+: `if `?br, `(later), ;
+: `then `dist! ;
+
+label `?dup
+  `dup `0= `if `drop `then
+
 bye

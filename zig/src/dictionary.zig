@@ -158,6 +158,19 @@ pub fn Dictionary(
             try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("exit") orelse unreachable);
         }
 
+        pub fn compileExternal(
+            self: *@This(),
+            name: []const u8,
+            id: vm.Cell,
+        ) vm.Error!void {
+            const ext_tag = bytecodes.lookupBytecodeByName("ext") orelse unreachable;
+            const exit_tag = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
+            try self.defineWord(name);
+            try self.here.commaC(self.memory, ext_tag);
+            try self.here.commaByteAlignedCell(self.memory, id);
+            try self.here.commaC(self.memory, exit_tag);
+        }
+
         pub fn iterator(self: *@This()) utils.LinkedListIterator {
             return utils.LinkedListIterator.from(self.memory, self.latest.fetch());
         }

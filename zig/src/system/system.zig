@@ -26,11 +26,11 @@ pub const System = struct {
 
         self.should_exit = @TypeOf(self.should_exit).init(false);
 
-        try c.initGraphics();
+        // try c.initGraphics();
     }
 
     pub fn deinit(self: @This()) void {
-        c.deinitGraphics();
+        // c.deinitGraphics();
         self.allocator.free(self.vm_memory);
     }
 
@@ -47,15 +47,13 @@ pub const System = struct {
         }
     }
 
-    pub fn mainLoop(self: *@This()) !void {
+    pub fn terminalLoop(self: *@This()) !void {
         while (!self.should_exit.load(.unordered)) {
 
             // c.glClear(c.GL_COLOR_BUFFER_BIT);
             // c.glfwSwapBuffers(window);
             // c.glfwPollEvents();
-
-            // 1/60
-            std.time.sleep(16000000);
+            // std.time.sleep(16000000);
         }
     }
 
@@ -102,8 +100,34 @@ const LineByLineRefiller = struct {
     }
 
     fn refill(self_: *anyopaque) vm.InputError!?[]const u8 {
-        const self: *LineByLineRefiller = @ptrCast(@alignCast(self_));
+        const self: *@This() = @ptrCast(@alignCast(self_));
         const slice = self.stream.reader().readUntilDelimiterOrEof(
+            self.buffer[0..self.buffer.len],
+            '\n',
+        ) catch return error.OversizeInputBuffer;
+        if (slice) |slc| {
+            return self.buffer[0..slc.len];
+        } else {
+            return null;
+        }
+    }
+};
+
+const UserInputRefiller = struct {
+    buffer: [128]u8,
+    stream: std.io.FixedBufferStream([]const u8),
+
+    fn init(self: *@This(), buffer: []const u8) void {
+        self.stream = std.io.fixedBufferStream(buffer);
+    }
+
+    fn refill(self_: *anyopaque) vm.InputError!?[]const u8 {
+        // TODO this should just wait and test some flag
+        // then there'd be a function setting the buffer and setting the flag
+        // to call from the system's terminal loop
+        const self: *@This() = @ptrCast(@alignCast(self_));
+        const reader = std.io.getStdIn().reader();
+        const slice = reader.readUntilDelimiterOrEof(
             self.buffer[0..self.buffer.len],
             '\n',
         ) catch return error.OversizeInputBuffer;

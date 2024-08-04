@@ -18,7 +18,7 @@ pub fn main() !void {
     try system.start();
     defer system.stop();
 
-    try system.mainLoop();
+    try system.terminalLoop();
 }
 
 test "lib-testing" {

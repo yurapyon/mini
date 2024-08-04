@@ -11,6 +11,7 @@ const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 // TODO rename somehow
 const t = @import("terminator.zig");
+const external = @import("ext_bytecodes.zig");
 
 pub const mem = @import("memory.zig");
 
@@ -110,6 +111,8 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
 }, Cell);
 
 pub const BytecodeFn = *const fn (vm: *MiniVM, ctx: ExecutionContext) Error!void;
+
+pub const ExternalFn = *const fn (vm: *MiniVM, ctx: ExecutionContext, userdata: ?*anyopaque) Error!void;
 
 /// Passed to bytecode callbacks when they are called
 pub const ExecutionContext = struct {
@@ -215,6 +218,7 @@ pub const MiniVM = struct {
         self.callbacks = callbacks;
 
         self.compileMemoryLocationConstants();
+        try external.defineAll(self);
 
         // TODO
         // run base file ?
