@@ -1,20 +1,14 @@
 immediate:
-  '[compile]' and 'literal' are confusing
-    things you might want to use [compile] with
-      should have non-immediate helper functions
+  'literal' id confusing
     compiling literals (anything with tags) should be done using
       ' tag c, or ['] tag c, etc and shouldnt be too obfuscated
-  'immediate' == 'syntax'
+  'immediate' == syntax
     define compile helpers, but only expose them through syntax
     this keeps the language from beinging too 'macro'y
-
-programs shouldnt expect to have the same base-file/stdlib
-  the bytecodes are fixed
-  the language is defined at runtime
+      this also custs down on confusing usages of '[compile]'
 
 ext:
   among other things, the reason to use a tag for ext's is that
-    the system can determine at compile time if it supports the ext or not
     all behavior that would be available with an ext bytecode
       that pops off the stack is available with an ext tag,
       barring the ability to interpret the ext with the interpreter
@@ -24,3 +18,15 @@ ext:
     binary system images can be searched for ext's and know what functions are being called
 
   ext stands for 'external xt' :)
+
+cross platform:
+  if a program is to support a new system it /should/ be rewritten from the ground up,
+    or at least the lower levels of it should be even if further on the code can be standardized
+  programs shouldnt expect to have the same base-file/stdlib
+    the bytecodes are fixed
+    the language is defined at runtime
+  we don't need to worry about cross platform because the Forth 'ROM' is the source code
+    Forth compiles itself when it runs, and creates the 'ROM' at runtime
+    when it comes to extending functionality, this can be done through
+      wordlists which can expose a platform-independent interface
+    but this doesnt need to be done through a standardized virtual computer or IC-like 'devices'

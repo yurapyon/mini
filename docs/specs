@@ -79,10 +79,6 @@ bytecodes:
 non-standard forth words:
   panic      - ( -- )            die
 
-  d!         - ( value addr -- ) store to device
-  d+!        - ( value addr -- ) store-add to device
-  d@         - ( addr -- value ) fetch from device
-
   next-char  - ( -- char )       read the next char from the input buffer
 
   cell>bytes - ( cell -- high-byte low-byte )
@@ -101,8 +97,4 @@ memory layout:
         cell field >input_buffer_at
         cell field >input_buffer_len
          128 field >input_buffer
-     16 * 16 field >devices
   constant dictionary_start
-
-devices:
-  16 devices of 16 bytes each
