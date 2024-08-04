@@ -1,4 +1,3 @@
-word ##.s      define ' ext c, 0 c, 0 c, ' exit c,
 word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
 word flipt!    define ] 0x80 swap rshift swap >terminator flipb! [ ' exit c,
 word immediate define ] latest @ 1 flipt! [ ' exit c,
@@ -8,6 +7,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : \ source >in ! drop ; immediate
 
+\ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
+: c!+   tuck c! 1+ ;
+: cell, cell>bytes c, c, ;
+: cell! swap cell>bytes rot c!+ c! ;
+
+\ tags
 : exit, ['] exit c, ;
 : br,   ['] branch  c, ;
 : ?br,  ['] branch0 c, ;
@@ -17,17 +22,17 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : litc, ['] litc c, ;
 : ext,  ['] ext c, ;
 
+: xt-call, call, cell, ;
+: xt-jump, jump, cell, ;
+: next,    here @ 3 + xt-jump, ;
+
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;
 : (later),   here @ blank, ;
 : (later)c,  here @ blankc, ;
 : something, lit, (later), ;
 : somewhere, jump, (later), ;
-
-: c!+ tuck c! 1+ ;
-
-: cell, cell>bytes c, c, ;
-: cell! swap cell>bytes rot c!+ c! ;
+: return,    exit, blank, ;
 
 : this   here @ swap ;
 : dist   this - ;
@@ -35,10 +40,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : distc! dup dist swap c! ;
 : back,  dist negate c, ;
 
-: xt-call, call, cell, ;
-: xt-jump, jump, cell, ;
-: return,  exit, blank, ;
-: next,    here @ 3 + xt-jump, ;
+\ basic syntax
+: [compile] ' xt-call, ; immediate
 
 : if   ?br, (later)c, ; immediate
 : else br,  (later)c, swap distc! ; immediate
@@ -50,20 +53,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : while ?br, (later)c, ; immediate
 : repeat swap br, back, distc! ; immediate
 
-: br-list 0 ;
-: br-list! begin ?dup while distc! repeat ;
-
-: [compile] ' xt-call, ; immediate
-
-: cond    br-list ; immediate
-: endcond br-list! ; immediate
+: cond    0 ; immediate
+: endcond begin ?dup while [compile] then repeat ; immediate
 
 : case    [compile] cond    ['] >r c, ; immediate
 : endcase [compile] endcond ['] r> c, ['] drop c, ; immediate
 : of      ['] r@ c, ['] = c, [compile] if ; immediate
 : endof   [compile] else ; immediate
 
-: char   word drop c@ ;
+: char word drop c@ ;
 : [char] litc, char c, ; immediate
 
 : +-()
@@ -73,6 +71,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   endcase ;
 
 : ( 1 begin next-char +-() dup 0= until drop ; immediate
+
+\ ===
 
 : 2dup over over ;
 : 2drop drop drop ;
@@ -122,29 +122,31 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : flag     dup constant 1 lshift ;
 : variable create cell allot ;
 
-: idxer  create , does> @ + ;
-: +field over idxer + ;
+: addrer create , does> @ + ;
+: +field over addrer + ;
 : field  swap aligned swap +field ;
 
 \ ===
+
+\ push address, push length, jump over the data
+: header, something, something, somewhere, rot this! ;
 
 : str-end? [char] " = ;
 
 : string,
   next-char drop
-  begin
-    next-char dup str-end? 0=
-  while
-    c,
-  repeat
+  begin next-char dup str-end? 0=
+  while c, repeat
   drop ;
 
-\ you can define different string routines
-\ then set them to a callback
-\ then string, calls them
-\ TODO look into ASSIGN from polyforth
-: header, something, something, somewhere, rot this! ;
-: s"      header, swap here @ string, dist swap ! this! ; immediate
+\ TODO
+\ look into ASSIGN from polyforth
+\   you can define different string reading routines
+\     then set them to a callback
+\     then 'string,' calls them
+: s" header, swap here @ string, dist swap ! this! ; immediate
+
+\ ===
 
 : ext, ['] ext c, cell, ;
 : ##.s    [ 0x0000 ext, ] ;
@@ -153,7 +155,7 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : ##cr    [ 0x0003 ext, ] ;
 : ##.d    [ 0x0004 ext, ] ;
 
-##.d
+\ ===
 
 : dyn, define next, ;
 : dyn! >cfa 1+ this! ;
@@ -161,46 +163,6 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
   word find if drop dyn! else dyn, then
   latest @ hide ] ;
 
-:dyn can-redefine 1 2 3 ##.s drop drop drop ;
-: thisthing can-redefine ;
-
-thisthing
-
-:dyn can-redefine 4 5 6 ##.s drop drop drop ;
-
-thisthing
-
-' thisthing execute
-
-
-##.s
-
-source ##.s
-
-
-bye
-
-
-
-: asdf s" this is  a string" ;
-
-asdf ##type ##cr
-
-
-word hello ##type ##cr
-##mem
-
-\ : banner s" : mini ;" ##type ##cr ;
-
-\ banner
-
-bye
-
+\ TODO
 \ should this file have to end with 'bye' or 'quit' ?
-
-\ including files needs an interpreter
-\ unless...
-\ including files can be done with devices
-
 bye
-
