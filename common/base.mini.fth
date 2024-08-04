@@ -50,12 +50,27 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : while ?br, (later)c, ; immediate
 : repeat swap br, back, distc! ; immediate
 
+: br-list 0 ;
+: br-list! begin ?dup while distc! repeat ;
+
+: [compile] ' xt-call, ; immediate
+
+: cond    br-list ; immediate
+: endcond br-list! ; immediate
+
+: case    [compile] cond    ['] >r c, ; immediate
+: endcase [compile] endcond ['] r> c, ['] drop c, ; immediate
+: of      ['] r@ c, ['] = c, [compile] if ; immediate
+: endof   [compile] else ; immediate
+
 : char   word drop c@ ;
 : [char] litc, char c, ; immediate
 
 : +-()
-  dup [char] ( = if  drop 1+ [ exit, ] then
-      [char] ) = if       1- [ exit, ] then ;
+  case
+    [char] ( of 1+ endof
+    [char] ) of 1- endof
+  endcase ;
 
 : ( 1 begin next-char +-() dup 0= until drop ; immediate
 
