@@ -1,4 +1,4 @@
-const vm = @import("mini.zig");
+const vm = @import("../mini.zig");
 
 const DeviceStore = packed struct(vm.Cell) {
     value: u8,

@@ -2,7 +2,7 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 
-const vm = @import("mini.zig");
+const vm = @import("../mini.zig");
 const c = @import("c.zig");
 
 pub const System = struct {
@@ -91,7 +91,7 @@ const callbacks = struct {
     }
 };
 
-const base_file = @embedFile("common/base.mini.fth");
+const base_file = @embedFile("../common/base.mini.fth");
 
 const LineByLineRefiller = struct {
     buffer: [128]u8,

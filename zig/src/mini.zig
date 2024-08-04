@@ -3,7 +3,6 @@ const builtin = @import("builtin");
 const Allocator = std.mem.Allocator;
 
 const bytecodes = @import("bytecodes.zig");
-const Devices = @import("devices.zig").Devices;
 const Stack = @import("stack.zig").Stack;
 const Register = @import("register.zig").Register;
 const InputSource = @import("input_source.zig").InputSource;
@@ -12,6 +11,8 @@ const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
 // TODO rename somehow
 const t = @import("terminator.zig");
+
+const Devices = @import("system/devices.zig").Devices;
 
 pub const mem = @import("memory.zig");
 
