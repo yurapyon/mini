@@ -1,9 +1,13 @@
 word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
-word flipt!    define ] 0x80 swap rshift swap >terminator flipb! [ ' exit c,
+word flag#     define ] 0x80 swap rshift [ ' exit c,
+word flipt!    define ] flag# swap >terminator flipb! [ ' exit c,
 word immediate define ] latest @ 1 flipt! [ ' exit c,
 word hide      define ]          2 flipt! [ ' exit c,
 word :         define ] word define latest @ hide ] [ ' exit c,
 word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
+
+: >cfa       >terminator 1+ ;
+: immediate? >terminator 1 flag# ;
 
 : \ source >in ! drop ; immediate
 
@@ -41,8 +45,6 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : back,  dist negate c, ;
 
 \ basic syntax
-: [compile] ' xt-call, ; immediate
-
 : if   ?br, (later)c, ; immediate
 : else br,  (later)c, swap distc! ; immediate
 : then distc! ; immediate
@@ -53,13 +55,17 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : while ?br, (later)c, ; immediate
 : repeat swap br, back, distc! ; immediate
 
-: cond    0 ; immediate
-: endcond begin ?dup while [compile] then repeat ; immediate
+: compile,  lit, cell, ['] xt-call, xt-call, ;
+: postpone, dup immediate? if >cfa xt-call, else >cfa compile, then ;
+: postpone  word find 2drop postpone, ; immediate
 
-: case    [compile] cond    ['] >r c, ; immediate
-: endcase [compile] endcond ['] r> c, ['] drop c, ; immediate
-: of      ['] r@ c, ['] = c, [compile] if ; immediate
-: endof   [compile] else ; immediate
+: cond    0 ; immediate
+: endcond begin ?dup while postpone then repeat ; immediate
+
+: case    postpone cond    ['] >r c, ; immediate
+: endcase postpone endcond ['] r> c, ['] drop c, ; immediate
+: of      ['] r@ c, ['] = c, postpone if ; immediate
+: endof   postpone else ; immediate
 
 : char word drop c@ ;
 : [char] litc, char c, ; immediate
@@ -105,7 +111,6 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : align   here @ aligned here ! ;
 
 : :noname 0 0 define here @ ] ;
-: >cfa    >terminator 1+ ;
 : last    latest @ >cfa ;
 : recurse last xt-jump, ; immediate
 

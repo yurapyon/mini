@@ -575,31 +575,8 @@ fn minus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.data_stack.push(value -% 1);
 }
 
-fn push0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(0);
-}
-
-fn pushFFFF(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(0xFFFF);
-}
-
-fn push1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(1);
-}
-
-fn push2(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(2);
-}
-
-fn push4(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(4);
-}
-
-fn push8(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(8);
-}
-
 // TODO could rename these next two to split and join
+// forth-79 is HILO and SQUISH
 fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.data_stack.pop();
     const high = @as(u8, @truncate(value >> 8));
