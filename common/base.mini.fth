@@ -14,6 +14,7 @@ forth
 : 2drop drop drop ;
 : 3drop drop 2drop ;
 
+\ TODO
 : >cfa >terminator 1+ ;
 : last latest @ >cfa ;
 

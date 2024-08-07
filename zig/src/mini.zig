@@ -9,8 +9,6 @@ const InputSource = @import("input_source.zig").InputSource;
 const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
-// TODO rename somehow
-const t = @import("terminator.zig");
 const external = @import("ext_bytecodes.zig");
 
 pub const mem = @import("memory.zig");

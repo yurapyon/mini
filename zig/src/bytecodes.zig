@@ -115,7 +115,6 @@ const lookup_table = [_]BytecodeDefinition{
 
     constructBasicBytecode("find", find),
     constructBasicBytecode("word", nextWord),
-    constructBasicBytecode(">terminator", toTerminator),
     constructBasicBytecode("define", define),
 
     constructTagBytecode("branch", branch),
@@ -528,12 +527,6 @@ fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     const shortcode = try mini.readCellAndAdvancePC();
     const exts = @import("ext_bytecodes.zig");
     try exts.executeExt(shortcode, mini, ctx);
-}
-
-fn toTerminator(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const definition_addr = try mini.data_stack.pop();
-    const terminator_addr = try mini.dictionary.toTerminator(definition_addr);
-    try mini.data_stack.push(terminator_addr);
 }
 
 fn eq0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
