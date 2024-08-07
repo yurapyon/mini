@@ -1,15 +1,20 @@
+word #imm      define ] 0x40 [ ' exit c,
 word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
-word flag#     define ] 0x80 swap rshift [ ' exit c,
-word flipt!    define ] flag# swap >terminator flipb! [ ' exit c,
-word immediate define ] latest @ 1 flipt! [ ' exit c,
-word hide      define ]          2 flipt! [ ' exit c,
-word :         define ] word define latest @ hide ] [ ' exit c,
-word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
-
-: >cfa       >terminator 1+ ;
-: immediate? >terminator 1 flag# ;
+word immediate define ] #imm latest @ >terminator flipb! [ ' exit c,
+word :         define ] word define ] [ ' exit c,
+word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 
 : \ source >in ! drop ; immediate
+
+: <> = 0= ;
+
+: 2dup over over ;
+: 2drop drop drop ;
+: 3drop drop 2drop ;
+
+: >cfa       >terminator 1+ ;
+: immediate? >terminator c@ #imm and ;
+: last       latest @ >cfa ;
 
 \ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
 : c!+   tuck c! 1+ ;
@@ -26,9 +31,11 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : litc, ['] litc c, ;
 : ext,  ['] ext c, ;
 
+: :noname  0 0 define here @ ] ;
 : xt-call, call, cell, ;
 : xt-jump, jump, cell, ;
 : next,    here @ 3 + xt-jump, ;
+: recurse  last xt-jump, ; immediate
 
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;
@@ -49,18 +56,12 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : else br,  (later)c, swap distc! ; immediate
 : then distc! ; immediate
 
-: begin here @ ; immediate
-: until ?br, back, ; immediate
-: again br,  back, ; immediate
-: while ?br, (later)c, ; immediate
-: repeat swap br, back, distc! ; immediate
-
 : compile,  lit, cell, ['] xt-call, xt-call, ;
 : postpone, dup immediate? if >cfa xt-call, else >cfa compile, then ;
 : postpone  word find 2drop postpone, ; immediate
 
 : cond    0 ; immediate
-: endcond begin ?dup while postpone then repeat ; immediate
+: endcond ?dup if postpone then recurse then ; immediate
 
 : case    postpone cond    ['] >r c, ; immediate
 : endcase postpone endcond ['] r> c, ['] drop c, ; immediate
@@ -76,15 +77,10 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
     [char] ) of 1- endof
   endcase ;
 
-: ( 1 begin next-char +-() dup 0= until drop ; immediate
+:noname next-char +-() dup if recurse then ;
+: ( 1 [ xt-call, ] drop ; immediate
 
 \ ===
-
-: 2dup over over ;
-: 2drop drop drop ;
-: 2over 3 pick 3 pick ;
-: 3dup 2 pick 2 pick 2 pick ;
-: 3drop drop 2drop ;
 
 : cell 2 ;
 : cells cell * ;
@@ -106,15 +102,11 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : within[] 2 pick >r clamp r> = ;
 : within[) 1- within[] ;
 
-: allot here +! ;
+\ ===
+
+: allot   here +! ;
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
-
-: :noname 0 0 define here @ ] ;
-: last    latest @ >cfa ;
-: recurse last xt-jump, ; immediate
-
-\ ===
 
 : >body  6 + ;
 : >does  >body 3 - ;
@@ -137,13 +129,8 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 \ push address, push length, jump over the data
 : header, something, something, somewhere, rot this! ;
 
-: str-end? [char] " = ;
-
-: string,
-  next-char drop
-  begin next-char dup str-end? 0=
-  while c, repeat
-  drop ;
+:noname next-char dup [char] " <> if c, recurse then ;
+: string, next-char drop [ xt-call, ] drop ;
 
 \ TODO
 \ look into ASSIGN from polyforth
@@ -156,11 +143,13 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 : dyn, define next, ;
 : dyn! >cfa 1+ this! ;
-: :dyn
-  word find if drop dyn! else dyn, then
-  latest @ hide ] ;
+: :dyn word find if drop dyn! else dyn, then ] ;
 
 \ ===
+
+: hello s" hellow" ;
+
+hello ##type ##cr
 
 \ TODO
 \ should this file have to end with 'bye' or 'quit' ?
