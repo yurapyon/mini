@@ -41,24 +41,24 @@ pub fn Stack(
             self.clear();
         }
 
-        pub fn depth(self: @This()) vm.Cell {
-            const top = self.top.fetch();
-            const stack_size = top - range.start;
-            return stack_size / @sizeOf(vm.Cell);
-        }
+        //         pub fn depth(self: @This()) vm.Cell {
+        //             const top = self.top.fetch();
+        //             const stack_size = top - range.start;
+        //             return stack_size / @sizeOf(vm.Cell);
+        //         }
 
-        pub fn asSlice(self: *@This()) vm.mem.MemoryError![]vm.Cell {
-            return vm.mem.sliceAt(self.memory, range.start, self.depth());
-        }
+        //         pub fn asSlice(self: *@This()) vm.mem.MemoryError![]vm.Cell {
+        //             return vm.mem.sliceAt(self.memory, range.start, self.depth());
+        //         }
 
         pub fn clear(self: @This()) void {
             self.top.store(range.start);
         }
 
         pub fn index(self: *@This(), at: usize) StackError!*vm.Cell {
-            if (at >= self.depth()) {
-                return error.StackUnderflow;
-            }
+            //             if (at >= self.depth()) {
+            //                 return error.StackUnderflow;
+            //             }
             const top = self.top.fetch();
             const addr = top - (at + 1) * @sizeOf(vm.Cell);
             return try vm.mem.cellAt(self.memory, @intCast(addr));

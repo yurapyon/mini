@@ -10,7 +10,7 @@ forth
 
 : <> = 0= ;
 
-: 2dup over over ;
+: 2dup  over over ;
 : 2drop drop drop ;
 : 3drop drop 2drop ;
 
@@ -89,8 +89,7 @@ compiler
 : [char] litc, char c, ;
 forth
 
-: +-()
-  case
+: +-() case
     [char] ( of 1+ endof
     [char] ) of 1- endof
   endcase ;
@@ -159,7 +158,9 @@ forth
 \ push address, push length, jump over the data
 : header, something, something, somewhere, rot this! ;
 
-: read-byte next-char next-char char>digit swap char>digit 16 * + ;
+: next-digit next-char char>digit ;
+
+: read-byte next-digit 16 * next-digit + ;
 
 variable readc
 
@@ -180,7 +181,7 @@ ascii
 : string, next-char drop read-str, drop ;
 
 compiler
-: " header, swap here @ string, dist swap cell! this! ;
+: "  header, swap here @ string, dist swap cell! this! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
