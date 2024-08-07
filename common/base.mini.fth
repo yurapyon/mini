@@ -1,10 +1,13 @@
-word #imm      define ] 0x40 [ ' exit c,
-word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
-word immediate define ] #imm latest @ >terminator flipb! [ ' exit c,
-word :         define ] word define ] [ ' exit c,
-word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
+word forth     define ] 0 context ! [ ' exit c,
+word compiler  define ] 1 context ! [ ' exit c,
 
-: \ source >in ! drop ; immediate
+word :         define ] word define ] [ ' exit c,
+compiler
+word ;         define ] ['] exit c, [ ' [ c, ' exit c,
+: \ source >in ! drop ;
+forth
+
+: \ source >in ! drop ;
 
 : <> = 0= ;
 
@@ -12,9 +15,8 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 : 2drop drop drop ;
 : 3drop drop 2drop ;
 
-: >cfa       >terminator 1+ ;
-: immediate? >terminator c@ #imm and ;
-: last       latest @ >cfa ;
+: >cfa >terminator 1+ ;
+: last latest @ >cfa ;
 
 \ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
 : c!+   tuck c! 1+ ;
@@ -35,7 +37,9 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 : xt-call, call, cell, ;
 : xt-jump, jump, cell, ;
 : next,    here @ 3 + xt-jump, ;
-: recurse  last xt-jump, ; immediate
+compiler
+: recurse  last xt-jump, ;
+forth
 
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;
@@ -52,24 +56,26 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 : back,  dist negate c, ;
 
 \ basic syntax
-: if   ?br, (later)c, ; immediate
-: else br,  (later)c, swap distc! ; immediate
-: then distc! ; immediate
+compiler
+: [compile] ' xt-call, ;
 
-: compile,  lit, cell, ['] xt-call, xt-call, ;
-: postpone, dup immediate? if >cfa xt-call, else >cfa compile, then ;
-: postpone  word find 2drop postpone, ; immediate
+: if   ?br, (later)c, ;
+: else br,  (later)c, swap distc! ;
+: then distc! ;
 
-: cond    0 ; immediate
-: endcond ?dup if postpone then recurse then ; immediate
+: cond    0 ;
+: endcond ?dup if [compile] then recurse then ;
 
-: case    postpone cond    ['] >r c, ; immediate
-: endcase postpone endcond ['] r> c, ['] drop c, ; immediate
-: of      ['] r@ c, ['] = c, postpone if ; immediate
-: endof   postpone else ; immediate
+: case    [compile] cond    ['] >r c, ;
+: endcase [compile] endcond ['] r> c, ['] drop c, ;
+: of      ['] r@ c, ['] = c, [compile] if ;
+: endof   [compile] else ;
+forth
 
 : char word drop c@ ;
-: [char] litc, char c, ; immediate
+compiler
+: [char] litc, char c, ;
+forth
 
 : +-()
   case
@@ -77,8 +83,10 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
     [char] ) of 1- endof
   endcase ;
 
+compiler
 :noname next-char +-() dup if recurse then ;
-: ( 1 [ xt-call, ] drop ; immediate
+: ( 1 [ xt-call, ] drop ;
+forth
 
 \ ===
 
@@ -112,7 +120,9 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 : >does  >body 3 - ;
 : does!  last >does ['] jump swap c!+ cell! ;
 : create word define something, return, this! ;
-: does>  something, ['] does! xt-call, exit, this! ; immediate
+compiler
+: does>  something, ['] does! xt-call, exit, this! ;
+forth
 
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
@@ -137,7 +147,9 @@ word ;         define ] ['] exit c, [ ' [ c, ' exit c, immediate
 \   you can define different string reading routines
 \     then set them to a callback
 \     then 'string,' calls them
-: s" header, swap here @ string, dist swap ! this! ; immediate
+compiler
+: s" header, swap here @ string, dist swap ! this! ;
+forth
 
 \ ===
 

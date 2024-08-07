@@ -39,7 +39,7 @@ pub fn Dictionary(
             self.here.store(dictionary_start);
             self.latest.store(0);
             self.context.store(@intFromEnum(vm.CompileContext.forth));
-            self.wordlists.store(0);
+            self.wordlists.storeWithOffset(0, 0) catch unreachable;
             self.wordlists.storeWithOffset(@sizeOf(vm.Cell), 0) catch unreachable;
         }
 
@@ -47,29 +47,39 @@ pub fn Dictionary(
             self: @This(),
             wordlist_idx: vm.Cell,
             word: []const u8,
-        ) vm.Error!?vm.Cell {
-            var latest = try self.wordlists.fetchWithOffset(
-                wordlist_idx * @sizeOf(vm.Cell),
-            );
-            while (latest != 0) {
-                const terminator_addr = t.compareStringUntilTerminator(
-                    self.memory,
-                    latest + @sizeOf(vm.Cell),
-                    word,
-                ) catch |err| switch (err) {
-                    // this won't happen with toTerminator
-                    //   because we check name length when defining words
-                    error.Overflow => unreachable,
-                    else => |e| return e,
-                };
+        ) vm.Error!?struct { addr: vm.Cell, wordlist_idx: vm.Cell } {
+            // TODO invalid wordlist error
+            var wordlists_at = wordlist_idx;
+            while (true) {
+                var latest = try self.wordlists.fetchWithOffset(
+                    wordlists_at * @sizeOf(vm.Cell),
+                );
+                while (latest != 0) {
+                    const terminator_addr = t.compareStringUntilTerminator(
+                        self.memory,
+                        latest + @sizeOf(vm.Cell),
+                        word,
+                    ) catch |err| switch (err) {
+                        // this won't happen with toTerminator
+                        //   because we check name length when defining words
+                        error.Overflow => unreachable,
+                        else => |e| return e,
+                    };
 
-                if (terminator_addr) |_| {
-                    return latest;
+                    if (terminator_addr) |_| {
+                        return .{
+                            .addr = latest,
+                            .wordlist_idx = wordlists_at,
+                        };
+                    }
+                    latest = (try vm.mem.cellAt(self.memory, latest)).*;
                 }
-                latest = (try vm.mem.cellAt(self.memory, latest)).*;
-            }
-            if (wordlist_idx > 0) {
-                return self.lookup(wordlist_idx - 1, word);
+
+                if (wordlists_at == 0) {
+                    break;
+                } else {
+                    wordlists_at -= 1;
+                }
             }
             return null;
         }
@@ -126,6 +136,7 @@ pub fn Dictionary(
             self.alignSelf();
 
             const definition_start = self.here.fetch();
+
             const context = @as(vm.CompileContext, @enumFromInt(self.context.fetch()));
             const previous_word_addr = switch (context) {
                 .forth => self.wordlists.fetchWithOffset(0) catch unreachable,
@@ -146,16 +157,14 @@ pub fn Dictionary(
                 // TODO error
                 else => unreachable,
             }
+
             try self.here.comma(self.memory, previous_word_addr);
-
             try self.here.commaString(name);
-
             const header_size = name.len + 3;
             const need_to_align = (definition_start + header_size) % 2 == 1;
             if (need_to_align) {
                 try self.here.commaC(self.memory, 0);
             }
-
             try self.here.commaC(self.memory, t.base_terminator);
         }
 

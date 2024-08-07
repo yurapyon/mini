@@ -137,11 +137,12 @@ pub const WordInfo = union(enum) {
     bytecode: u8,
     number: Cell,
 
-    fn fromMiniWord(definition_addr: Cell, terminator: t.TerminatorInfo) Error!@This() {
+    // TODO rename to 'is compiler word' or something
+    fn fromMiniWord(definition_addr: Cell, is_immediate: bool) Error!@This() {
         return .{
             .mini_word = .{
                 .definition_addr = definition_addr,
-                .is_immediate = terminator.is_immediate,
+                .is_immediate = is_immediate,
             },
         };
     }
@@ -337,9 +338,9 @@ pub const MiniVM = struct {
         // TODO would be nice if lookups couldnt error
         const state = @as(CompileState, @enumFromInt(self.state.fetch()));
         const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
-        if (try self.dictionary.lookup(wordlist_idx, str)) |definition_addr| {
-            const terminator = try self.dictionary.getTerminator(definition_addr);
-            return try WordInfo.fromMiniWord(definition_addr, terminator);
+        if (try self.dictionary.lookup(wordlist_idx, str)) |lookup_result| {
+            const is_immediate = lookup_result.wordlist_idx == 1;
+            return try WordInfo.fromMiniWord(lookup_result.addr, is_immediate);
         } else if (bytecodes.lookupBytecodeByName(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
