@@ -57,8 +57,7 @@ pub fn compareStringUntilTerminator(
 }
 
 pub const TerminatorInfo = packed struct(u8) {
-    padding: u5,
-    is_hidden: bool,
+    padding: u6,
     is_immediate: bool,
     terminator_indicator: u1,
 

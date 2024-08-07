@@ -42,6 +42,13 @@ pub fn Register(comptime offset_: vm.Cell) type {
             return (vm.mem.cellAt(self.memory, offset) catch unreachable).*;
         }
 
+        pub fn fetchWithOffset(
+            self: @This(),
+            addr_offset: vm.Cell,
+        ) vm.mem.MemoryError!vm.Cell {
+            return (try vm.mem.cellAt(self.memory, offset +% addr_offset)).*;
+        }
+
         pub fn storeAdd(
             self: @This(),
             value: vm.Cell,
@@ -54,6 +61,14 @@ pub fn Register(comptime offset_: vm.Cell) type {
             value: vm.Cell,
         ) void {
             (vm.mem.cellAt(self.memory, offset) catch unreachable).* -%= value;
+        }
+
+        pub fn storeWithOffset(
+            self: @This(),
+            addr_offset: vm.Cell,
+            value: vm.Cell,
+        ) vm.mem.MemoryError!void {
+            (try vm.mem.cellAt(self.memory, offset +% addr_offset)).* +%= value;
         }
 
         pub fn deref(

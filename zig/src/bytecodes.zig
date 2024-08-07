@@ -122,8 +122,8 @@ const lookup_table = [_]BytecodeDefinition{
     constructTagBytecode("branch0", branch0),
     .{
         .name = "execute",
-        .compileSemantics = executeCompileInterpret,
-        .interpretSemantics = executeCompileInterpret,
+        .compileSemantics = compileSelf,
+        .interpretSemantics = executeInterpret,
         .executeSemantics = executeExecute,
     },
     constructTagBytecode("jump", jump),
@@ -323,7 +323,7 @@ fn executeExecute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     try mini.absoluteJump(addr, true);
 }
 
-fn executeCompileInterpret(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
+fn executeInterpret(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
     try executeExecute(mini, ctx);
     try mini.executionLoop();
 }

@@ -86,9 +86,16 @@ pub fn returnStackErrorFromStackError(err: Error) Error {
     };
 }
 
+// TODO could rename this to interpreter state
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
+    _,
+};
+
+pub const CompileContext = enum(Cell) {
+    forth = 0,
+    compiler,
     _,
 };
 
@@ -102,6 +109,8 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     data_stack_end: u0,
     here: Cell,
     latest: Cell,
+    context: Cell,
+    wordlists: [2]Cell,
     state: Cell,
     base: Cell,
     input_buffer_at: Cell,
@@ -174,6 +183,8 @@ pub const MiniVM = struct {
     dictionary: Dictionary(
         MemoryLayout.offsetOf("here"),
         MemoryLayout.offsetOf("latest"),
+        MemoryLayout.offsetOf("context"),
+        MemoryLayout.offsetOf("wordlists"),
     ),
     state: Register(MemoryLayout.offsetOf("state")),
     base: Register(MemoryLayout.offsetOf("base")),
@@ -202,8 +213,8 @@ pub const MiniVM = struct {
             self.memory,
             MemoryLayout.offsetOf("dictionary_start"),
         );
-        try self.base.init(self.memory);
         try self.state.init(self.memory);
+        try self.base.init(self.memory);
         try self.input_source.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
@@ -222,6 +233,7 @@ pub const MiniVM = struct {
 
         // TODO
         // run base file ?
+        // probably not
     }
 
     fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
@@ -231,6 +243,7 @@ pub const MiniVM = struct {
     fn compileMemoryLocationConstants(self: *@This()) void {
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
+        self.compileMemoryLocationConstant("context");
         self.compileMemoryLocationConstant("state");
         self.compileMemoryLocationConstant("base");
         self.dictionary.compileConstant(
@@ -322,7 +335,9 @@ pub const MiniVM = struct {
 
     fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
-        if (try self.dictionary.lookup(str)) |definition_addr| {
+        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
+        const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
+        if (try self.dictionary.lookup(wordlist_idx, str)) |definition_addr| {
             const terminator = try self.dictionary.getTerminator(definition_addr);
             return try WordInfo.fromMiniWord(definition_addr, terminator);
         } else if (bytecodes.lookupBytecodeByName(str)) |bytecode| {

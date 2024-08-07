@@ -14,11 +14,15 @@ const t = @import("terminator.zig");
 pub fn Dictionary(
     comptime here_offset: vm.Cell,
     comptime latest_offset: vm.Cell,
+    comptime context_offset: vm.Cell,
+    comptime wordlists_offset: vm.Cell,
 ) type {
     return struct {
         memory: vm.mem.CellAlignedMemory,
         here: Register(here_offset),
         latest: Register(latest_offset),
+        context: Register(context_offset),
+        wordlists: Register(wordlists_offset),
 
         pub fn initInOneMemoryBlock(
             self: *@This(),
@@ -26,18 +30,27 @@ pub fn Dictionary(
             // TODO could probably make this comptime
             dictionary_start: vm.Cell,
         ) vm.mem.MemoryError!void {
+            try vm.mem.assertCellMemoryAccess(memory, wordlists_offset + @sizeOf(vm.Cell));
             self.memory = memory;
             try self.here.init(self.memory);
+            try self.context.init(self.memory);
             try self.latest.init(self.memory);
+            try self.wordlists.init(self.memory);
             self.here.store(dictionary_start);
             self.latest.store(0);
+            self.context.store(@intFromEnum(vm.CompileContext.forth));
+            self.wordlists.store(0);
+            self.wordlists.storeWithOffset(@sizeOf(vm.Cell), 0) catch unreachable;
         }
 
         pub fn lookup(
             self: @This(),
+            wordlist_idx: vm.Cell,
             word: []const u8,
         ) vm.Error!?vm.Cell {
-            var latest = self.latest.fetch();
+            var latest = try self.wordlists.fetchWithOffset(
+                wordlist_idx * @sizeOf(vm.Cell),
+            );
             while (latest != 0) {
                 const terminator_addr = t.compareStringUntilTerminator(
                     self.memory,
@@ -50,16 +63,13 @@ pub fn Dictionary(
                     else => |e| return e,
                 };
 
-                if (terminator_addr) |addr| {
-                    const terminator_byte = try vm.mem.checkedRead(self.memory, addr);
-                    const terminator = t.TerminatorInfo.fromByte(terminator_byte);
-                    if (!terminator.is_hidden) {
-                        return latest;
-                    } else {
-                        std.debug.print("hidden word skipped: {s}\n", .{word});
-                    }
+                if (terminator_addr) |_| {
+                    return latest;
                 }
                 latest = (try vm.mem.cellAt(self.memory, latest)).*;
+            }
+            if (wordlist_idx > 0) {
+                return self.lookup(wordlist_idx - 1, word);
             }
             return null;
         }
@@ -116,9 +126,26 @@ pub fn Dictionary(
             self.alignSelf();
 
             const definition_start = self.here.fetch();
-            const previous_word_addr = self.latest.fetch();
+            const context = @as(vm.CompileContext, @enumFromInt(self.context.fetch()));
+            const previous_word_addr = switch (context) {
+                .forth => self.wordlists.fetchWithOffset(0) catch unreachable,
+                .compiler => self.wordlists.fetchWithOffset(
+                    @sizeOf(vm.Cell),
+                ) catch unreachable,
+                // TODO error
+                else => unreachable,
+            };
 
             self.latest.store(definition_start);
+            switch (context) {
+                .forth => self.wordlists.storeWithOffset(0, definition_start) catch unreachable,
+                .compiler => self.wordlists.storeWithOffset(
+                    @sizeOf(vm.Cell),
+                    definition_start,
+                ) catch unreachable,
+                // TODO error
+                else => unreachable,
+            }
             try self.here.comma(self.memory, previous_word_addr);
 
             try self.here.commaString(name);

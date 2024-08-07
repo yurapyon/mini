@@ -36,7 +36,7 @@ word definition layout:
   terminator bits:
     0: 1
     1: is-immediate
-    2: is-hidden
+    2: TBD
     3: TBD
     4: TBD
     5: TBD
