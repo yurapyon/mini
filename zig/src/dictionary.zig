@@ -80,11 +80,11 @@ pub fn Dictionary(
             self: @This(),
             addr: vm.Cell,
         ) vm.mem.MemoryError!vm.Cell {
-            // TODO
-            // return (try self.toTerminator(addr)) + 1;
-            _ = self;
-            _ = addr;
-            return 0;
+            const name_len_addr = addr + 2;
+            const name_len = try vm.mem.checkedRead(self.memory, name_len_addr);
+            const name_end = name_len_addr + 1 + name_len;
+            const definition_end = std.mem.alignForward(vm.Cell, name_end, @alignOf(vm.Cell));
+            return definition_end;
         }
 
         // TODO should this throw memory errors?
