@@ -14,13 +14,26 @@ forth
 : 2drop drop drop ;
 : 3drop drop 2drop ;
 
-: >cfa >terminator 1+ ;
-: last latest @ >cfa ;
-
 \ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
 : c!+   tuck c! 1+ ;
 : cell, cell>bytes c, c, ;
 : cell! swap cell>bytes rot c!+ c! ;
+
+: cell 2 ;
+: cells cell * ;
+
+: u/   u/mod nip ;
+: umod u/mod drop ;
+: /    /mod nip ;
+: mod  /mod drop ;
+
+: allot   here +! ;
+: aligned dup cell mod + ;
+: align   here @ aligned here ! ;
+
+: name-len 2 + c@ ;
+: >cfa dup name-len + 3 + aligned ;
+: last latest @ >cfa ;
 
 \ tags
 : exit, ['] exit c, ;
@@ -87,7 +100,7 @@ forth
 
 compiler
 :noname [compile] ( ;
-: ( [ xt-jump, ] ; \ this comment is just to fix vim syntax highlight )
+: ( [ xt-jump, ] ; \ this comment is to fix vim syntax highlight )
 
 :noname [compile] \ ;
 : \ [ xt-jump, ] ;
@@ -95,17 +108,9 @@ forth
 
 \ ===
 
-: cell 2 ;
-: cells cell * ;
-
 : binary 2 base ! ;
 : decimal 10 base ! ;
 : hex 16 base ! ;
-
-: u/   u/mod nip ;
-: umod u/mod drop ;
-: /    /mod nip ;
-: mod  /mod drop ;
 
 : min 2dup > if swap then drop ;
 : max 2dup < if swap then drop ;
@@ -126,10 +131,6 @@ forth
   endcond ;
 
 \ ===
-
-: allot   here +! ;
-: aligned dup cell mod + ;
-: align   here @ aligned here ! ;
 
 : >body  6 + ;
 : >does  >body 3 - ;
