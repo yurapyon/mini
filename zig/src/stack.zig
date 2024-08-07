@@ -4,8 +4,8 @@ const Range = @import("range.zig").Range;
 const Register = @import("register.zig").Register;
 
 pub const StackError = error{
-    StackOverflow,
-    StackUnderflow,
+// StackOverflow,
+// StackUnderflow,
 } || vm.mem.MemoryError;
 
 /// Stack
@@ -41,118 +41,108 @@ pub fn Stack(
             self.clear();
         }
 
-        pub fn depth(self: @This()) vm.Cell {
-            const top = self.top.fetch();
-            const stack_size = top - range.start;
-            return stack_size / @sizeOf(vm.Cell);
-        }
-
-        pub fn asSlice(self: *@This()) vm.mem.MemoryError![]vm.Cell {
-            return vm.mem.sliceAt(self.memory, range.start, self.depth());
-        }
-
         pub fn clear(self: @This()) void {
             self.top.store(range.start);
         }
 
-        pub fn index(self: *@This(), at: usize) StackError!*vm.Cell {
-            if (at >= self.depth()) {
-                return error.StackUnderflow;
-            }
+        fn wrappedAddress(addr: vm.Cell) vm.Cell {
+            return range.wrapWithin(addr);
+        }
+
+        pub fn index(self: *@This(), at: vm.Cell) *vm.Cell {
             const top = self.top.fetch();
-            const addr = top - (at + 1) * @sizeOf(vm.Cell);
-            return try vm.mem.cellAt(self.memory, @intCast(addr));
+            const addr = top - at * @sizeOf(vm.Cell);
+            // NOTE
+            // this cellAt access won't fail because top.fetch()
+            //   is only ever changed by sizeOf(Cell), and the range it's
+            //      wrapped within was verified on init
+            return vm.mem.cellAt(self.memory, wrappedAddress(addr)) catch unreachable;
         }
 
         pub fn swapValues(
             self: *@This(),
-            a_idx: usize,
-            b_idx: usize,
-        ) StackError!void {
-            const a_cell = try self.index(a_idx);
-            const b_cell = try self.index(b_idx);
+            a_idx: vm.Cell,
+            b_idx: vm.Cell,
+        ) void {
+            const a_cell = self.index(a_idx);
+            const b_cell = self.index(b_idx);
             const temp = a_cell.*;
             a_cell.* = b_cell.*;
             b_cell.* = temp;
         }
 
-        pub fn peek(self: @This()) StackError!vm.Cell {
-            const addr = self.top.fetch();
-            if (addr == range.start) {
-                return error.StackUnderflow;
-            }
-            return (try vm.mem.cellAt(self.memory, addr - @sizeOf(vm.Cell))).*;
+        pub fn peek(self: *@This()) vm.Cell {
+            return self.index(0).*;
         }
 
         pub fn push(
-            self: @This(),
+            self: *@This(),
             value: vm.Cell,
-        ) StackError!void {
+        ) void {
             const addr = self.top.fetch();
-            if (addr >= range.end) {
-                return error.StackOverflow;
-            }
-            self.top.storeAdd(@sizeOf(vm.Cell));
-            (try vm.mem.cellAt(self.memory, addr)).* = value;
+            const write_to = wrappedAddress(addr + @sizeOf(vm.Cell));
+            self.top.store(write_to);
+            self.index(0).* = value;
         }
 
-        pub fn pop(self: @This()) StackError!vm.Cell {
-            const ret = try self.peek();
-            self.top.storeSubtract(@sizeOf(vm.Cell));
+        pub fn pop(self: *@This()) vm.Cell {
+            const ret = self.peek();
+            const addr = self.top.fetch();
+            self.top.store(wrappedAddress(addr - @sizeOf(vm.Cell)));
             return ret;
         }
 
         pub fn popMultiple(
             self: *@This(),
             comptime ct: usize,
-        ) StackError![ct]vm.Cell {
+        ) [ct]vm.Cell {
             var ret = [_]vm.Cell{0} ** ct;
             comptime var i = 0;
             inline while (i < ct) : (i += 1) {
-                ret[i] = try self.pop();
+                ret[i] = self.pop();
             }
             return ret;
         }
 
-        pub fn dup(self: *@This()) StackError!void {
-            try self.push(try self.peek());
+        pub fn dup(self: *@This()) void {
+            self.push(self.peek());
         }
 
-        pub fn drop(self: *@This()) StackError!void {
-            _ = try self.pop();
+        pub fn drop(self: *@This()) void {
+            _ = self.pop();
         }
 
-        pub fn swap(self: *@This()) StackError!void {
-            try self.swapValues(0, 1);
+        pub fn swap(self: *@This()) void {
+            self.swapValues(0, 1);
         }
 
-        pub fn rot(self: *@This()) StackError!void {
-            try self.swap();
-            try self.flip();
+        pub fn rot(self: *@This()) void {
+            self.swap();
+            self.flip();
         }
 
-        pub fn nrot(self: *@This()) StackError!void {
-            try self.flip();
-            try self.swap();
+        pub fn nrot(self: *@This()) void {
+            self.flip();
+            self.swap();
         }
 
-        pub fn nip(self: *@This()) StackError!void {
-            try self.swap();
-            try self.drop();
+        pub fn nip(self: *@This()) void {
+            self.swap();
+            self.drop();
         }
 
-        pub fn flip(self: *@This()) StackError!void {
-            try self.swapValues(0, 2);
+        pub fn flip(self: *@This()) void {
+            self.swapValues(0, 2);
         }
 
-        pub fn tuck(self: *@This()) StackError!void {
-            try self.dup();
-            try self.swapValues(1, 2);
+        pub fn tuck(self: *@This()) void {
+            self.dup();
+            self.swapValues(1, 2);
         }
 
-        pub fn over(self: *@This()) StackError!void {
-            const over_cell = try self.index(1);
-            try self.push(over_cell.*);
+        pub fn over(self: *@This()) void {
+            const over_cell = self.index(1);
+            self.push(over_cell.*);
         }
     };
 }
