@@ -60,7 +60,7 @@ fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Erro
 }
 
 fn printString(mini: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Error!void {
-    const len, const addr = try mini.data_stack.popMultiple(2);
+    const len, const addr = mini.data_stack.popMultiple(2);
     const str = try vm.mem.constSliceFromAddrAndLen(mini.memory, addr, len);
     std.debug.print("{s}", .{str});
 }

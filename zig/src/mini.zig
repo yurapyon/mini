@@ -360,7 +360,7 @@ pub const MiniVM = struct {
                 try self.executeCfa(cfa_addr);
             },
             .number => |value| {
-                try self.data_stack.push(value);
+                self.data_stack.push(value);
             },
         }
     }
@@ -401,9 +401,7 @@ pub const MiniVM = struct {
         //     to signal when to exit an executionLoop
         //   so 0 is used as a sentinel, that 'exit' will pop from
         //     the return stack and store to the PC
-        self.return_stack.push(0) catch |err| {
-            return returnStackErrorFromStackError(err);
-        };
+        self.return_stack.push(0);
         self.program_counter.store(cfa_addr);
         try self.executionLoop();
     }
@@ -440,9 +438,7 @@ pub const MiniVM = struct {
         useReturnStack: bool,
     ) Error!void {
         if (useReturnStack) {
-            self.return_stack.push(self.program_counter.fetch()) catch |err| {
-                return returnStackErrorFromStackError(err);
-            };
+            self.return_stack.push(self.program_counter.fetch());
         }
         self.program_counter.store(addr);
     }
@@ -506,7 +502,7 @@ pub const MiniVM = struct {
 
     /// pops ( addr len -- ) from the stack and return as a []u8
     pub fn popSlice(self: *@This()) Error![]u8 {
-        const len, const addr = try self.data_stack.popMultiple(2);
+        const len, const addr = self.data_stack.popMultiple(2);
         return mem.sliceFromAddrAndLen(self.memory, addr, len);
     }
 };

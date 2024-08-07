@@ -209,7 +209,7 @@ fn quit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 fn exit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const should_continue = try mini.callbacks.onExit(mini, mini.callbacks.userdata);
     if (should_continue) {
-        const addr = try mini.return_stack.pop();
+        const addr = mini.return_stack.pop();
         try mini.absoluteJump(addr, false);
     }
 }
@@ -222,10 +222,10 @@ fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
     const result = try mini.lookupStringAndGetAddress(word);
     if (result.is_bytecode) {
-        try mini.data_stack.push(result.value);
+        mini.data_stack.push(result.value);
     } else {
         const cfa_addr = try mini.dictionary.toCfa(result.value);
-        try mini.data_stack.push(cfa_addr);
+        mini.data_stack.push(cfa_addr);
     }
 }
 
@@ -261,7 +261,7 @@ fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const condition = try mini.data_stack.pop();
+    const condition = mini.data_stack.pop();
     if (!vm.isTruthy(condition)) {
         return try branch(mini, ctx);
     } else {
@@ -270,38 +270,38 @@ fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 }
 
 fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const len, const addr = try mini.data_stack.popMultiple(2);
+    const len, const addr = mini.data_stack.popMultiple(2);
     const word = try vm.mem.sliceFromAddrAndLen(mini.memory, addr, len);
     const result_or_error = mini.lookupStringAndGetAddress(word);
     const result = result_or_error catch |err| switch (err) {
         error.WordNotFound => {
-            try mini.data_stack.push(addr);
-            try mini.data_stack.push(len);
-            try mini.data_stack.push(vm.fromBool(vm.Cell, false));
+            mini.data_stack.push(addr);
+            mini.data_stack.push(len);
+            mini.data_stack.push(vm.fromBool(vm.Cell, false));
             return;
         },
         else => return err,
     };
-    try mini.data_stack.push(result.value);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, !result.is_bytecode));
-    try mini.data_stack.push(vm.fromBool(vm.Cell, true));
+    mini.data_stack.push(result.value);
+    mini.data_stack.push(vm.fromBool(vm.Cell, !result.is_bytecode));
+    mini.data_stack.push(vm.fromBool(vm.Cell, true));
 }
 
 fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO should try and refill
     const range = mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
-    try mini.data_stack.push(range.address);
-    try mini.data_stack.push(range.len);
+    mini.data_stack.push(range.address);
+    mini.data_stack.push(range.len);
 }
 
 fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     // TODO this is messy
     if (mini.input_source.readNextChar()) |char| {
-        try mini.data_stack.push(char);
+        mini.data_stack.push(char);
     } else {
         _ = try mini.input_source.refill();
         if (mini.input_source.readNextChar()) |char| {
-            try mini.data_stack.push(char);
+            mini.data_stack.push(char);
         } else {
             return error.Panic;
         }
@@ -318,7 +318,7 @@ fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 // TODO
 // should a version of this be made that works for bytecodes?
 fn executeExecute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
+    const addr = mini.data_stack.pop();
     try mini.absoluteJump(addr, true);
 }
 
@@ -335,192 +335,186 @@ fn jump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
+    const addr, const value = mini.data_stack.popMultiple(2);
     const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* = value;
 }
 
 fn storeAdd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
+    const addr, const value = mini.data_stack.popMultiple(2);
     const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
     mem_ptr.* +%= value;
 }
 
 fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
+    const addr = mini.data_stack.pop();
     const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
-    try mini.data_stack.push(mem_ptr.*);
+    mini.data_stack.push(mem_ptr.*);
 }
 
 fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     try mini.dictionary.here.comma(mini.dictionary.memory, value);
 }
 
 fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const value = try mini.readCellAndAdvancePC();
-    try mini.data_stack.push(value);
+    mini.data_stack.push(value);
 }
 
 fn storeC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
+    const addr, const value = mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     const ptr = try vm.mem.checkedAccess(mini.memory, addr);
     ptr.* = byte;
 }
 
 fn storeAddC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
+    const addr, const value = mini.data_stack.popMultiple(2);
     const byte: u8 = @truncate(value);
     const ptr = try vm.mem.checkedAccess(mini.memory, addr);
     ptr.* += byte;
 }
 
 fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
+    const addr = mini.data_stack.pop();
     const value = try vm.mem.checkedRead(mini.memory, addr);
-    try mini.data_stack.push(value);
+    mini.data_stack.push(value);
 }
 
 fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     try mini.dictionary.here.commaC(mini.dictionary.memory, @truncate(value));
 }
 
 fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const byte = try mini.readByteAndAdvancePC();
-    try mini.data_stack.push(byte);
+    mini.data_stack.push(byte);
 }
 
 fn toR(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    mini.return_stack.push(value) catch |err| {
-        return vm.returnStackErrorFromStackError(err);
-    };
+    const value = mini.data_stack.pop();
+    mini.return_stack.push(value);
 }
 
 fn fromR(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.return_stack.pop() catch |err| {
-        return vm.returnStackErrorFromStackError(err);
-    };
-    try mini.data_stack.push(value);
+    const value = mini.return_stack.pop();
+    mini.data_stack.push(value);
 }
 
 fn Rfetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.return_stack.peek() catch |err| {
-        return vm.returnStackErrorFromStackError(err);
-    };
-    try mini.data_stack.push(value);
+    const value = mini.return_stack.peek();
+    mini.data_stack.push(value);
 }
 
 fn eq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a == b));
+    const a, const b = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(vm.fromBool(vm.Cell, a == b));
 }
 
 fn lt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
 }
 
 fn lteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
 }
 
 fn plus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a +% b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a +% b);
 }
 
 fn minus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a -% b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a -% b);
 }
 
 fn multiply(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a *% b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a *% b);
 }
 
 fn divMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
+    const b, const a = mini.data_stack.popMultiple(2);
     const signed_a = @as(vm.SignedCell, @bitCast(a));
     const signed_b = @as(vm.SignedCell, @bitCast(b));
     const quotient = try std.math.divTrunc(vm.SignedCell, signed_a, signed_b);
     const remainder = try std.math.mod(vm.SignedCell, signed_a, signed_b);
-    try mini.data_stack.push(@bitCast(remainder));
-    try mini.data_stack.push(@bitCast(quotient));
+    mini.data_stack.push(@bitCast(remainder));
+    mini.data_stack.push(@bitCast(quotient));
 }
 
 fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
+    const b, const a = mini.data_stack.popMultiple(2);
     const quotient = try std.math.divTrunc(vm.Cell, a, b);
     const remainder = try std.math.mod(vm.Cell, a, b);
-    try mini.data_stack.push(remainder);
-    try mini.data_stack.push(quotient);
+    mini.data_stack.push(remainder);
+    mini.data_stack.push(quotient);
 }
 
 fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     const signed_value = @as(vm.SignedCell, @bitCast(value));
-    try mini.data_stack.push(@bitCast(-signed_value));
+    mini.data_stack.push(@bitCast(-signed_value));
 }
 
 fn lshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const shift_, const value = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(value << @truncate(shift_));
+    const shift_, const value = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(value << @truncate(shift_));
 }
 
 fn rshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const shift_, const value = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(value >> @truncate(shift_));
+    const shift_, const value = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(value >> @truncate(shift_));
 }
 
 fn miniAnd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a & b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a & b);
 }
 
 fn miniOr(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a | b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a | b);
 }
 
 fn xor(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a ^ b);
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(a ^ b);
 }
 
 fn invert(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(~value);
+    const value = mini.data_stack.pop();
+    mini.data_stack.push(~value);
 }
 
 fn dup(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.dup();
+    mini.data_stack.dup();
 }
 
 fn drop(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.drop();
+    mini.data_stack.drop();
 }
 
 fn swap(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.swap();
+    mini.data_stack.swap();
 }
 
 fn pick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const idx = try mini.data_stack.pop();
-    const value = (try mini.data_stack.index(idx)).*;
-    try mini.data_stack.push(value);
+    const idx = mini.data_stack.pop();
+    const value = mini.data_stack.index(idx).*;
+    mini.data_stack.push(value);
 }
 
 fn rot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.rot();
+    mini.data_stack.rot();
 }
 
 fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.nrot();
+    mini.data_stack.nrot();
 }
 
 fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
@@ -530,60 +524,60 @@ fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
 }
 
 fn eq0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(vm.fromBool(vm.Cell, value == 0));
+    const value = mini.data_stack.pop();
+    mini.data_stack.push(vm.fromBool(vm.Cell, value == 0));
 }
 
 fn gt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
 }
 
 fn gteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
+    const b, const a = mini.data_stack.popMultiple(2);
+    mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
 }
 
 fn storeHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     mini.dictionary.here.store(value);
 }
 
 fn storeAddHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     mini.dictionary.here.storeAdd(value);
 }
 
 fn fetchHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(mini.dictionary.here.fetch());
+    mini.data_stack.push(mini.dictionary.here.fetch());
 }
 
 fn plus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(value +% 1);
+    const value = mini.data_stack.pop();
+    mini.data_stack.push(value +% 1);
 }
 
 fn minus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(value -% 1);
+    const value = mini.data_stack.pop();
+    mini.data_stack.push(value -% 1);
 }
 
 // TODO could rename these next two to split and join
 // forth-79 is HILO and SQUISH
 fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
+    const value = mini.data_stack.pop();
     const high = @as(u8, @truncate(value >> 8));
     const low = @as(u8, @truncate(value));
-    try mini.data_stack.push(high);
-    try mini.data_stack.push(low);
+    mini.data_stack.push(high);
+    mini.data_stack.push(low);
 }
 
 fn bytesToCell(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const low, const high = try mini.data_stack.popMultiple(2);
+    const low, const high = mini.data_stack.popMultiple(2);
     const low_byte = @as(u8, @truncate(low));
     const high_byte = @as(u8, @truncate(high));
     const value = low_byte | (@as(vm.Cell, high_byte) << 8);
-    try mini.data_stack.push(value);
+    mini.data_stack.push(value);
 }
 
 fn cmove(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -605,26 +599,26 @@ fn memEq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 }
 
 fn maybeDup(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const condition = try mini.data_stack.peek();
+    const condition = mini.data_stack.peek();
     if (vm.isTruthy(condition)) {
         try dup(mini, ctx);
     }
 }
 
 fn nip(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.nip();
+    mini.data_stack.nip();
 }
 
 fn flip(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.flip();
+    mini.data_stack.flip();
 }
 
 fn tuck(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.tuck();
+    mini.data_stack.tuck();
 }
 
 fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.over();
+    mini.data_stack.over();
 }
 
 fn call(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
@@ -634,7 +628,7 @@ fn call(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
 
 fn refill(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
     const did_refill = try mini.input_source.refill();
-    try mini.data_stack.push(vm.fromBool(vm.Cell, did_refill));
+    mini.data_stack.push(vm.fromBool(vm.Cell, did_refill));
 }
 
 // ===
