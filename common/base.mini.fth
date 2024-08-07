@@ -4,7 +4,6 @@ word compiler define ] 1 context ! [ ' exit c,
 word : define ] word define ] [ ' exit c,
 compiler
 word ; define ] ['] exit c, [ ' [ c, ' exit c,
-: \ source >in ! drop ;
 forth
 
 : \ source >in ! drop ;
@@ -83,9 +82,15 @@ forth
     [char] ) of 1- endof
   endcase ;
 
-compiler
 :noname next-char +-() dup if recurse then ;
 : ( 1 [ xt-call, ] drop ;
+
+compiler
+:noname [compile] ( ;
+: ( [ xt-jump, ] ; \ this comment is just to fix vim syntax highlight )
+
+:noname [compile] \ ;
+: \ [ xt-jump, ] ;
 forth
 
 \ ===
@@ -136,19 +141,24 @@ forth
 
 \ ===
 
+compiler
+: assign lit, here @ 5 + cell, ['] swap c, ['] ! c, exit, ;
+forth
+
 \ push address, push length, jump over the data
 : header, something, something, somewhere, rot this! ;
 
-:noname next-char dup [char] " <> if c, recurse then ;
+variable strc,
+
+:noname next-char dup [char] " <> if strc, @ execute recurse then ;
 : string, next-char drop [ xt-call, ] drop ;
 
+: ascii strc, assign c, ;
 \ TODO
-\ look into ASSIGN from polyforth
-\   you can define different string reading routines
-\     then set them to a callback
-\     then 'string,' calls them
+: escaped strc, assign c, ;
+
 compiler
-: s" header, swap here @ string, dist swap ! this! ;
+: s" header, swap here @ ascii string, dist swap ! this! ;
 forth
 
 \ ===
