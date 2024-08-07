@@ -72,6 +72,7 @@ pub const SemanticsError = error{
 pub const WordError = error{
     WordNotFound,
     WordNameTooLong,
+    // TODO is WordNameInvalid ever used?
     WordNameInvalid,
 };
 
