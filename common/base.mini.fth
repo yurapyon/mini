@@ -115,6 +115,16 @@ forth
 : within[] 2 pick >r clamp r> = ;
 : within[) 1- within[] ;
 
+: numeric?   [char] 0 [char] 9 within[] ;
+: capital?   [char] A [char] Z within[] ;
+: lowercase? [char] a [char] z within[] ;
+
+: char>digit cond
+    dup numeric?   if [char] 0 -      else
+    dup capital?   if [char] A - 10 + else
+    dup lowercase? if [char] a - 10 + else
+  endcond ;
+
 \ ===
 
 : allot   here +! ;
@@ -148,17 +158,30 @@ forth
 \ push address, push length, jump over the data
 : header, something, something, somewhere, rot this! ;
 
-variable strc,
+: read-byte next-char next-char char>digit swap char>digit 16 * + ;
 
-:noname next-char dup [char] " <> if strc, @ execute recurse then ;
-: string, next-char drop [ xt-call, ] drop ;
+variable readc
 
-: ascii strc, assign c, ;
-\ TODO
-: escaped strc, assign c, ;
+: ascii readc assign ;
+
+: escaped readc assign
+  dup [char] \ = if
+    drop next-char
+    dup case
+      [char] n of drop 10 endof
+      [char] x of drop read-byte endof
+    endcase
+  then ;
+
+ascii
+
+: read-str, next-char dup [char] " <> if readc @ execute c, recurse then ;
+: string, next-char drop read-str, drop ;
 
 compiler
-: s" header, swap here @ ascii string, dist swap ! this! ;
+: " header, swap here @ string, dist swap cell! this! ;
+: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
+: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
 \ ===
@@ -169,7 +192,7 @@ forth
 
 \ ===
 
-: hello s" hellow" ;
+: hello e" hellow\x0aasdf" ;
 
 hello ##type ##cr
 
