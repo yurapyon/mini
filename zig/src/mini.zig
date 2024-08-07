@@ -316,8 +316,9 @@ pub const MiniVM = struct {
     // ===
 
     fn evaluateString(self: *@This(), word: []const u8) Error!void {
-        if (try self.lookupString(word)) |word_info| {
-            const state: CompileState = @enumFromInt(self.state.fetch());
+        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
+        const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
+        if (try self.lookupString(wordlist_idx, word)) |word_info| {
             switch (state) {
                 .interpret => {
                     try self.interpret(word_info);
@@ -334,10 +335,8 @@ pub const MiniVM = struct {
         }
     }
 
-    fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
+    fn lookupString(self: *@This(), wordlist_idx: Cell, str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
-        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
-        const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
         if (try self.dictionary.lookup(wordlist_idx, str)) |lookup_result| {
             const is_immediate = lookup_result.wordlist_idx == 1;
             return try WordInfo.fromMiniWord(lookup_result.addr, is_immediate);
@@ -487,7 +486,7 @@ pub const MiniVM = struct {
     } {
         // NOTE TODO
         // in this case lookupString could have a early return to not try and parse numbers
-        if (try self.lookupString(str)) |word_info| {
+        if (try self.lookupString(1, str)) |word_info| {
             switch (word_info) {
                 .bytecode => |bytecode| {
                     return .{

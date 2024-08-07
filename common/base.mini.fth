@@ -1,9 +1,9 @@
-word forth     define ] 0 context ! [ ' exit c,
-word compiler  define ] 1 context ! [ ' exit c,
+word forth    define ] 0 context ! [ ' exit c,
+word compiler define ] 1 context ! [ ' exit c,
 
-word :         define ] word define ] [ ' exit c,
+word : define ] word define ] [ ' exit c,
 compiler
-word ;         define ] ['] exit c, [ ' [ c, ' exit c,
+word ; define ] ['] exit c, [ ' [ c, ' exit c,
 : \ source >in ! drop ;
 forth
 
