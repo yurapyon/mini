@@ -180,6 +180,32 @@ pub fn Dictionary(
     };
 }
 
+const DictonaryIterator = struct {
+    forth_iterator: utils.LinkedListIterator,
+    compiler_iterator: utils.LinkedListIterator,
+    last_forth_addr: vm.Cell,
+    last_compiler_addr: vm.Cell,
+
+    fn from(dictionary: Dictionary) @This() {
+        const forth_latest = dictionary.wordlists.fetchWithOffset(0);
+        const compiler_latest = dictionary.wordlists.fetchWithOffset(@sizeOf(vm.Cell));
+        return .{
+            .forth_iterator = utils.LinkedListIterator.from(dictionary.memory, forth_latest),
+            .compiler_iterator = utils.LinkedListIterator.from(dictionary.memory, compiler_latest),
+            .last_forth_addr = forth_latest,
+            .last_compiler_addr = compiler_latest,
+        };
+    }
+
+    fn next(self: *@This()) struct {
+        addr: vm.Cell,
+        wordlist_idx: vm.Cell,
+    } {
+        // TODO
+        _ = self;
+    }
+};
+
 test "dictionary" {
     // TODO
     //     const testing = @import("std").testing;
