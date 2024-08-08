@@ -56,7 +56,11 @@ pub fn Dictionary(
                     const name_addr = name_len_addr + 1;
 
                     const name_len = try vm.mem.checkedRead(self.memory, name_len_addr);
-                    const to_compare = try vm.mem.constSliceFromAddrAndLen(self.memory, name_addr, name_len);
+                    const to_compare = try vm.mem.constSliceFromAddrAndLen(
+                        self.memory,
+                        name_addr,
+                        name_len,
+                    );
                     if (utils.stringsEqual(word, to_compare)) {
                         return .{
                             .addr = latest,

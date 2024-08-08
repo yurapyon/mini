@@ -14,7 +14,7 @@ pub const Range = struct {
 
     pub fn wrapWithin(self: @This(), value: vm.Cell) vm.Cell {
         const range = self.end - self.start;
-        const offsetted_value = value - self.start;
+        const offsetted_value = value -% self.start;
         return (offsetted_value % range) + self.start;
     }
 };

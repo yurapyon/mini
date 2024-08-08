@@ -3,11 +3,6 @@ const vm = @import("mini.zig");
 const Range = @import("range.zig").Range;
 const Register = @import("register.zig").Register;
 
-pub const StackError = error{
-// StackOverflow,
-// StackUnderflow,
-} || vm.mem.MemoryError;
-
 /// Stack
 pub fn Stack(
     comptime top_offset: vm.Cell,
@@ -159,54 +154,49 @@ test "stack" {
     var stack: Stack(0, .{ .start = 2, .end = 32 }) = undefined;
     try stack.initInOneMemoryBlock(memory);
 
-    try testing.expectEqual(0, stack.depth());
+    stack.push(0);
+    stack.push(1);
+    stack.push(2);
+    try expectStack(&stack, &[_]vm.Cell{ 2, 1, 0 });
 
-    try stack.push(0);
-    try stack.push(1);
-    try stack.push(2);
-    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+    try testing.expectEqual(2, stack.pop());
 
-    try testing.expectEqual(2, try stack.pop());
+    stack.tuck();
+    try expectStack(&stack, &[_]vm.Cell{ 1, 0, 1 });
 
-    try stack.tuck();
-    try expectStack(stack, &[_]vm.Cell{ 1, 0, 1 });
+    stack.drop();
+    stack.swap();
+    stack.push(2);
+    try expectStack(&stack, &[_]vm.Cell{ 2, 1, 0 });
 
-    try stack.drop();
-    try stack.swap();
-    try stack.push(2);
-    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+    stack.rot();
+    try expectStack(&stack, &[_]vm.Cell{ 0, 2, 1 });
 
-    try stack.rot();
-    try expectStack(stack, &[_]vm.Cell{ 1, 2, 0 });
+    stack.nrot();
+    try expectStack(&stack, &[_]vm.Cell{ 2, 1, 0 });
 
-    try stack.nrot();
-    try expectStack(stack, &[_]vm.Cell{ 0, 1, 2 });
+    stack.flip();
+    stack.nip();
+    stack.over();
+    try expectStack(&stack, &[_]vm.Cell{ 2, 0, 2 });
 
-    try stack.flip();
-    try stack.nip();
-    try stack.over();
-    try expectStack(stack, &[_]vm.Cell{ 2, 0, 2 });
+    stack.dup();
+    try expectStack(&stack, &[_]vm.Cell{ 2, 2, 0, 2 });
 
-    try stack.dup();
-    try expectStack(stack, &[_]vm.Cell{ 2, 0, 2, 2 });
-
-    const a, const b, const c, const d = try stack.popMultiple(4);
+    const a, const b, const c, const d = stack.popMultiple(4);
     try testing.expectEqual(2, a);
     try testing.expectEqual(2, b);
     try testing.expectEqual(0, c);
     try testing.expectEqual(2, d);
 
-    try testing.expectEqual(0, stack.depth());
+    // TODO test circularity of stack
 }
 
 pub fn expectStack(stack: anytype, expectation: []const vm.Cell) !void {
-    const S = @TypeOf(stack);
-
+    // const S = @TypeOf(stack);
     const testing = @import("std").testing;
-    const mem: [*]vm.Cell = @ptrCast(@alignCast(&stack.memory[S.range.start]));
-    try testing.expectEqualSlices(
-        vm.Cell,
-        expectation,
-        mem[0..expectation.len],
-    );
+
+    for (expectation, 0..) |expected, i| {
+        try testing.expectEqual(expected, stack.index(@intCast(i)).*);
+    }
 }

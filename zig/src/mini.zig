@@ -47,10 +47,6 @@ pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
     Panic,
-    StackOverflow,
-    StackUnderflow,
-    ReturnStackOverflow,
-    ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
     InvalidCompileState,
@@ -75,15 +71,6 @@ pub const WordError = error{
 };
 
 pub const MathError = error{ Overflow, DivisionByZero, NegativeDenominator };
-
-// TODO this isnt working right
-pub fn returnStackErrorFromStackError(err: Error) Error {
-    return switch (err) {
-        error.StackOverflow => error.ReturnStackOverflow,
-        error.StackUnderflow => error.ReturnStackUnderflow,
-        else => err,
-    };
-}
 
 // TODO could rename this to interpreter state
 pub const CompileState = enum(Cell) {
@@ -418,7 +405,10 @@ pub const MiniVM = struct {
         _ = try self.callbacks.onExecuteLoop(self, self.callbacks.userdata);
 
         while (self.program_counter.fetch() > 0) {
-            const should_continue = try self.callbacks.onExecuteBytecode(self, self.callbacks.userdata);
+            const should_continue = try self.callbacks.onExecuteBytecode(
+                self,
+                self.callbacks.userdata,
+            );
             if (should_continue) {
                 const bytecode = try self.readByteAndAdvancePC();
                 const ctx = ExecutionContext{
