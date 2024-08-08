@@ -198,6 +198,8 @@ forth
 
 hello ##type ##cr
 
+##.d
+
 \ TODO
 \ should this file have to end with 'bye' or 'quit' ?
 bye

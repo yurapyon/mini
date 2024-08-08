@@ -13,38 +13,34 @@ pub fn printWordBody(
     }
 }
 
+// TODO this is kinda broken because we dont handle having two wordlists
 pub fn printDictionary(mini: *vm.MiniVM) !void {
-    // TODO
-    _ = mini;
-    //     var dictionary_iter = mini.dictionary.iterator();
-    //
-    //     var previous_addr = mini.dictionary.here.fetch();
-    //
-    //     while (try dictionary_iter.next()) |addr| {
-    //         const terminator_addr = try mini.dictionary.toTerminator(addr);
-    //
-    //         const name = try vm.mem.sliceFromAddrAndLen(
-    //             mini.dictionary.memory,
-    //             addr + 2,
-    //             terminator_addr - (addr + 2),
-    //         );
-    //
-    //         const terminator = mini.memory[terminator_addr];
-    //         const terminator_info = TerminatorInfo.fromByte(terminator);
-    //
-    //         const cutoff_name = if (name[name.len - 1] == 0) name[0 .. name.len - 1] else name;
-    //
-    //         std.debug.print("{s}{x:0>4}: {s}\t{s}", .{
-    //             if (terminator_info.is_immediate) "i" else " ",
-    //             addr,
-    //             cutoff_name,
-    //             if (cutoff_name.len >= 8) "" else "\t",
-    //         });
-    //         printWordBody(mini.memory, terminator_addr + 1, previous_addr);
-    //         std.debug.print("\n", .{});
-    //
-    //         previous_addr = addr;
-    //     }
+    var dictionary_iter = mini.dictionary.iterator();
+
+    var previous_addr = mini.dictionary.here.fetch();
+
+    while (try dictionary_iter.next()) |addr| {
+        const name_len_addr = addr + 2;
+        const name_addr = name_len_addr + 1;
+        const name_len = mini.dictionary.memory[name_len_addr];
+        const name = try vm.mem.sliceFromAddrAndLen(
+            mini.dictionary.memory,
+            name_addr,
+            name_len,
+        );
+
+        std.debug.print("{x:0>4}: {s}\t{s}{s}", .{
+            addr,
+            name,
+            if (name.len <= 1) "\t" else "",
+            if (name.len <= 9) "\t" else "",
+        });
+        const cfa_addr = try mini.dictionary.toCfa(addr);
+        printWordBody(mini.memory, cfa_addr, previous_addr);
+        std.debug.print("\n", .{});
+
+        previous_addr = addr;
+    }
 }
 
 // TODO currenly unused, should format more nicely
