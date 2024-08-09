@@ -9,7 +9,13 @@ pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;
 }
 
-pub const Error = error{} || vm.Error || mem.Error;
+pub fn isTruthy(value: Cell) bool {
+    return value != 0;
+}
+
+pub const Error = error{
+    ExternalPanic,
+} || vm.Error || mem.Error;
 
 pub const Memory align(@alignOf(Cell)) = [64 * 1024]u8;
 

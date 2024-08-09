@@ -4,8 +4,8 @@ an evolved 'forth'
 
 goals:
   easy
-    easy to write/read CS code
-    easy to implement/port vm
+    language is easy to write/read
+    vm is easy to implement/port
   anachronistic
     modern conveniences while retaining old fashioned jank
   small memory footprint

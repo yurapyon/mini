@@ -7,7 +7,6 @@ const stack = @import("stack.zig");
 
 pub const Error = error{
     Panic,
-    ExternalPanic,
 } || mem.Error;
 
 pub const BytecodeFn = *const fn (vm: *VM) Error!void;
