@@ -47,10 +47,12 @@ const lookup_table = [_]ExternalDefinition{
 };
 
 fn printStack(mini: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Error!void {
-    std.debug.print("stack ==\n", .{});
-    for (try mini.data_stack.asSlice(), 0..) |cell, i| {
-        std.debug.print("{}: {}\n", .{ i, cell });
-    }
+    _ = mini;
+    // TODO
+    //     std.debug.print("stack ==\n", .{});
+    //     for (try mini.data_stack.asSlice(), 0..) |cell, i| {
+    //         std.debug.print("{}: {}\n", .{ i, cell });
+    //     }
 }
 
 fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Error!void {
@@ -58,7 +60,7 @@ fn miniBreakpoint(_: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Erro
 }
 
 fn printString(mini: *vm.MiniVM, _: vm.ExecutionContext, _: ?*anyopaque) vm.Error!void {
-    const len, const addr = try mini.data_stack.popMultiple(2);
+    const len, const addr = mini.data_stack.popMultiple(2);
     const str = try vm.mem.constSliceFromAddrAndLen(mini.memory, addr, len);
     std.debug.print("{s}", .{str});
 }

@@ -1,18 +1,21 @@
-.   | \ \ ` | \ `   .
-.   | | | | | | |   ,
+(name tbd)
 
-small forth vm
+an evolved 'forth'
 
 goals:
   easy
-    easy to write/read mini code
+    easy to write/read CS code
     easy to implement/port vm
+  anachronistic
+    modern conveniences while retaining old fashioned jank
   small memory footprint
 
 roadmap:
   planned:
     self-hosted version
       it would be fun
+  maybe:
+    web version
 
 \ ======
 

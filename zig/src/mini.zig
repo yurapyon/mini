@@ -9,8 +9,6 @@ const InputSource = @import("input_source.zig").InputSource;
 const dictionary = @import("dictionary.zig");
 const Dictionary = @import("dictionary.zig").Dictionary;
 const utils = @import("utils.zig");
-// TODO rename somehow
-const t = @import("terminator.zig");
 const external = @import("ext_bytecodes.zig");
 
 pub const mem = @import("memory.zig");
@@ -49,10 +47,6 @@ pub const max_memory_size = 64 * 1024;
 
 pub const Error = error{
     Panic,
-    StackOverflow,
-    StackUnderflow,
-    ReturnStackOverflow,
-    ReturnStackUnderflow,
     InvalidProgramCounter,
     InvalidAddress,
     InvalidCompileState,
@@ -72,23 +66,22 @@ pub const SemanticsError = error{
 pub const WordError = error{
     WordNotFound,
     WordNameTooLong,
+    // TODO is WordNameInvalid ever used?
     WordNameInvalid,
 };
 
 pub const MathError = error{ Overflow, DivisionByZero, NegativeDenominator };
 
-// TODO this isnt working right
-pub fn returnStackErrorFromStackError(err: Error) Error {
-    return switch (err) {
-        error.StackOverflow => error.ReturnStackOverflow,
-        error.StackUnderflow => error.ReturnStackUnderflow,
-        else => err,
-    };
-}
-
+// TODO could rename this to interpreter state
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
+    _,
+};
+
+pub const CompileContext = enum(Cell) {
+    forth = 0,
+    compiler,
     _,
 };
 
@@ -102,6 +95,8 @@ pub const MemoryLayout = utils.MemoryLayout(struct {
     data_stack_end: u0,
     here: Cell,
     latest: Cell,
+    context: Cell,
+    wordlists: [2]Cell,
     state: Cell,
     base: Cell,
     input_buffer_at: Cell,
@@ -128,11 +123,12 @@ pub const WordInfo = union(enum) {
     bytecode: u8,
     number: Cell,
 
-    fn fromMiniWord(definition_addr: Cell, terminator: t.TerminatorInfo) Error!@This() {
+    // TODO rename to 'is compiler word' or something
+    fn fromMiniWord(definition_addr: Cell, is_immediate: bool) Error!@This() {
         return .{
             .mini_word = .{
                 .definition_addr = definition_addr,
-                .is_immediate = terminator.is_immediate,
+                .is_immediate = is_immediate,
             },
         };
     }
@@ -174,6 +170,8 @@ pub const MiniVM = struct {
     dictionary: Dictionary(
         MemoryLayout.offsetOf("here"),
         MemoryLayout.offsetOf("latest"),
+        MemoryLayout.offsetOf("context"),
+        MemoryLayout.offsetOf("wordlists"),
     ),
     state: Register(MemoryLayout.offsetOf("state")),
     base: Register(MemoryLayout.offsetOf("base")),
@@ -202,8 +200,8 @@ pub const MiniVM = struct {
             self.memory,
             MemoryLayout.offsetOf("dictionary_start"),
         );
-        try self.base.init(self.memory);
         try self.state.init(self.memory);
+        try self.base.init(self.memory);
         try self.input_source.initInOneMemoryBlock(
             self.memory,
             MemoryLayout.offsetOf("input_buffer"),
@@ -222,6 +220,7 @@ pub const MiniVM = struct {
 
         // TODO
         // run base file ?
+        // probably not
     }
 
     fn compileMemoryLocationConstant(self: *@This(), comptime name: []const u8) void {
@@ -231,12 +230,9 @@ pub const MiniVM = struct {
     fn compileMemoryLocationConstants(self: *@This()) void {
         self.compileMemoryLocationConstant("here");
         self.compileMemoryLocationConstant("latest");
+        self.compileMemoryLocationConstant("context");
         self.compileMemoryLocationConstant("state");
         self.compileMemoryLocationConstant("base");
-        self.dictionary.compileConstant(
-            "r0",
-            MemoryLayout.offsetOf("return_stack"),
-        ) catch unreachable;
         self.dictionary.compileConstant(
             "d0",
             MemoryLayout.offsetOf("dictionary_start"),
@@ -302,8 +298,9 @@ pub const MiniVM = struct {
     // ===
 
     fn evaluateString(self: *@This(), word: []const u8) Error!void {
-        if (try self.lookupString(word)) |word_info| {
-            const state: CompileState = @enumFromInt(self.state.fetch());
+        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
+        const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
+        if (try self.lookupString(wordlist_idx, word)) |word_info| {
             switch (state) {
                 .interpret => {
                     try self.interpret(word_info);
@@ -320,11 +317,11 @@ pub const MiniVM = struct {
         }
     }
 
-    fn lookupString(self: *@This(), str: []const u8) Error!?WordInfo {
+    fn lookupString(self: *@This(), wordlist_idx: Cell, str: []const u8) Error!?WordInfo {
         // TODO would be nice if lookups couldnt error
-        if (try self.dictionary.lookup(str)) |definition_addr| {
-            const terminator = try self.dictionary.getTerminator(definition_addr);
-            return try WordInfo.fromMiniWord(definition_addr, terminator);
+        if (try self.dictionary.lookup(wordlist_idx, str)) |lookup_result| {
+            const is_immediate = lookup_result.wordlist_idx == 1;
+            return try WordInfo.fromMiniWord(lookup_result.addr, is_immediate);
         } else if (bytecodes.lookupBytecodeByName(str)) |bytecode| {
             return WordInfo.fromBytecode(bytecode);
         } else if (try self.maybeParseNumber(str)) |value| {
@@ -350,7 +347,7 @@ pub const MiniVM = struct {
                 try self.executeCfa(cfa_addr);
             },
             .number => |value| {
-                try self.data_stack.push(value);
+                self.data_stack.push(value);
             },
         }
     }
@@ -386,14 +383,12 @@ pub const MiniVM = struct {
 
     pub fn executeCfa(self: *@This(), cfa_addr: Cell) Error!void {
         // NOTE
-        // this puts some 'dummy data' on the return stack
-        // the 'dummy data' is actually the xt currently being executed
-        //   and can be accessed with `r0 @` from forth
-        // i think its more clear to write it out this way
-        //   rather than using the absoluteJump function below
-        self.return_stack.push(cfa_addr) catch |err| {
-            return returnStackErrorFromStackError(err);
-        };
+        // this puts a sentinel on the return stack
+        //   with circular stacks, you can't use the depth of the return stack
+        //     to signal when to exit an executionLoop
+        //   so 0 is used as a sentinel, that 'exit' will pop from
+        //     the return stack and store to the PC
+        self.return_stack.push(0);
         self.program_counter.store(cfa_addr);
         try self.executionLoop();
     }
@@ -409,8 +404,11 @@ pub const MiniVM = struct {
         // TODO should we care about this return?
         _ = try self.callbacks.onExecuteLoop(self, self.callbacks.userdata);
 
-        while (self.return_stack.depth() > 0) {
-            const should_continue = try self.callbacks.onExecuteBytecode(self, self.callbacks.userdata);
+        while (self.program_counter.fetch() > 0) {
+            const should_continue = try self.callbacks.onExecuteBytecode(
+                self,
+                self.callbacks.userdata,
+            );
             if (should_continue) {
                 const bytecode = try self.readByteAndAdvancePC();
                 const ctx = ExecutionContext{
@@ -430,9 +428,7 @@ pub const MiniVM = struct {
         useReturnStack: bool,
     ) Error!void {
         if (useReturnStack) {
-            self.return_stack.push(self.program_counter.fetch()) catch |err| {
-                return returnStackErrorFromStackError(err);
-            };
+            self.return_stack.push(self.program_counter.fetch());
         }
         self.program_counter.store(addr);
     }
@@ -471,7 +467,7 @@ pub const MiniVM = struct {
     } {
         // NOTE TODO
         // in this case lookupString could have a early return to not try and parse numbers
-        if (try self.lookupString(str)) |word_info| {
+        if (try self.lookupString(1, str)) |word_info| {
             switch (word_info) {
                 .bytecode => |bytecode| {
                     return .{
@@ -496,7 +492,7 @@ pub const MiniVM = struct {
 
     /// pops ( addr len -- ) from the stack and return as a []u8
     pub fn popSlice(self: *@This()) Error![]u8 {
-        const len, const addr = try self.data_stack.popMultiple(2);
+        const len, const addr = self.data_stack.popMultiple(2);
         return mem.sliceFromAddrAndLen(self.memory, addr, len);
     }
 };

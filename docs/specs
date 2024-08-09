@@ -10,7 +10,7 @@ language:
   untyped
   case-insensitive
   max input line length: 128 chars
-  max word name length:  2^16 (limited by input buffer length)
+  max word name length:  256 chars
   max numeric base:      36
 
 states:
@@ -22,28 +22,11 @@ repl behavior:
   bye: system dependent
 
 word definition layout:
-  odd length name
-  prealign0               16      24              x       x+8
-  |?......|previous-------|name...|.......|.......|>127---|code...
-
-  even length name
-  prealign0               16      24              x       x+8
-  |?......|previous-------|name...|.......|\0-----|>127---|code...
-
-  the name field may be zero terminated to align the entire header to u16s
-
-  terminator is a byte >=128
-  terminator bits:
-    0: 1
-    1: is-immediate
-    2: is-hidden
-    3: TBD
-    4: TBD
-    5: TBD
-    6: TBD
-    7: TBD
+  align(2)0               16      24                      x
+  |?......|previous-------|namelen|.......|.......|?align-|code...
 
 program execution:
+  \ TODO now that portability isn't as much of a concern, is this still true?
   behavior of the program counter is well defined and will be the same across systems
     this means i.e. that execution of 'ext' can only move the PC to PC+2
     this is to keep programs portable

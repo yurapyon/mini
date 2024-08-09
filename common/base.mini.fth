@@ -1,20 +1,39 @@
-word flipb!    define ] tuck c@ xor swap c! [ ' exit c,
-word flag#     define ] 0x80 swap rshift [ ' exit c,
-word flipt!    define ] flag# swap >terminator flipb! [ ' exit c,
-word immediate define ] latest @ 1 flipt! [ ' exit c,
-word hide      define ]          2 flipt! [ ' exit c,
-word :         define ] word define latest @ hide ] [ ' exit c,
-word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
+word forth    define ] 0 context ! [ ' exit c,
+word compiler define ] 1 context ! [ ' exit c,
 
-: >cfa       >terminator 1+ ;
-: immediate? >terminator 1 flag# ;
+word : define ] word define ] [ ' exit c,
+compiler
+word ; define ] ['] exit c, [ ' [ c, ' exit c,
+forth
 
-: \ source >in ! drop ; immediate
+: \ source >in ! drop ;
+
+: <> = 0= ;
+
+: 2dup  over over ;
+: 2drop drop drop ;
+: 3drop drop 2drop ;
 
 \ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
 : c!+   tuck c! 1+ ;
 : cell, cell>bytes c, c, ;
 : cell! swap cell>bytes rot c!+ c! ;
+
+: cell 2 ;
+: cells cell * ;
+
+: u/   u/mod nip ;
+: umod u/mod drop ;
+: /    /mod nip ;
+: mod  /mod drop ;
+
+: allot   here +! ;
+: aligned dup cell mod + ;
+: align   here @ aligned here ! ;
+
+: name-len 2 + c@ ;
+: >cfa dup name-len + 3 + aligned ;
+: last latest @ >cfa ;
 
 \ tags
 : exit, ['] exit c, ;
@@ -26,9 +45,13 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : litc, ['] litc c, ;
 : ext,  ['] ext c, ;
 
+: :noname  0 0 define here @ ] ;
 : xt-call, call, cell, ;
 : xt-jump, jump, cell, ;
 : next,    here @ 3 + xt-jump, ;
+compiler
+: recurse  last xt-jump, ;
+forth
 
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;
@@ -45,58 +68,48 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : back,  dist negate c, ;
 
 \ basic syntax
-: if   ?br, (later)c, ; immediate
-: else br,  (later)c, swap distc! ; immediate
-: then distc! ; immediate
+compiler
+: [compile] ' xt-call, ;
 
-: begin here @ ; immediate
-: until ?br, back, ; immediate
-: again br,  back, ; immediate
-: while ?br, (later)c, ; immediate
-: repeat swap br, back, distc! ; immediate
+: if   ?br, (later)c, ;
+: else br,  (later)c, swap distc! ;
+: then distc! ;
 
-: compile,  lit, cell, ['] xt-call, xt-call, ;
-: postpone, dup immediate? if >cfa xt-call, else >cfa compile, then ;
-: postpone  word find 2drop postpone, ; immediate
+: cond    0 ;
+: endcond ?dup if [compile] then recurse then ;
 
-: cond    0 ; immediate
-: endcond begin ?dup while postpone then repeat ; immediate
-
-: case    postpone cond    ['] >r c, ; immediate
-: endcase postpone endcond ['] r> c, ['] drop c, ; immediate
-: of      ['] r@ c, ['] = c, postpone if ; immediate
-: endof   postpone else ; immediate
+: case    [compile] cond    ['] >r c, ;
+: endcase [compile] endcond ['] r> c, ['] drop c, ;
+: of      ['] r@ c, ['] = c, [compile] if ;
+: endof   [compile] else ;
+forth
 
 : char word drop c@ ;
-: [char] litc, char c, ; immediate
+compiler
+: [char] litc, char c, ;
+forth
 
-: +-()
-  case
+: +-() case
     [char] ( of 1+ endof
     [char] ) of 1- endof
   endcase ;
 
-: ( 1 begin next-char +-() dup 0= until drop ; immediate
+:noname next-char +-() dup if recurse then ;
+: ( 1 [ xt-call, ] drop ;
+
+compiler
+:noname [compile] ( ;
+: ( [ xt-jump, ] ; \ this comment is to fix vim syntax highlight )
+
+:noname [compile] \ ;
+: \ [ xt-jump, ] ;
+forth
 
 \ ===
-
-: 2dup over over ;
-: 2drop drop drop ;
-: 2over 3 pick 3 pick ;
-: 3dup 2 pick 2 pick 2 pick ;
-: 3drop drop 2drop ;
-
-: cell 2 ;
-: cells cell * ;
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
 : hex 16 base ! ;
-
-: u/   u/mod nip ;
-: umod u/mod drop ;
-: /    /mod nip ;
-: mod  /mod drop ;
 
 : min 2dup > if swap then drop ;
 : max 2dup < if swap then drop ;
@@ -106,13 +119,15 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : within[] 2 pick >r clamp r> = ;
 : within[) 1- within[] ;
 
-: allot here +! ;
-: aligned dup cell mod + ;
-: align   here @ aligned here ! ;
+: numeric?   [char] 0 [char] 9 within[] ;
+: capital?   [char] A [char] Z within[] ;
+: lowercase? [char] a [char] z within[] ;
 
-: :noname 0 0 define here @ ] ;
-: last    latest @ >cfa ;
-: recurse last xt-jump, ; immediate
+: char>digit cond
+    dup numeric?   if [char] 0 -      else
+    dup capital?   if [char] A - 10 + else
+    dup lowercase? if [char] a - 10 + else
+  endcond ;
 
 \ ===
 
@@ -120,7 +135,9 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 : >does  >body 3 - ;
 : does!  last >does ['] jump swap c!+ cell! ;
 : create word define something, return, this! ;
-: does>  something, ['] does! xt-call, exit, this! ; immediate
+compiler
+: does>  something, ['] does! xt-call, exit, this! ;
+forth
 
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
@@ -134,33 +151,54 @@ word ;         define ] ['] exit c, latest @ hide [ ' [ c, ' exit c, immediate
 
 \ ===
 
+compiler
+: assign lit, here @ 5 + cell, ['] swap c, ['] ! c, exit, ;
+forth
+
 \ push address, push length, jump over the data
 : header, something, something, somewhere, rot this! ;
 
-: str-end? [char] " = ;
+: next-digit next-char char>digit ;
 
-: string,
-  next-char drop
-  begin next-char dup str-end? 0=
-  while c, repeat
-  drop ;
+: read-byte next-digit 16 * next-digit + ;
 
-\ TODO
-\ look into ASSIGN from polyforth
-\   you can define different string reading routines
-\     then set them to a callback
-\     then 'string,' calls them
-: s" header, swap here @ string, dist swap ! this! ; immediate
+variable readc
+
+: ascii readc assign ;
+
+: escaped readc assign
+  dup [char] \ = if
+    drop next-char
+    dup case
+      [char] n of drop 10 endof
+      [char] x of drop read-byte endof
+    endcase
+  then ;
+
+ascii
+
+: read-str, next-char dup [char] " <> if readc @ execute c, recurse then ;
+: string, next-char drop read-str, drop ;
+
+compiler
+: "  header, swap here @ string, dist swap cell! this! ;
+: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
+: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
+forth
 
 \ ===
 
 : dyn, define next, ;
 : dyn! >cfa 1+ this! ;
-: :dyn
-  word find if drop dyn! else dyn, then
-  latest @ hide ] ;
+: :dyn word find if drop dyn! else dyn, then ] ;
 
 \ ===
+
+: hello e" hellow\x0aasdf" ;
+
+hello ##type ##cr
+
+##.d
 
 \ TODO
 \ should this file have to end with 'bye' or 'quit' ?
