@@ -205,7 +205,7 @@ const bytecodes = [64]BytecodeFn{
     VM.panic,
 };
 
-test {
+test "vm" {
     const vm: VM = undefined;
     _ = vm;
 }

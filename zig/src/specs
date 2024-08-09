@@ -26,8 +26,8 @@ core instructions
   0x2e rshift
   0x26 1+
   0x27 1-
-  0x22
-  0x23
+  0x22 >io ( write byte to io )
+  0x23 io> ( read byte from io )
 
   0x10 !a
   0x11 @a
@@ -104,6 +104,10 @@ use the p register (ie, the next cell in memory)
   call
   skip
   skip0
+
+use byte from p register
+  >io
+  io>
 
 '=' is the same as 'xor invert'
 
