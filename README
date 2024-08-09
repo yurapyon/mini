@@ -1,50 +1,6 @@
-(name tbd)
+forthy VM and virtual computer
 
-an evolved 'forth'
-
-goals:
-  easy
-    language is easy to write/read
-    vm is easy to implement/port
-  anachronistic
-    modern conveniences while retaining old fashioned jank
-  small memory footprint
-
-roadmap:
-  planned:
-    self-hosted version
-      it would be fun
-  maybe:
-    web version
-
-\ ======
-
-: (tbd name) ;
-
-virtual computer
-
-(tbd if it will be primarily in zig or on the web)
-
-goals:
-  art tool
-    usable for making motion graphics/video art
-  (tbd)
-
-roadmap:
-  planned:
-    interactive
-      edit memory directly and in real time
-    io
-      graphics
-      mouse/keyboard input
-      filesystem access
-    built-in code editor
-  maybe:
-    repl
-    io
-      audio
-
-\ ======
+(everything tbd)
 
 you need:
   zig
