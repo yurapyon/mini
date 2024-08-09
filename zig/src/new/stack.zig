@@ -3,6 +3,7 @@ const Cell = runtime.Cell;
 
 const CircularStack = struct {
     stack: [32]Cell,
+    // TODO index could just be a u5 here
     idx: u8,
 
     fn peek(self: @This()) Cell {
@@ -26,17 +27,49 @@ pub const DataStack = struct {
     second: Cell,
     inner: CircularStack,
 
-    fn push(self: *@This(), value: Cell) void {
+    pub fn push(self: *@This(), value: Cell) void {
         self.inner.push(self.second);
         self.second = self.top;
         self.top = value;
     }
 
-    fn pop(self: *@This()) Cell {
+    pub fn pop(self: *@This()) Cell {
         const ret = self.top;
         self.top = self.second;
         self.second = self.inner.pop();
         return ret;
+    }
+
+    pub fn eq(self: *@This()) void {
+        self.top = ~(self.top ^ self.second);
+        self.inner.pop();
+    }
+
+    pub fn gt(self: *@This()) void {
+        self.push(runtime.cellFromBoolean(self.top < self.second));
+    }
+
+    pub fn gteq(self: *@This()) void {
+        self.push(runtime.cellFromBoolean(self.top <= self.second));
+    }
+
+    pub fn and_(self: *@This()) void {
+        self.top = self.top & self.second;
+        self.second = self.inner.pop();
+    }
+
+    pub fn ior(self: *@This()) void {
+        self.top = self.top | self.second;
+        self.second = self.inner.pop();
+    }
+
+    pub fn xor(self: *@This()) void {
+        self.top = self.top ^ self.second;
+        self.second = self.inner.pop();
+    }
+
+    pub fn invert(self: *@This()) void {
+        self.top = ~self.top;
     }
 };
 
@@ -44,12 +77,12 @@ pub const ReturnStack = struct {
     top: Cell,
     inner: CircularStack,
 
-    fn push(self: *@This(), value: Cell) void {
+    pub fn push(self: *@This(), value: Cell) void {
         self.inner.push(self.top);
         self.top = value;
     }
 
-    fn pop(self: *@This()) Cell {
+    pub fn pop(self: *@This()) Cell {
         const ret = self.top;
         self.top = self.inner.pop();
         return ret;

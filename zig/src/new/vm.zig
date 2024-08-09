@@ -5,8 +5,12 @@ const Memory = runtime.Memory;
 
 const stack = @import("stack.zig");
 
-/// Basically a 16bit version of the F18
-///   some opcodes are added for convenience
+pub const Error = error{
+    Panic,
+    ExternalPanic,
+};
+
+/// A 16bit hosted version of the F18
 /// By design, this VM can never access out-of-bounds memory
 ///   there can still be alignment errors though
 pub const VM = struct {
@@ -20,6 +24,8 @@ pub const VM = struct {
     memory: *Memory,
 
     // program control ===
+
+    fn nop(_: *@This()) void {}
 
     fn exit(self: *@This()) void {
         self.registers.p = self.return_stack.pop();
@@ -109,6 +115,13 @@ pub const VM = struct {
     }
 
     // ALU, registers ===
+
+    // external ===
+
+    fn external(self: *@This()) Error!void {
+        // TODO
+        _ = self;
+    }
 };
 
 test {
