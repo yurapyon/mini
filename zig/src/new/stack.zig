@@ -1,8 +1,10 @@
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
 
+const stack_inner_depth = 32;
+
 const CircularStack = struct {
-    stack: [32]Cell,
+    stack: [stack_inner_depth]Cell,
     idx: u8,
 
     fn peek(self: @This()) Cell {
@@ -177,34 +179,88 @@ pub const ReturnStack = struct {
     }
 };
 
+// tests ===
+
+fn testCommon(
+    stack: anytype,
+) !void {
+    const testing = @import("std").testing;
+
+    const value = 0xbeef;
+    stack.push(value);
+    try testing.expectEqual(value, stack.pop());
+
+    for (0..(stack_inner_depth * 2)) |_| {
+        _ = stack.pop();
+    }
+
+    for (0..(stack_inner_depth * 2)) |_| {
+        stack.push(0xabcd);
+    }
+}
+
+fn testUnop(
+    stack: anytype,
+    value: Cell,
+    operator: fn (_: @TypeOf(stack)) void,
+    expected: Cell,
+) !void {
+    const testing = @import("std").testing;
+    stack.push(value);
+    operator(stack);
+    try testing.expectEqual(expected, stack.pop());
+}
+
+fn testBinop(
+    stack: anytype,
+    second: Cell,
+    top: Cell,
+    operator: fn (_: @TypeOf(stack)) void,
+    expected: Cell,
+) !void {
+    const testing = @import("std").testing;
+    stack.push(second);
+    stack.push(top);
+    operator(stack);
+    try testing.expectEqual(expected, stack.pop());
+}
+
+fn testStackManipulator(
+    stack: anytype,
+    setup: []const Cell,
+    operator: fn (_: @TypeOf(stack)) void,
+    expected: []const Cell,
+) !void {
+    const testing = @import("std").testing;
+    for (setup) |value| {
+        stack.push(value);
+    }
+    operator(stack);
+    for (0..(expected.len)) |i| {
+        const idx = expected.len - i - 1;
+        try testing.expectEqual(expected[idx], stack.pop());
+    }
+}
+
 test "stack: circular" {
     const testing = @import("std").testing;
     var cs: CircularStack = undefined;
 
+    try testCommon(&cs);
+
     cs.push(0xbeef);
     try testing.expectEqual(0xbeef, cs.peek());
-    try testing.expectEqual(0xbeef, cs.pop());
     cs.setTop(0x1234);
     try testing.expectEqual(0x1234, cs.peek());
-
-    for (0..(cs.stack.len * 2)) |_| {
-        _ = cs.pop();
-    }
-
-    for (0..(cs.stack.len * 2)) |_| {
-        cs.push(0xabcd);
-    }
 }
 
 test "stack: data" {
-    const testing = @import("std").testing;
     var ds: DataStack = undefined;
+
+    try testCommon(&ds);
 
     const forth_true = runtime.cellFromBoolean(true);
     const forth_false = runtime.cellFromBoolean(false);
-
-    ds.push(0xbeef);
-    try testing.expectEqual(0xbeef, ds.pop());
 
     try testBinop(&ds, 0xbeef, 0xbeef, DataStack.eq, forth_true);
     try testBinop(&ds, 0x1234, 0xbeef, DataStack.eq, forth_false);
@@ -222,21 +278,55 @@ test "stack: data" {
     try testBinop(&ds, 0xbe00, 0x00ef, DataStack.xor, 0xbeef);
     try testBinop(&ds, 0x0000, 0x1111, DataStack.xor, 0x1111);
 
-    // TODO
-    // test invert true->false
+    try testUnop(&ds, forth_true, DataStack.invert, forth_false);
 
     try testBinop(&ds, 0xbeef, 8, DataStack.lshift, 0xef00);
     try testBinop(&ds, 0xbeef, 8, DataStack.rshift, 0x00be);
 
-    // TODO
-    // inc
-    // dec
-    // stack manip
+    try testUnop(&ds, 1, DataStack.inc, 2);
+    try testUnop(&ds, 0xffff, DataStack.inc, 0x0000);
+    try testUnop(&ds, 2, DataStack.dec, 1);
+    try testUnop(&ds, 0x0000, DataStack.dec, 0xffff);
 
-    try testBinop(&ds, 1234, 1, DataStack.add, 1235);
-    try testBinop(&ds, 0xffff, 1, DataStack.add, 0x0000);
-    try testBinop(&ds, 1234, 1, DataStack.subtract, 1233);
-    try testBinop(&ds, 0x0000, 1, DataStack.subtract, 0xffff);
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.drop,
+        &[_]Cell{ 1, 2 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.dup,
+        &[_]Cell{ 1, 2, 3, 3 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.swap,
+        &[_]Cell{ 1, 3, 2 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.flip,
+        &[_]Cell{ 3, 2, 1 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.over,
+        &[_]Cell{ 1, 2, 3, 2 },
+    );
+
+    try testBinop(&ds, 1234, 2, DataStack.add, 1236);
+    try testBinop(&ds, 0xffff, 2, DataStack.add, 0x0001);
+    try testBinop(&ds, 1234, 2, DataStack.subtract, 1232);
+    try testBinop(&ds, 0x0000, 2, DataStack.subtract, 0xfffe);
     try testBinop(&ds, 5, 5, DataStack.multiply, 25);
     try testBinop(&ds, 5, 5, DataStack.divide, 1);
     try testBinop(&ds, 5, 0, DataStack.divide, 0);
@@ -245,24 +335,8 @@ test "stack: data" {
     try testBinop(&ds, 5, 0, DataStack.mod, 0);
 }
 
-fn testBinop(
-    ds: *DataStack,
-    second: Cell,
-    top: Cell,
-    operator: fn (_: *DataStack) void,
-    expected: Cell,
-) !void {
-    const testing = @import("std").testing;
-    ds.push(second);
-    ds.push(top);
-    operator(ds);
-    try testing.expectEqual(expected, ds.pop());
-}
-
 test "stack: return" {
-    const testing = @import("std").testing;
     var rs: ReturnStack = undefined;
 
-    rs.push(0xbeef);
-    try testing.expectEqual(0xbeef, rs.pop());
+    try testCommon(&rs);
 }
