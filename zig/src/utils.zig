@@ -33,11 +33,11 @@ fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
 
 /// Memory layouts
 ///   build a representation of packed memory with the ability to query offsets by field name
-pub fn MemoryLayout(comptime Type: type, comptime OffsetType: type) type {
+pub fn MemoryLayout(comptime Type: type) type {
     return struct {
         pub const layout = structToMemoryLayout(Type);
 
-        pub fn offsetOf(comptime field: []const u8) OffsetType {
+        pub fn offsetOf(comptime field: []const u8) comptime_int {
             if (!@hasField(Type, field)) {
                 @compileError(std.fmt.comptimePrint(
                     "Field '{s}' doesnt exist on type '{}'\n",
@@ -73,7 +73,7 @@ test "layouts" {
         b: u8,
         c: [3]u16,
         d: u8,
-    }, usize);
+    });
 
     try testing.expectEqual(TestLayout.offsetOf("a"), 0);
     try testing.expectEqual(TestLayout.offsetOf("b"), 1);

@@ -18,12 +18,7 @@ pub const Error = error{
     ExternalPanic,
 } || vm.Error || mem.Error;
 
-pub const Memory align(@alignOf(Cell)) = [64 * 1024]u8;
-
-const Device = [16]u8;
-
-const MainMemoryLayout = utils.MemoryLayout(struct {
-    device_memory: [16]Device,
+const MemoryLayout = utils.MemoryLayout(struct {
     here: Cell,
     latest: Cell,
     context: Cell,
@@ -34,17 +29,12 @@ const MainMemoryLayout = utils.MemoryLayout(struct {
     input_buffer_at: Cell,
     input_buffer_len: Cell,
     dictionary_start: u0,
-}, Cell);
-
-const DeviceMemoryLayout = utils.MemoryLayout(struct {
-    forth: Device,
-    _: [15]Device,
-}, Cell);
+});
 
 pub const Runtime = struct {
     vm: vm.VM,
     dictionary: dictionary.Dictionary,
-    memory: Memory,
+    memory: mem.Memory,
 };
 
 test "runtime" {
