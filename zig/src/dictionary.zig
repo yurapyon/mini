@@ -1,11 +1,13 @@
 const std = @import("std");
 
+const utils = @import("utils.zig");
+
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
-const CompileContext = runtime.ComplieContext;
+const Wordlists = runtime.Wordlists;
 const MainMemoryLayout = runtime.MainMemoryLayout;
 
 const register = @import("register.zig");
@@ -39,9 +41,11 @@ pub const Dictionary = struct {
 
         self.here.store(dictionary_start);
         self.latest.store(0);
-        self.context.store(@intFromEnum(CompileContext.forth));
-        self.storeWordlistLatest(0, 0) catch unreachable;
-        self.storeWordlistLatest(1, 0) catch unreachable;
+        const forth_wordlist_idx = @intFromEnum(Wordlists.forth);
+        const compiler_wordlist_idx = @intFromEnum(Wordlists.compiler);
+        self.context.store(forth_wordlist_idx);
+        self.storeWordlistLatest(forth_wordlist_idx, 0) catch unreachable;
+        self.storeWordlistLatest(compiler_wordlist_idx, 0) catch unreachable;
     }
 
     // ===
@@ -73,15 +77,19 @@ pub const Dictionary = struct {
     pub fn find(
         self: @This(),
         wordlist_idx: Cell,
-        str: []const u8,
-    ) (Error || register.Error)!void {
+        to_find: []const u8,
+    ) (Error || register.Error)!?Cell {
         const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
         const iter = LinkedListIterator.from(self.memory, wordlist_latest);
 
-        while (iter.next()) |addr| {
-            _ = addr;
+        while (iter.next()) |definition_addr| {
+            const name = self.getDefinitionName(definition_addr);
+            if (utils.stringsEqual(to_find, name)) {
+                return definition_addr;
+            }
         }
-        _ = str;
+
+        return null;
     }
 
     pub fn define(self: *@This(), name: []const u8) (Error || register.Error)!void {
@@ -91,7 +99,7 @@ pub const Dictionary = struct {
 
         const definition_start = self.here.alignForward();
 
-        const context = @as(CompileContext, @enumFromInt(self.context.fetch()));
+        const context = @as(Wordlists, @enumFromInt(self.context.fetch()));
         const wordlist_latest = try self.fetchWordlistLatest(context);
 
         self.latest.store(definition_start);
@@ -99,18 +107,29 @@ pub const Dictionary = struct {
 
         try self.here.comma(wordlist_latest);
         try self.here.commaC(@intCast(name.len));
-        // TODO
-        // try self.here.commaString(name);
+        try self.here.commaString(name);
 
         _ = self.here.alignForward();
     }
 
-    pub fn toCfa(self: @This(), definition_addr: Cell) Error!Cell {
+    fn getNameInfo(self: @This(), definition_addr: Cell) Error!struct { addr: Cell, len: u8 } {
         const name_len_addr = std.math.add(Cell, definition_addr, 2) catch {
             return error.OutOfBounds;
         };
-        const name_len = self.memory[name_len_addr];
-        const name_end = name_len_addr + 1 + name_len;
+        return .{
+            .addr = name_len_addr + 1,
+            .len = self.memory[name_len_addr],
+        };
+    }
+
+    fn getDefinitionName(self: @This(), definition_addr: Cell) Error![]const u8 {
+        const name_info = try self.getNameLen(definition_addr);
+        return mem.constSliceFromAddrAndLen(name_info.addr, name_info.len);
+    }
+
+    pub fn toCfa(self: @This(), definition_addr: Cell) Error!Cell {
+        const name_info = try self.getNameLen(definition_addr);
+        const name_end = name_info.addr + name_info.len;
         const definition_end = mem.alignToCell(name_end);
         return definition_end;
     }

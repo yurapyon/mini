@@ -151,15 +151,13 @@ pub fn Register(comptime offset: Cell) type {
 
         pub fn commaString(self: @This(), string: []const u8) Error!void {
             try self.assertForwardReference(string.len);
-
-            // TODO
-            //                     const dest = try mem.sliceFromAddrAndLen(
-            //                         self.memory,
-            //                         self.fetch(),
-            //                         string.len,
-            //                     );
-            //                     @memcpy(dest, string);
-            //                     self.storeAdd(@intCast(string.len));
+            const dest = try mem.sliceFromAddrAndLen(
+                self.memory,
+                self.fetch(),
+                string.len,
+            );
+            @memcpy(dest, string);
+            self.storeAdd(@intCast(string.len));
         }
     };
 }

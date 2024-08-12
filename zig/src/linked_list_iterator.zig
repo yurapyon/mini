@@ -1,14 +1,14 @@
 const mem = @import("memory.zig");
-const MemoryPtr = mem.MemoryPtr;
+const ConstMemoryPtr = mem.ConstMemoryPtr;
 
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
 
 pub const LinkedListIterator = struct {
-    memory: MemoryPtr,
+    memory: ConstMemoryPtr,
     last_addr: Cell,
 
-    pub fn from(memory: MemoryPtr, first_addr: Cell) @This() {
+    pub fn from(memory: ConstMemoryPtr, first_addr: Cell) @This() {
         return .{
             .memory = memory,
             .last_addr = first_addr,
@@ -26,5 +26,36 @@ pub const LinkedListIterator = struct {
 };
 
 test "linked list iterator" {
-    // TODO
+    const testing = @import("std").testing;
+
+    const memory = try mem.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    const setup = [_]u8{
+        // 0x1234
+        0x34,
+        0x12,
+
+        // 0x0004
+        0x04,
+        0x00,
+
+        // 0x0000
+        0x00,
+        0x00,
+
+        // 0x0002
+        0x02,
+        0x00,
+    };
+
+    @memcpy(memory[0..setup.len], &setup);
+
+    var iter = LinkedListIterator.from(memory, 0x0006);
+
+    try testing.expectEqual(0x0006, iter.next());
+    try testing.expectEqual(0x0002, iter.next());
+    try testing.expectEqual(0x0004, iter.next());
+    try testing.expectEqual(null, iter.next());
+    try testing.expectEqual(null, iter.next());
 }

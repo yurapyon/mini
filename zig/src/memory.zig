@@ -6,6 +6,7 @@ const Cell = runtime.Cell;
 
 pub const Error = error{
     MisalignedAddress,
+    OutOfBounds,
 };
 
 // NOTE
@@ -53,4 +54,30 @@ pub fn alignToCell(addr: Cell) Cell {
         addr,
         @alignOf(Cell),
     );
+}
+
+pub fn sliceFromAddrAndLen(
+    memory: []u8,
+    addr: Cell,
+    len: Cell,
+) Error![]u8 {
+    if (len > 0) {
+        _ = std.mat.add(addr + len - 1) catch {
+            return error.OutOfBounds;
+        };
+    }
+    return memory[addr..][0..len];
+}
+
+pub fn constSliceFromAddrAndLen(
+    memory: []const u8,
+    addr: Cell,
+    len: Cell,
+) Error![]const u8 {
+    if (len > 0) {
+        _ = std.mat.add(addr + len - 1) catch {
+            return error.OutOfBounds;
+        };
+    }
+    return memory[addr..][0..len];
 }
