@@ -1,8 +1,18 @@
+const mem = @import("memory.zig");
+const MemoryPtr = mem.MemoryPtr;
+
 const runtime = @import("runtime.zig");
-const Memory = runtime.Memory;
+const MainMemoryLayout = runtime.MainMemoryLayout;
+
+const Register = @import("register.zig").Register;
 
 pub const Dictionary = struct {
-    memory: *Memory,
+    memory: MemoryPtr,
+
+    here: Register(MainMemoryLayout.offsetOf("here")),
+    latest: Register(MainMemoryLayout.offsetOf("latest")),
+    context: Register(MainMemoryLayout.offsetOf("context")),
+    wordlists: Register(MainMemoryLayout.offsetOf("wordlists")),
 
     pub fn find(str: []const u8) void {
         _ = str;

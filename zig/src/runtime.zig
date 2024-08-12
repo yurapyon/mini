@@ -18,7 +18,7 @@ pub const Error = error{
     ExternalPanic,
 } || vm.Error || mem.Error;
 
-const MemoryLayout = utils.MemoryLayout(struct {
+pub const MainMemoryLayout = utils.MemoryLayout(struct {
     here: Cell,
     latest: Cell,
     context: Cell,
