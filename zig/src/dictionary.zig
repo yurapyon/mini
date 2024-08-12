@@ -35,9 +35,9 @@ pub const Dictionary = struct {
         self.memory = memory;
 
         self.here.init(self.memory);
-        self.here.latest(self.memory);
-        self.here.context(self.memory);
-        self.here.wordlists(self.memory);
+        self.latest.init(self.memory);
+        self.context.init(self.memory);
+        self.wordlists.init(self.memory);
 
         self.here.store(dictionary_start);
         self.latest.store(0);
@@ -78,12 +78,12 @@ pub const Dictionary = struct {
         self: @This(),
         wordlist_idx: Cell,
         to_find: []const u8,
-    ) (Error || register.Error)!?Cell {
+    ) (Error || register.Error || mem.Error)!?Cell {
         const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
-        const iter = LinkedListIterator.from(self.memory, wordlist_latest);
+        var iter = LinkedListIterator.from(self.memory, wordlist_latest);
 
-        while (iter.next()) |definition_addr| {
-            const name = self.getDefinitionName(definition_addr);
+        while (try iter.next()) |definition_addr| {
+            const name = try self.getDefinitionName(definition_addr);
             if (utils.stringsEqual(to_find, name)) {
                 return definition_addr;
             }
@@ -92,14 +92,17 @@ pub const Dictionary = struct {
         return null;
     }
 
-    pub fn define(self: *@This(), name: []const u8) (Error || register.Error)!void {
+    pub fn define(
+        self: *@This(),
+        name: []const u8,
+    ) (Error || register.Error || mem.Error)!void {
         if (name.len > std.math.maxInt(u8)) {
             return error.WordNameTooLong;
         }
 
         const definition_start = self.here.alignForward();
 
-        const context = @as(Wordlists, @enumFromInt(self.context.fetch()));
+        const context = self.context.fetch();
         const wordlist_latest = try self.fetchWordlistLatest(context);
 
         self.latest.store(definition_start);
@@ -122,13 +125,16 @@ pub const Dictionary = struct {
         };
     }
 
-    fn getDefinitionName(self: @This(), definition_addr: Cell) Error![]const u8 {
-        const name_info = try self.getNameLen(definition_addr);
-        return mem.constSliceFromAddrAndLen(name_info.addr, name_info.len);
+    fn getDefinitionName(
+        self: @This(),
+        definition_addr: Cell,
+    ) (Error || mem.Error)![]const u8 {
+        const name_info = try self.getNameInfo(definition_addr);
+        return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
     }
 
     pub fn toCfa(self: @This(), definition_addr: Cell) Error!Cell {
-        const name_info = try self.getNameLen(definition_addr);
+        const name_info = try self.getNameInfo(definition_addr);
         const name_end = name_info.addr + name_info.len;
         const definition_end = mem.alignToCell(name_end);
         return definition_end;
@@ -136,5 +142,40 @@ pub const Dictionary = struct {
 };
 
 test "dictionary" {
-    // TODO
+    const testing = @import("std").testing;
+
+    const memory = try mem.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    const dictionary_start = Dictionary.dictionary_start;
+
+    var dictionary: Dictionary = undefined;
+    dictionary.init(memory);
+
+    try dictionary.define("name");
+
+    try testing.expectEqual(
+        dictionary.here.fetch() - dictionary_start,
+        try dictionary.toCfa(dictionary_start) - dictionary_start,
+    );
+
+    try testing.expectEqualSlices(
+        u8,
+        &[_]u8{ 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e' },
+        memory[dictionary_start..][0..7],
+    );
+
+    try dictionary.define("hellow");
+
+    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
+    try testing.expectEqual(null, try dictionary.find(0, "wow"));
+
+    const noname_addr = dictionary.here.alignForward();
+    try dictionary.define("");
+    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
+    try testing.expectEqual(null, try dictionary.find(0, "wow"));
+
+    try testing.expectEqual(noname_addr, try dictionary.find(0, ""));
+
+    // TODO more tests
 }

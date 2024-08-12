@@ -62,7 +62,7 @@ pub fn sliceFromAddrAndLen(
     len: Cell,
 ) Error![]u8 {
     if (len > 0) {
-        _ = std.mat.add(addr + len - 1) catch {
+        _ = std.math.add(Cell, addr, len - 1) catch {
             return error.OutOfBounds;
         };
     }
@@ -75,7 +75,7 @@ pub fn constSliceFromAddrAndLen(
     len: Cell,
 ) Error![]const u8 {
     if (len > 0) {
-        _ = std.mat.add(addr + len - 1) catch {
+        _ = std.math.add(Cell, addr, len - 1) catch {
             return error.OutOfBounds;
         };
     }

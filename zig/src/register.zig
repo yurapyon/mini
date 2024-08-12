@@ -8,6 +8,7 @@ const Cell = runtime.Cell;
 
 pub const Error = error{
     OutOfBounds,
+    StringTooLong,
 };
 
 // NOTE
@@ -149,12 +150,17 @@ pub fn Register(comptime offset: Cell) type {
 
         // ===
 
-        pub fn commaString(self: @This(), string: []const u8) Error!void {
-            try self.assertForwardReference(string.len);
+        pub fn commaString(self: @This(), string: []const u8) (Error || mem.Error)!void {
+            if (string.len > std.math.maxInt(Cell)) {
+                return error.StringTooLong;
+            }
+
+            const cell_str_len: Cell = @intCast(string.len);
+            try self.assertForwardReference(cell_str_len);
             const dest = try mem.sliceFromAddrAndLen(
                 self.memory,
                 self.fetch(),
-                string.len,
+                cell_str_len,
             );
             @memcpy(dest, string);
             self.storeAdd(@intCast(string.len));
