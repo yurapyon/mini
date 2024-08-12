@@ -18,6 +18,8 @@ pub const Error = error{
     ExternalPanic,
 } || vm.Error || mem.Error;
 
+pub const max_wordlists = 2;
+
 pub const MainMemoryLayout = utils.MemoryLayout(struct {
     here: Cell,
     latest: Cell,
