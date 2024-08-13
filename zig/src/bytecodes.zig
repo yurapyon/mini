@@ -54,7 +54,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "<=", .callback = lteq },
 
     .{ .name = "and", .callback = and_ },
-    .{ .name = "or", .callback = ior },
+    .{ .name = "or", .callback = or_ },
     .{ .name = "xor", .callback = xor },
     .{ .name = "invert", .callback = invert },
     .{ .name = "lshift", .callback = lshift },
@@ -71,11 +71,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "r>", .callback = fromR },
     .{ .name = "r@", .callback = fetchR },
 
-    .{ .name = "+" },
-    .{ .name = "-" },
-    .{ .name = "*" },
-    .{ .name = "/" },
-    .{ .name = "mod" },
+    .{ .name = "+", .callback = plus },
+    .{ .name = "-", .callback = minus },
+    .{ .name = "*", .callback = multiply },
+    .{ .name = "/", .callback = divide },
+    .{ .name = "mod", .callback = mod },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -89,12 +89,12 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "rot", .callback = rot },
     .{ .name = "-rot", .callback = nrot },
 
-    .{ .name = "find" },
-    .{ .name = "word" },
-    .{ .name = "define" },
-    .{ .name = "next-char" },
-    .{ .name = "refill" },
-    .{ .name = "'" },
+    .{ .name = "find", .callback = find },
+    .{ .name = "word", .callback = nextWord },
+    .{ .name = "define", .callback = define },
+    .{ .name = "next-char", .callback = nextChar },
+    .{ .name = "refill", .callback = refill },
+    .{ .name = "'", .callback = tick },
 
     .{},
     .{},
@@ -179,7 +179,7 @@ fn and_(rt: *Runtime) Error!void {
     rt.data_stack.and_();
 }
 
-fn ior(rt: *Runtime) Error!void {
+fn or_(rt: *Runtime) Error!void {
     rt.data_stack.ior();
 }
 
@@ -285,4 +285,54 @@ fn fromR(rt: *Runtime) Error!void {
 
 fn fetchR(rt: *Runtime) Error!void {
     rt.data_stack.push(rt.return_stack.peek());
+}
+
+fn plus(rt: *Runtime) Error!void {
+    rt.data_stack.add();
+}
+
+fn minus(rt: *Runtime) Error!void {
+    rt.data_stack.subtract();
+}
+
+fn multiply(rt: *Runtime) Error!void {
+    rt.data_stack.multiply();
+}
+
+fn divide(rt: *Runtime) Error!void {
+    rt.data_stack.divide();
+}
+
+fn mod(rt: *Runtime) Error!void {
+    rt.data_stack.mod();
+}
+
+fn find(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(addr, len);
+    _ = word;
+}
+
+fn nextWord(rt: *Runtime) Error!void {
+    const range = rt.input_buffer.readNextWordRange() orelse return error.UnexpectedEndOfInput;
+    rt.data_stack.push(range.address);
+    rt.data_stack.push(range.len);
+}
+
+fn define(rt: *Runtime) Error!void {
+    _ = rt;
+}
+
+fn nextChar(rt: *Runtime) Error!void {
+    _ = rt;
+    // TODO should we automatically refill?
+}
+
+fn refill(rt: *Runtime) Error!void {
+    const did_refill = try runtime.input_buffer.refill();
+    rt.data_stack.push(runtime.cellFromBool(did_refill));
+}
+
+fn tick(rt: *Runtime) Error!void {
+    _ = rt;
 }

@@ -5,11 +5,14 @@ const MemoryPtr = mem.MemoryPtr;
 
 const utils = @import("utils.zig");
 
+const register = @import("register.zig");
+const Register = register.Register;
+
 const dictionary = @import("dictionary.zig");
 const Dictionary = dictionary.Dictionary;
 
-const register = @import("register.zig");
-const Register = register.Register;
+const input_buffer = @import("input_buffer.zig");
+const InputBuffer = input_buffer.InputBuffer;
 
 const stack = @import("stack.zig");
 const DataStack = stack.DataStack;
@@ -70,9 +73,10 @@ pub const Runtime = struct {
     dictionary: Dictionary,
     state: Register(MainMemoryLayout.offsetOf("state")),
     base: Register(MainMemoryLayout.offsetOf("base")),
+    input_buffer: InputBuffer,
 
-    userdata: ?*anyopaque,
     externals_callback: ?ExternalsCallback,
+    userdata: ?*anyopaque,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;

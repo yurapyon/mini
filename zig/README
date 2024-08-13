@@ -1,13 +1,12 @@
 zig implementation ==
 
 files:
-  mini.zig         - brings all the vm's components together and defines some types
+  runtime.zig      - brings all the vm's components together and defines some types
 
   stack.zig        - stack structure used for both the data and return stack
   dictionary.zig   - manages the 'here' & 'latest' registers to compile words to forth memory
-  input_source.zig - manages line-by-line input and input buffer
+  input_buffer.zig - manages line-by-line input and input buffer
   register.zig     - memory-mapped 'pointer' into forth memory
-  devices/         - this will have implementations of 'devices' which will handle io/ffi
 
   bytecodes.zig    - implements bytecode behaviors and the lookup table
 

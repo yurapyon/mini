@@ -122,7 +122,7 @@ pub const InputBuffer = struct {
         var char = self.skipWhitespace() orelse return null;
 
         // NOTE
-        // self.at.fetch() is >1 because we didnt return early after skipWhitespace
+        // self.at.fetch() is >=1 because we didnt return early after skipWhitespace
         const word_start = self.at.fetch() - 1;
 
         while (true) {
@@ -156,31 +156,31 @@ test "input buffer" {
     const memory = try mem.allocateMemory(testing.allocator);
     defer testing.allocator.free(memory);
 
-    var input_source: InputBuffer = undefined;
-    input_source.init(memory);
+    var input_buffer: InputBuffer = undefined;
+    input_buffer.init(memory);
 
     const refill_str = "refill";
-    input_source.setRefillCallback(testRefill, @ptrCast(@constCast(&@as([]const u8, refill_str))));
+    input_buffer.setRefillCallback(testRefill, @ptrCast(@constCast(&@as([]const u8, refill_str))));
 
-    try input_source.setInputBuffer("asdf wowo hellow");
+    try input_buffer.setInputBuffer("asdf wowo hellow");
 
-    try testing.expectEqual('a', input_source.readNextChar());
-    try testing.expectEqual('s', input_source.readNextChar());
-    try testing.expectEqual('d', input_source.readNextChar());
-    try testing.expectEqual('f', input_source.readNextChar());
+    try testing.expectEqual('a', input_buffer.readNextChar());
+    try testing.expectEqual('s', input_buffer.readNextChar());
+    try testing.expectEqual('d', input_buffer.readNextChar());
+    try testing.expectEqual('f', input_buffer.readNextChar());
 
     try testing.expectEqualSlices(
         u8,
         "wowo",
-        input_source.readNextWord() orelse return error.OutOfInput,
+        input_buffer.readNextWord() orelse return error.OutOfInput,
     );
 
-    _ = try input_source.refill();
+    _ = try input_buffer.refill();
 
     try testing.expectEqualSlices(
         u8,
         "refill",
-        input_source.readNextWord() orelse return error.OutOfInput,
+        input_buffer.readNextWord() orelse return error.OutOfInput,
     );
 }
 
