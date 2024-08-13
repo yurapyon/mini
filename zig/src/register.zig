@@ -38,12 +38,14 @@ pub fn Register(comptime offset: Cell) type {
         }
 
         fn assertForwardOffset(address_offset: Cell) Error!void {
+            // TODO use mem.assertOffsetInBounds
             _ = std.math.add(Cell, offset, address_offset) catch {
                 return error.OutOfBounds;
             };
         }
 
         fn assertForwardReference(self: @This(), reference_offset: Cell) Error!void {
+            // TODO use mem.assertOffsetInBounds
             const addr = self.fetch();
             _ = std.math.add(Cell, addr, reference_offset) catch {
                 return error.OutOfBounds;

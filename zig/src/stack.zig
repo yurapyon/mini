@@ -47,6 +47,14 @@ pub const DataStack = struct {
         return ret;
     }
 
+    pub fn pop2(self: *@This()) [2]Cell {
+        const a = self.top;
+        const b = self.second;
+        self.top = self.inner.pop();
+        self.second = self.inner.pop();
+        return .{ b, a };
+    }
+
     fn binop(self: *@This(), value: Cell) void {
         self.top = value;
         self.second = self.inner.pop();
@@ -54,6 +62,11 @@ pub const DataStack = struct {
 
     pub fn eq(self: *@This()) void {
         const value = runtime.cellFromBoolean(self.second == self.top);
+        self.binop(value);
+    }
+
+    pub fn eq0(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.top == 0);
         self.binop(value);
     }
 
@@ -66,6 +79,18 @@ pub const DataStack = struct {
     // TODO should this use signed cells?
     pub fn gteq(self: *@This()) void {
         const value = runtime.cellFromBoolean(self.second >= self.top);
+        self.binop(value);
+    }
+
+    // TODO should this use signed cells?
+    pub fn lt(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second < self.top);
+        self.binop(value);
+    }
+
+    // TODO should this use signed cells?
+    pub fn lteq(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second <= self.top);
         self.binop(value);
     }
 
@@ -131,6 +156,22 @@ pub const DataStack = struct {
         self.push(self.second);
     }
 
+    pub fn nip(self: *@This()) void {
+        self.second = self.inner.pop();
+    }
+
+    pub fn tuck(self: *@This()) void {
+        self.inner.push(self.top);
+    }
+
+    pub fn rot(self: *@This()) void {
+        self.push(self.inner.pop());
+    }
+
+    pub fn nrot(self: *@This()) void {
+        self.inner.push(self.pop());
+    }
+
     pub fn add(self: *@This()) void {
         const value = self.second +% self.top;
         self.binop(value);
@@ -167,6 +208,10 @@ pub const ReturnStack = struct {
     top: Cell,
     inner: CircularStack,
 
+    pub fn peek(self: *@This()) Cell {
+        return self.top;
+    }
+
     pub fn push(self: *@This(), value: Cell) void {
         self.inner.push(self.top);
         self.top = value;
@@ -175,6 +220,12 @@ pub const ReturnStack = struct {
     pub fn pop(self: *@This()) Cell {
         const ret = self.top;
         self.top = self.inner.pop();
+        return ret;
+    }
+
+    pub fn swapOut(self: *@This(), value: Cell) Cell {
+        const ret = self.top;
+        self.top = value;
         return ret;
     }
 };
@@ -321,6 +372,34 @@ test "stack: data" {
         &[_]Cell{ 1, 2, 3 },
         DataStack.over,
         &[_]Cell{ 1, 2, 3, 2 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.nip,
+        &[_]Cell{ 1, 3 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.tuck,
+        &[_]Cell{ 1, 3, 2, 3 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.rot,
+        &[_]Cell{ 2, 3, 1 },
+    );
+
+    try testStackManipulator(
+        &ds,
+        &[_]Cell{ 1, 2, 3 },
+        DataStack.nrot,
+        &[_]Cell{ 3, 1, 2 },
     );
 
     try testBinop(&ds, 1234, 2, DataStack.add, 1236);

@@ -1,10 +1,21 @@
 const builtin = @import("builtin");
 
-pub const mem = @import("memory.zig");
-pub const utils = @import("utils.zig");
+const mem = @import("memory.zig");
+const MemoryPtr = mem.MemoryPtr;
 
-const vm = @import("vm.zig");
+const utils = @import("utils.zig");
+
 const dictionary = @import("dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
+const register = @import("register.zig");
+const Register = register.Register;
+
+const stack = @import("stack.zig");
+const DataStack = stack.DataStack;
+const ReturnStack = stack.ReturnStack;
+
+const bytecodes = @import("bytecodes.zig");
 
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
@@ -25,7 +36,7 @@ pub fn isTruthy(value: Cell) bool {
 
 pub const Error = error{
     ExternalPanic,
-} || vm.Error || mem.Error;
+} || mem.Error;
 
 pub const MainMemoryLayout = utils.MemoryLayout(struct {
     here: Cell,
@@ -48,10 +59,53 @@ pub const Wordlists = enum(Cell) {
     _,
 };
 
+pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) Error!void;
+
 pub const Runtime = struct {
-    vm: vm.VM,
-    dictionary: dictionary.Dictionary,
-    memory: mem.Memory,
+    memory: MemoryPtr,
+    program_counter: Cell,
+    current_token_addr: Cell,
+    data_stack: DataStack,
+    return_stack: ReturnStack,
+    dictionary: Dictionary,
+    state: Register(MainMemoryLayout.offsetOf("state")),
+    base: Register(MainMemoryLayout.offsetOf("base")),
+
+    userdata: ?*anyopaque,
+    externals_callback: ?ExternalsCallback,
+
+    pub fn init(self: *@This(), memory: MemoryPtr) void {
+        self.memory = memory;
+        self.program_counter = 0;
+        self.dictionary.init(memory);
+        self.state.init(memory);
+        self.base.init(memory);
+    }
+
+    // ===
+
+    fn defineBuiltin(
+        name: []const u8,
+    ) void {
+        // TODO
+        _ = name;
+    }
+
+    // ===
+
+    fn executeLoop(self: *@This()) !void {
+        while (self.return_stack.peek() != 0) {
+            const token_addr = try mem.readCell(self.memory, self.program_counter);
+            self.current_token_addr = token_addr;
+            const token = try mem.readCell(self.memory, token_addr);
+            if (bytecodes.getBytecode(token)) |definition| {
+                try definition.callback(self);
+            } else {
+                // TODO call external fn
+                unreachable;
+            }
+        }
+    }
 };
 
 test "runtime" {
