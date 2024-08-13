@@ -45,6 +45,9 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
+    .{ .name = "bye", .callback = bye },
+
+    .{ .name = "lit", .callback = lit },
 
     .{ .name = "=", .callback = eq },
     .{ .name = ">", .callback = gt },
@@ -111,8 +114,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{},
     .{},
     .{},
-    .{},
-    .{},
 };
 
 fn nop(_: *Runtime) Error!void {}
@@ -143,12 +144,17 @@ fn jump0(rt: *Runtime) Error!void {
     if (!runtime.isTruthy(conditional)) {
         try jump(rt);
     } else {
-        // TODO advance program counter
+        try rt.advancePC(@sizeOf(Cell));
     }
 }
 
 fn quit(rt: *Runtime) Error!void {
     rt.return_stack.push(0);
+    rt.interpreter.should_quit = true;
+}
+
+fn bye(rt: *Runtime) Error!void {
+    rt.interpreter.should_bye = true;
 }
 
 fn eq(rt: *Runtime) Error!void {
@@ -310,17 +316,28 @@ fn mod(rt: *Runtime) Error!void {
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(addr, len);
-    _ = word;
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    if (try rt.interpreter.dictionary.find(wordlist_idx, word)) |definition_addr| {
+        rt.data_stack.push(definition_addr);
+        rt.data_stack.push(runtime.cellFromBool(true));
+    } else {
+        rt.data_stack.push(0);
+        rt.data_stack.push(runtime.cellFromBool(false));
+    }
 }
 
 fn nextWord(rt: *Runtime) Error!void {
-    const range = rt.input_buffer.readNextWordRange() orelse return error.UnexpectedEndOfInput;
+    const range = rt.interpreter.input_buffer.readNextWordRange() orelse {
+        return error.UnexpectedEndOfInput;
+    };
     rt.data_stack.push(range.address);
     rt.data_stack.push(range.len);
 }
 
 fn define(rt: *Runtime) Error!void {
-    _ = rt;
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(addr, len);
+    try rt.interpreter.dictionary.define(word);
 }
 
 fn nextChar(rt: *Runtime) Error!void {
@@ -329,10 +346,17 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try runtime.input_buffer.refill();
+    const did_refill = try runtime.interpreter.input_buffer.refill();
     rt.data_stack.push(runtime.cellFromBool(did_refill));
 }
 
 fn tick(rt: *Runtime) Error!void {
+    const word = try rt.interpreter.input_buffer.readNextWord();
+    _ = word;
+    // TODO
+}
+
+fn lit(rt: *Runtime) Error!void {
     _ = rt;
+    // TODO
 }

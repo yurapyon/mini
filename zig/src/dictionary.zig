@@ -7,8 +7,10 @@ const MemoryPtr = mem.MemoryPtr;
 
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
-const Wordlists = runtime.Wordlists;
 const MainMemoryLayout = runtime.MainMemoryLayout;
+
+const interpreter = @import("interpreter.zig");
+const Wordlists = interpreter.Wordlists;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -51,7 +53,7 @@ pub const Dictionary = struct {
     // ===
 
     fn assertValidWordlist(wordlist_idx: Cell) Error!void {
-        if (wordlist_idx >= runtime.max_wordlists) {
+        if (wordlist_idx >= interpreter.max_wordlists) {
             return error.InvalidWordlist;
         }
     }
@@ -138,6 +140,14 @@ pub const Dictionary = struct {
         const name_end = name_info.addr + name_info.len;
         const definition_end = mem.alignToCell(name_end);
         return definition_end;
+    }
+
+    // ===
+
+    pub fn compileLit(self: *@This(), value: Cell) Error!void {
+        _ = self;
+        _ = value;
+        // TODO
     }
 };
 

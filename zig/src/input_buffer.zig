@@ -160,7 +160,10 @@ test "input buffer" {
     input_buffer.init(memory);
 
     const refill_str = "refill";
-    input_buffer.setRefillCallback(testRefill, @ptrCast(@constCast(&@as([]const u8, refill_str))));
+    input_buffer.setRefillCallback(
+        testRefill,
+        @ptrCast(@constCast(&@as([]const u8, refill_str))),
+    );
 
     try input_buffer.setInputBuffer("asdf wowo hellow");
 

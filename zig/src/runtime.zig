@@ -14,6 +14,9 @@ const Dictionary = dictionary.Dictionary;
 const input_buffer = @import("input_buffer.zig");
 const InputBuffer = input_buffer.InputBuffer;
 
+const interpreter = @import("interpreter.zig");
+const Interpreter = interpreter.Interpreter;
+
 const stack = @import("stack.zig");
 const DataStack = stack.DataStack;
 const ReturnStack = stack.ReturnStack;
@@ -54,53 +57,63 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     dictionary_start: u0,
 });
 
-pub const max_wordlists = 2;
-
-pub const Wordlists = enum(Cell) {
-    forth = 0,
-    compiler,
-    _,
-};
-
 pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) Error!void;
 
 pub const Runtime = struct {
     memory: MemoryPtr,
+
+    interpreter: Interpreter,
+
     program_counter: Cell,
     current_token_addr: Cell,
     data_stack: DataStack,
     return_stack: ReturnStack,
-    dictionary: Dictionary,
-    state: Register(MainMemoryLayout.offsetOf("state")),
-    base: Register(MainMemoryLayout.offsetOf("base")),
-    input_buffer: InputBuffer,
 
     externals_callback: ?ExternalsCallback,
     userdata: ?*anyopaque,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
+
+        self.interpreter.init(self.memory);
+
         self.program_counter = 0;
-        self.dictionary.init(memory);
-        self.state.init(memory);
-        self.base.init(memory);
     }
 
     // ===
 
-    fn defineBuiltin(
-        name: []const u8,
-    ) void {
-        // TODO
-        _ = name;
+    pub fn executeCfa(self: *@This(), cfa_addr: Cell) Error!void {
+        // NOTE
+        // this puts a sentinel on the return stack
+        //   with circular stacks, you can't use the depth of the return stack
+        //     to signal when to exit an executionLoop
+        //   so 0 is used as a sentinel, that 'exit' will pop from
+        //     the return stack and store to the PC
+
+        self.return_stack.push(0);
+        self.program_counter.store(cfa_addr);
+        try self.executionLoop();
     }
 
-    // ===
+    pub fn advancePC(self: *@This(), offset: Cell) mem.Error!void {
+        try mem.assertOffsetInBounds(self.program_counter, offset);
+        self.program_counter += offset;
+    }
 
     fn executeLoop(self: *@This()) !void {
-        while (self.return_stack.peek() != 0) {
+        // Execution strategy:
+        //   1. increment PC, then
+        //   2. evaluate byte at PC-1
+        // this makes return stack and jump logic easier
+        //   because bytecodes can just set the jump location
+        //     directly without having to do any math
+
+        while (self.program_counter != 0) {
             const token_addr = try mem.readCell(self.memory, self.program_counter);
             self.current_token_addr = token_addr;
+
+            try self.advancePC(@sizeOf(Cell));
+
             const token = try mem.readCell(self.memory, token_addr);
             if (bytecodes.getBytecode(token)) |definition| {
                 try definition.callback(self);
@@ -113,6 +126,11 @@ pub const Runtime = struct {
 };
 
 test "runtime" {
-    const r: Runtime = undefined;
-    _ = r;
+    const testing = @import("std").testing;
+
+    const memory = try mem.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    var rt: Runtime = undefined;
+    rt.init(memory);
 }
