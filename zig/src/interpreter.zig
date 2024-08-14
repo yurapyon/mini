@@ -13,6 +13,7 @@ const Register = register.Register;
 
 const dictionary = @import("dictionary.zig");
 const Dictionary = dictionary.Dictionary;
+const WordInfo = dictionary.WordInfo;
 
 const input_buffer = @import("input_buffer.zig");
 const InputBuffer = input_buffer.InputBuffer;
@@ -24,10 +25,7 @@ pub const Error = error{
 };
 
 pub const LookupResult = union(enum) {
-    word: struct {
-        definition_addr: Cell,
-        wordlist_idx: Cell,
-    },
+    word: WordInfo,
     number: Cell,
 };
 
@@ -61,18 +59,9 @@ pub const Interpreter = struct {
 
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
-        const current_wordlist = try state.toWordlistIndex();
-        var i: Cell = 0;
-        while (i <= current_wordlist) : (i += 1) {
-            const wordlist_idx = current_wordlist - i;
-            if (try self.dictionary.find(wordlist_idx, string)) |definition_addr| {
-                return .{
-                    .word = .{
-                        .definition_addr = definition_addr,
-                        .wordlist_idx = current_wordlist - i,
-                    },
-                };
-            }
+        const current_wordlist = state.toWordlistIndex() catch unreachable;
+        if (try self.dictionary.search(current_wordlist, string)) |word_info| {
+            return .{ .word = word_info };
         }
 
         if (try self.maybeParseNumber(string)) |value| {
@@ -111,16 +100,13 @@ test "interpreter" {
     interpreter.init(memory);
 
     const d0_idx = interpreter.dictionary.here.fetch();
-    interpreter.dictionary.context.store(1);
-    try interpreter.dictionary.define("hello");
+    try interpreter.dictionary.define(1, "hello");
 
     const d1_idx = interpreter.dictionary.here.fetch();
-    interpreter.dictionary.context.store(0);
-    try interpreter.dictionary.define("hello");
+    try interpreter.dictionary.define(0, "hello");
 
     const d2_idx = interpreter.dictionary.here.fetch();
-    interpreter.dictionary.context.store(0);
-    try interpreter.dictionary.define("helloasdf");
+    try interpreter.dictionary.define(0, "helloasdf");
 
     interpreter.state.store(1);
     try testing.expectEqual(

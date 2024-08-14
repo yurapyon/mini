@@ -54,7 +54,7 @@ pub const DataStack = struct {
         const b = self.second;
         self.top = self.inner.pop();
         self.second = self.inner.pop();
-        return .{ b, a };
+        return .{ a, b };
     }
 
     fn binop(self: *@This(), value: Cell) void {

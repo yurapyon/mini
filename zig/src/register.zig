@@ -8,10 +8,7 @@ const Cell = runtime.Cell;
 
 // ===
 
-// pub const Error = error{
-//     OutOfBounds,
-//     StringTooLong,
-// };
+// TODO remove unused functions
 
 // NOTE
 // reasoning to use this over a normal *Cell:

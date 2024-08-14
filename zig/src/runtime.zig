@@ -106,7 +106,7 @@ pub const Runtime = struct {
     should_quit: bool,
 
     externals_callback: ?ExternalsCallback,
-    userdata: ?*anyopaque,
+    externals_userdata: ?*anyopaque,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
@@ -115,6 +115,47 @@ pub const Runtime = struct {
         self.input_buffer.init(self.memory);
 
         self.program_counter = 0;
+
+        bytecodes.initBuiltins(&self.interpreter.dictionary) catch unreachable;
+        self.interpreter.dictionary.updateInternalAddresses() catch unreachable;
+        self.defineInternalConstants() catch unreachable;
+    }
+
+    fn defineInternalConstants(self: *@This()) !void {
+        try self.defineMemoryLocationConstant("here");
+        try self.defineMemoryLocationConstant("latest");
+        try self.defineMemoryLocationConstant("context");
+        try self.defineMemoryLocationConstant("state");
+        try self.defineMemoryLocationConstant("base");
+        try self.interpreter.dictionary.compileConstant(
+            "d0",
+            MainMemoryLayout.offsetOf("dictionary_start"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            ">in",
+            MainMemoryLayout.offsetOf("input_buffer_at"),
+        );
+        // TODO
+        try self.defineSourceWord();
+    }
+
+    fn defineMemoryLocationConstant(self: *@This(), comptime name: []const u8) !void {
+        try self.interpreter.dictionary.compileConstant(
+            name,
+            MainMemoryLayout.offsetOf(name),
+        );
+    }
+
+    fn defineSourceWord(self: *@This()) !void {
+        _ = self;
+        // TODO
+        //         try self.interpreter.dictionary.defineWord("source")
+        //         try self.interpreter.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer"))
+        //         try self.interpreter.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer_len"))
+        //         const fetch_bytecode = bytecodes.lookupBytecodeByName("@") orelse unreachable;
+        //         try self.interpreter.dictionary.here.commaC(self.dictionary.memory, fetch_bytecode)
+        //         const exit_bytecode = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
+        //         try self.interpreter.dictionary.here.commaC(self.dictionary.memory, exit_bytecode)
     }
 
     // ===
@@ -169,7 +210,7 @@ pub const Runtime = struct {
             }
         } else {
             // TODO printWordNotFound fn
-            // std.debug.print("Word not found: {s}\n", .{word});
+            std.debug.print("Word not found: {s}\n", .{word});
             return error.WordNotFound;
         }
     }
@@ -238,6 +279,7 @@ pub const Runtime = struct {
             try definition.callback(self);
         } else {
             // TODO call external fn
+            std.debug.print("external {}\n", .{token});
             unreachable;
         }
     }
@@ -263,5 +305,5 @@ test "runtime" {
     var rt: Runtime = undefined;
     rt.init(memory);
 
-    try rt.repl();
+    // try rt.repl();
 }

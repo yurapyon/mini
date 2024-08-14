@@ -1,10 +1,18 @@
-word forth    define ] 0 context ! [ ' exit c,
-word compiler define ] 1 context ! [ ' exit c,
+word ] define ' enter @ , ' lit , 1 , ' state , ' ! , ' exit ,
+1 context !
+word [ define ' enter @ , ' lit , 0 , ' state , ' ! , ' exit ,
+word ['] define ' enter @ , ' ' , ' lit , ' lit , ' , , ' , , ' exit ,
+0 context !
 
-word : define ] word define ] [ ' exit c,
+word forth    define ] bye 0 context ! [ ' exit ,
+word compiler define ] 1 context ! [ ' exit ,
+
+word : define ] word define ] [ ' exit ,
 compiler
-word ; define ] ['] exit c, [ ' [ c, ' exit c,
+word ; define ] ['] exit , [ ' [ , ' exit ,
 forth
+
+bye
 
 : \ source >in ! drop ;
 

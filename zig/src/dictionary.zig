@@ -8,6 +8,9 @@ const MemoryPtr = mem.MemoryPtr;
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
 const MainMemoryLayout = runtime.MainMemoryLayout;
+const CompileState = runtime.CompileState;
+
+const bytecodes = @import("bytecodes.zig");
 
 const interpreter = @import("interpreter.zig");
 const Wordlists = interpreter.Wordlists;
@@ -19,14 +22,14 @@ const LinkedListIterator = @import("linked_list_iterator.zig").LinkedListIterato
 
 // ===
 
-pub const Error = error{
-    OutOfBounds,
-    InvalidWordlist,
-    WordNameTooLong,
+pub const WordInfo = struct {
+    definition_addr: Cell,
+    wordlist_idx: Cell,
 };
 
 pub const Dictionary = struct {
     const dictionary_start = MainMemoryLayout.offsetOf("dictionary_start");
+    const enter_code = bytecodes.getBytecodeToken("enter") orelse unreachable;
 
     memory: MemoryPtr,
 
@@ -34,6 +37,11 @@ pub const Dictionary = struct {
     latest: Register(MainMemoryLayout.offsetOf("latest")),
     context: Register(MainMemoryLayout.offsetOf("context")),
     wordlists: Register(MainMemoryLayout.offsetOf("wordlists")),
+
+    tag_addresses: struct {
+        lit: Cell,
+        exit: Cell,
+    },
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
@@ -50,6 +58,13 @@ pub const Dictionary = struct {
         self.context.store(forth_wordlist_idx);
         self.storeWordlistLatest(forth_wordlist_idx, 0) catch unreachable;
         self.storeWordlistLatest(compiler_wordlist_idx, 0) catch unreachable;
+    }
+
+    pub fn updateInternalAddresses(self: *@This()) !void {
+        const lit_definition_addr = (try self.find(0, "lit")) orelse return error.WordNotFound;
+        self.tag_addresses.lit = try self.toCfa(lit_definition_addr);
+        const exit_definition_addr = (try self.find(0, "exit")) orelse return error.WordNotFound;
+        self.tag_addresses.exit = try self.toCfa(exit_definition_addr);
     }
 
     // ===
@@ -97,12 +112,33 @@ pub const Dictionary = struct {
         return null;
     }
 
+    // TODO probably rename this to findWord and the above to findWordInWordlist
+    pub fn search(
+        self: @This(),
+        starting_wordlist_idx: Cell,
+        to_find: []const u8,
+    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?WordInfo {
+        var i: Cell = 0;
+        while (i <= starting_wordlist_idx) : (i += 1) {
+            const wordlist_idx = starting_wordlist_idx - i;
+            if (try self.find(wordlist_idx, to_find)) |definition_addr| {
+                return .{
+                    .definition_addr = definition_addr,
+                    .wordlist_idx = wordlist_idx,
+                };
+            }
+        }
+
+        return null;
+    }
+
     // TODO rename to defineWord
     // TODO NOTE this checks memory bounds, so for other functions that rely on
     //   name_len being in bounds, it's technically always going to be
     //   there are ways to break this in forth though
     pub fn define(
         self: *@This(),
+        wordlist_idx: Cell,
         name: []const u8,
     ) error{
         WordNameTooLong,
@@ -116,11 +152,10 @@ pub const Dictionary = struct {
 
         const definition_start = self.here.alignForward();
 
-        const context = self.context.fetch();
-        const wordlist_latest = try self.fetchWordlistLatest(context);
+        const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
 
         self.latest.store(definition_start);
-        self.storeWordlistLatest(context, definition_start) catch unreachable;
+        self.storeWordlistLatest(wordlist_idx, definition_start) catch unreachable;
 
         try self.here.comma(wordlist_latest);
         try self.here.commaC(@intCast(name.len));
@@ -130,6 +165,9 @@ pub const Dictionary = struct {
         };
 
         _ = self.here.alignForward();
+
+        // TODO
+        // @import("std").debug.print("defined: {s} {} {}\n", .{ name, definition_start, wordlist_idx });
     }
 
     fn getDefinitionName(
@@ -161,14 +199,36 @@ pub const Dictionary = struct {
 
     // ===
 
-    pub fn compileXt(self: *@This(), value: Cell) error{ OutOfBounds, MisalignedAddress }!void {
+    pub fn compileXt(
+        self: *@This(),
+        value: Cell,
+    ) error{ OutOfBounds, MisalignedAddress }!void {
         try self.here.comma(value);
     }
 
-    pub fn compileLit(self: *@This(), value: Cell) error{ OutOfBounds, MisalignedAddress }!void {
-        // TODO have to find definition of lit
-        // self.here.comma(value);
+    pub fn compileLit(
+        self: *@This(),
+        value: Cell,
+    ) error{ OutOfBounds, MisalignedAddress }!void {
+        try self.here.comma(self.tag_addresses.lit);
         try self.here.comma(value);
+    }
+
+    pub fn compileConstant(
+        self: *@This(),
+        name: []const u8,
+        value: Cell,
+    ) error{ WordNameTooLong, OutOfBounds, MisalignedAddress }!void {
+        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+        self.define(wordlist_idx, name) catch |err| switch (err) {
+            error.InvalidWordlist => unreachable,
+            else => |e| return e,
+        };
+        try self.here.comma(enter_code);
+        try self.compileLit(value);
+        try self.compileXt(self.tag_addresses.exit);
+        // TODO
+        // @import("std").debug.print("constant: {s} {} {}\n", .{ name, value, self.tag_addresses.lit });
     }
 };
 
@@ -183,7 +243,7 @@ test "dictionary" {
     var dictionary: Dictionary = undefined;
     dictionary.init(memory);
 
-    try dictionary.define("name");
+    try dictionary.define(0, "name");
 
     try testing.expectEqual(
         dictionary.here.fetch() - dictionary_start,
@@ -196,13 +256,13 @@ test "dictionary" {
         memory[dictionary_start..][0..7],
     );
 
-    try dictionary.define("hellow");
+    try dictionary.define(0, "hellow");
 
     try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
     try testing.expectEqual(null, try dictionary.find(0, "wow"));
 
     const noname_addr = dictionary.here.alignForward();
-    try dictionary.define("");
+    try dictionary.define(0, "");
     try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
     try testing.expectEqual(null, try dictionary.find(0, "wow"));
 

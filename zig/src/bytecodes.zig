@@ -4,6 +4,10 @@ const utils = @import("utils.zig");
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
+const CompileState = runtime.CompileState;
+
+const dictionary = @import("dictionary.zig");
+const Dictionary = dictionary.Dictionary;
 
 // ===
 
@@ -27,25 +31,41 @@ const bytecodes_count = 64;
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     callback: BytecodeFn = panic,
+    // TODO tag_only: bool,  ?
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeDefinition {
-    if (token >= bytecodes_count) {
-        return null;
-    } else {
+    if (token < bytecodes_count) {
         return bytecodes[token];
+    } else {
+        return null;
     }
 }
 
-pub fn getBytecodeByName(name: []const u8) ?BytecodeDefinition {
+pub fn getBytecodeToken(name: []const u8) ?Cell {
     for (bytecodes, 0..) |definition, i| {
         const equal = utils.stringsEqual(definition.name, name);
         if (equal) {
-            return bytecodes[i];
+            return i;
         }
     }
 
     return null;
+}
+
+fn defineBuiltin(dict: *Dictionary, token: Cell) !void {
+    const bytecode_definition = getBytecode(token) orelse return error.InvalidBytecode;
+    const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+    if (bytecode_definition.name.len > 0) {
+        try dict.define(wordlist_idx, bytecode_definition.name);
+        try dict.here.comma(token);
+    }
+}
+
+pub fn initBuiltins(dict: *Dictionary) !void {
+    for (0..bytecodes_count) |i| {
+        try defineBuiltin(dict, @intCast(i));
+    }
 }
 
 const bytecodes = [bytecodes_count]BytecodeDefinition{
@@ -77,9 +97,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "!", .callback = store },
     .{ .name = "+!", .callback = fetchAdd },
     .{ .name = "@", .callback = fetch },
+    .{ .name = ",", .callback = comma },
     .{ .name = "c!", .callback = storeC },
     .{ .name = "+c!", .callback = fetchAddC },
     .{ .name = "c@", .callback = fetchC },
+    .{ .name = "c,", .callback = commaC },
 
     .{ .name = ">r", .callback = toR },
     .{ .name = "r>", .callback = fromR },
@@ -110,8 +132,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
 
-    .{},
-    .{},
     .{},
     .{},
     .{},
@@ -265,12 +285,12 @@ fn nrot(rt: *Runtime) Error!void {
 }
 
 fn store(rt: *Runtime) Error!void {
-    const value, const addr = rt.data_stack.pop2();
+    const addr, const value = rt.data_stack.pop2();
     try mem.writeCell(rt.memory, addr, value);
 }
 
 fn fetchAdd(rt: *Runtime) Error!void {
-    const value, const addr = rt.data_stack.pop2();
+    const addr, const value = rt.data_stack.pop2();
     (try mem.cellPtr(rt.memory, addr)).* +%= value;
 }
 
@@ -279,14 +299,19 @@ fn fetch(rt: *Runtime) Error!void {
     rt.data_stack.push(try mem.readCell(rt.memory, addr));
 }
 
+fn comma(rt: *Runtime) Error!void {
+    const value = rt.data_stack.pop();
+    try rt.interpreter.dictionary.here.comma(value);
+}
+
 fn storeC(rt: *Runtime) Error!void {
-    const value, const addr = rt.data_stack.pop2();
+    const addr, const value = rt.data_stack.pop2();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] = value_u8;
 }
 
 fn fetchAddC(rt: *Runtime) Error!void {
-    const value, const addr = rt.data_stack.pop2();
+    const addr, const value = rt.data_stack.pop2();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] +%= value_u8;
 }
@@ -294,6 +319,11 @@ fn fetchAddC(rt: *Runtime) Error!void {
 fn fetchC(rt: *Runtime) Error!void {
     const addr = rt.data_stack.pop();
     rt.data_stack.push(rt.memory[addr]);
+}
+
+fn commaC(rt: *Runtime) Error!void {
+    const value = rt.data_stack.pop();
+    try rt.interpreter.dictionary.here.commaC(@truncate(value));
 }
 
 fn toR(rt: *Runtime) Error!void {
@@ -331,9 +361,10 @@ fn mod(rt: *Runtime) Error!void {
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    // TODO which wordlist should this use?
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.find(wordlist_idx, word)) |definition_addr| {
-        rt.data_stack.push(definition_addr);
+    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+        rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
         rt.data_stack.push(0);
@@ -353,7 +384,8 @@ fn nextWord(rt: *Runtime) Error!void {
 fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
-    try rt.interpreter.dictionary.define(word);
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    try rt.interpreter.dictionary.define(wordlist_idx, word);
 }
 
 fn nextChar(rt: *Runtime) Error!void {
@@ -374,12 +406,13 @@ fn tick(rt: *Runtime) Error!void {
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
-    // TODO which wordlist should this use?
-    const maybe_definition_addr = try rt.interpreter.dictionary.find(0, word);
-    if (maybe_definition_addr) |definition_addr| {
-        const cfa_addr = try rt.interpreter.dictionary.toCfa(definition_addr);
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+        const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);
     } else {
+        // TODO
+        @import("std").debug.print("word not found {}:{s}\n", .{ wordlist_idx, word });
         return error.WordNotFound;
     }
 }
