@@ -90,7 +90,11 @@ pub const ExternalError = error{
     ExternalPanic,
 };
 
-pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) ExternalError!void;
+pub const ExternalsCallback = *const fn (
+    rt: *Runtime,
+    id: Cell,
+    userdata: ?*anyopaque,
+) ExternalError!void;
 
 pub const Runtime = struct {
     memory: MemoryPtr,
@@ -135,7 +139,6 @@ pub const Runtime = struct {
             ">in",
             MainMemoryLayout.offsetOf("input_buffer_at"),
         );
-        // TODO
         try self.defineSourceWord();
     }
 
@@ -147,15 +150,25 @@ pub const Runtime = struct {
     }
 
     fn defineSourceWord(self: *@This()) !void {
-        _ = self;
-        // TODO
-        //         try self.interpreter.dictionary.defineWord("source")
-        //         try self.interpreter.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer"))
-        //         try self.interpreter.dictionary.compileLit(MemoryLayout.offsetOf("input_buffer_len"))
-        //         const fetch_bytecode = bytecodes.lookupBytecodeByName("@") orelse unreachable;
-        //         try self.interpreter.dictionary.here.commaC(self.dictionary.memory, fetch_bytecode)
-        //         const exit_bytecode = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
-        //         try self.interpreter.dictionary.here.commaC(self.dictionary.memory, exit_bytecode)
+        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+        try self.interpreter.dictionary.define(wordlist_idx, "source");
+        try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
+        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
+        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
+        const fetch_definition_addr = (try self.interpreter.dictionary.find(wordlist_idx, "@")) orelse unreachable;
+        const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
+        try self.interpreter.dictionary.compileXt(fetch_cfa);
+        const exit_definition_addr = (try self.interpreter.dictionary.find(wordlist_idx, "exit")) orelse unreachable;
+        const exit_cfa = try self.interpreter.dictionary.toCfa(exit_definition_addr);
+        try self.interpreter.dictionary.compileXt(exit_cfa);
+    }
+
+    pub fn defineExternal(self: *@This(), name: []const u8, wordlist_idx: Cell, id: Cell) !void {
+        if (id < bytecodes.bytecodes_count) {
+            return error.ReservedBytecodeId;
+        }
+        try self.interpreter.dictionary.define(wordlist_idx, name);
+        try self.interpreter.dictionary.here.comma(id);
     }
 
     // ===
@@ -278,9 +291,9 @@ pub const Runtime = struct {
         if (bytecodes.getBytecode(token)) |definition| {
             try definition.callback(self);
         } else {
-            // TODO call external fn
-            std.debug.print("external {}\n", .{token});
-            unreachable;
+            if (self.externals_callback) |cb| {
+                try cb(self, token, self.externals_userdata);
+            }
         }
     }
 
@@ -297,7 +310,7 @@ pub const Runtime = struct {
 };
 
 test "runtime" {
-    const testing = @import("std").testing;
+    const testing = std.testing;
 
     const memory = try mem.allocateMemory(testing.allocator);
     defer testing.allocator.free(memory);

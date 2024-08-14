@@ -26,7 +26,9 @@ pub const Error = error{
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
-const bytecodes_count = 64;
+pub const bytecodes_count = 64;
+
+pub const enter_code = getBytecodeToken("enter") orelse unreachable;
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",

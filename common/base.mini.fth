@@ -1,20 +1,24 @@
-word ] define ' enter @ , ' lit , 1 , ' state , ' ! , ' exit ,
+word enter-code define ' enter @ , ' lit , ' enter @ , ' exit ,
+
+word ] define enter-code , ' lit , 1 , ' state , ' ! , ' exit ,
 1 context !
-word [ define ' enter @ , ' lit , 0 , ' state , ' ! , ' exit ,
-word ['] define ' enter @ , ' ' , ' lit , ' lit , ' , , ' , , ' exit ,
+word [ define enter-code , ' lit , 0 , ' state , ' ! , ' exit ,
+word ['] define enter-code , ' ' , ' lit , ' lit , ' , , ' , , ' exit ,
 0 context !
 
-word forth    define ] bye 0 context ! [ ' exit ,
-word compiler define ] 1 context ! [ ' exit ,
+word forth    define enter-code , ] 0 context ! [ ' exit ,
+word compiler define enter-code , ] 1 context ! [ ' exit ,
 
-word : define ] word define ] [ ' exit ,
+word : define enter-code , ] word define enter-code , ] [ ' exit ,
 compiler
-word ; define ] ['] exit , [ ' [ , ' exit ,
+word ; define enter-code , ] ['] exit , [ ' [ , ' exit ,
 forth
 
-bye
-
 : \ source >in ! drop ;
+
+\ this is a comment
+
+bye
 
 : <> = 0= ;
 

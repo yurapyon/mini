@@ -29,7 +29,6 @@ pub const WordInfo = struct {
 
 pub const Dictionary = struct {
     const dictionary_start = MainMemoryLayout.offsetOf("dictionary_start");
-    const enter_code = bytecodes.getBytecodeToken("enter") orelse unreachable;
 
     memory: MemoryPtr,
 
@@ -167,7 +166,7 @@ pub const Dictionary = struct {
         _ = self.here.alignForward();
 
         // TODO
-        // @import("std").debug.print("defined: {s} {} {}\n", .{ name, definition_start, wordlist_idx });
+        @import("std").debug.print("defined: {s} {} {}\n", .{ name, definition_start, wordlist_idx });
     }
 
     fn getDefinitionName(
@@ -212,6 +211,9 @@ pub const Dictionary = struct {
     ) error{ OutOfBounds, MisalignedAddress }!void {
         try self.here.comma(self.tag_addresses.lit);
         try self.here.comma(value);
+
+        // TODO
+        // @import("std").debug.print("lit: {} {}\n", .{ value, self.tag_addresses.lit });
     }
 
     pub fn compileConstant(
@@ -224,7 +226,7 @@ pub const Dictionary = struct {
             error.InvalidWordlist => unreachable,
             else => |e| return e,
         };
-        try self.here.comma(enter_code);
+        try self.here.comma(bytecodes.enter_code);
         try self.compileLit(value);
         try self.compileXt(self.tag_addresses.exit);
         // TODO

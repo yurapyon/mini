@@ -5,6 +5,10 @@ const mem = @import("memory.zig");
 
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
+const Cell = runtime.Cell;
+const ExternalError = runtime.ExternalError;
+
+// ===
 
 // pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
 //     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
@@ -36,6 +40,12 @@ const LineByLineRefiller = struct {
     }
 };
 
+fn external(rt: *Runtime, token: Cell, userdata: ?*anyopaque) ExternalError!void {
+    _ = userdata;
+    std.debug.print("from main {}\n", .{token});
+    std.debug.print("{}\n", .{rt.data_stack.top});
+}
+
 fn runVM(allocator: Allocator) !void {
     const memory = try mem.allocateMemory(allocator);
     defer allocator.free(memory);
@@ -48,6 +58,10 @@ fn runVM(allocator: Allocator) !void {
 
     rt.input_buffer.refill_callback = LineByLineRefiller.refill;
     rt.input_buffer.refill_userdata = &refiller;
+
+    rt.externals_callback = external;
+    const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
+    try rt.defineExternal("hi", wlidx, 500);
 
     try rt.repl();
 }
