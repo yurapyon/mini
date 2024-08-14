@@ -17,7 +17,7 @@ pub const LinkedListIterator = struct {
         };
     }
 
-    pub fn next(self: *@This()) mem.Error!?Cell {
+    pub fn next(self: *@This()) error{MisalignedAddress}!?Cell {
         if (self.last_addr == 0) {
             return null;
         }

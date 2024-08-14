@@ -54,7 +54,7 @@ pub const Dictionary = struct {
 
     // ===
 
-    fn assertValidWordlist(wordlist_idx: Cell) Error!void {
+    fn assertValidWordlist(wordlist_idx: Cell) error{InvalidWordlist}!void {
         if (wordlist_idx >= interpreter.max_wordlists) {
             return error.InvalidWordlist;
         }
@@ -64,13 +64,13 @@ pub const Dictionary = struct {
         self: *@This(),
         wordlist_idx: Cell,
         value: Cell,
-    ) Error!void {
+    ) error{InvalidWordlist}!void {
         try assertValidWordlist(wordlist_idx);
         const wordlist_addr = wordlist_idx * @sizeOf(Cell);
         self.wordlists.storeWithOffset(wordlist_addr, value) catch unreachable;
     }
 
-    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) Error!Cell {
+    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) error{InvalidWordlist}!Cell {
         try assertValidWordlist(wordlist_idx);
         const wordlist_addr = wordlist_idx * @sizeOf(Cell);
         return self.wordlists.fetchWithOffset(wordlist_addr) catch unreachable;
@@ -83,7 +83,7 @@ pub const Dictionary = struct {
         self: @This(),
         wordlist_idx: Cell,
         to_find: []const u8,
-    ) (Error || register.Error || mem.Error)!?Cell {
+    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?Cell {
         const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
         var iter = LinkedListIterator.from(self.memory, wordlist_latest);
 
@@ -104,7 +104,12 @@ pub const Dictionary = struct {
     pub fn define(
         self: *@This(),
         name: []const u8,
-    ) (Error || register.Error || mem.Error)!void {
+    ) error{
+        WordNameTooLong,
+        InvalidWordlist,
+        OutOfBounds,
+        MisalignedAddress,
+    }!void {
         if (name.len > std.math.maxInt(u8)) {
             return error.WordNameTooLong;
         }
@@ -119,33 +124,35 @@ pub const Dictionary = struct {
 
         try self.here.comma(wordlist_latest);
         try self.here.commaC(@intCast(name.len));
-        try self.here.commaString(name);
+        self.here.commaString(name) catch |err| switch (err) {
+            error.StringTooLong => unreachable,
+            else => |e| return e,
+        };
 
         _ = self.here.alignForward();
+    }
+
+    fn getDefinitionName(
+        self: @This(),
+        definition_addr: Cell,
+    ) error{OutOfBounds}![]const u8 {
+        const name_info = try self.getNameInfo(definition_addr);
+        return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
     }
 
     fn getNameInfo(
         self: @This(),
         definition_addr: Cell,
-    ) Error!struct { addr: Cell, len: u8 } {
-        const name_len_addr = std.math.add(Cell, definition_addr, 2) catch {
-            return error.OutOfBounds;
-        };
+    ) error{OutOfBounds}!struct { addr: Cell, len: u8 } {
+        try mem.assertOffsetInBounds(definition_addr, @sizeOf(Cell));
+        const name_len_addr = definition_addr + @sizeOf(Cell);
         return .{
             .addr = name_len_addr + 1,
             .len = self.memory[name_len_addr],
         };
     }
 
-    fn getDefinitionName(
-        self: @This(),
-        definition_addr: Cell,
-    ) (Error || mem.Error)![]const u8 {
-        const name_info = try self.getNameInfo(definition_addr);
-        return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
-    }
-
-    pub fn toCfa(self: @This(), definition_addr: Cell) Error!Cell {
+    pub fn toCfa(self: @This(), definition_addr: Cell) error{OutOfBounds}!Cell {
         const name_info = try self.getNameInfo(definition_addr);
         const name_end = name_info.addr + name_info.len;
         const definition_end = mem.alignToCell(name_end);
@@ -154,14 +161,14 @@ pub const Dictionary = struct {
 
     // ===
 
-    pub fn compileXt(self: *@This(), value: Cell) Error!void {
-        self.here.comma(value);
+    pub fn compileXt(self: *@This(), value: Cell) error{ OutOfBounds, MisalignedAddress }!void {
+        try self.here.comma(value);
     }
 
-    pub fn compileLit(self: *@This(), value: Cell) Error!void {
+    pub fn compileLit(self: *@This(), value: Cell) error{ OutOfBounds, MisalignedAddress }!void {
         // TODO have to find definition of lit
         // self.here.comma(value);
-        self.here.comma(value);
+        try self.here.comma(value);
     }
 };
 

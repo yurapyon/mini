@@ -9,7 +9,16 @@ const Cell = runtime.Cell;
 
 pub const Error = error{
     Panic,
-} || mem.Error;
+    InvalidProgramCounter,
+    WordNameTooLong,
+    InvalidWordlist,
+    OutOfBounds,
+    MisalignedAddress,
+    UnexpectedEndOfInput,
+    CannotRefill,
+    OversizeInputBuffer,
+    WordNotFound,
+};
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
@@ -17,14 +26,14 @@ const bytecodes_count = 64;
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
-    callback: BytecodeFn = nop,
+    callback: BytecodeFn = panic,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeDefinition {
     if (token >= bytecodes_count) {
         return null;
     } else {
-        return bytecodes[@truncate(token)];
+        return bytecodes[token];
     }
 }
 
@@ -113,16 +122,15 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{},
     .{},
     .{},
-    .{},
-    .{},
-    .{},
 };
 
 fn nop(_: *Runtime) Error!void {}
 
+fn panic(_: *Runtime) Error!void {
+    return error.Panic;
+}
+
 fn enter(rt: *Runtime) Error!void {
-    // NOTE
-    // program counter is going to be advanced already
     rt.return_stack.push(rt.program_counter);
     rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
 }
@@ -132,16 +140,20 @@ fn exit(rt: *Runtime) Error!void {
 }
 
 fn execute(rt: *Runtime) Error!void {
-    rt.program_counter = rt.return_stack.swapOut(rt.program_counter);
+    const cfa_addr = rt.data_stack.pop();
+    rt.return_stack.push(rt.program_counter);
+    rt.program_counter = cfa_addr;
 }
 
 fn jump(rt: *Runtime) Error!void {
-    // TODO make sure this works
+    try rt.assertValidProgramCounter();
     const addr = rt.memory[rt.program_counter];
     rt.program_counter = addr;
 }
 
 fn jump0(rt: *Runtime) Error!void {
+    try rt.assertValidProgramCounter();
+
     const conditional = rt.data_stack.pop();
     if (!runtime.isTruthy(conditional)) {
         try jump(rt);
@@ -151,11 +163,12 @@ fn jump0(rt: *Runtime) Error!void {
 }
 
 fn quit(rt: *Runtime) Error!void {
-    rt.return_stack.push(0);
+    rt.program_counter = 0;
     rt.should_quit = true;
 }
 
 fn bye(rt: *Runtime) Error!void {
+    rt.program_counter = 0;
     rt.should_bye = true;
 }
 
@@ -253,17 +266,17 @@ fn nrot(rt: *Runtime) Error!void {
 
 fn store(rt: *Runtime) Error!void {
     const value, const addr = rt.data_stack.pop2();
-    try mem.writeCell(addr, value);
+    try mem.writeCell(rt.memory, addr, value);
 }
 
 fn fetchAdd(rt: *Runtime) Error!void {
     const value, const addr = rt.data_stack.pop2();
-    (try mem.cellPtr(addr)).* +%= value;
+    (try mem.cellPtr(rt.memory, addr)).* +%= value;
 }
 
 fn fetch(rt: *Runtime) Error!void {
     const addr = rt.data_stack.pop();
-    rt.data_stack.push(try mem.readCell(addr));
+    rt.data_stack.push(try mem.readCell(rt.memory, addr));
 }
 
 fn storeC(rt: *Runtime) Error!void {
@@ -280,7 +293,7 @@ fn fetchAddC(rt: *Runtime) Error!void {
 
 fn fetchC(rt: *Runtime) Error!void {
     const addr = rt.data_stack.pop();
-    rt.data_stack.push(@intCast(rt.memory[addr]));
+    rt.data_stack.push(rt.memory[addr]);
 }
 
 fn toR(rt: *Runtime) Error!void {
@@ -317,19 +330,20 @@ fn mod(rt: *Runtime) Error!void {
 
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
-    const word = try mem.constSliceFromAddrAndLen(addr, len);
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
     if (try rt.interpreter.dictionary.find(wordlist_idx, word)) |definition_addr| {
         rt.data_stack.push(definition_addr);
-        rt.data_stack.push(runtime.cellFromBool(true));
+        rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
         rt.data_stack.push(0);
-        rt.data_stack.push(runtime.cellFromBool(false));
+        rt.data_stack.push(runtime.cellFromBoolean(false));
     }
 }
 
 fn nextWord(rt: *Runtime) Error!void {
-    const range = rt.interpreter.input_buffer.readNextWordRange() orelse {
+    // TODO should this try to refill?
+    const range = rt.input_buffer.readNextWordRange() orelse {
         return error.UnexpectedEndOfInput;
     };
     rt.data_stack.push(range.address);
@@ -338,27 +352,41 @@ fn nextWord(rt: *Runtime) Error!void {
 
 fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
-    const word = try mem.constSliceFromAddrAndLen(addr, len);
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     try rt.interpreter.dictionary.define(word);
 }
 
 fn nextChar(rt: *Runtime) Error!void {
-    _ = rt;
-    // TODO should we automatically refill?
+    // TODO should this try to refill?
+    const char = rt.input_buffer.readNextChar() orelse {
+        return error.UnexpectedEndOfInput;
+    };
+    rt.data_stack.push(char);
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try runtime.interpreter.input_buffer.refill();
-    rt.data_stack.push(runtime.cellFromBool(did_refill));
+    const did_refill = try rt.input_buffer.refill();
+    rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
 fn tick(rt: *Runtime) Error!void {
-    const word = try rt.interpreter.input_buffer.readNextWord();
-    _ = word;
-    // TODO
+    // TODO should this try to refill?
+    const word = rt.input_buffer.readNextWord() orelse {
+        return error.UnexpectedEndOfInput;
+    };
+    // TODO which wordlist should this use?
+    const maybe_definition_addr = try rt.interpreter.dictionary.find(0, word);
+    if (maybe_definition_addr) |definition_addr| {
+        const cfa_addr = try rt.interpreter.dictionary.toCfa(definition_addr);
+        rt.data_stack.push(cfa_addr);
+    } else {
+        return error.WordNotFound;
+    }
 }
 
 fn lit(rt: *Runtime) Error!void {
-    _ = rt;
-    // TODO
+    try rt.assertValidProgramCounter();
+    const value = try mem.readCell(rt.memory, rt.program_counter);
+    rt.data_stack.push(value);
+    try rt.advancePC(@sizeOf(Cell));
 }

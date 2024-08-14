@@ -224,12 +224,6 @@ pub const ReturnStack = struct {
         self.top = self.inner.pop();
         return ret;
     }
-
-    pub fn swapOut(self: *@This(), value: Cell) Cell {
-        const ret = self.top;
-        self.top = value;
-        return ret;
-    }
 };
 
 // tests ===

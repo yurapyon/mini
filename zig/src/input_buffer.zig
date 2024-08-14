@@ -10,17 +10,11 @@ const Register = register.Register;
 
 // ===
 
-pub const Error = error{
-    UnexpectedEndOfInput,
-    OversizeInputBuffer,
-    CannotRefill,
-};
-
 pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';
 }
 
-pub const RefillFn = *const fn (userdata: ?*anyopaque) Error!?[]const u8;
+pub const RefillFn = *const fn (userdata: ?*anyopaque) error{CannotRefill}!?[]const u8;
 
 const input_buffer_len = 128;
 
@@ -50,15 +44,17 @@ pub const InputBuffer = struct {
     fn setInputBuffer(
         self: *@This(),
         buffer: []const u8,
-    ) (Error || mem.Error)!void {
+    ) error{OversizeInputBuffer}!void {
         if (buffer.len > input_buffer_len) {
             return error.OversizeInputBuffer;
         }
-        const mem_slice = try mem.sliceFromAddrAndLen(
+        // NOTE
+        // this will always be in-bounds as long as buffer_offset + input_buffer_len is
+        const mem_slice = mem.sliceFromAddrAndLen(
             self.memory,
             buffer_offset,
             @intCast(buffer.len),
-        );
+        ) catch unreachable;
         @memcpy(mem_slice, buffer);
         self.at.store(0);
         self.len.store(@intCast(buffer.len));
@@ -73,7 +69,7 @@ pub const InputBuffer = struct {
         self.refill_userdata = userdata;
     }
 
-    pub fn refill(self: *@This()) (Error || mem.Error)!bool {
+    pub fn refill(self: *@This()) error{ CannotRefill, OversizeInputBuffer }!bool {
         const refill_callback = self.refill_callback orelse return error.CannotRefill;
         const buffer = try refill_callback(self.refill_userdata);
         if (buffer) |buf| {
@@ -86,8 +82,7 @@ pub const InputBuffer = struct {
 
     // ===
 
-    // NOTE
-    // this doesnt try to refill
+    // returns null on end of input
     pub fn readNextChar(self: *@This()) ?u8 {
         const buffer_at = self.at.fetch();
         // NOTE
@@ -109,6 +104,7 @@ pub const InputBuffer = struct {
         }
     }
 
+    // returns null on end of input
     fn skipWhitespace(self: *@This()) ?u8 {
         var char = self.readNextChar() orelse return null;
         while (isWhitespace(char)) {
@@ -117,6 +113,7 @@ pub const InputBuffer = struct {
         return char;
     }
 
+    // returns null on end of input
     pub fn readNextWordRange(self: *@This()) ?struct {
         address: Cell,
         len: Cell,
@@ -142,6 +139,7 @@ pub const InputBuffer = struct {
         };
     }
 
+    // returns null on end of input
     pub fn readNextWord(self: *@This()) ?[]const u8 {
         const range = self.readNextWordRange() orelse return null;
         return mem.sliceFromAddrAndLen(
@@ -189,7 +187,7 @@ test "input buffer" {
     );
 }
 
-fn testRefill(userdata: ?*anyopaque) Error!?[]const u8 {
+fn testRefill(userdata: ?*anyopaque) !?[]const u8 {
     if (userdata) |data| {
         const str: *[]const u8 = @ptrCast(@alignCast(data));
         return str.*;

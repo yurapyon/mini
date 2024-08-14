@@ -44,10 +44,6 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
-pub const Error = error{
-    ExternalPanic,
-} || mem.Error;
-
 pub const MainMemoryLayout = utils.MemoryLayout(struct {
     here: Cell,
     latest: Cell,
@@ -60,6 +56,12 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     input_buffer_len: Cell,
     dictionary_start: u0,
 });
+
+comptime {
+    if (MainMemoryLayout.offsetOf("dictionary_start") >= std.math.maxInt(Cell) + 1) {
+        @compileError("MainMemoryLayout doesn't fit within Memory");
+    }
+}
 
 pub const CompileState = enum(Cell) {
     interpret = 0,
@@ -84,7 +86,11 @@ pub const CompileState = enum(Cell) {
     }
 };
 
-pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) Error!void;
+pub const ExternalError = error{
+    ExternalPanic,
+};
+
+pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) ExternalError!void;
 
 pub const Runtime = struct {
     memory: MemoryPtr,
@@ -191,11 +197,11 @@ pub const Runtime = struct {
                     try self.setupExecuteLoop(cfa_addr);
                     try self.executeLoop();
                 } else {
-                    try self.dictionary.compileXt(cfa_addr);
+                    try self.interpreter.dictionary.compileXt(cfa_addr);
                 }
             },
             .number => |value| {
-                try self.dictionary.compileLit(value);
+                try self.interpreter.dictionary.compileLit(value);
             },
         }
     }
@@ -226,7 +232,7 @@ pub const Runtime = struct {
         }
     }
 
-    fn executeCfaAddr(self: *@This(), cfa_addr: Cell) Error!void {
+    fn executeCfaAddr(self: *@This(), cfa_addr: Cell) !void {
         const token = try mem.readCell(self.memory, cfa_addr);
         if (bytecodes.getBytecode(token)) |definition| {
             try definition.callback(self);
@@ -236,7 +242,13 @@ pub const Runtime = struct {
         }
     }
 
-    pub fn advancePC(self: *@This(), offset: Cell) mem.Error!void {
+    pub fn assertValidProgramCounter(self: @This()) error{InvalidProgramCounter}!void {
+        if (self.program_counter == 0) {
+            return error.InvalidProgramCounter;
+        }
+    }
+
+    pub fn advancePC(self: *@This(), offset: Cell) error{OutOfBounds}!void {
         try mem.assertOffsetInBounds(self.program_counter, offset);
         self.program_counter += offset;
     }
@@ -250,4 +262,6 @@ test "runtime" {
 
     var rt: Runtime = undefined;
     rt.init(memory);
+
+    try rt.repl();
 }

@@ -6,11 +6,6 @@ const Cell = runtime.Cell;
 
 // ===
 
-pub const Error = error{
-    MisalignedAddress,
-    OutOfBounds,
-};
-
 // NOTE
 // in bounds memory access is guaranteed because
 //   the size of memory is defined in terms of the max address a cell can hold
@@ -29,30 +24,37 @@ pub fn allocateMemory(allocator: Allocator) Allocator.Error!MemoryPtr {
     return @ptrCast(slice.ptr);
 }
 
-pub fn assertOffsetInBounds(addr: Cell, offset: Cell) Error!void {
+pub fn assertOffsetInBounds(addr: Cell, offset: Cell) error{OutOfBounds}!void {
     _ = std.math.add(Cell, addr, offset) catch {
         return error.OutOfBounds;
     };
 }
 
-pub fn assertCellAccess(addr: Cell) Error!void {
+pub fn assertCellAccess(addr: Cell) error{MisalignedAddress}!void {
     if (addr % @alignOf(Cell) != 0) {
         return error.MisalignedAddress;
     }
 }
 
-pub fn readCell(memory: ConstMemoryPtr, addr: Cell) Error!Cell {
+pub fn readCell(
+    memory: ConstMemoryPtr,
+    addr: Cell,
+) error{MisalignedAddress}!Cell {
     try assertCellAccess(addr);
     const cell_ptr: *const Cell = @ptrCast(@alignCast(&memory[addr]));
     return cell_ptr.*;
 }
 
-pub fn cellPtr(memory: MemoryPtr, addr: Cell) Error!*Cell {
+pub fn cellPtr(memory: MemoryPtr, addr: Cell) error{MisalignedAddress}!*Cell {
     try assertCellAccess(addr);
     return @ptrCast(@alignCast(&memory[addr]));
 }
 
-pub fn writeCell(memory: MemoryPtr, addr: Cell, value: Cell) Error!void {
+pub fn writeCell(
+    memory: MemoryPtr,
+    addr: Cell,
+    value: Cell,
+) error{MisalignedAddress}!void {
     (try cellPtr(memory, addr)).* = value;
 }
 
@@ -68,7 +70,7 @@ pub fn sliceFromAddrAndLen(
     memory: []u8,
     addr: Cell,
     len: Cell,
-) Error![]u8 {
+) error{OutOfBounds}![]u8 {
     if (len > 0) {
         try assertOffsetInBounds(addr, len - 1);
     }
@@ -79,7 +81,7 @@ pub fn constSliceFromAddrAndLen(
     memory: []const u8,
     addr: Cell,
     len: Cell,
-) Error![]const u8 {
+) error{OutOfBounds}![]const u8 {
     if (len > 0) {
         try assertOffsetInBounds(addr, len - 1);
     }
