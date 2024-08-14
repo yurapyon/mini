@@ -1,7 +1,7 @@
 .   | \ \ ` | \ `   .
 .   | | | | | | |   ,
 
-small forth vm
+small forth
 
 goals:
   easy
@@ -14,37 +14,7 @@ roadmap:
     self-hosted version
       it would be fun
 
-\ ======
-
-: (tbd name) ;
-
-virtual computer
-
-(tbd if it will be primarily in zig or on the web)
-
-goals:
-  art tool
-    usable for making motion graphics/video art
-  (tbd)
-
-roadmap:
-  planned:
-    interactive
-      edit memory directly and in real time
-    io
-      graphics
-      mouse/keyboard input
-      filesystem access
-    built-in code editor
-  maybe:
-    repl
-    io
-      audio
-
-\ ======
-
 you need:
   zig
-  npm
 
 MIT

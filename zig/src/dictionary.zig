@@ -1,223 +1,274 @@
 const std = @import("std");
 
-const vm = @import("mini.zig");
 const utils = @import("utils.zig");
 
+const mem = @import("memory.zig");
+const MemoryPtr = mem.MemoryPtr;
+
+const runtime = @import("runtime.zig");
+const Cell = runtime.Cell;
+const MainMemoryLayout = runtime.MainMemoryLayout;
+const CompileState = runtime.CompileState;
+
 const bytecodes = @import("bytecodes.zig");
-const Register = @import("register.zig").Register;
 
-// TODO rename this somehow
-const t = @import("terminator.zig");
+const interpreter = @import("interpreter.zig");
+const Wordlists = interpreter.Wordlists;
 
-/// This is a Forth style dictionary
-///   where each definition has a pointer to the previous definition
-pub fn Dictionary(
-    comptime here_offset: vm.Cell,
-    comptime latest_offset: vm.Cell,
-) type {
-    return struct {
-        memory: vm.mem.CellAlignedMemory,
-        here: Register(here_offset),
-        latest: Register(latest_offset),
+const register = @import("register.zig");
+const Register = register.Register;
 
-        pub fn initInOneMemoryBlock(
-            self: *@This(),
-            memory: vm.mem.CellAlignedMemory,
-            // TODO could probably make this comptime
-            dictionary_start: vm.Cell,
-        ) vm.mem.MemoryError!void {
-            self.memory = memory;
-            try self.here.init(self.memory);
-            try self.latest.init(self.memory);
-            self.here.store(dictionary_start);
-            self.latest.store(0);
+const LinkedListIterator = @import("linked_list_iterator.zig").LinkedListIterator;
+
+// ===
+
+pub const WordInfo = struct {
+    definition_addr: Cell,
+    wordlist_idx: Cell,
+};
+
+pub const Dictionary = struct {
+    const dictionary_start = MainMemoryLayout.offsetOf("dictionary_start");
+
+    memory: MemoryPtr,
+
+    here: Register(MainMemoryLayout.offsetOf("here")),
+    latest: Register(MainMemoryLayout.offsetOf("latest")),
+    context: Register(MainMemoryLayout.offsetOf("context")),
+    wordlists: Register(MainMemoryLayout.offsetOf("wordlists")),
+
+    tag_addresses: struct {
+        lit: Cell,
+        exit: Cell,
+    },
+
+    pub fn init(self: *@This(), memory: MemoryPtr) void {
+        self.memory = memory;
+
+        self.here.init(self.memory);
+        self.latest.init(self.memory);
+        self.context.init(self.memory);
+        self.wordlists.init(self.memory);
+
+        self.here.store(dictionary_start);
+        self.latest.store(0);
+        const forth_wordlist_idx = @intFromEnum(Wordlists.forth);
+        const compiler_wordlist_idx = @intFromEnum(Wordlists.compiler);
+        self.context.store(forth_wordlist_idx);
+        self.storeWordlistLatest(forth_wordlist_idx, 0) catch unreachable;
+        self.storeWordlistLatest(compiler_wordlist_idx, 0) catch unreachable;
+    }
+
+    pub fn updateInternalAddresses(self: *@This()) !void {
+        const lit_definition_addr = (try self.find(0, "lit")) orelse return error.WordNotFound;
+        self.tag_addresses.lit = try self.toCfa(lit_definition_addr);
+        const exit_definition_addr = (try self.find(0, "exit")) orelse return error.WordNotFound;
+        self.tag_addresses.exit = try self.toCfa(exit_definition_addr);
+    }
+
+    // ===
+
+    fn assertValidWordlist(wordlist_idx: Cell) error{InvalidWordlist}!void {
+        if (wordlist_idx >= interpreter.max_wordlists) {
+            return error.InvalidWordlist;
+        }
+    }
+
+    fn storeWordlistLatest(
+        self: *@This(),
+        wordlist_idx: Cell,
+        value: Cell,
+    ) error{InvalidWordlist}!void {
+        try assertValidWordlist(wordlist_idx);
+        const wordlist_addr = wordlist_idx * @sizeOf(Cell);
+        self.wordlists.storeWithOffset(wordlist_addr, value) catch unreachable;
+    }
+
+    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) error{InvalidWordlist}!Cell {
+        try assertValidWordlist(wordlist_idx);
+        const wordlist_addr = wordlist_idx * @sizeOf(Cell);
+        return self.wordlists.fetchWithOffset(wordlist_addr) catch unreachable;
+    }
+
+    // ===
+
+    // TODO rename to findWord
+    pub fn find(
+        self: @This(),
+        wordlist_idx: Cell,
+        to_find: []const u8,
+    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?Cell {
+        const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
+        var iter = LinkedListIterator.from(self.memory, wordlist_latest);
+
+        while (try iter.next()) |definition_addr| {
+            const name = try self.getDefinitionName(definition_addr);
+            if (utils.stringsEqual(to_find, name)) {
+                return definition_addr;
+            }
         }
 
-        pub fn lookup(
-            self: @This(),
-            word: []const u8,
-        ) vm.Error!?vm.Cell {
-            var latest = self.latest.fetch();
-            while (latest != 0) {
-                const terminator_addr = t.compareStringUntilTerminator(
-                    self.memory,
-                    latest + @sizeOf(vm.Cell),
-                    word,
-                ) catch |err| switch (err) {
-                    // this won't happen with toTerminator
-                    //   because we check name length when defining words
-                    error.Overflow => unreachable,
-                    else => |e| return e,
+        return null;
+    }
+
+    // TODO probably rename this to findWord and the above to findWordInWordlist
+    pub fn search(
+        self: @This(),
+        starting_wordlist_idx: Cell,
+        to_find: []const u8,
+    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?WordInfo {
+        var i: Cell = 0;
+        while (i <= starting_wordlist_idx) : (i += 1) {
+            const wordlist_idx = starting_wordlist_idx - i;
+            if (try self.find(wordlist_idx, to_find)) |definition_addr| {
+                return .{
+                    .definition_addr = definition_addr,
+                    .wordlist_idx = wordlist_idx,
                 };
-
-                if (terminator_addr) |addr| {
-                    const terminator_byte = try vm.mem.checkedRead(self.memory, addr);
-                    const terminator = t.TerminatorInfo.fromByte(terminator_byte);
-                    if (!terminator.is_hidden) {
-                        return latest;
-                    } else {
-                        std.debug.print("hidden word skipped: {s}\n", .{word});
-                    }
-                }
-                latest = (try vm.mem.cellAt(self.memory, latest)).*;
             }
-            return null;
         }
 
-        pub fn toTerminator(
-            self: @This(),
-            addr: vm.Cell,
-        ) vm.mem.MemoryError!vm.Cell {
-            const terminator_addr = t.readUntilTerminator(
-                self.memory,
-                addr + @sizeOf(vm.Cell),
-            ) catch |err| switch (err) {
-                // this won't happen with toTerminator
-                //   because we check name length when defining words
-                error.Overflow => unreachable,
-                else => |e| return e,
-            };
-            return terminator_addr;
+        return null;
+    }
+
+    // TODO rename to defineWord
+    // TODO NOTE this checks memory bounds, so for other functions that rely on
+    //   name_len being in bounds, it's technically always going to be
+    //   there are ways to break this in forth though
+    pub fn define(
+        self: *@This(),
+        wordlist_idx: Cell,
+        name: []const u8,
+    ) error{
+        WordNameTooLong,
+        InvalidWordlist,
+        OutOfBounds,
+        MisalignedAddress,
+    }!void {
+        if (name.len > std.math.maxInt(u8)) {
+            return error.WordNameTooLong;
         }
 
-        pub fn toCfa(
-            self: @This(),
-            addr: vm.Cell,
-        ) vm.mem.MemoryError!vm.Cell {
-            return (try self.toTerminator(addr)) + 1;
-        }
+        const definition_start = self.here.alignForward();
 
-        pub fn getTerminator(
-            self: @This(),
-            addr: vm.Cell,
-        ) vm.mem.MemoryError!t.TerminatorInfo {
-            // NOTE
-            // the next array access is ok because we've already checked
-            //   for out of bounds errors in toTerminator
-            const terminator_byte = self.memory[try self.toTerminator(addr)];
-            return t.TerminatorInfo.fromByte(terminator_byte);
-        }
+        const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
 
-        // TODO should this throw memory errors?
-        fn alignSelf(self: *@This()) void {
-            _ = self.here.alignForward(@alignOf(vm.Cell));
-        }
+        self.latest.store(definition_start);
+        self.storeWordlistLatest(wordlist_idx, definition_start) catch unreachable;
 
-        pub fn defineWord(
-            self: *@This(),
-            name: []const u8,
-        ) vm.Error!void {
-            for (name) |ch| {
-                if (ch >= t.base_terminator) {
-                    return error.WordNameInvalid;
-                }
-            }
+        try self.here.comma(wordlist_latest);
+        try self.here.commaC(@intCast(name.len));
+        self.here.commaString(name) catch |err| switch (err) {
+            error.StringTooLong => unreachable,
+            else => |e| return e,
+        };
 
-            self.alignSelf();
+        _ = self.here.alignForward();
 
-            const definition_start = self.here.fetch();
-            const previous_word_addr = self.latest.fetch();
+        // TODO
+        @import("std").debug.print("defined: {s} {} {}\n", .{ name, definition_start, wordlist_idx });
+    }
 
-            self.latest.store(definition_start);
-            try self.here.comma(self.memory, previous_word_addr);
+    fn getDefinitionName(
+        self: @This(),
+        definition_addr: Cell,
+    ) error{OutOfBounds}![]const u8 {
+        const name_info = try self.getNameInfo(definition_addr);
+        return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
+    }
 
-            try self.here.commaString(name);
+    fn getNameInfo(
+        self: @This(),
+        definition_addr: Cell,
+    ) error{OutOfBounds}!struct { addr: Cell, len: u8 } {
+        try mem.assertOffsetInBounds(definition_addr, @sizeOf(Cell));
+        const name_len_addr = definition_addr + @sizeOf(Cell);
+        return .{
+            .addr = name_len_addr + 1,
+            .len = self.memory[name_len_addr],
+        };
+    }
 
-            const header_size = name.len + 3;
-            const need_to_align = (definition_start + header_size) % 2 == 1;
-            if (need_to_align) {
-                try self.here.commaC(self.memory, 0);
-            }
+    pub fn toCfa(self: @This(), definition_addr: Cell) error{OutOfBounds}!Cell {
+        const name_info = try self.getNameInfo(definition_addr);
+        const name_end = name_info.addr + name_info.len;
+        const definition_end = mem.alignToCell(name_end);
+        return definition_end;
+    }
 
-            try self.here.commaC(self.memory, t.base_terminator);
-        }
+    // ===
 
-        pub fn compileLit(self: *@This(), value: vm.Cell) vm.mem.MemoryError!void {
-            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("lit") orelse unreachable);
-            try self.here.commaByteAlignedCell(self.memory, value);
-        }
+    pub fn compileXt(
+        self: *@This(),
+        value: Cell,
+    ) error{ OutOfBounds, MisalignedAddress }!void {
+        try self.here.comma(value);
+    }
 
-        pub fn compileLitC(self: *@This(), value: u8) vm.mem.MemoryError!void {
-            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("litc") orelse unreachable);
-            try self.here.commaC(self.memory, value);
-        }
+    pub fn compileLit(
+        self: *@This(),
+        value: Cell,
+    ) error{ OutOfBounds, MisalignedAddress }!void {
+        try self.here.comma(self.tag_addresses.lit);
+        try self.here.comma(value);
 
-        // TODO rename this
-        pub fn compileAbsJump(self: *@This(), addr: vm.Cell) vm.Error!void {
-            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("call") orelse unreachable);
-            try self.here.commaByteAlignedCell(self.memory, addr);
-        }
+        // TODO
+        // @import("std").debug.print("lit: {} {}\n", .{ value, self.tag_addresses.lit });
+    }
 
-        pub fn compileConstant(
-            self: *@This(),
-            name: []const u8,
-            value: vm.Cell,
-        ) vm.Error!void {
-            try self.defineWord(name);
-            try self.compileLit(value);
-            try self.here.commaC(self.memory, bytecodes.lookupBytecodeByName("exit") orelse unreachable);
-        }
-
-        pub fn compileExternal(
-            self: *@This(),
-            name: []const u8,
-            id: vm.Cell,
-        ) vm.Error!void {
-            const ext_tag = bytecodes.lookupBytecodeByName("ext") orelse unreachable;
-            const exit_tag = bytecodes.lookupBytecodeByName("exit") orelse unreachable;
-            try self.defineWord(name);
-            try self.here.commaC(self.memory, ext_tag);
-            try self.here.commaByteAlignedCell(self.memory, id);
-            try self.here.commaC(self.memory, exit_tag);
-        }
-
-        pub fn iterator(self: *@This()) utils.LinkedListIterator {
-            return utils.LinkedListIterator.from(self.memory, self.latest.fetch());
-        }
-    };
-}
+    pub fn compileConstant(
+        self: *@This(),
+        name: []const u8,
+        value: Cell,
+    ) error{ WordNameTooLong, OutOfBounds, MisalignedAddress }!void {
+        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+        self.define(wordlist_idx, name) catch |err| switch (err) {
+            error.InvalidWordlist => unreachable,
+            else => |e| return e,
+        };
+        try self.here.comma(bytecodes.enter_code);
+        try self.compileLit(value);
+        try self.compileXt(self.tag_addresses.exit);
+        // TODO
+        // @import("std").debug.print("constant: {s} {} {}\n", .{ name, value, self.tag_addresses.lit });
+    }
+};
 
 test "dictionary" {
     const testing = @import("std").testing;
 
-    const memory = try vm.mem.allocateCellAlignedMemory(
-        testing.allocator,
-        vm.max_memory_size,
-    );
+    const memory = try mem.allocateMemory(testing.allocator);
     defer testing.allocator.free(memory);
 
-    const here_offset = 0;
-    const latest_offset = 2;
-    const dictionary_start = 16;
+    const dictionary_start = Dictionary.dictionary_start;
 
-    var dictionary: Dictionary(here_offset, latest_offset) = undefined;
-    try dictionary.initInOneMemoryBlock(
-        memory,
-        dictionary_start,
-    );
+    var dictionary: Dictionary = undefined;
+    dictionary.init(memory);
 
-    try dictionary.defineWord("name");
+    try dictionary.define(0, "name");
 
     try testing.expectEqual(
         dictionary.here.fetch() - dictionary_start,
-        ((try dictionary.toTerminator(dictionary_start)) - dictionary_start) + 1,
+        try dictionary.toCfa(dictionary_start) - dictionary_start,
     );
 
     try testing.expectEqualSlices(
         u8,
-        &[_]u8{ 0x00, 0x00, 'n', 'a', 'm', 'e', t.base_terminator },
+        &[_]u8{ 0x00, 0x00, 0x04, 'n', 'a', 'm', 'e' },
         memory[dictionary_start..][0..7],
     );
 
-    try dictionary.defineWord("hellow");
+    try dictionary.define(0, "hellow");
 
-    try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
-    try testing.expectEqual(null, try dictionary.lookup("wow"));
+    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
+    try testing.expectEqual(null, try dictionary.find(0, "wow"));
 
-    const noname_addr = dictionary.here.alignForward(@alignOf(vm.Cell));
-    try dictionary.defineWord("");
-    try testing.expectEqual(dictionary_start, try dictionary.lookup("name"));
-    try testing.expectEqual(null, try dictionary.lookup("wow"));
+    const noname_addr = dictionary.here.alignForward();
+    try dictionary.define(0, "");
+    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
+    try testing.expectEqual(null, try dictionary.find(0, "wow"));
 
-    try testing.expectEqual(noname_addr, try dictionary.lookup(""));
+    try testing.expectEqual(noname_addr, try dictionary.find(0, ""));
+
+    // TODO more tests
 }

@@ -1,3 +1,0 @@
-figure out testing for the ts side of things
-figure out how errors should work, just like zig
-  you should never be able to crash the vm from mini

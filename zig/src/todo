@@ -1,0 +1,2 @@
+if some internal state can be invalidated from forth, just truncate/wrap the value in zig
+  ie state, context

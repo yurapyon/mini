@@ -1,789 +1,430 @@
-const std = @import("std");
-
-const vm = @import("mini.zig");
+const mem = @import("memory.zig");
 const utils = @import("utils.zig");
 
-//
+const runtime = @import("runtime.zig");
+const Runtime = runtime.Runtime;
+const Cell = runtime.Cell;
+const CompileState = runtime.CompileState;
 
-// TODO
-// possible new bytecodes
-//   bytes, ?
-//   bytes! ?
-//   / mod u/ umod ?
-//     could define these as bytecodes then /mod and u/mod be forth words
+const dictionary = @import("dictionary.zig");
+const Dictionary = dictionary.Dictionary;
 
 // ===
 
-fn nop(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {}
+pub const Error = error{
+    Panic,
+    InvalidProgramCounter,
+    WordNameTooLong,
+    InvalidWordlist,
+    OutOfBounds,
+    MisalignedAddress,
+    UnexpectedEndOfInput,
+    CannotRefill,
+    OversizeInputBuffer,
+    WordNotFound,
+};
 
-fn compileSelf(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    try mini.dictionary.here.commaC(mini.dictionary.memory, ctx.current_bytecode);
-}
+pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
-fn cannotCompile(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    return error.CannotCompile;
-}
+pub const bytecodes_count = 64;
 
-fn cannotInterpret(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    return error.CannotInterpret;
-}
+pub const enter_code = getBytecodeToken("enter") orelse unreachable;
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
-    compileSemantics: vm.BytecodeFn = nop,
-    interpretSemantics: vm.BytecodeFn = nop,
-    executeSemantics: vm.BytecodeFn = nop,
+    callback: BytecodeFn = panic,
+    // TODO tag_only: bool,  ?
 };
 
-pub fn getBytecodeDefinition(bytecode: u8) BytecodeDefinition {
-    return switch (bytecode) {
-        inline 0...(lookup_table.len - 1) => |byte| {
-            return lookup_table[byte];
-        },
-        else => unreachable,
-    };
+pub fn getBytecode(token: Cell) ?BytecodeDefinition {
+    if (token < bytecodes_count) {
+        return bytecodes[token];
+    } else {
+        return null;
+    }
 }
 
-pub fn lookupBytecodeByName(name: []const u8) ?u8 {
-    for (lookup_table, 0..) |named_callback, i| {
-        const eql = utils.stringsEqual(named_callback.name, name);
-        if (eql) {
-            return @truncate(i);
+pub fn getBytecodeToken(name: []const u8) ?Cell {
+    for (bytecodes, 0..) |definition, i| {
+        const equal = utils.stringsEqual(definition.name, name);
+        if (equal) {
+            return i;
         }
     }
 
     return null;
 }
 
-test "bytecode-utils" {
-    const testing = std.testing;
-
-    try testing.expectEqual(0, lookupBytecodeByName("panic"));
-    try testing.expectEqual(null, lookupBytecodeByName("_definetly-not-defined_"));
-}
-
-// ===
-
-fn constructBasicBytecode(
-    name: []const u8,
-    callback: vm.BytecodeFn,
-) BytecodeDefinition {
-    return .{
-        .name = name,
-        .compileSemantics = compileSelf,
-        .interpretSemantics = callback,
-        .executeSemantics = callback,
-    };
-}
-
-fn constructBasicImmediateBytecode(
-    name: []const u8,
-    callback: vm.BytecodeFn,
-) BytecodeDefinition {
-    return .{
-        .name = name,
-        .compileSemantics = callback,
-        .interpretSemantics = callback,
-        .executeSemantics = callback,
-    };
-}
-
-fn constructTagBytecode(
-    name: []const u8,
-    executeCallback: vm.BytecodeFn,
-) BytecodeDefinition {
-    return .{
-        .name = name,
-        .compileSemantics = cannotCompile,
-        .interpretSemantics = cannotInterpret,
-        .executeSemantics = executeCallback,
-    };
-}
-
-const lookup_table = [_]BytecodeDefinition{
-    // NOTE
-    // panic is bytecode '0' so that you can just zero the memory to inialize it
-    constructBasicBytecode("panic", panic),
-    constructBasicBytecode("bye", bye),
-    constructBasicBytecode("quit", quit),
-    constructTagBytecode("exit", exit),
-
-    constructBasicBytecode("'", tick),
-    constructBasicImmediateBytecode("[']", bracketTick),
-    constructBasicBytecode("]", rBracket),
-    constructBasicImmediateBytecode("[", lBracket),
-
-    constructBasicBytecode("find", find),
-    constructBasicBytecode("word", nextWord),
-    constructBasicBytecode(">terminator", toTerminator),
-    constructBasicBytecode("define", define),
-
-    constructTagBytecode("branch", branch),
-    constructTagBytecode("branch0", branch0),
-    .{
-        .name = "execute",
-        .compileSemantics = executeCompileInterpret,
-        .interpretSemantics = executeCompileInterpret,
-        .executeSemantics = executeExecute,
-    },
-    constructTagBytecode("jump", jump),
-
-    // ===
-
-    constructBasicBytecode("!", store),
-    constructBasicBytecode("+!", storeAdd),
-    constructBasicBytecode("@", fetch),
-    constructBasicBytecode(",", comma),
-    constructTagBytecode("lit", lit),
-
-    constructBasicBytecode("c!", storeC),
-    constructBasicBytecode("+c!", storeAddC),
-    constructBasicBytecode("c@", fetchC),
-    constructBasicBytecode("c,", commaC),
-    constructTagBytecode("litc", litC),
-
-    constructBasicBytecode(">r", toR),
-    constructBasicBytecode("r>", fromR),
-    constructBasicBytecode("r@", Rfetch),
-
-    constructBasicBytecode("=", eq),
-    constructBasicBytecode("<", lt),
-    constructBasicBytecode("<=", lteq),
-    constructBasicBytecode("0=", eq0),
-    constructBasicBytecode(">", gt),
-    constructBasicBytecode(">=", gteq),
-
-    constructBasicBytecode("+", plus),
-    constructBasicBytecode("-", minus),
-    constructBasicBytecode("*", multiply),
-    constructBasicBytecode("/mod", divMod),
-    constructBasicBytecode("u/mod", uDivMod),
-    constructBasicBytecode("negate", negate),
-
-    constructBasicBytecode("1+", plus1),
-    constructBasicBytecode("1-", minus1),
-
-    constructBasicBytecode("lshift", lshift),
-    constructBasicBytecode("rshift", rshift),
-    constructBasicBytecode("and", miniAnd),
-    constructBasicBytecode("or", miniOr),
-    constructBasicBytecode("xor", xor),
-    constructBasicBytecode("invert", invert),
-
-    constructBasicBytecode("dup", dup),
-    constructBasicBytecode("drop", drop),
-    constructBasicBytecode("swap", swap),
-    constructBasicBytecode("pick", pick),
-    constructBasicBytecode("nip", nip),
-    constructBasicBytecode("flip", flip),
-    constructBasicBytecode("tuck", tuck),
-    constructBasicBytecode("over", over),
-    constructBasicBytecode("rot", rot),
-    constructBasicBytecode("-rot", nrot),
-    constructBasicBytecode("?dup", maybeDup),
-
-    constructBasicBytecode("next-char", nextChar),
-    constructTagBytecode("ext", ext),
-
-    constructBasicBytecode("cell>bytes", cellToBytes),
-    constructBasicBytecode("bytes>cell", bytesToCell),
-
-    constructBasicBytecode("cmove", cmove),
-    constructBasicBytecode("cmove>", cmoveUp),
-    constructBasicBytecode("mem=", memEq),
-
-    constructTagBytecode("call", call),
-    constructBasicBytecode("nop", nop),
-    constructBasicBytecode("refill", refill),
-};
-
-// ===
-
-fn bye(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.should_bye = true;
-}
-
-fn quit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.should_quit = true;
-}
-
-fn exit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const should_continue = try mini.callbacks.onExit(mini, mini.callbacks.userdata);
-    if (should_continue) {
-        const addr = try mini.return_stack.pop();
-        try mini.absoluteJump(addr, false);
+fn defineBuiltin(dict: *Dictionary, token: Cell) !void {
+    const bytecode_definition = getBytecode(token) orelse return error.InvalidBytecode;
+    const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+    if (bytecode_definition.name.len > 0) {
+        try dict.define(wordlist_idx, bytecode_definition.name);
+        try dict.here.comma(token);
     }
 }
 
-fn panic(_: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
+pub fn initBuiltins(dict: *Dictionary) !void {
+    for (0..bytecodes_count) |i| {
+        try defineBuiltin(dict, @intCast(i));
+    }
+}
+
+const bytecodes = [bytecodes_count]BytecodeDefinition{
+    .{ .name = "nop", .callback = nop },
+    .{ .name = "exit", .callback = exit },
+    .{ .name = "enter", .callback = enter },
+    .{ .name = "execute", .callback = execute },
+    .{ .name = "jump", .callback = jump },
+    .{ .name = "jump0", .callback = jump0 },
+    .{ .name = "quit", .callback = quit },
+    .{ .name = "bye", .callback = bye },
+
+    .{ .name = "lit", .callback = lit },
+
+    .{ .name = "=", .callback = eq },
+    .{ .name = ">", .callback = gt },
+    .{ .name = ">=", .callback = gteq },
+    .{ .name = "0=", .callback = eq0 },
+    .{ .name = "<", .callback = lt },
+    .{ .name = "<=", .callback = lteq },
+
+    .{ .name = "and", .callback = and_ },
+    .{ .name = "or", .callback = or_ },
+    .{ .name = "xor", .callback = xor },
+    .{ .name = "invert", .callback = invert },
+    .{ .name = "lshift", .callback = lshift },
+    .{ .name = "rshift", .callback = rshift },
+
+    .{ .name = "!", .callback = store },
+    .{ .name = "+!", .callback = fetchAdd },
+    .{ .name = "@", .callback = fetch },
+    .{ .name = ",", .callback = comma },
+    .{ .name = "c!", .callback = storeC },
+    .{ .name = "+c!", .callback = fetchAddC },
+    .{ .name = "c@", .callback = fetchC },
+    .{ .name = "c,", .callback = commaC },
+
+    .{ .name = ">r", .callback = toR },
+    .{ .name = "r>", .callback = fromR },
+    .{ .name = "r@", .callback = fetchR },
+
+    .{ .name = "+", .callback = plus },
+    .{ .name = "-", .callback = minus },
+    .{ .name = "*", .callback = multiply },
+    .{ .name = "/", .callback = divide },
+    .{ .name = "mod", .callback = mod },
+    .{ .name = "1+", .callback = inc },
+    .{ .name = "1-", .callback = dec },
+
+    .{ .name = "drop", .callback = drop },
+    .{ .name = "dup", .callback = dup },
+    .{ .name = "swap", .callback = swap },
+    .{ .name = "flip", .callback = flip },
+    .{ .name = "over", .callback = over },
+    .{ .name = "nip", .callback = nip },
+    .{ .name = "tuck", .callback = tuck },
+    .{ .name = "rot", .callback = rot },
+    .{ .name = "-rot", .callback = nrot },
+
+    .{ .name = "find", .callback = find },
+    .{ .name = "word", .callback = nextWord },
+    .{ .name = "define", .callback = define },
+    .{ .name = "next-char", .callback = nextChar },
+    .{ .name = "refill", .callback = refill },
+    .{ .name = "'", .callback = tick },
+
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+    .{},
+};
+
+fn nop(_: *Runtime) Error!void {}
+
+fn panic(_: *Runtime) Error!void {
     return error.Panic;
 }
 
-fn tick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
-    const result = try mini.lookupStringAndGetAddress(word);
-    if (result.is_bytecode) {
-        try mini.data_stack.push(result.value);
-    } else {
-        const cfa_addr = try mini.dictionary.toCfa(result.value);
-        try mini.data_stack.push(cfa_addr);
-    }
+fn enter(rt: *Runtime) Error!void {
+    rt.return_stack.push(rt.program_counter);
+    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
 }
 
-fn bracketTick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const word = mini.input_source.readNextWord() orelse return error.UnexpectedEndOfInput;
-    const result = try mini.lookupStringAndGetAddress(word);
-    if (result.is_bytecode) {
-        try mini.dictionary.compileLitC(@truncate(result.value));
-    } else {
-        const cfa_addr = try mini.dictionary.toCfa(result.value);
-        try mini.dictionary.compileLit(cfa_addr);
-    }
+fn exit(rt: *Runtime) Error!void {
+    rt.program_counter = rt.return_stack.pop();
 }
 
-fn rBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.state.store(@intFromEnum(vm.CompileState.compile));
+fn execute(rt: *Runtime) Error!void {
+    const cfa_addr = rt.data_stack.pop();
+    rt.return_stack.push(rt.program_counter);
+    rt.program_counter = cfa_addr;
 }
 
-fn lBracket(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    mini.state.store(@intFromEnum(vm.CompileState.interpret));
-}
-
-fn branch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const pc = mini.program_counter.fetch();
-    const byte_jump = try mini.readByteAndAdvancePC();
-    const signed_byte_jump = @as(i8, @bitCast(byte_jump));
+fn jump(rt: *Runtime) Error!void {
+    try rt.assertValidProgramCounter();
+    const addr = try mem.readCell(rt.memory, rt.program_counter);
     // NOTE
-    // this intCast is from i8 to SignedCell
-    // this is to preserve negativity
-    const signed_cell_jump = @as(vm.SignedCell, @intCast(signed_byte_jump));
-    const cell_jump = @as(vm.Cell, @bitCast(signed_cell_jump));
-    try mini.absoluteJump(pc +% cell_jump, false);
+    // adds @sizeOf(Cell) to skip the enter code
+    try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
+    rt.program_counter = addr + @sizeOf(Cell);
 }
 
-fn branch0(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const condition = try mini.data_stack.pop();
-    if (!vm.isTruthy(condition)) {
-        return try branch(mini, ctx);
+fn jump0(rt: *Runtime) Error!void {
+    try rt.assertValidProgramCounter();
+
+    const conditional = rt.data_stack.pop();
+    if (!runtime.isTruthy(conditional)) {
+        try jump(rt);
     } else {
-        _ = try mini.readByteAndAdvancePC();
+        try rt.advancePC(@sizeOf(Cell));
     }
 }
 
-fn find(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const len, const addr = try mini.data_stack.popMultiple(2);
-    const word = try vm.mem.sliceFromAddrAndLen(mini.memory, addr, len);
-    const result_or_error = mini.lookupStringAndGetAddress(word);
-    const result = result_or_error catch |err| switch (err) {
-        error.WordNotFound => {
-            try mini.data_stack.push(addr);
-            try mini.data_stack.push(len);
-            try mini.data_stack.push(vm.fromBool(vm.Cell, false));
-            return;
-        },
-        else => return err,
-    };
-    try mini.data_stack.push(result.value);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, !result.is_bytecode));
-    try mini.data_stack.push(vm.fromBool(vm.Cell, true));
+fn quit(rt: *Runtime) Error!void {
+    rt.program_counter = 0;
+    rt.should_quit = true;
 }
 
-fn nextWord(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO should try and refill
-    const range = mini.input_source.readNextWordRange() orelse return error.UnexpectedEndOfInput;
-    try mini.data_stack.push(range.address);
-    try mini.data_stack.push(range.len);
+fn bye(rt: *Runtime) Error!void {
+    rt.program_counter = 0;
+    rt.should_bye = true;
 }
 
-fn nextChar(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    // TODO this is messy
-    if (mini.input_source.readNextChar()) |char| {
-        try mini.data_stack.push(char);
+fn eq(rt: *Runtime) Error!void {
+    rt.data_stack.eq();
+}
+
+fn eq0(rt: *Runtime) Error!void {
+    rt.data_stack.eq0();
+}
+
+fn gt(rt: *Runtime) Error!void {
+    rt.data_stack.gt();
+}
+
+fn gteq(rt: *Runtime) Error!void {
+    rt.data_stack.gteq();
+}
+
+fn lt(rt: *Runtime) Error!void {
+    rt.data_stack.lt();
+}
+
+fn lteq(rt: *Runtime) Error!void {
+    rt.data_stack.lteq();
+}
+
+fn and_(rt: *Runtime) Error!void {
+    rt.data_stack.and_();
+}
+
+fn or_(rt: *Runtime) Error!void {
+    rt.data_stack.ior();
+}
+
+fn xor(rt: *Runtime) Error!void {
+    rt.data_stack.xor();
+}
+
+fn invert(rt: *Runtime) Error!void {
+    rt.data_stack.invert();
+}
+
+fn lshift(rt: *Runtime) Error!void {
+    rt.data_stack.lshift();
+}
+
+fn rshift(rt: *Runtime) Error!void {
+    rt.data_stack.rshift();
+}
+
+fn inc(rt: *Runtime) Error!void {
+    rt.data_stack.inc();
+}
+
+fn dec(rt: *Runtime) Error!void {
+    rt.data_stack.dec();
+}
+
+fn drop(rt: *Runtime) Error!void {
+    rt.data_stack.drop();
+}
+
+fn dup(rt: *Runtime) Error!void {
+    rt.data_stack.dup();
+}
+
+fn swap(rt: *Runtime) Error!void {
+    rt.data_stack.swap();
+}
+
+fn flip(rt: *Runtime) Error!void {
+    rt.data_stack.flip();
+}
+
+fn over(rt: *Runtime) Error!void {
+    rt.data_stack.over();
+}
+
+fn nip(rt: *Runtime) Error!void {
+    rt.data_stack.nip();
+}
+
+fn tuck(rt: *Runtime) Error!void {
+    rt.data_stack.tuck();
+}
+
+fn rot(rt: *Runtime) Error!void {
+    rt.data_stack.rot();
+}
+
+fn nrot(rt: *Runtime) Error!void {
+    rt.data_stack.nrot();
+}
+
+fn store(rt: *Runtime) Error!void {
+    const addr, const value = rt.data_stack.pop2();
+    try mem.writeCell(rt.memory, addr, value);
+}
+
+fn fetchAdd(rt: *Runtime) Error!void {
+    const addr, const value = rt.data_stack.pop2();
+    (try mem.cellPtr(rt.memory, addr)).* +%= value;
+}
+
+fn fetch(rt: *Runtime) Error!void {
+    const addr = rt.data_stack.pop();
+    rt.data_stack.push(try mem.readCell(rt.memory, addr));
+}
+
+fn comma(rt: *Runtime) Error!void {
+    const value = rt.data_stack.pop();
+    try rt.interpreter.dictionary.here.comma(value);
+}
+
+fn storeC(rt: *Runtime) Error!void {
+    const addr, const value = rt.data_stack.pop2();
+    const value_u8: u8 = @truncate(value);
+    rt.memory[addr] = value_u8;
+}
+
+fn fetchAddC(rt: *Runtime) Error!void {
+    const addr, const value = rt.data_stack.pop2();
+    const value_u8: u8 = @truncate(value);
+    rt.memory[addr] +%= value_u8;
+}
+
+fn fetchC(rt: *Runtime) Error!void {
+    const addr = rt.data_stack.pop();
+    rt.data_stack.push(rt.memory[addr]);
+}
+
+fn commaC(rt: *Runtime) Error!void {
+    const value = rt.data_stack.pop();
+    try rt.interpreter.dictionary.here.commaC(@truncate(value));
+}
+
+fn toR(rt: *Runtime) Error!void {
+    rt.return_stack.push(rt.data_stack.pop());
+}
+
+fn fromR(rt: *Runtime) Error!void {
+    rt.data_stack.push(rt.return_stack.pop());
+}
+
+fn fetchR(rt: *Runtime) Error!void {
+    rt.data_stack.push(rt.return_stack.peek());
+}
+
+fn plus(rt: *Runtime) Error!void {
+    rt.data_stack.add();
+}
+
+fn minus(rt: *Runtime) Error!void {
+    rt.data_stack.subtract();
+}
+
+fn multiply(rt: *Runtime) Error!void {
+    rt.data_stack.multiply();
+}
+
+fn divide(rt: *Runtime) Error!void {
+    rt.data_stack.divide();
+}
+
+fn mod(rt: *Runtime) Error!void {
+    rt.data_stack.mod();
+}
+
+fn find(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    // TODO which wordlist should this use?
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+        rt.data_stack.push(word_info.definition_addr);
+        rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
-        _ = try mini.input_source.refill();
-        if (mini.input_source.readNextChar()) |char| {
-            try mini.data_stack.push(char);
-        } else {
-            return error.Panic;
-        }
+        rt.data_stack.push(0);
+        rt.data_stack.push(runtime.cellFromBoolean(false));
     }
 }
 
-fn define(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const word = try mini.popSlice();
-    try mini.dictionary.defineWord(word);
-}
-
-// NOTE
-// this only works for forth words
-// TODO
-// should a version of this be made that works for bytecodes?
-fn executeExecute(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
-    try mini.absoluteJump(addr, true);
-}
-
-fn executeCompileInterpret(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    try executeExecute(mini, ctx);
-    try mini.executionLoop();
-}
-
-/// This jumps to the following address in memory without
-///   pushing anything to the return stack
-fn jump(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.readCellAndAdvancePC();
-    try mini.absoluteJump(addr, false);
-}
-
-fn store(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
-    mem_ptr.* = value;
-}
-
-fn storeAdd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
-    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
-    mem_ptr.* +%= value;
-}
-
-fn fetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
-    const mem_ptr = try vm.mem.cellAt(mini.memory, addr);
-    try mini.data_stack.push(mem_ptr.*);
-}
-
-fn comma(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.dictionary.here.comma(mini.dictionary.memory, value);
-}
-
-fn lit(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.readCellAndAdvancePC();
-    try mini.data_stack.push(value);
-}
-
-fn storeC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
-    const byte: u8 = @truncate(value);
-    const ptr = try vm.mem.checkedAccess(mini.memory, addr);
-    ptr.* = byte;
-}
-
-fn storeAddC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr, const value = try mini.data_stack.popMultiple(2);
-    const byte: u8 = @truncate(value);
-    const ptr = try vm.mem.checkedAccess(mini.memory, addr);
-    ptr.* += byte;
-}
-
-fn fetchC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.data_stack.pop();
-    const value = try vm.mem.checkedRead(mini.memory, addr);
-    try mini.data_stack.push(value);
-}
-
-fn commaC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.dictionary.here.commaC(mini.dictionary.memory, @truncate(value));
-}
-
-fn litC(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const byte = try mini.readByteAndAdvancePC();
-    try mini.data_stack.push(byte);
-}
-
-fn toR(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    mini.return_stack.push(value) catch |err| {
-        return vm.returnStackErrorFromStackError(err);
+fn nextWord(rt: *Runtime) Error!void {
+    // TODO should this try to refill?
+    const range = rt.input_buffer.readNextWordRange() orelse {
+        return error.UnexpectedEndOfInput;
     };
+    rt.data_stack.push(range.address);
+    rt.data_stack.push(range.len);
 }
 
-fn fromR(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.return_stack.pop() catch |err| {
-        return vm.returnStackErrorFromStackError(err);
+fn define(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    try rt.interpreter.dictionary.define(wordlist_idx, word);
+}
+
+fn nextChar(rt: *Runtime) Error!void {
+    // TODO should this try to refill?
+    const char = rt.input_buffer.readNextChar() orelse {
+        return error.UnexpectedEndOfInput;
     };
-    try mini.data_stack.push(value);
+    rt.data_stack.push(char);
 }
 
-fn Rfetch(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = mini.return_stack.peek() catch |err| {
-        return vm.returnStackErrorFromStackError(err);
+fn refill(rt: *Runtime) Error!void {
+    const did_refill = try rt.input_buffer.refill();
+    rt.data_stack.push(runtime.cellFromBoolean(did_refill));
+}
+
+fn tick(rt: *Runtime) Error!void {
+    // TODO should this try to refill?
+    const word = rt.input_buffer.readNextWord() orelse {
+        return error.UnexpectedEndOfInput;
     };
-    try mini.data_stack.push(value);
-}
-
-fn eq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const a, const b = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a == b));
-}
-
-fn lt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a < b));
-}
-
-fn lteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a <= b));
-}
-
-fn plus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a +% b);
-}
-
-fn minus(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a -% b);
-}
-
-fn multiply(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a *% b);
-}
-
-fn divMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    const signed_a = @as(vm.SignedCell, @bitCast(a));
-    const signed_b = @as(vm.SignedCell, @bitCast(b));
-    const quotient = try std.math.divTrunc(vm.SignedCell, signed_a, signed_b);
-    const remainder = try std.math.mod(vm.SignedCell, signed_a, signed_b);
-    try mini.data_stack.push(@bitCast(remainder));
-    try mini.data_stack.push(@bitCast(quotient));
-}
-
-fn uDivMod(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    const quotient = try std.math.divTrunc(vm.Cell, a, b);
-    const remainder = try std.math.mod(vm.Cell, a, b);
-    try mini.data_stack.push(remainder);
-    try mini.data_stack.push(quotient);
-}
-
-fn negate(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    const signed_value = @as(vm.SignedCell, @bitCast(value));
-    try mini.data_stack.push(@bitCast(-signed_value));
-}
-
-fn lshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const shift_, const value = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(value << @truncate(shift_));
-}
-
-fn rshift(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const shift_, const value = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(value >> @truncate(shift_));
-}
-
-fn miniAnd(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a & b);
-}
-
-fn miniOr(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a | b);
-}
-
-fn xor(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(a ^ b);
-}
-
-fn invert(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(~value);
-}
-
-fn dup(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.dup();
-}
-
-fn drop(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.drop();
-}
-
-fn swap(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.swap();
-}
-
-fn pick(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const idx = try mini.data_stack.pop();
-    const value = (try mini.data_stack.index(idx)).*;
-    try mini.data_stack.push(value);
-}
-
-fn rot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.rot();
-}
-
-fn nrot(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.nrot();
-}
-
-fn ext(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const shortcode = try mini.readCellAndAdvancePC();
-    const exts = @import("ext_bytecodes.zig");
-    try exts.executeExt(shortcode, mini, ctx);
-}
-
-fn toTerminator(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const definition_addr = try mini.data_stack.pop();
-    const terminator_addr = try mini.dictionary.toTerminator(definition_addr);
-    try mini.data_stack.push(terminator_addr);
-}
-
-fn eq0(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(vm.fromBool(vm.Cell, value == 0));
-}
-
-fn gt(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a > b));
-}
-
-fn gteq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const b, const a = try mini.data_stack.popMultiple(2);
-    try mini.data_stack.push(vm.fromBool(vm.Cell, a >= b));
-}
-
-fn storeHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    mini.dictionary.here.store(value);
-}
-
-fn storeAddHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    mini.dictionary.here.storeAdd(value);
-}
-
-fn fetchHere(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.push(mini.dictionary.here.fetch());
-}
-
-fn plus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(value +% 1);
-}
-
-fn minus1(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    try mini.data_stack.push(value -% 1);
-}
-
-// TODO could rename these next two to split and join
-// forth-79 is HILO and SQUISH
-fn cellToBytes(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const value = try mini.data_stack.pop();
-    const high = @as(u8, @truncate(value >> 8));
-    const low = @as(u8, @truncate(value));
-    try mini.data_stack.push(high);
-    try mini.data_stack.push(low);
-}
-
-fn bytesToCell(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const low, const high = try mini.data_stack.popMultiple(2);
-    const low_byte = @as(u8, @truncate(low));
-    const high_byte = @as(u8, @truncate(high));
-    const value = low_byte | (@as(vm.Cell, high_byte) << 8);
-    try mini.data_stack.push(value);
-}
-
-fn cmove(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
-    // std.mem.copyForwards()
-}
-
-fn cmoveUp(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
-    // std.mem.copyBackwards()
-}
-
-fn memEq(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    _ = mini;
-    // TODO
-    // std.mem.eql
-}
-
-fn maybeDup(mini: *vm.MiniVM, ctx: vm.ExecutionContext) vm.Error!void {
-    const condition = try mini.data_stack.peek();
-    if (vm.isTruthy(condition)) {
-        try dup(mini, ctx);
+    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
+    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+        const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
+        rt.data_stack.push(cfa_addr);
+    } else {
+        // TODO
+        @import("std").debug.print("word not found {}:{s}\n", .{ wordlist_idx, word });
+        return error.WordNotFound;
     }
 }
 
-fn nip(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.nip();
-}
-
-fn flip(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.flip();
-}
-
-fn tuck(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.tuck();
-}
-
-fn over(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    try mini.data_stack.over();
-}
-
-fn call(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const addr = try mini.readCellAndAdvancePC();
-    try mini.absoluteJump(addr, true);
-}
-
-fn refill(mini: *vm.MiniVM, _: vm.ExecutionContext) vm.Error!void {
-    const did_refill = try mini.input_source.refill();
-    try mini.data_stack.push(vm.fromBool(vm.Cell, did_refill));
-}
-
-// ===
-
-test "bytecodes" {
-    const testing = @import("std").testing;
-
-    const memory = try vm.mem.allocateCellAlignedMemory(
-        testing.allocator,
-        vm.max_memory_size,
-    );
-    defer testing.allocator.free(memory);
-
-    var mini: vm.MiniVM = undefined;
-    try mini.init(memory);
-
-    try mini.data_stack.push(1);
-    try mini.data_stack.push(0xabcd);
-
-    try testWords(
-        &mini,
-        &[_]VmWordTest{
-            .{
-                .word = "dup",
-                .stack = &[_]u16{ 1, 0xabcd, 0xabcd },
-            },
-            .{
-                .word = "0xffff",
-                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff },
-            },
-            .{
-                .word = "4",
-                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0xffff, 4 },
-            },
-            .{
-                .word = "rshift",
-                .stack = &[_]u16{ 1, 0xabcd, 0xabcd, 0x0fff },
-            },
-            .{
-                .word = "and",
-                .stack = &[_]u16{ 1, 0xabcd, 0x0bcd },
-            },
-        },
-    );
-
-    mini.data_stack.clear();
-
-    try testWords(
-        &mini,
-        &[_]VmWordTest{
-            .{
-                .word = "1",
-                .stack = &[_]u16{1},
-            },
-            .{
-                .word = "2",
-                .stack = &[_]u16{ 1, 2 },
-            },
-            .{
-                .word = "+",
-                .stack = &[_]u16{3},
-            },
-            .{
-                .word = "4",
-                .stack = &[_]u16{ 3, 4 },
-            },
-            .{
-                .word = "tuck",
-                .stack = &[_]u16{ 4, 3, 4 },
-            },
-        },
-    );
-
-    mini.data_stack.clear();
-
-    try testWords(
-        &mini,
-        &[_]VmWordTest{
-            .{
-                .word = "1",
-                .stack = &[_]u16{1},
-            },
-            .{
-                .word = "2",
-                .stack = &[_]u16{ 1, 2 },
-            },
-            .{
-                .word = "-",
-                .stack = &[_]u16{@bitCast(@as(vm.SignedCell, -1))},
-            },
-            .{
-                .word = "negate",
-                .stack = &[_]u16{@bitCast(@as(vm.SignedCell, 1))},
-            },
-        },
-    );
-}
-
-const TestMode = enum {
-    compile,
-    interpret,
-    execute,
-};
-
-const VmWordTest = struct {
-    word: []const u8,
-    stack: []const vm.Cell,
-    mode: TestMode = .interpret,
-};
-
-fn testWords(mini: *vm.MiniVM, word_tests: []const VmWordTest) !void {
-    // TODO is there a way to print which line failed?
-    for (word_tests) |word_test| {
-        try testBytecodeStack(
-            mini,
-            word_test.word,
-            word_test.mode,
-            word_test.stack,
-        );
-    }
-}
-
-fn testBytecodeStack(
-    mini: *vm.MiniVM,
-    word: []const u8,
-    mode: TestMode,
-    expect_stack: []const vm.Cell,
-) !void {
-    const stack = @import("stack.zig");
-
-    const bytecode = lookupBytecodeByName(word) orelse unreachable;
-    const bytecode_definition = getBytecodeDefinition(bytecode);
-
-    const ctx = vm.ExecutionContext{
-        .current_bytecode = bytecode,
-    };
-
-    try switch (mode) {
-        .compile => bytecode_definition.compileSemantics(mini, ctx),
-        .interpret => bytecode_definition.interpretSemantics(mini, ctx),
-        .execute => bytecode_definition.executeSemantics(mini, ctx),
-    };
-
-    try stack.expectStack(mini.data_stack, expect_stack);
+fn lit(rt: *Runtime) Error!void {
+    try rt.assertValidProgramCounter();
+    const value = try mem.readCell(rt.memory, rt.program_counter);
+    rt.data_stack.push(value);
+    try rt.advancePC(@sizeOf(Cell));
 }

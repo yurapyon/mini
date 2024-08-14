@@ -1,5 +1,7 @@
 const std = @import("std");
 
+// ===
+
 const FieldLayout = struct {
     name: []const u8,
     offset: usize,
@@ -33,11 +35,11 @@ fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
 
 /// Memory layouts
 ///   build a representation of packed memory with the ability to query offsets by field name
-pub fn MemoryLayout(comptime Type: type, comptime OffsetType: type) type {
+pub fn MemoryLayout(comptime Type: type) type {
     return struct {
         pub const layout = structToMemoryLayout(Type);
 
-        pub fn offsetOf(comptime field: []const u8) OffsetType {
+        pub fn offsetOf(comptime field: []const u8) comptime_int {
             if (!@hasField(Type, field)) {
                 @compileError(std.fmt.comptimePrint(
                     "Field '{s}' doesnt exist on type '{}'\n",
@@ -73,7 +75,7 @@ test "layouts" {
         b: u8,
         c: [3]u16,
         d: u8,
-    }, usize);
+    });
 
     try testing.expectEqual(TestLayout.offsetOf("a"), 0);
     try testing.expectEqual(TestLayout.offsetOf("b"), 1);
@@ -105,7 +107,11 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
     }
 
     if (str.len == 0) {
-        return 0;
+        if (base == 1) {
+            return 0;
+        } else {
+            return error.InvalidNumber;
+        }
     }
 
     var is_negative: bool = false;
@@ -188,31 +194,10 @@ pub fn stringsEqual(a: []const u8, b: []const u8) bool {
     return true;
 }
 
-// ===
+test "string compare" {
+    const testing = std.testing;
 
-// TODO write some tests
-pub const LinkedListIterator = struct {
-    const vm = @import("mini.zig");
-
-    memory: vm.mem.CellAlignedMemory,
-    last_addr: vm.Cell,
-
-    pub fn from(
-        memory: vm.mem.CellAlignedMemory,
-        first_addr: vm.Cell,
-    ) @This() {
-        return .{
-            .memory = memory,
-            .last_addr = first_addr,
-        };
-    }
-
-    pub fn next(self: *@This()) !?vm.Cell {
-        if (self.last_addr == 0) {
-            return null;
-        }
-        const ret = self.last_addr;
-        self.last_addr = (try vm.mem.cellAt(self.memory, self.last_addr)).*;
-        return ret;
-    }
-};
+    try testing.expect(stringsEqual("asdf", "asdf"));
+    try testing.expect(stringsEqual("asdf", "Asdf"));
+    try testing.expect(!stringsEqual("asdf ", "asdf"));
+}

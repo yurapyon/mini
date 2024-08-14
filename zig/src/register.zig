@@ -1,168 +1,166 @@
 const std = @import("std");
 
-const vm = @import("mini.zig");
+const mem = @import("memory.zig");
+const MemoryPtr = mem.MemoryPtr;
 
-const Range = @import("range.zig");
+const runtime = @import("runtime.zig");
+const Cell = runtime.Cell;
+
+// ===
+
+// TODO remove unused functions
+
+// NOTE
+// reasoning to use this over a normal *Cell:
+//   by using a cell sized offset, we get
+//     - memory mapping
+//     - defining the location at comptime
+//       - verify alignment and in-bounds access in most cases
+//     - quick and easy pointer arithmetic outside of zig's ptr type constraints
+//   also, the offset is more easily passed to forth, which is very common
+//     i.e. for 'here' and 'latest'
+//   a raw pointer is more "natural" but i think the tradeoffs are worth it
 
 /// A register is basically a pointer into VM Memory
-/// Won't crash as long as offset is within memory
-///   This is checked for on init
-pub fn Register(comptime offset_: vm.Cell) type {
+pub fn Register(comptime offset: Cell) type {
     return struct {
         comptime {
-            if (offset % @alignOf(vm.Cell) != 0) {
-                @compileError("Register must be vm.Cell aligned");
-            }
+            mem.assertCellAccess(offset) catch {
+                @compileError("Register must be Cell aligned");
+            };
         }
 
-        pub const offset = offset_;
+        memory: MemoryPtr,
 
-        memory: vm.mem.CellAlignedMemory,
-
-        pub fn init(
-            self: *@This(),
-            memory: vm.mem.CellAlignedMemory,
-        ) vm.mem.MemoryError!void {
-            if (offset >= memory.len) {
-                return error.OutOfBounds;
-            }
+        pub fn init(self: *@This(), memory: MemoryPtr) void {
             self.memory = memory;
         }
 
-        pub fn store(
-            self: @This(),
-            value: vm.Cell,
-        ) void {
-            (vm.mem.cellAt(self.memory, offset) catch unreachable).* = value;
+        fn assertForwardOffset(address_offset: Cell) error{OutOfBounds}!void {
+            try mem.assertOffsetInBounds(offset, address_offset);
         }
 
-        pub fn fetch(
-            self: @This(),
-        ) vm.Cell {
-            return (vm.mem.cellAt(self.memory, offset) catch unreachable).*;
+        fn assertForwardReference(self: @This(), reference_offset: Cell) error{OutOfBounds}!void {
+            const addr = self.fetch();
+            try mem.assertOffsetInBounds(addr, reference_offset);
         }
 
-        pub fn storeAdd(
-            self: @This(),
-            value: vm.Cell,
-        ) void {
-            (vm.mem.cellAt(self.memory, offset) catch unreachable).* +%= value;
+        // Cells ===
+
+        pub fn store(self: @This(), value: Cell) void {
+            mem.writeCell(self.memory, offset, value) catch unreachable;
         }
 
-        pub fn storeSubtract(
+        pub fn storeWithOffset(
             self: @This(),
-            value: vm.Cell,
-        ) void {
-            (vm.mem.cellAt(self.memory, offset) catch unreachable).* -%= value;
+            addr_offset: Cell,
+            value: Cell,
+        ) error{ OutOfBounds, MisalignedAddress }!void {
+            try assertForwardOffset(addr_offset);
+            try mem.writeCell(self.memory, offset + addr_offset, value);
         }
 
-        pub fn deref(
-            self: @This(),
-            memory: vm.mem.CellAlignedMemory,
-        ) vm.mem.MemoryError!vm.Cell {
-            return (try vm.mem.cellAt(memory, self.fetch())).*;
+        pub fn fetch(self: @This()) Cell {
+            return mem.readCell(self.memory, offset) catch unreachable;
         }
 
-        /// Will error if self.fetch() is not cell aligned and within write_to
+        pub fn fetchWithOffset(
+            self: @This(),
+            addr_offset: Cell,
+        ) error{ OutOfBounds, MisalignedAddress }!Cell {
+            try assertForwardOffset(addr_offset);
+            return try mem.readCell(self.memory, offset + addr_offset);
+        }
+
+        pub fn storeAdd(self: @This(), value: Cell) void {
+            const cell_ptr = mem.cellPtr(self.memory, offset) catch unreachable;
+            cell_ptr.* +%= value;
+        }
+
+        pub fn storeSubtract(self: @This(), value: Cell) void {
+            const cell_ptr = mem.cellPtr(self.memory, offset) catch unreachable;
+            cell_ptr.* -%= value;
+        }
+
+        // TODO
+        //         pub fn deref(
+        //             self: @This(),
+        //         ) mem.MemoryError!Cell {
+        //             return (try mem.cellAt(memory, self.fetch())).*;
+        //         }
+
         pub fn comma(
             self: @This(),
-            write_to: vm.mem.CellAlignedMemory,
-            value: vm.Cell,
-        ) vm.mem.MemoryError!void {
-            (try vm.mem.cellAt(write_to, self.fetch())).* = value;
-            self.storeAdd(@sizeOf(vm.Cell));
+            value: Cell,
+        ) error{ OutOfBounds, MisalignedAddress }!void {
+            try self.assertForwardReference(@sizeOf(Cell));
+            const addr = self.fetch();
+            try mem.writeCell(self.memory, addr, value);
+            self.storeAdd(@sizeOf(Cell));
         }
 
-        pub fn alignForward(
-            self: @This(),
-            alignment: vm.Cell,
-        ) vm.Cell {
-            const new_addr = std.mem.alignForward(
-                vm.Cell,
-                self.fetch(),
-                alignment,
-            );
+        pub fn alignForward(self: @This()) Cell {
+            const new_addr = mem.alignToCell(self.fetch());
             self.store(new_addr);
             return new_addr;
         }
 
+        pub fn derefByteAlignedAndAdvance(self: @This()) error{OutOfBounds}!Cell {
+            const low = try self.derefAndAdvanceC();
+            const high = try self.derefAndAdvanceC();
+            return @as(Cell, high) << 8 | low;
+        }
+
+        pub fn commaByteAligned(self: @This(), value: Cell) error{OutOfBounds}!void {
+            const high: u8 = @truncate(value >> 8);
+            const low: u8 = @truncate(value);
+            try self.commaC(low);
+            try self.commaC(high);
+        }
+
+        // u8s ===
+
         pub fn storeC(self: @This(), value: u8) void {
-            const byte = vm.mem.checkedAccess(
-                self.memory,
-                offset,
-            ) catch unreachable;
-            byte.* = value;
+            self.memory[offset] = value;
         }
 
         pub fn fetchC(self: @This()) u8 {
-            const byte = vm.mem.checkedRead(
-                self.memory,
-                offset,
-            ) catch unreachable;
-            return byte;
+            return self.memory[offset];
         }
 
         pub fn storeAddC(self: @This(), value: u8) void {
-            const byte = vm.mem.checkedAccess(self.memory, offset) catch unreachable;
-            byte.* +%= value;
+            self.memory[offset] +%= value;
         }
 
-        /// Will error if self.fetch() is not within write_to
-        pub fn commaC(
-            self: @This(),
-            write_to: []u8,
-            value: u8,
-        ) vm.mem.MemoryError!void {
-            const byte = try vm.mem.checkedAccess(write_to, self.fetch());
-            byte.* = value;
+        pub fn commaC(self: @This(), value: u8) error{OutOfBounds}!void {
+            try self.assertForwardReference(1);
+            const addr = self.fetch();
+            self.memory[addr] = value;
             self.storeAdd(1);
         }
 
-        /// Will error if self.fetch() is not within write_to
-        pub fn commaByteAlignedCell(
-            self: @This(),
-            write_to: []u8,
-            value: vm.Cell,
-        ) vm.mem.MemoryError!void {
-            try vm.mem.writeByteAlignedCell(write_to, self.fetch(), value);
-            self.storeAdd(@sizeOf(vm.Cell));
-        }
-
-        // TODO rename to derefByte & derefCell
-
-        /// Will error if self.fetch() is not within read_from
-        pub fn readByteAndAdvance(
-            self: @This(),
-            read_from: []const u8,
-        ) vm.mem.MemoryError!u8 {
+        pub fn derefAndAdvanceC(self: @This()) error{OutOfBounds}!u8 {
+            try self.assertForwardReference(1);
             const addr = self.fetch();
             self.storeAdd(1);
-            return try vm.mem.checkedRead(read_from, addr);
+            return self.memory[addr];
         }
 
-        /// Will error if self.fetch()+1 is not within read_from
-        pub fn readCellAndAdvance(
-            self: @This(),
-            read_from: []const u8,
-        ) vm.mem.MemoryError!vm.Cell {
-            const low = try self.readByteAndAdvance(read_from);
-            const high = try self.readByteAndAdvance(read_from);
-            return @as(vm.Cell, high) << 8 | low;
-        }
+        // ===
 
-        /// Will error if self.fetch()+string.len is not within read_from
         pub fn commaString(
             self: @This(),
             string: []const u8,
-        ) vm.Error!void {
-            if (string.len > std.math.maxInt(vm.Cell)) {
-                // TODO rename this to StringTooLong or something
-                return error.WordNameTooLong;
+        ) error{ OutOfBounds, StringTooLong }!void {
+            if (string.len > std.math.maxInt(Cell)) {
+                return error.StringTooLong;
             }
-            const dest = try vm.mem.sliceFromAddrAndLen(
+
+            const cell_str_len: Cell = @intCast(string.len);
+            const dest = try mem.sliceFromAddrAndLen(
                 self.memory,
                 self.fetch(),
-                string.len,
+                cell_str_len,
             );
             @memcpy(dest, string);
             self.storeAdd(@intCast(string.len));
@@ -170,50 +168,98 @@ pub fn Register(comptime offset_: vm.Cell) type {
     };
 }
 
-test "registers" {
+test "register: store fetch" {
     const testing = @import("std").testing;
 
-    const memory = try vm.mem.allocateCellAlignedMemory(
-        testing.allocator,
-        vm.max_memory_size,
-    );
+    const memory = try mem.allocateMemory(testing.allocator);
     defer testing.allocator.free(memory);
 
-    const reg_a = Register(0){ .memory = memory };
-    const reg_b = Register(2){ .memory = memory };
+    const a_loc = 0;
+    const b_loc = 2;
+
+    var reg_a: Register(a_loc) = undefined;
+    var reg_b: Register(b_loc) = undefined;
+
+    reg_a.init(memory);
+    reg_b.init(memory);
 
     reg_a.store(0xdead);
     reg_b.store(0xbeef);
-    try testing.expectEqualSlices(u8, &[_]u8{ 0xad, 0xde, 0xef, 0xbe }, memory[0..4]);
+    try expectMemory(
+        memory,
+        &[_]u8{ 0xad, 0xde, 0xef, 0xbe },
+    );
 
     reg_a.storeAdd(0x1111);
     reg_b.storeAdd(0x2222);
-    try testing.expectEqualSlices(u8, &[_]u8{ 0xbe, 0xef, 0x11, 0xe1 }, memory[0..4]);
+    try expectMemory(
+        memory,
+        &[_]u8{ 0xbe, 0xef, 0x11, 0xe1 },
+    );
 
     try testing.expectEqual(0xefbe, reg_a.fetch());
 
-    const here = Register(0){
-        .memory = memory,
-    };
+    reg_a.storeSubtract(0x1111);
+    reg_b.storeSubtract(0x2222);
+    try expectMemory(
+        memory,
+        &[_]u8{ 0xad, 0xde, 0xef, 0xbe },
+    );
+
+    try reg_a.storeWithOffset(2, 0xbeef);
+    try testing.expectEqual(0xbeef, try reg_a.fetchWithOffset(2));
+    try testing.expectEqual(0xbeef, reg_b.fetch());
+
+    try testing.expectEqual(error.MisalignedAddress, reg_a.fetchWithOffset(1));
+    try testing.expectEqual(error.OutOfBounds, reg_b.fetchWithOffset(0xfffe));
+}
+
+test "register: comma" {
+    const testing = @import("std").testing;
+
+    const memory = try mem.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    const here_loc = 0;
+    var here: Register(here_loc) = undefined;
+    here.init(memory);
+
     here.store(2);
-    try here.comma(memory, 0xadde);
-    try here.comma(memory, 0xefbe);
-    try testing.expectEqualSlices(u8, &[_]u8{ 0x06, 0x00, 0xde, 0xad, 0xbe, 0xef }, memory[0..6]);
+    try here.comma(0xadde);
+    try here.comma(0xefbe);
+    try expectMemory(
+        memory,
+        &[_]u8{ 0x06, 0x00, 0xde, 0xad, 0xbe, 0xef },
+    );
+
+    here.store(0xffff);
+    try testing.expectEqual(error.OutOfBounds, here.comma(0xbeef));
+    here.store(0x0001);
+    try testing.expectEqual(error.MisalignedAddress, here.comma(0xbeef));
+    try testing.expectEqual(2, here.alignForward());
+    try testing.expectEqual(2, here.fetch());
 
     here.storeC(2);
-    try here.commaC(memory, 0xab);
-    try here.commaC(memory, 0xcd);
-    try testing.expectEqualSlices(u8, &[_]u8{ 0x04, 0x00, 0xab, 0xcd, 0xbe, 0xef }, memory[0..6]);
+    try here.commaC(0xab);
+    try here.commaC(0xcd);
+    try expectMemory(
+        memory,
+        &[_]u8{ 0x04, 0x00, 0xab, 0xcd, 0xbe, 0xef },
+    );
 
-    try testing.expectEqual(0x04, here.fetchC());
-    here.storeAddC(1);
-    try testing.expectEqual(0x05, here.fetchC());
-    const aligned_here = here.alignForward(@alignOf(vm.Cell));
-    try testing.expectEqual(0x06, here.fetchC());
-    try testing.expectEqual(0x06, aligned_here);
+    here.store(3);
+    try testing.expectEqual(0xbecd, try here.derefByteAlignedAndAdvance());
+    here.store(3);
+    try here.commaByteAligned(0x1234);
+    here.store(3);
+    try testing.expectEqual(0x1234, try here.derefByteAlignedAndAdvance());
+}
 
-    here.store(2);
-    try here.comma(memory, 0xbeef);
-    here.storeSubtract(2);
-    try testing.expectEqual(0xbeef, try here.deref(memory));
+fn expectMemory(memory: MemoryPtr, expectation: []const u8) !void {
+    const testing = @import("std").testing;
+    try testing.expectEqualSlices(
+        u8,
+        expectation,
+        memory[0..expectation.len],
+    );
 }
