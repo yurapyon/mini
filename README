@@ -1,9 +1,20 @@
-forthy VM and virtual computer
+.   | \ \ ` | \ `   .
+.   | | | | | | |   ,
 
-(everything tbd)
+small forth
+
+goals:
+  easy
+    easy to write/read mini code
+    easy to implement/port vm
+  small memory footprint
+
+roadmap:
+  planned:
+    self-hosted version
+      it would be fun
 
 you need:
   zig
-  npm
 
 MIT
