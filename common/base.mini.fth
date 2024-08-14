@@ -16,28 +16,14 @@ forth
 
 : \ source >in ! drop ;
 
-\ this is a comment
-
-bye
-
 : <> = 0= ;
 
 : 2dup  over over ;
 : 2drop drop drop ;
 : 3drop drop 2drop ;
 
-\ vs. ',' and '!', 'cell,' and 'cell!' don't care about alignment
-: c!+   tuck c! 1+ ;
-: cell, cell>bytes c, c, ;
-: cell! swap cell>bytes rot c!+ c! ;
-
 : cell 2 ;
 : cells cell * ;
-
-: u/   u/mod nip ;
-: umod u/mod drop ;
-: /    /mod nip ;
-: mod  /mod drop ;
 
 : allot   here +! ;
 : aligned dup cell mod + ;
@@ -48,22 +34,21 @@ bye
 : last latest @ >cfa ;
 
 \ tags
-: exit, ['] exit c, ;
-: br,   ['] branch  c, ;
-: ?br,  ['] branch0 c, ;
-: jump, ['] jump c, ;
-: call, ['] call c, ;
-: lit,  ['] lit  c, ;
-: litc, ['] litc c, ;
-: ext,  ['] ext c, ;
+: exit,  ['] exit , ;
+: jump0, ['] jump0 , ;
+: jump,  ['] jump , ;
+: lit,   ['] lit  , ;
 
 : :noname  0 0 define here @ ] ;
-: xt-call, call, cell, ;
-: xt-jump, jump, cell, ;
-: next,    here @ 3 + xt-jump, ;
+: next,    here @ 3 + jump, , ;
 compiler
-: recurse  last xt-jump, ;
+: recurse  jump, last , ;
 forth
+
+: looper hi recurse ;
+\ looper
+
+bye
 
 : blank,     0 c, 0 c, ;
 : blankc,    0 c, ;

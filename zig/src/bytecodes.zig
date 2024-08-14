@@ -169,8 +169,11 @@ fn execute(rt: *Runtime) Error!void {
 
 fn jump(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
-    const addr = rt.memory[rt.program_counter];
-    rt.program_counter = addr;
+    const addr = try mem.readCell(rt.memory, rt.program_counter);
+    // NOTE
+    // adds @sizeOf(Cell) to skip the enter code
+    try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
+    rt.program_counter = addr + @sizeOf(Cell);
 }
 
 fn jump0(rt: *Runtime) Error!void {

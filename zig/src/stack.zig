@@ -32,6 +32,9 @@ const CircularStack = struct {
 };
 
 pub const DataStack = struct {
+    // TODO what in here should use signed cells?
+    // everything maybe ?
+
     top: Cell,
     second: Cell,
     inner: CircularStack,

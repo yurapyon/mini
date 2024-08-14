@@ -66,7 +66,9 @@ fn runVM(allocator: Allocator) !void {
     try rt.repl();
 }
 
-pub fn main() !void {}
+pub fn main() !void {
+    try runVM(std.heap.c_allocator);
+}
 
 test "lib-testing" {
     _ = @import("bytecodes.zig");
