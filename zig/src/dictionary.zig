@@ -124,7 +124,10 @@ pub const Dictionary = struct {
         _ = self.here.alignForward();
     }
 
-    fn getNameInfo(self: @This(), definition_addr: Cell) Error!struct { addr: Cell, len: u8 } {
+    fn getNameInfo(
+        self: @This(),
+        definition_addr: Cell,
+    ) Error!struct { addr: Cell, len: u8 } {
         const name_len_addr = std.math.add(Cell, definition_addr, 2) catch {
             return error.OutOfBounds;
         };
@@ -152,15 +155,13 @@ pub const Dictionary = struct {
     // ===
 
     pub fn compileXt(self: *@This(), value: Cell) Error!void {
-        _ = self;
-        _ = value;
-        // TODO
+        self.here.comma(value);
     }
 
     pub fn compileLit(self: *@This(), value: Cell) Error!void {
-        _ = self;
-        _ = value;
-        // TODO
+        // TODO have to find definition of lit
+        // self.here.comma(value);
+        self.here.comma(value);
     }
 };
 

@@ -74,6 +74,14 @@ pub const CompileState = enum(Cell) {
         }
         return state;
     }
+
+    pub fn toWordlistIndex(self: @This()) !Cell {
+        return switch (self) {
+            .interpret => 0,
+            .compile => 1,
+            _ => return error.InvalidCompileState,
+        };
+    }
 };
 
 pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) Error!void;
@@ -105,7 +113,7 @@ pub const Runtime = struct {
 
     // ===
 
-    pub fn repl(self: *@This()) Error!void {
+    pub fn repl(self: *@This()) !void {
         self.should_bye = false;
 
         while (!self.should_bye) {
@@ -138,6 +146,8 @@ pub const Runtime = struct {
         _ = self;
     }
 
+    // ===
+
     pub fn evaluateString(self: *@This(), word: []const u8) !void {
         const state = try CompileState.fromCell(self.interpreter.state.fetch());
 
@@ -158,11 +168,12 @@ pub const Runtime = struct {
         }
     }
 
-    fn interpret(self: *@This(), lookup_result: LookupResult) Error!void {
+    fn interpret(self: *@This(), lookup_result: LookupResult) !void {
         switch (lookup_result) {
             .word => |word| {
                 const cfa_addr = try self.interpreter.dictionary.toCfa(word.definition_addr);
-                try self.executeCfa(cfa_addr);
+                try self.setupExecuteLoop(cfa_addr);
+                try self.executeLoop();
             },
             .number => |value| {
                 self.data_stack.push(value);
@@ -170,13 +181,15 @@ pub const Runtime = struct {
         }
     }
 
-    fn compile(self: *@This(), lookup_result: LookupResult) Error!void {
+    fn compile(self: *@This(), lookup_result: LookupResult) !void {
         switch (lookup_result) {
             .word => |word| {
                 const cfa_addr = try self.interpreter.dictionary.toCfa(word.definition_addr);
-                // TODO next line is messy
-                if (word.wordlist_idx == 1) {
-                    try self.executeCfa(cfa_addr);
+
+                const compiler_wordlist = try CompileState.compile.toWordlistIndex();
+                if (word.wordlist_idx == compiler_wordlist) {
+                    try self.setupExecuteLoop(cfa_addr);
+                    try self.executeLoop();
                 } else {
                     try self.dictionary.compileXt(cfa_addr);
                 }
@@ -187,26 +200,16 @@ pub const Runtime = struct {
         }
     }
 
-    // ===
-
-    pub fn executeCfa(self: *@This(), cfa_addr: Cell) Error!void {
+    fn setupExecuteLoop(self: *@This(), cfa_addr: Cell) !void {
         // NOTE
-        // this puts a sentinel on the return stack
-        //   with circular stacks, you can't use the depth of the return stack
-        //     to signal when to exit an executionLoop
-        //   so 0 is used as a sentinel, that 'exit' will pop from
-        //     the return stack and store to the PC
+        // this sets program_counter to 0 so a call to 'enter' can push 0 to the return stack
 
-        self.return_stack.push(0);
-        self.program_counter.store(cfa_addr);
-        try self.executionLoop();
+        self.program_counter = 0;
+        self.current_token_addr = cfa_addr;
+        try self.executeCfaAddr(cfa_addr);
     }
 
-    pub fn advancePC(self: *@This(), offset: Cell) mem.Error!void {
-        try mem.assertOffsetInBounds(self.program_counter, offset);
-        self.program_counter += offset;
-    }
-
+    // Assumes self.program_counter is on the cell to execute
     fn executeLoop(self: *@This()) !void {
         // Execution strategy:
         //   1. increment PC, then
@@ -218,17 +221,24 @@ pub const Runtime = struct {
         while (self.program_counter != 0) {
             const token_addr = try mem.readCell(self.memory, self.program_counter);
             self.current_token_addr = token_addr;
-
             try self.advancePC(@sizeOf(Cell));
-
-            const token = try mem.readCell(self.memory, token_addr);
-            if (bytecodes.getBytecode(token)) |definition| {
-                try definition.callback(self);
-            } else {
-                // TODO call external fn
-                unreachable;
-            }
+            try self.executeCfaAddr(token_addr);
         }
+    }
+
+    fn executeCfaAddr(self: *@This(), cfa_addr: Cell) Error!void {
+        const token = try mem.readCell(self.memory, cfa_addr);
+        if (bytecodes.getBytecode(token)) |definition| {
+            try definition.callback(self);
+        } else {
+            // TODO call external fn
+            unreachable;
+        }
+    }
+
+    pub fn advancePC(self: *@This(), offset: Cell) mem.Error!void {
+        try mem.assertOffsetInBounds(self.program_counter, offset);
+        self.program_counter += offset;
     }
 };
 

@@ -31,6 +31,14 @@ pub const LookupResult = union(enum) {
     number: Cell,
 };
 
+pub const Wordlists = enum(Cell) {
+    forth = 0,
+    compiler,
+    _,
+};
+
+pub const max_wordlists = 2;
+
 pub const Interpreter = struct {
     memory: MemoryPtr,
 
@@ -53,16 +61,17 @@ pub const Interpreter = struct {
 
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
-
-        // TODO next line is messy
-        const current_wordlist: Cell = if (state == .interpret) 0 else 1;
+        const current_wordlist = try state.toWordlistIndex();
         var i: Cell = 0;
         while (i <= current_wordlist) : (i += 1) {
-            if (try self.dictionary.find(current_wordlist - i, string)) |definition_addr| {
-                return .{ .word = .{
-                    .definition_addr = definition_addr,
-                    .wordlist_idx = current_wordlist - i,
-                } };
+            const wordlist_idx = current_wordlist - i;
+            if (try self.dictionary.find(wordlist_idx, string)) |definition_addr| {
+                return .{
+                    .word = .{
+                        .definition_addr = definition_addr,
+                        .wordlist_idx = current_wordlist - i,
+                    },
+                };
             }
         }
 
@@ -75,7 +84,7 @@ pub const Interpreter = struct {
         return null;
     }
 
-    fn maybeParseNumber(self: *@This(), word: []const u8) !?Cell {
+    fn maybeParseNumber(self: @This(), word: []const u8) !?Cell {
         const number_or_error = utils.parseNumber(word, self.base.fetch());
         const maybe_number = number_or_error catch |err| switch (err) {
             error.InvalidNumber => null,
@@ -93,5 +102,78 @@ pub const Interpreter = struct {
 };
 
 test "interpreter" {
-    // TODO
+    const testing = @import("std").testing;
+
+    const memory = try mem.allocateMemory(testing.allocator);
+    defer testing.allocator.free(memory);
+
+    var interpreter: Interpreter = undefined;
+    interpreter.init(memory);
+
+    const d0_idx = interpreter.dictionary.here.fetch();
+    interpreter.dictionary.context.store(1);
+    try interpreter.dictionary.define("hello");
+
+    const d1_idx = interpreter.dictionary.here.fetch();
+    interpreter.dictionary.context.store(0);
+    try interpreter.dictionary.define("hello");
+
+    const d2_idx = interpreter.dictionary.here.fetch();
+    interpreter.dictionary.context.store(0);
+    try interpreter.dictionary.define("helloasdf");
+
+    interpreter.state.store(1);
+    try testing.expectEqual(
+        LookupResult{
+            .word = .{
+                .definition_addr = d0_idx,
+                .wordlist_idx = 1,
+            },
+        },
+        try interpreter.lookupString("hello"),
+    );
+
+    try testing.expectEqual(
+        LookupResult{
+            .word = .{
+                .definition_addr = d2_idx,
+                .wordlist_idx = 0,
+            },
+        },
+        try interpreter.lookupString("helloasdf"),
+    );
+
+    interpreter.state.store(0);
+    try testing.expectEqual(
+        LookupResult{
+            .word = .{
+                .definition_addr = d1_idx,
+                .wordlist_idx = 0,
+            },
+        },
+        try interpreter.lookupString("hello"),
+    );
+
+    interpreter.base.store(10);
+    try testing.expectEqual(
+        LookupResult{
+            .number = 1234,
+        },
+        try interpreter.lookupString("1234"),
+    );
+
+    try testing.expectEqual(
+        LookupResult{
+            .number = 0xbeef,
+        },
+        try interpreter.lookupString("0xbeef"),
+    );
+
+    interpreter.base.store(16);
+    try testing.expectEqual(
+        LookupResult{
+            .number = 0xbeef,
+        },
+        try interpreter.lookupString("beef"),
+    );
 }
