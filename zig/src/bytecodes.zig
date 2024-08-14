@@ -5,6 +5,8 @@ const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 
+// ===
+
 pub const Error = error{
     Panic,
 } || mem.Error;
@@ -150,11 +152,11 @@ fn jump0(rt: *Runtime) Error!void {
 
 fn quit(rt: *Runtime) Error!void {
     rt.return_stack.push(0);
-    rt.interpreter.should_quit = true;
+    rt.should_quit = true;
 }
 
 fn bye(rt: *Runtime) Error!void {
-    rt.interpreter.should_bye = true;
+    rt.should_bye = true;
 }
 
 fn eq(rt: *Runtime) Error!void {

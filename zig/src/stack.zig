@@ -1,6 +1,8 @@
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
 
+// ===
+
 const stack_inner_depth = 32;
 
 const CircularStack = struct {

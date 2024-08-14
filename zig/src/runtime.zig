@@ -1,3 +1,4 @@
+const std = @import("std");
 const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
@@ -16,12 +17,15 @@ const InputBuffer = input_buffer.InputBuffer;
 
 const interpreter = @import("interpreter.zig");
 const Interpreter = interpreter.Interpreter;
+const LookupResult = interpreter.LookupResult;
 
 const stack = @import("stack.zig");
 const DataStack = stack.DataStack;
 const ReturnStack = stack.ReturnStack;
 
 const bytecodes = @import("bytecodes.zig");
+
+// ===
 
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
@@ -57,17 +61,35 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     dictionary_start: u0,
 });
 
+pub const CompileState = enum(Cell) {
+    interpret = 0,
+    compile,
+    _,
+
+    pub fn fromCell(value: Cell) !@This() {
+        const state = @as(@This(), @enumFromInt(value));
+        switch (state) {
+            .interpret, .compile => {},
+            _ => return error.InvalidCompileState,
+        }
+        return state;
+    }
+};
+
 pub const ExternalsCallback = *const fn (rt: *Runtime, userdata: ?*anyopaque) Error!void;
 
 pub const Runtime = struct {
     memory: MemoryPtr,
 
-    interpreter: Interpreter,
-
     program_counter: Cell,
     current_token_addr: Cell,
     data_stack: DataStack,
     return_stack: ReturnStack,
+    interpreter: Interpreter,
+    input_buffer: InputBuffer,
+
+    should_bye: bool,
+    should_quit: bool,
 
     externals_callback: ?ExternalsCallback,
     userdata: ?*anyopaque,
@@ -76,8 +98,93 @@ pub const Runtime = struct {
         self.memory = memory;
 
         self.interpreter.init(self.memory);
+        self.input_buffer.init(self.memory);
 
         self.program_counter = 0;
+    }
+
+    // ===
+
+    pub fn repl(self: *@This()) Error!void {
+        self.should_bye = false;
+
+        while (!self.should_bye) {
+            self.should_quit = false;
+
+            var did_refill = try self.input_buffer.refill();
+
+            while (did_refill and !self.should_quit and !self.should_bye) {
+                const word = self.input_buffer.readNextWord();
+                if (word) |w| {
+                    try self.evaluateString(w);
+                } else {
+                    did_refill = try self.input_buffer.refill();
+                }
+            }
+
+            try self.onQuit();
+        }
+
+        try self.onBye();
+    }
+
+    pub fn onQuit(self: *@This()) !void {
+        // TODO set refiller to cmd line input
+        // TODO remove next line when bye/quit logic is figured out
+        self.should_bye = true;
+    }
+
+    pub fn onBye(self: *@This()) !void {
+        _ = self;
+    }
+
+    pub fn evaluateString(self: *@This(), word: []const u8) !void {
+        const state = try CompileState.fromCell(self.interpreter.state.fetch());
+
+        if (try self.interpreter.lookupString(word)) |lookup_result| {
+            switch (state) {
+                .interpret => {
+                    try self.interpret(lookup_result);
+                },
+                .compile => {
+                    try self.compile(lookup_result);
+                },
+                _ => unreachable,
+            }
+        } else {
+            // TODO printWordNotFound fn
+            // std.debug.print("Word not found: {s}\n", .{word});
+            return error.WordNotFound;
+        }
+    }
+
+    fn interpret(self: *@This(), lookup_result: LookupResult) Error!void {
+        switch (lookup_result) {
+            .word => |word| {
+                const cfa_addr = try self.interpreter.dictionary.toCfa(word.definition_addr);
+                try self.executeCfa(cfa_addr);
+            },
+            .number => |value| {
+                self.data_stack.push(value);
+            },
+        }
+    }
+
+    fn compile(self: *@This(), lookup_result: LookupResult) Error!void {
+        switch (lookup_result) {
+            .word => |word| {
+                const cfa_addr = try self.interpreter.dictionary.toCfa(word.definition_addr);
+                // TODO next line is messy
+                if (word.wordlist_idx == 1) {
+                    try self.executeCfa(cfa_addr);
+                } else {
+                    try self.dictionary.compileXt(cfa_addr);
+                }
+            },
+            .number => |value| {
+                try self.dictionary.compileLit(value);
+            },
+        }
     }
 
     // ===

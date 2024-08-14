@@ -8,6 +8,8 @@ const MainMemoryLayout = runtime.MainMemoryLayout;
 const register = @import("register.zig");
 const Register = register.Register;
 
+// ===
+
 pub const Error = error{
     UnexpectedEndOfInput,
     OversizeInputBuffer,

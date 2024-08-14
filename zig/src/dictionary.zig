@@ -17,6 +17,8 @@ const Register = register.Register;
 
 const LinkedListIterator = @import("linked_list_iterator.zig").LinkedListIterator;
 
+// ===
+
 pub const Error = error{
     OutOfBounds,
     InvalidWordlist,
@@ -76,6 +78,7 @@ pub const Dictionary = struct {
 
     // ===
 
+    // TODO rename to findWord
     pub fn find(
         self: @This(),
         wordlist_idx: Cell,
@@ -94,6 +97,10 @@ pub const Dictionary = struct {
         return null;
     }
 
+    // TODO rename to defineWord
+    // TODO NOTE this checks memory bounds, so for other functions that rely on
+    //   name_len being in bounds, it's technically always going to be
+    //   there are ways to break this in forth though
     pub fn define(
         self: *@This(),
         name: []const u8,
@@ -143,6 +150,12 @@ pub const Dictionary = struct {
     }
 
     // ===
+
+    pub fn compileXt(self: *@This(), value: Cell) Error!void {
+        _ = self;
+        _ = value;
+        // TODO
+    }
 
     pub fn compileLit(self: *@This(), value: Cell) Error!void {
         _ = self;

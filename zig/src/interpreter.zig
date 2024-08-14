@@ -1,10 +1,11 @@
-const std = @import("std");
+const utils = @import("utils.zig");
 
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
+const CompileState = runtime.CompileState;
 const MainMemoryLayout = runtime.MainMemoryLayout;
 
 const register = @import("register.zig");
@@ -16,14 +17,18 @@ const Dictionary = dictionary.Dictionary;
 const input_buffer = @import("input_buffer.zig");
 const InputBuffer = input_buffer.InputBuffer;
 
+// ===
+
 pub const Error = error{
     InvalidCompileState,
 };
 
-pub const CompileState = enum(Cell) {
-    interpret = 0,
-    compile,
-    _,
+pub const LookupResult = union(enum) {
+    word: struct {
+        definition_addr: Cell,
+        wordlist_idx: Cell,
+    },
+    number: Cell,
 };
 
 pub const Interpreter = struct {
@@ -32,10 +37,6 @@ pub const Interpreter = struct {
     dictionary: Dictionary,
     state: Register(MainMemoryLayout.offsetOf("state")),
     base: Register(MainMemoryLayout.offsetOf("base")),
-    input_buffer: InputBuffer,
-
-    should_bye: bool,
-    should_quit: bool,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
@@ -43,7 +44,6 @@ pub const Interpreter = struct {
         self.dictionary.init(self.memory);
         self.state.init(self.memory);
         self.base.init(self.memory);
-        self.input_buffer.init(self.memory);
 
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
@@ -51,71 +51,47 @@ pub const Interpreter = struct {
 
     //
 
-    pub fn repl(self: *@This()) Error!void {
-        self.should_bye = false;
+    pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
+        const state = try CompileState.fromCell(self.state.fetch());
 
-        while (!self.should_bye) {
-            self.should_quit = false;
-
-            var did_refill = try self.input_source.refill();
-
-            while (did_refill and !self.should_quit and !self.should_bye) {
-                const word = self.input_source.readNextWord();
-                if (word) |w| {
-                    try self.evaluateString(w);
-                } else {
-                    did_refill = try self.input_source.refill();
-                }
+        // TODO next line is messy
+        const current_wordlist: Cell = if (state == .interpret) 0 else 1;
+        var i: Cell = 0;
+        while (i <= current_wordlist) : (i += 1) {
+            if (try self.dictionary.find(current_wordlist - i, string)) |definition_addr| {
+                return .{ .word = .{
+                    .definition_addr = definition_addr,
+                    .wordlist_idx = current_wordlist - i,
+                } };
             }
-
-            try self.onQuit();
         }
 
-        try self.onBye();
-    }
-
-    pub fn onQuit(self: *@This()) !void {
-        // TODO set refiller to cmd line input
-        // TODO remove next line when bye/quit logic is figured out
-        self.should_bye = true;
-    }
-
-    pub fn onBye(self: *@This()) !void {
-        _ = self;
-    }
-
-    //
-
-    fn assertValidCompileState(self: @This()) !void {
-        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
-        switch (state) {
-            .interpret, .compile => {},
-            else => return error.InvalidCompileState,
+        if (try self.maybeParseNumber(string)) |value| {
+            return .{
+                .number = value,
+            };
         }
+
+        return null;
     }
 
-    pub fn evaluateString(self: *@This(), word: []const u8) !void {
-        const state = @as(CompileState, @enumFromInt(self.state.fetch()));
-        try self.assertValidCompileState();
-
-        // TODO this next line is messy
-        const wordlist_idx: Cell = if (state == .interpret) 0 else 1;
-        _ = word;
-        _ = wordlist_idx;
-        //         if (try self.lookupString(wordlist_idx, word)) |word_info| {
-        //             switch (state) {
-        //                 .interpret => {
-        //                     try self.interpret(word_info);
-        //                 },
-        //                 .compile => {
-        //                     try self.compile(word_info);
-        //                 },
-        //                 else => unreachable,
-        //             }
-        //         } else {
-        //             // TODO printWordNotFound fn
-        //             std.debug.print("Word not found: {s}\n", .{word});
-        //             return error.WordNotFound;
-        //         }
+    fn maybeParseNumber(self: *@This(), word: []const u8) !?Cell {
+        const number_or_error = utils.parseNumber(word, self.base.fetch());
+        const maybe_number = number_or_error catch |err| switch (err) {
+            error.InvalidNumber => null,
+            else => return err,
+        };
+        if (maybe_number) |value| {
+            // NOTE
+            // We are truncating here
+            //   if a number is too big it will just get wrapped % 2^16
+            return @truncate(value);
+        } else {
+            return null;
+        }
     }
 };
+
+test "interpreter" {
+    // TODO
+}
