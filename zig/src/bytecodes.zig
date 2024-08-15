@@ -119,6 +119,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
 
     .{ .name = "drop", .callback = drop },
     .{ .name = "dup", .callback = dup },
+    .{ .name = "?dup", .callback = maybeDup },
     .{ .name = "swap", .callback = swap },
     .{ .name = "flip", .callback = flip },
     .{ .name = "over", .callback = over },
@@ -134,7 +135,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
 
-    .{},
     .{},
     .{},
     .{},
@@ -164,16 +164,14 @@ fn exit(rt: *Runtime) Error!void {
 fn execute(rt: *Runtime) Error!void {
     const cfa_addr = rt.data_stack.pop();
     rt.return_stack.push(rt.program_counter);
-    rt.program_counter = cfa_addr;
+    rt.setCfaToExecute(cfa_addr);
 }
 
 fn jump(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
     const addr = try mem.readCell(rt.memory, rt.program_counter);
-    // NOTE
-    // adds @sizeOf(Cell) to skip the enter code
     try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
-    rt.program_counter = addr + @sizeOf(Cell);
+    rt.program_counter = addr;
 }
 
 fn jump0(rt: *Runtime) Error!void {
@@ -259,6 +257,13 @@ fn drop(rt: *Runtime) Error!void {
 
 fn dup(rt: *Runtime) Error!void {
     rt.data_stack.dup();
+}
+
+fn maybeDup(rt: *Runtime) Error!void {
+    const top = rt.data_stack.peek();
+    if (runtime.isTruthy(top)) {
+        rt.data_stack.dup();
+    }
 }
 
 fn swap(rt: *Runtime) Error!void {

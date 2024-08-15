@@ -39,6 +39,10 @@ pub const DataStack = struct {
     second: Cell,
     inner: CircularStack,
 
+    pub fn peek(self: *@This()) Cell {
+        return self.top;
+    }
+
     pub fn push(self: *@This(), value: Cell) void {
         self.inner.push(self.second);
         self.second = self.top;
@@ -71,8 +75,7 @@ pub const DataStack = struct {
     }
 
     pub fn eq0(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.top == 0);
-        self.binop(value);
+        self.top = runtime.cellFromBoolean(self.top == 0);
     }
 
     // TODO should this use signed cells?

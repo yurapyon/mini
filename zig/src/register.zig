@@ -22,13 +22,15 @@ const Cell = runtime.Cell;
 //   a raw pointer is more "natural" but i think the tradeoffs are worth it
 
 /// A register is basically a pointer into VM Memory
-pub fn Register(comptime offset: Cell) type {
+pub fn Register(comptime offset_: Cell) type {
     return struct {
         comptime {
-            mem.assertCellAccess(offset) catch {
+            mem.assertCellAccess(offset_) catch {
                 @compileError("Register must be Cell aligned");
             };
         }
+
+        pub const offset = offset_;
 
         memory: MemoryPtr,
 

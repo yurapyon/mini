@@ -29,61 +29,51 @@ forth
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
-: name-len 2 + c@ ;
-: >cfa dup name-len + 3 + aligned ;
+: >name-len cell + ;
+: >cfa >name-len dup c@ + 1 + aligned ;
 : last latest @ >cfa ;
 
 \ tags
 : exit,  ['] exit , ;
 : jump0, ['] jump0 , ;
 : jump,  ['] jump , ;
-: lit,   ['] lit  , ;
+: lit,   ['] lit , ;
 
-: :noname  0 0 define here @ ] ;
-: next,    here @ 3 + jump, , ;
+: :noname 0 0 define here @ enter-code , ] ;
+: next,   here @ 2 cells + jump, , ;
 compiler
-: recurse  jump, last , ;
+: recurse jump, last cell + , ;
 forth
 
-: looper hi recurse ;
-\ looper
-
-bye
-
-: blank,     0 c, 0 c, ;
-: blankc,    0 c, ;
+: blank,     0 , ;
 : (later),   here @ blank, ;
-: (later)c,  here @ blankc, ;
 : something, lit, (later), ;
 : somewhere, jump, (later), ;
-: return,    exit, blank, ;
 
-: this   here @ swap ;
-: dist   this - ;
-: this!  this cell! ;
-: distc! dup dist swap c! ;
-: back,  dist negate c, ;
+: this  here @ swap ;
+: dist  this - ;
+: this! this ! ;
 
 \ basic syntax
 compiler
-: [compile] ' xt-call, ;
+: [compile] ' , ;
 
-: if   ?br, (later)c, ;
-: else br,  (later)c, swap distc! ;
-: then distc! ;
+: if   jump0, (later), ;
+: else jump,  (later), swap this! ;
+: then this! ;
 
 : cond    0 ;
 : endcond ?dup if [compile] then recurse then ;
 
-: case    [compile] cond    ['] >r c, ;
-: endcase [compile] endcond ['] r> c, ['] drop c, ;
-: of      ['] r@ c, ['] = c, [compile] if ;
+: case    [compile] cond    ['] >r , ;
+: endcase [compile] endcond ['] r> , ['] drop , ;
+: of      ['] r@ , ['] = , [compile] if ;
 : endof   [compile] else ;
 forth
 
 : char word drop c@ ;
 compiler
-: [char] litc, char c, ;
+: [char] lit, char , ;
 forth
 
 : +-() case
@@ -92,14 +82,14 @@ forth
   endcase ;
 
 :noname next-char +-() dup if recurse then ;
-: ( 1 [ xt-call, ] drop ;
+: ( 1 [ , ] drop ;
 
 compiler
 :noname [compile] ( ;
-: ( [ xt-jump, ] ; \ this comment is to fix vim syntax highlight )
+: ( [ , ] ; \ this comment is to fix vim syntax highlight )
 
 :noname [compile] \ ;
-: \ [ xt-jump, ] ;
+: \ [ , ] ;
 forth
 
 \ ===
@@ -113,7 +103,7 @@ forth
 
 \ ( value min max -- value )
 : clamp rot min max ;
-: within[] 2 pick >r clamp r> = ;
+: within[] rot tuck <= -rot >= and ;
 : within[) 1- within[] ;
 
 : numeric?   [char] 0 [char] 9 within[] ;
@@ -128,13 +118,17 @@ forth
 
 \ ===
 
-: >body  6 + ;
-: >does  >body 3 - ;
-: does!  last >does ['] jump swap c!+ cell! ;
-: create word define something, return, this! ;
+: !+ tuck ! cell + ;
+
+: >body  5 cells + ;
+: >does  >body 2 cells - ;
+: does!  last >does ['] jump swap !+ ! ;
+: create word define enter-code , something, exit, blank, this! ;
 compiler
-: does>  something, ['] does! xt-call, exit, this! ;
+: does>  something, ['] does! , exit, this! ;
 forth
+
+: variable create cell allot ;
 
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
@@ -144,12 +138,10 @@ forth
 : +field    over offsetter + ;
 : field     swap aligned swap +field ;
 
-: variable create cell allot ;
-
 \ ===
 
 compiler
-: assign lit, here @ 5 + cell, ['] swap c, ['] ! c, exit, ;
+: assign something, ['] swap , ['] ! , exit, this! enter-code , ;
 forth
 
 \ push address, push length, jump over the data
@@ -159,11 +151,11 @@ forth
 
 : read-byte next-digit 16 * next-digit + ;
 
-variable readc
+variable read-char
 
-: ascii readc assign ;
+: ascii read-char assign ;
 
-: escaped readc assign
+: escaped read-char assign
   dup [char] \ = if
     drop next-char
     dup case
@@ -174,14 +166,22 @@ variable readc
 
 ascii
 
-: read-str, next-char dup [char] " <> if readc @ execute c, recurse then ;
+: read-str, next-char dup [char] " <> if read-char @ execute c, recurse then ;
 : string, next-char drop read-str, drop ;
 
 compiler
-: "  header, swap here @ string, dist swap cell! this! ;
+: "  header, swap here @ string, dist swap ! align this! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
+
+\ asdf ==
+
+: hello s" hellow" ;
+
+hello hi drop hi
+
+bye
 
 \ ===
 
@@ -199,31 +199,4 @@ hello ##type ##cr
 
 \ TODO
 \ should this file have to end with 'bye' or 'quit' ?
-bye
-
-variable ahere
-0 ahere !
-
-: a! ;
-: a@ ;
-
-: a, ahere ! 1 ahere +! ;
-
-: label ahere @ constant ;
-
-: `br, ;
-: `?br, ;
-: `(later), ahere @ 0 a, ;
-
-: `this  ahere @ swap ;
-: `dist  `this - ;
-: `dist! dup `dist swap a! ;
-: `back, `dist negate a, ;
-
-: `if `?br, `(later), ;
-: `then `dist! ;
-
-label `?dup
-  `dup `0= `if `drop `then
-
 bye

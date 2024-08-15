@@ -51,6 +51,7 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     wordlists: [2]Cell,
     state: Cell,
     base: Cell,
+    execute: [2]Cell,
     input_buffer: [128]u8,
     input_buffer_at: Cell,
     input_buffer_len: Cell,
@@ -101,6 +102,7 @@ pub const Runtime = struct {
 
     program_counter: Cell,
     current_token_addr: Cell,
+    execute_register: Register(MainMemoryLayout.offsetOf("execute")),
     data_stack: DataStack,
     return_stack: ReturnStack,
     interpreter: Interpreter,
@@ -119,10 +121,19 @@ pub const Runtime = struct {
         self.input_buffer.init(self.memory);
 
         self.program_counter = 0;
+        self.execute_register.init(self.memory);
 
         bytecodes.initBuiltins(&self.interpreter.dictionary) catch unreachable;
         self.interpreter.dictionary.updateInternalAddresses() catch unreachable;
         self.defineInternalConstants() catch unreachable;
+
+        // TODO
+        // it might work to set up the execute register so you jump to the cfa you want to call
+        // rather than return have to come back just to exit
+        self.execute_register.storeWithOffset(
+            @sizeOf(Cell),
+            self.interpreter.dictionary.tag_addresses.exit,
+        ) catch unreachable;
     }
 
     fn defineInternalConstants(self: *@This()) !void {
@@ -260,13 +271,16 @@ pub const Runtime = struct {
         }
     }
 
+    pub fn setCfaToExecute(self: *@This(), cfa_addr: Cell) void {
+        self.execute_register.store(cfa_addr);
+        self.program_counter = @TypeOf(self.execute_register).offset;
+    }
+
     fn setupExecuteLoop(self: *@This(), cfa_addr: Cell) !void {
         // NOTE
-        // this sets program_counter to 0 so a call to 'enter' can push 0 to the return stack
-
-        self.program_counter = 0;
-        self.current_token_addr = cfa_addr;
-        try self.executeCfaAddr(cfa_addr);
+        // puts a zero on the return stack as a sentinel for the execute loop to exit
+        self.return_stack.push(0);
+        self.setCfaToExecute(cfa_addr);
     }
 
     // Assumes self.program_counter is on the cell to execute
@@ -282,17 +296,14 @@ pub const Runtime = struct {
             const token_addr = try mem.readCell(self.memory, self.program_counter);
             self.current_token_addr = token_addr;
             try self.advancePC(@sizeOf(Cell));
-            try self.executeCfaAddr(token_addr);
-        }
-    }
 
-    fn executeCfaAddr(self: *@This(), cfa_addr: Cell) !void {
-        const token = try mem.readCell(self.memory, cfa_addr);
-        if (bytecodes.getBytecode(token)) |definition| {
-            try definition.callback(self);
-        } else {
-            if (self.externals_callback) |cb| {
-                try cb(self, token, self.externals_userdata);
+            const token = try mem.readCell(self.memory, token_addr);
+            if (bytecodes.getBytecode(token)) |definition| {
+                try definition.callback(self);
+            } else {
+                if (self.externals_callback) |cb| {
+                    try cb(self, token, self.externals_userdata);
+                }
             }
         }
     }

@@ -164,9 +164,6 @@ pub const Dictionary = struct {
         };
 
         _ = self.here.alignForward();
-
-        // TODO
-        @import("std").debug.print("defined: {s} {} {}\n", .{ name, definition_start, wordlist_idx });
     }
 
     fn getDefinitionName(
@@ -211,9 +208,6 @@ pub const Dictionary = struct {
     ) error{ OutOfBounds, MisalignedAddress }!void {
         try self.here.comma(self.tag_addresses.lit);
         try self.here.comma(value);
-
-        // TODO
-        // @import("std").debug.print("lit: {} {}\n", .{ value, self.tag_addresses.lit });
     }
 
     pub fn compileConstant(
@@ -229,13 +223,11 @@ pub const Dictionary = struct {
         try self.here.comma(bytecodes.enter_code);
         try self.compileLit(value);
         try self.compileXt(self.tag_addresses.exit);
-        // TODO
-        // @import("std").debug.print("constant: {s} {} {}\n", .{ name, value, self.tag_addresses.lit });
     }
 };
 
 test "dictionary" {
-    const testing = @import("std").testing;
+    const testing = std.testing;
 
     const memory = try mem.allocateMemory(testing.allocator);
     defer testing.allocator.free(memory);
