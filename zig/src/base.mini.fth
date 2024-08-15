@@ -3,18 +3,32 @@ word enter-code define ' enter @ , ' lit , ' enter @ , ' exit ,
 word ] define enter-code , ' lit , 1 , ' state , ' ! , ' exit ,
 1 context !
 word [ define enter-code , ' lit , 0 , ' state , ' ! , ' exit ,
-word ['] define enter-code , ' ' , ' lit , ' lit , ' , , ' , , ' exit ,
 0 context !
 
-word forth    define enter-code , ] 0 context ! [ ' exit ,
-word compiler define enter-code , ] 1 context ! [ ' exit ,
+word \ define enter-code , ] source >in ! drop [ ' exit ,
 
+\ equivalent to
+\ : : word define enter-code , ] ;
 word : define enter-code , ] word define enter-code , ] [ ' exit ,
-compiler
-word ; define enter-code , ] ['] exit , [ ' [ , ' exit ,
-forth
 
-: \ source >in ! drop ;
+\ equivalent to
+\ : lit, ['] lit , ;
+: lit, lit [ ' lit , ] , [ ' exit ,
+
+1 context !
+
+\ equivalent to
+\ : ['] ' lit, , ;
+: ['] ' lit, , [ ' exit ,
+
+\ equivalent to
+\ : ; exit, [compile] [ ;
+: ; ['] exit , [ ' [ , ' exit ,
+
+0 context !
+
+: forth    0 context ! ;
+: compiler 1 context ! ;
 
 : <> = 0= ;
 
@@ -37,7 +51,6 @@ forth
 : exit,  ['] exit , ;
 : jump0, ['] jump0 , ;
 : jump,  ['] jump , ;
-: lit,   ['] lit , ;
 
 : :noname 0 0 define here @ enter-code , ] ;
 : next,   here @ 2 cells + jump, , ;
@@ -175,19 +188,15 @@ compiler
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
-\ asdf ==
-
-: hello s" hellow" ;
-
-hello hi drop hi
+\ ===
 
 bye
 
-\ ===
-
-: dyn, define next, ;
-: dyn! >cfa 1+ this! ;
+: dyn, define enter-code , next, ;
+: dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
+
+bye
 
 \ ===
 

@@ -1,25 +1,6 @@
-figure out how refill functions should work
-  its hard to read a file when the input buffer can only be 128 chars
-  need to be able to split things line by line
-
-word headers technically dont need both a terminator and a namelen
-could potentially just use one byte for flags and one for name len
-for adding mini-word semantics, more flags may be needed
-
-for functions that can return errors
-  as long as they won't be called within bytecodes (or as refiller functions)
-  they can be more general
-
 better errors in console when vm crashes
   need to keep track of 'last executed string'
   maybe have a debug mode flag
 
-can the vm and interpreter/compiler be more separate?
-
-it might be nice to not have to worry about alignment from forth
-
-figure out how to not pass the memory around as a slice
-  either use ptr to VM
-  or have CellAlignedMEmory be a struct and pass a ptr to it
-
 d!, d@ etc could have thier own memory space that starts at 0 ?
+  theres no d! or d@ currently but this could be an idea for external callbacks

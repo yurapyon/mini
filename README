@@ -1,18 +1,27 @@
 .   | \ \ ` | \ `   .
 .   | | | | | | |   ,
 
-small forth
+a forth
 
 goals:
   easy
     easy to write/read mini code
-    easy to implement/port vm
+    easy to implement/port
   small memory footprint
+  embeddable
 
 roadmap:
   planned:
     self-hosted version
       it would be fun
+    io
+      graphics
+      keyboard/mouse
+  maybe:
+    usable for games?
+    io
+      file system
+      audio
 
 you need:
   zig

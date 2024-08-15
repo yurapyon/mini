@@ -8,15 +8,13 @@ const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 const ExternalError = runtime.ExternalError;
 
+const CliOptions = @import("cli_options.zig").CliOptions;
+
+const Repl = @import("repl.zig").Repl;
+
 // ===
 
-// pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
-//     var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
-//     defer file.close();
-//     return file.readToEndAlloc(allocator, std.math.maxInt(usize));
-// }
-
-const base_file = @embedFile("common/base.mini.fth");
+const base_file = @embedFile("base.mini.fth");
 
 const LineByLineRefiller = struct {
     buffer: [128]u8,
@@ -67,6 +65,20 @@ fn runVM(allocator: Allocator) !void {
 }
 
 pub fn main() !void {
+    const allocator = std.heap.c_allocator;
+
+    var cli_options: CliOptions = undefined;
+    try cli_options.initFromProcessArgs(allocator);
+    defer cli_options.deinit();
+
+    if (cli_options.interactive) {
+        try Repl.start(allocator);
+    } else if (cli_options.run_system) {
+        // TODO start graphics sytem
+    }
+
+    // TODO load and interpret each file in cli_options
+
     try runVM(std.heap.c_allocator);
 }
 

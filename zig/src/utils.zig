@@ -1,6 +1,9 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 // ===
+
+// TODO can probably move memory layout stuff to another file
 
 const FieldLayout = struct {
     name: []const u8,
@@ -95,6 +98,8 @@ test "layouts" {
     );
 }
 
+// ===
+
 pub const ParseNumberError = error{
     InvalidNumber,
     InvalidBase,
@@ -179,6 +184,8 @@ test "parse number" {
     try testing.expectEqual(0, try parseNumber("", 1));
 }
 
+// ===
+
 /// Case insensitive string compare
 pub fn stringsEqual(a: []const u8, b: []const u8) bool {
     if (a.len != b.len) {
@@ -200,4 +207,12 @@ test "string compare" {
     try testing.expect(stringsEqual("asdf", "asdf"));
     try testing.expect(stringsEqual("asdf", "Asdf"));
     try testing.expect(!stringsEqual("asdf ", "asdf"));
+}
+
+// ===
+
+pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
+    var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
+    defer file.close();
+    return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }
