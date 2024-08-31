@@ -1,0 +1,62 @@
+mini specs ===
+
+vm:
+  cell size:     2 bytes
+  address space: 64k bytes
+  endianness:    little
+  negatives:     twos-compilment
+  threading:     token-threaded
+  type system:   untyped
+
+language:
+  case-insensitive
+  max input line length: 128 chars
+  max word name length:  256 chars
+  max numeric base:      36
+
+interpreter states:
+  0x0 interpret
+  0x1 compile
+
+word definition layout:
+  align(2)0               16      24                      x
+  |?......|previous-------|namelen|.......|.......|?align-|code...
+
+bytecodes (acutally u16) :
+  nop
+  exit enter execute jump jump0 quit bye
+  lit
+  = > = 0= < <=
+  and or xor invert lshift rshift
+  ! +! @ , c! +c! c@ c,
+  >r r> r@
+  + - / mod 1+ 1-
+  drop dup ?dup swap flip over nip tuck rot -rot
+  find word define next-char refill '
+
+non-standard bytecodes:
+  nop       - do nothing
+  enter     - move program counter off the current token and onto forth code
+  jump      - absolute jump
+  jump0     - absolute conditional jump
+  flip      - ( a b c -- c b a )
+  define    - ( name-addr name-len -- ) write a word header for name to the dictionary
+  next-char - read a char from the input buffer and advance >in
+
+memory layout:
+  0  cell field >here
+     cell field >latest
+     cell field >context
+  2 cells field >wordlists
+     cell field >state
+     cell field >base
+  2 cells field >execute
+      128 field >input_buffer
+     cell field >input_buffer_at
+     cell field >input_buffer_len
+  constant dictionary_start
+
+internals ===
+
+stacks
+  circular stacks modelled after the GreenArrays F18 processor
