@@ -2,5 +2,5 @@ better errors in console when vm crashes
   need to keep track of 'last executed string'
   maybe have a debug mode flag
 
-d!, d@ etc could have thier own memory space that starts at 0 ?
-  theres no d! or d@ currently but this could be an idea for external callbacks
+if some internal state can be invalidated from forth, just truncate/wrap the value in zig
+  ie state, context

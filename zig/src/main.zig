@@ -12,6 +12,8 @@ const CliOptions = @import("cli_options.zig").CliOptions;
 
 const Repl = @import("repl.zig").Repl;
 
+const System = @import("system.zig").System;
+
 // ===
 
 const base_file = @embedFile("base.mini.fth");
@@ -71,14 +73,28 @@ pub fn main() !void {
     try cli_options.initFromProcessArgs(allocator);
     defer cli_options.deinit();
 
-    if (cli_options.interactive) {
-        try Repl.start(allocator);
-    } else if (cli_options.run_system) {
-        // TODO start graphics sytem
-    }
-
     // TODO load and interpret each file in cli_options
 
+    if (cli_options.run_system) {
+        // TODO run this in a separate thread
+        //         if (cli_options.interactive) {
+        //             try Repl.start(allocator);
+        //         }
+
+        const system: System = undefined;
+        try system.init();
+        try system.start();
+        defer system.stop();
+        defer system.deinit();
+    } else {
+        if (cli_options.interactive) {
+            try Repl.start(allocator);
+        }
+    }
+
+    // TODO
+    // note: the system or the repl will have thier own loops,
+    //   and this wont be called here
     try runVM(std.heap.c_allocator);
 }
 
