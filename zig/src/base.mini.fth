@@ -98,6 +98,8 @@ forth
 : ( 1 [ , ] drop ;
 
 compiler
+\ redefine comment words to work in compile state
+
 :noname [compile] ( ;
 : ( [ , ] ; \ this comment is to fix vim syntax highlight )
 
@@ -153,16 +155,15 @@ forth
 
 \ ===
 
+\         push address, push length, jump over the data
+: header, something, something, somewhere, rot this! ;
+
 compiler
 : assign something, ['] swap , ['] ! , exit, this! enter-code , ;
 forth
 
-\ push address, push length, jump over the data
-: header, something, something, somewhere, rot this! ;
-
-: next-digit next-char char>digit ;
-
-: read-byte next-digit 16 * next-digit + ;
+: read-digit next-char char>digit ;
+: read-byte read-digit 16 * read-digit + ;
 
 variable read-char
 

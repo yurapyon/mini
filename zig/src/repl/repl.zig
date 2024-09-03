@@ -1,12 +1,14 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const mem = @import("memory.zig");
+const mem = @import("../memory.zig");
 
-const runtime = @import("runtime.zig");
+const runtime = @import("../runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 const ExternalError = runtime.ExternalError;
+
+// ===
 
 pub const Repl = struct {
     prompt_callback: ?Cell,

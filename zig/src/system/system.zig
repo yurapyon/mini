@@ -11,13 +11,13 @@ pub const System = struct {
 
     // ===
 
-    pub fn start(self: @This()) !void {
+    pub fn start(self: *@This()) !void {
         // setup
 
         try self.loop();
     }
 
-    pub fn stop(self: @This()) !void {
+    pub fn stop(self: *@This()) void {
         _ = self;
     }
 

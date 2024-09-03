@@ -8,11 +8,10 @@ const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 const ExternalError = runtime.ExternalError;
 
-const CliOptions = @import("cli_options.zig").CliOptions;
+const CliOptions = @import("repl/cli_options.zig").CliOptions;
+const Repl = @import("repl/repl.zig").Repl;
 
-const Repl = @import("repl.zig").Repl;
-
-const System = @import("system.zig").System;
+const System = @import("system/system.zig").System;
 
 // ===
 
@@ -81,7 +80,7 @@ pub fn main() !void {
         //             try Repl.start(allocator);
         //         }
 
-        const system: System = undefined;
+        var system: System = undefined;
         try system.init();
         try system.start();
         defer system.stop();
