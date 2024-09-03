@@ -68,7 +68,7 @@ pub const Dictionary = struct {
 
     // ===
 
-    fn assertValidWordlist(wordlist_idx: Cell) error{InvalidWordlist}!void {
+    fn assertValidWordlist(wordlist_idx: Cell) !void {
         if (wordlist_idx >= interpreter.max_wordlists) {
             return error.InvalidWordlist;
         }
@@ -78,13 +78,13 @@ pub const Dictionary = struct {
         self: *@This(),
         wordlist_idx: Cell,
         value: Cell,
-    ) error{InvalidWordlist}!void {
+    ) !void {
         try assertValidWordlist(wordlist_idx);
         const wordlist_addr = wordlist_idx * @sizeOf(Cell);
         self.wordlists.storeWithOffset(wordlist_addr, value) catch unreachable;
     }
 
-    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) error{InvalidWordlist}!Cell {
+    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) !Cell {
         try assertValidWordlist(wordlist_idx);
         const wordlist_addr = wordlist_idx * @sizeOf(Cell);
         return self.wordlists.fetchWithOffset(wordlist_addr) catch unreachable;
@@ -97,7 +97,7 @@ pub const Dictionary = struct {
         self: @This(),
         wordlist_idx: Cell,
         to_find: []const u8,
-    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?Cell {
+    ) !?Cell {
         const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
         var iter = LinkedListIterator.from(self.memory, wordlist_latest);
 
@@ -116,7 +116,7 @@ pub const Dictionary = struct {
         self: @This(),
         starting_wordlist_idx: Cell,
         to_find: []const u8,
-    ) error{ InvalidWordlist, MisalignedAddress, OutOfBounds }!?WordInfo {
+    ) !?WordInfo {
         var i: Cell = 0;
         while (i <= starting_wordlist_idx) : (i += 1) {
             const wordlist_idx = starting_wordlist_idx - i;
@@ -139,12 +139,7 @@ pub const Dictionary = struct {
         self: *@This(),
         wordlist_idx: Cell,
         name: []const u8,
-    ) error{
-        WordNameTooLong,
-        InvalidWordlist,
-        OutOfBounds,
-        MisalignedAddress,
-    }!void {
+    ) !void {
         if (name.len > std.math.maxInt(u8)) {
             return error.WordNameTooLong;
         }
@@ -169,7 +164,7 @@ pub const Dictionary = struct {
     fn getDefinitionName(
         self: @This(),
         definition_addr: Cell,
-    ) error{OutOfBounds}![]const u8 {
+    ) ![]const u8 {
         const name_info = try self.getNameInfo(definition_addr);
         return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
     }
@@ -177,7 +172,7 @@ pub const Dictionary = struct {
     fn getNameInfo(
         self: @This(),
         definition_addr: Cell,
-    ) error{OutOfBounds}!struct { addr: Cell, len: u8 } {
+    ) !struct { addr: Cell, len: u8 } {
         try mem.assertOffsetInBounds(definition_addr, @sizeOf(Cell));
         const name_len_addr = definition_addr + @sizeOf(Cell);
         return .{
@@ -186,7 +181,7 @@ pub const Dictionary = struct {
         };
     }
 
-    pub fn toCfa(self: @This(), definition_addr: Cell) error{OutOfBounds}!Cell {
+    pub fn toCfa(self: @This(), definition_addr: Cell) !Cell {
         const name_info = try self.getNameInfo(definition_addr);
         const name_end = name_info.addr + name_info.len;
         const definition_end = mem.alignToCell(name_end);
@@ -198,14 +193,14 @@ pub const Dictionary = struct {
     pub fn compileXt(
         self: *@This(),
         value: Cell,
-    ) error{ OutOfBounds, MisalignedAddress }!void {
+    ) !void {
         try self.here.comma(value);
     }
 
     pub fn compileLit(
         self: *@This(),
         value: Cell,
-    ) error{ OutOfBounds, MisalignedAddress }!void {
+    ) !void {
         try self.here.comma(self.tag_addresses.lit);
         try self.here.comma(value);
     }
@@ -214,7 +209,7 @@ pub const Dictionary = struct {
         self: *@This(),
         name: []const u8,
         value: Cell,
-    ) error{ WordNameTooLong, OutOfBounds, MisalignedAddress }!void {
+    ) !void {
         const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
         self.define(wordlist_idx, name) catch |err| switch (err) {
             error.InvalidWordlist => unreachable,

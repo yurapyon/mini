@@ -308,13 +308,13 @@ pub const Runtime = struct {
         }
     }
 
-    pub fn assertValidProgramCounter(self: @This()) error{InvalidProgramCounter}!void {
+    pub fn assertValidProgramCounter(self: @This()) !void {
         if (self.program_counter == 0) {
             return error.InvalidProgramCounter;
         }
     }
 
-    pub fn advancePC(self: *@This(), offset: Cell) error{OutOfBounds}!void {
+    pub fn advancePC(self: *@This(), offset: Cell) !void {
         try mem.assertOffsetInBounds(self.program_counter, offset);
         self.program_counter += offset;
     }

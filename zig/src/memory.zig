@@ -24,13 +24,13 @@ pub fn allocateMemory(allocator: Allocator) Allocator.Error!MemoryPtr {
     return @ptrCast(slice.ptr);
 }
 
-pub fn assertOffsetInBounds(addr: Cell, offset: Cell) error{OutOfBounds}!void {
+pub fn assertOffsetInBounds(addr: Cell, offset: Cell) !void {
     _ = std.math.add(Cell, addr, offset) catch {
         return error.OutOfBounds;
     };
 }
 
-pub fn assertCellAccess(addr: Cell) error{MisalignedAddress}!void {
+pub fn assertCellAccess(addr: Cell) !void {
     if (addr % @alignOf(Cell) != 0) {
         return error.MisalignedAddress;
     }
@@ -39,13 +39,13 @@ pub fn assertCellAccess(addr: Cell) error{MisalignedAddress}!void {
 pub fn readCell(
     memory: ConstMemoryPtr,
     addr: Cell,
-) error{MisalignedAddress}!Cell {
+) !Cell {
     try assertCellAccess(addr);
     const cell_ptr: *const Cell = @ptrCast(@alignCast(&memory[addr]));
     return cell_ptr.*;
 }
 
-pub fn cellPtr(memory: MemoryPtr, addr: Cell) error{MisalignedAddress}!*Cell {
+pub fn cellPtr(memory: MemoryPtr, addr: Cell) !*Cell {
     try assertCellAccess(addr);
     return @ptrCast(@alignCast(&memory[addr]));
 }
@@ -54,7 +54,7 @@ pub fn writeCell(
     memory: MemoryPtr,
     addr: Cell,
     value: Cell,
-) error{MisalignedAddress}!void {
+) !void {
     (try cellPtr(memory, addr)).* = value;
 }
 
@@ -70,7 +70,7 @@ pub fn sliceFromAddrAndLen(
     memory: []u8,
     addr: Cell,
     len: Cell,
-) error{OutOfBounds}![]u8 {
+) ![]u8 {
     if (len > 0) {
         try assertOffsetInBounds(addr, len - 1);
     }
@@ -81,7 +81,7 @@ pub fn constSliceFromAddrAndLen(
     memory: []const u8,
     addr: Cell,
     len: Cell,
-) error{OutOfBounds}![]const u8 {
+) ![]const u8 {
     if (len > 0) {
         try assertOffsetInBounds(addr, len - 1);
     }
