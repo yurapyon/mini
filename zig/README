@@ -3,7 +3,7 @@ zig implementation ==
 files:
   // core
   runtime.zig      - brings all the vm's components together and defines some types
-  register.zig     - memory-mapped 'pointer' into forth memory
+  register.zig     - 'pointer' that stores an offset into vm memory
   stack.zig        - circular stacks modelled after the F18 architecture
 
   dictionary.zig   - compilation and word lookup
