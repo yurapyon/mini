@@ -25,7 +25,7 @@ const LineByLineRefiller = struct {
         self.stream = std.io.fixedBufferStream(buffer);
     }
 
-    fn refill(self_: ?*anyopaque) error{CannotRefill}!?[]const u8 {
+    fn refill(self_: ?*anyopaque) !?[]const u8 {
         const self: *@This() = @ptrCast(@alignCast(self_));
         const slice = self.stream.reader().readUntilDelimiterOrEof(
             self.buffer[0..self.buffer.len],

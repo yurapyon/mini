@@ -38,11 +38,11 @@ pub fn Register(comptime offset_: Cell) type {
             self.memory = memory;
         }
 
-        fn assertForwardOffset(address_offset: Cell) error{OutOfBounds}!void {
+        fn assertForwardOffset(address_offset: Cell) !void {
             try mem.assertOffsetInBounds(offset, address_offset);
         }
 
-        fn assertForwardReference(self: @This(), reference_offset: Cell) error{OutOfBounds}!void {
+        fn assertForwardReference(self: @This(), reference_offset: Cell) !void {
             const addr = self.fetch();
             try mem.assertOffsetInBounds(addr, reference_offset);
         }
@@ -57,7 +57,7 @@ pub fn Register(comptime offset_: Cell) type {
             self: @This(),
             addr_offset: Cell,
             value: Cell,
-        ) error{ OutOfBounds, MisalignedAddress }!void {
+        ) !void {
             try assertForwardOffset(addr_offset);
             try mem.writeCell(self.memory, offset + addr_offset, value);
         }
@@ -69,7 +69,7 @@ pub fn Register(comptime offset_: Cell) type {
         pub fn fetchWithOffset(
             self: @This(),
             addr_offset: Cell,
-        ) error{ OutOfBounds, MisalignedAddress }!Cell {
+        ) !Cell {
             try assertForwardOffset(addr_offset);
             return try mem.readCell(self.memory, offset + addr_offset);
         }
@@ -94,7 +94,7 @@ pub fn Register(comptime offset_: Cell) type {
         pub fn comma(
             self: @This(),
             value: Cell,
-        ) error{ OutOfBounds, MisalignedAddress }!void {
+        ) !void {
             try self.assertForwardReference(@sizeOf(Cell));
             const addr = self.fetch();
             try mem.writeCell(self.memory, addr, value);
@@ -107,13 +107,13 @@ pub fn Register(comptime offset_: Cell) type {
             return new_addr;
         }
 
-        pub fn derefByteAlignedAndAdvance(self: @This()) error{OutOfBounds}!Cell {
+        pub fn derefByteAlignedAndAdvance(self: @This()) !Cell {
             const low = try self.derefAndAdvanceC();
             const high = try self.derefAndAdvanceC();
             return @as(Cell, high) << 8 | low;
         }
 
-        pub fn commaByteAligned(self: @This(), value: Cell) error{OutOfBounds}!void {
+        pub fn commaByteAligned(self: @This(), value: Cell) !void {
             const high: u8 = @truncate(value >> 8);
             const low: u8 = @truncate(value);
             try self.commaC(low);
@@ -134,14 +134,14 @@ pub fn Register(comptime offset_: Cell) type {
             self.memory[offset] +%= value;
         }
 
-        pub fn commaC(self: @This(), value: u8) error{OutOfBounds}!void {
+        pub fn commaC(self: @This(), value: u8) !void {
             try self.assertForwardReference(1);
             const addr = self.fetch();
             self.memory[addr] = value;
             self.storeAdd(1);
         }
 
-        pub fn derefAndAdvanceC(self: @This()) error{OutOfBounds}!u8 {
+        pub fn derefAndAdvanceC(self: @This()) !u8 {
             try self.assertForwardReference(1);
             const addr = self.fetch();
             self.storeAdd(1);
@@ -153,7 +153,7 @@ pub fn Register(comptime offset_: Cell) type {
         pub fn commaString(
             self: @This(),
             string: []const u8,
-        ) error{ OutOfBounds, StringTooLong }!void {
+        ) !void {
             if (string.len > std.math.maxInt(Cell)) {
                 return error.StringTooLong;
             }

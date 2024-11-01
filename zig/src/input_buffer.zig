@@ -44,7 +44,7 @@ pub const InputBuffer = struct {
     fn setInputBuffer(
         self: *@This(),
         buffer: []const u8,
-    ) error{OversizeInputBuffer}!void {
+    ) !void {
         if (buffer.len > input_buffer_len) {
             return error.OversizeInputBuffer;
         }
@@ -69,7 +69,7 @@ pub const InputBuffer = struct {
         self.refill_userdata = userdata;
     }
 
-    pub fn refill(self: *@This()) error{ CannotRefill, OversizeInputBuffer }!bool {
+    pub fn refill(self: *@This()) !bool {
         const refill_callback = self.refill_callback orelse return error.CannotRefill;
         const buffer = try refill_callback(self.refill_userdata);
         if (buffer) |buf| {
