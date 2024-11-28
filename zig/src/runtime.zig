@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
@@ -98,6 +99,7 @@ pub const ExternalsCallback = *const fn (
 ) ExternalError!void;
 
 pub const Runtime = struct {
+    allocator: Allocator,
     memory: MemoryPtr,
 
     program_counter: Cell,
@@ -114,11 +116,12 @@ pub const Runtime = struct {
     externals_callback: ?ExternalsCallback,
     externals_userdata: ?*anyopaque,
 
-    pub fn init(self: *@This(), memory: MemoryPtr) void {
+    pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
+        self.allocator = allocator;
         self.memory = memory;
 
         self.interpreter.init(self.memory);
-        self.input_buffer.init(self.memory);
+        self.input_buffer.init(self.allocator, self.memory);
 
         self.program_counter = 0;
         self.execute_register.init(self.memory);
@@ -190,7 +193,7 @@ pub const Runtime = struct {
         while (!self.should_bye) {
             self.should_quit = false;
 
-            var did_refill = try self.input_buffer.refill();
+            var did_refill = try self.input_buffer.refill(true);
 
             while (did_refill and !self.should_quit and !self.should_bye) {
                 const word = self.input_buffer.readNextWord();
