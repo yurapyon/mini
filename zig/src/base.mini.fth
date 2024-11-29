@@ -189,15 +189,15 @@ compiler
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
-\ ===
+quit
 
-bye
+hi
+
+\ ===
 
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
-
-bye
 
 \ ===
 
@@ -207,6 +207,3 @@ hello ##type ##cr
 
 ##.d
 
-\ TODO
-\ should this file have to end with 'bye' or 'quit' ?
-bye

@@ -13,31 +13,12 @@ const Repl = @import("repl/repl.zig").Repl;
 
 const System = @import("system/system.zig").System;
 
+const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
+
 // ===
 
 const base_file = @embedFile("base.mini.fth");
-
-const LineByLineRefiller = struct {
-    buffer: [128]u8,
-    stream: std.io.FixedBufferStream([]const u8),
-
-    fn init(self: *@This(), buffer: []const u8) void {
-        self.stream = std.io.fixedBufferStream(buffer);
-    }
-
-    fn refill(self_: ?*anyopaque) !?[]const u8 {
-        const self: *@This() = @ptrCast(@alignCast(self_));
-        const slice = self.stream.reader().readUntilDelimiterOrEof(
-            self.buffer[0..self.buffer.len],
-            '\n',
-        ) catch return error.CannotRefill;
-        if (slice) |slc| {
-            return self.buffer[0..slc.len];
-        } else {
-            return null;
-        }
-    }
-};
 
 fn external(rt: *Runtime, token: Cell, userdata: ?*anyopaque) ExternalError!void {
     _ = userdata;
@@ -50,13 +31,17 @@ fn runVM(allocator: Allocator) !void {
     defer allocator.free(memory);
 
     var rt: Runtime = undefined;
-    rt.init(memory);
+    rt.init(allocator, memory);
 
-    var refiller: LineByLineRefiller = undefined;
-    refiller.init(base_file);
+    var stdin: StdInRefiller = undefined;
+    stdin.init();
+    try rt.input_buffer.pushRefiller(stdin.toRefiller());
 
-    rt.input_buffer.refill_callback = LineByLineRefiller.refill;
-    rt.input_buffer.refill_userdata = &refiller;
+    stdin.prompt = "> ";
+
+    var buffer: BufferRefiller = undefined;
+    buffer.init(base_file);
+    try rt.input_buffer.pushRefiller(buffer.toRefiller());
 
     rt.externals_callback = external;
     const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;

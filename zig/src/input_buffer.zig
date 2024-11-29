@@ -1,3 +1,7 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
@@ -8,13 +12,13 @@ const MainMemoryLayout = runtime.MainMemoryLayout;
 const register = @import("register.zig");
 const Register = register.Register;
 
+const Refiller = @import("refillers/refiller.zig").Refiller;
+
 // ===
 
 pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';
 }
-
-pub const RefillFn = *const fn (userdata: ?*anyopaque) error{CannotRefill}!?[]const u8;
 
 const input_buffer_len = 128;
 
@@ -26,10 +30,9 @@ pub const InputBuffer = struct {
     at: Register(MainMemoryLayout.offsetOf("input_buffer_at")),
     len: Register(MainMemoryLayout.offsetOf("input_buffer_len")),
 
-    refill_callback: ?RefillFn,
-    refill_userdata: ?*anyopaque,
+    refiller_stack: ArrayList(Refiller),
 
-    pub fn init(self: *@This(), memory: MemoryPtr) void {
+    pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
         self.memory = memory;
         self.at.init(memory);
         self.len.init(memory);
@@ -37,8 +40,7 @@ pub const InputBuffer = struct {
         self.at.store(0);
         self.len.store(0);
 
-        self.refill_callback = null;
-        self.refill_userdata = null;
+        self.refiller_stack = ArrayList(Refiller).init(allocator);
     }
 
     fn setInputBuffer(
@@ -60,23 +62,36 @@ pub const InputBuffer = struct {
         self.len.store(@intCast(buffer.len));
     }
 
-    pub fn setRefillCallback(
+    pub fn pushRefiller(
         self: *@This(),
-        refill_callback: RefillFn,
-        userdata: ?*anyopaque,
-    ) void {
-        self.refill_callback = refill_callback;
-        self.refill_userdata = userdata;
+        refiller: Refiller,
+    ) !void {
+        try self.refiller_stack.append(refiller);
     }
 
-    pub fn refill(self: *@This()) !bool {
-        const refill_callback = self.refill_callback orelse return error.CannotRefill;
-        const buffer = try refill_callback(self.refill_userdata);
-        if (buffer) |buf| {
-            try self.setInputBuffer(buf);
-            return true;
-        } else {
-            return false;
+    // Returns whether there are still refillers
+    pub fn popRefiller(
+        self: *@This(),
+    ) bool {
+        _ = self.refiller_stack.pop();
+        return self.refiller_stack.items.len > 0;
+    }
+
+    pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
+        while (true) {
+            const refiller = &self.refiller_stack
+                .items[self.refiller_stack.items.len - 1];
+            const buffer = try refiller.refill();
+            if (buffer) |buf| {
+                try self.setInputBuffer(buf);
+                return true;
+            } else {
+                if (continue_on_empty and self.refiller_stack.items.len > 0) {
+                    _ = self.popRefiller();
+                } else {
+                    return false;
+                }
+            }
         }
     }
 
