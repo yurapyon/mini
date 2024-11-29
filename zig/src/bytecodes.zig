@@ -407,7 +407,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill();
+    const did_refill = try rt.input_buffer.refill(true);
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 

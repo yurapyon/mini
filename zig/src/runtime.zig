@@ -200,7 +200,7 @@ pub const Runtime = struct {
                 if (word) |w| {
                     try self.evaluateString(w);
                 } else {
-                    did_refill = try self.input_buffer.refill();
+                    did_refill = try self.input_buffer.refill(true);
                 }
             }
 

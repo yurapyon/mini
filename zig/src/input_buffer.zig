@@ -12,18 +12,14 @@ const MainMemoryLayout = runtime.MainMemoryLayout;
 const register = @import("register.zig");
 const Register = register.Register;
 
+const RefillFn = @import("refillers/refiller.zig").RefillFn;
+const Refiller = @import("refillers/refiller.zig").Refiller;
+
 // ===
 
 pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';
 }
-
-pub const RefillFn = *const fn (userdata: ?*anyopaque) error{CannotRefill}!?[]const u8;
-
-pub const Refiller = struct {
-    callback: RefillFn,
-    userdata: *anyopaque,
-};
 
 const input_buffer_len = 128;
 
@@ -37,9 +33,6 @@ pub const InputBuffer = struct {
 
     refiller_stack: ArrayList(Refiller),
 
-    refill_callback: ?RefillFn,
-    refill_userdata: ?*anyopaque,
-
     pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
         self.memory = memory;
         self.at.init(memory);
@@ -48,10 +41,7 @@ pub const InputBuffer = struct {
         self.at.store(0);
         self.len.store(0);
 
-        try self.refiller_stack.init(allocator);
-
-        self.refill_callback = null;
-        self.refill_userdata = null;
+        self.refiller_stack = ArrayList(Refiller).init(allocator);
     }
 
     fn setInputBuffer(
@@ -73,25 +63,22 @@ pub const InputBuffer = struct {
         self.len.store(@intCast(buffer.len));
     }
 
-    pub fn setRefillCallback(
+    pub fn pushRefiller(
         self: *@This(),
-        refill_callback: RefillFn,
-        userdata: ?*anyopaque,
-    ) void {
-        self.refill_callback = refill_callback;
-        self.refill_userdata = userdata;
+        refiller: Refiller,
+    ) !void {
+        try self.refiller_stack.append(refiller);
     }
 
     pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
         while (true) {
-            // TODO get top
-            const refiller = self.refiller_stack;
+            const refiller = &self.refiller_stack.items[self.refiller_stack.items.len - 1];
             const buffer = try refiller.refill();
             if (buffer) |buf| {
                 try self.setInputBuffer(buf);
                 return true;
             } else {
-                if (continue_on_empty and self.refiller_stack.len > 0) {
+                if (continue_on_empty and self.refiller_stack.items.len > 0) {
                     _ = self.refiller_stack.pop();
                 } else {
                     return false;

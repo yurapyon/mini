@@ -6,7 +6,7 @@ pub const BufferRefiller = struct {
     buffer: [128]u8,
     stream: std.io.FixedBufferStream([]const u8),
 
-    fn init(self: *@This(), buffer: []const u8) void {
+    pub fn init(self: *@This(), buffer: []const u8) void {
         self.stream = std.io.fixedBufferStream(buffer);
     }
 

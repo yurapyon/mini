@@ -18,7 +18,7 @@ pub const Repl = struct {
         defer allocator.free(memory);
 
         var rt: Runtime = undefined;
-        rt.init(memory);
+        rt.init(allocator, memory);
 
         try printBanner();
     }
