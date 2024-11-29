@@ -116,12 +116,16 @@ pub const Runtime = struct {
     externals_callback: ?ExternalsCallback,
     externals_userdata: ?*anyopaque,
 
+    last_evaluated_word: ?[]const u8,
+
     pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
         self.allocator = allocator;
         self.memory = memory;
 
         self.interpreter.init(self.memory);
         self.input_buffer.init(self.allocator, self.memory);
+
+        self.last_evaluated_word = null;
 
         self.program_counter = 0;
         self.execute_register.init(self.memory);
@@ -198,7 +202,16 @@ pub const Runtime = struct {
             while (did_refill and !self.should_quit and !self.should_bye) {
                 const word = self.input_buffer.readNextWord();
                 if (word) |w| {
-                    try self.evaluateString(w);
+                    self.evaluateString(w) catch |err| switch (err) {
+                        error.WordNotFound => {
+                            // TODO don't use debug
+                            // TODO printWordNotFound fn
+                            std.debug.print("Word not found: {s}\n", .{
+                                self.last_evaluated_word orelse unreachable,
+                            });
+                        },
+                        else => return err,
+                    };
                 } else {
                     did_refill = try self.input_buffer.refill(true);
                 }
@@ -222,6 +235,8 @@ pub const Runtime = struct {
     // ===
 
     pub fn evaluateString(self: *@This(), word: []const u8) !void {
+        self.last_evaluated_word = word;
+
         const state = try CompileState.fromCell(self.interpreter.state.fetch());
 
         if (try self.interpreter.lookupString(word)) |lookup_result| {
@@ -235,8 +250,6 @@ pub const Runtime = struct {
                 _ => unreachable,
             }
         } else {
-            // TODO printWordNotFound fn
-            std.debug.print("Word not found: {s}\n", .{word});
             return error.WordNotFound;
         }
     }

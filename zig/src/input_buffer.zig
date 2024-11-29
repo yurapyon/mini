@@ -12,7 +12,6 @@ const MainMemoryLayout = runtime.MainMemoryLayout;
 const register = @import("register.zig");
 const Register = register.Register;
 
-const RefillFn = @import("refillers/refiller.zig").RefillFn;
 const Refiller = @import("refillers/refiller.zig").Refiller;
 
 // ===
@@ -80,7 +79,8 @@ pub const InputBuffer = struct {
 
     pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
         while (true) {
-            const refiller = &self.refiller_stack.items[self.refiller_stack.items.len - 1];
+            const refiller = &self.refiller_stack
+                .items[self.refiller_stack.items.len - 1];
             const buffer = try refiller.refill();
             if (buffer) |buf| {
                 try self.setInputBuffer(buf);
