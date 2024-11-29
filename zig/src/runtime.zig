@@ -211,9 +211,8 @@ pub const Runtime = struct {
     }
 
     pub fn onQuit(self: *@This()) !void {
-        // TODO set refiller to cmd line input
-        // TODO remove next line when bye/quit logic is figured out
-        self.should_bye = true;
+        const should_continue = self.input_buffer.popRefiller();
+        self.should_bye = !should_continue;
     }
 
     pub fn onBye(self: *@This()) !void {

@@ -14,6 +14,7 @@ const Repl = @import("repl/repl.zig").Repl;
 const System = @import("system/system.zig").System;
 
 const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
 
 // ===
 
@@ -32,10 +33,15 @@ fn runVM(allocator: Allocator) !void {
     var rt: Runtime = undefined;
     rt.init(allocator, memory);
 
-    var buffer_refiller: BufferRefiller = undefined;
-    buffer_refiller.init(base_file);
+    var stdin: StdInRefiller = undefined;
+    stdin.init();
+    try rt.input_buffer.pushRefiller(stdin.toRefiller());
 
-    try rt.input_buffer.pushRefiller(buffer_refiller.toRefiller());
+    stdin.prompt = "> ";
+
+    var buffer: BufferRefiller = undefined;
+    buffer.init(base_file);
+    try rt.input_buffer.pushRefiller(buffer.toRefiller());
 
     rt.externals_callback = external;
     const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;

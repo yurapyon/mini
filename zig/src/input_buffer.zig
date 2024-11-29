@@ -70,6 +70,14 @@ pub const InputBuffer = struct {
         try self.refiller_stack.append(refiller);
     }
 
+    // Returns whether there are still refillers
+    pub fn popRefiller(
+        self: *@This(),
+    ) bool {
+        _ = self.refiller_stack.pop();
+        return self.refiller_stack.items.len > 0;
+    }
+
     pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
         while (true) {
             const refiller = &self.refiller_stack.items[self.refiller_stack.items.len - 1];
@@ -79,7 +87,7 @@ pub const InputBuffer = struct {
                 return true;
             } else {
                 if (continue_on_empty and self.refiller_stack.items.len > 0) {
-                    _ = self.refiller_stack.pop();
+                    _ = self.popRefiller();
                 } else {
                     return false;
                 }
