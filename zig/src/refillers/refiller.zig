@@ -1,6 +1,7 @@
 pub const RefillFn = *const fn (userdata: ?*anyopaque) error{CannotRefill}!?[]const u8;
 
 pub const Refiller = struct {
+    id: []const u8,
     callback: RefillFn,
     userdata: *anyopaque,
 

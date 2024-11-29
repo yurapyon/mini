@@ -224,8 +224,11 @@ pub const Runtime = struct {
     }
 
     pub fn onQuit(self: *@This()) !void {
-        const should_continue = self.input_buffer.popRefiller();
-        self.should_bye = !should_continue;
+        const current_refiller = self.input_buffer.peekRefiller();
+        if (!std.mem.eql(u8, current_refiller.id, "stdin")) {
+            const should_continue = self.input_buffer.popRefiller();
+            self.should_bye = !should_continue;
+        }
     }
 
     pub fn onBye(self: *@This()) !void {

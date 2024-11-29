@@ -70,17 +70,19 @@ pub const InputBuffer = struct {
     }
 
     // Returns whether there are still refillers
-    pub fn popRefiller(
-        self: *@This(),
-    ) bool {
+    pub fn popRefiller(self: *@This()) bool {
         _ = self.refiller_stack.pop();
         return self.refiller_stack.items.len > 0;
     }
 
+    pub fn peekRefiller(self: *@This()) *Refiller {
+        return &self.refiller_stack
+            .items[self.refiller_stack.items.len - 1];
+    }
+
     pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
         while (true) {
-            const refiller = &self.refiller_stack
-                .items[self.refiller_stack.items.len - 1];
+            const refiller = self.peekRefiller();
             const buffer = try refiller.refill();
             if (buffer) |buf| {
                 try self.setInputBuffer(buf);

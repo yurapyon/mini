@@ -32,6 +32,7 @@ pub const StdInRefiller = struct {
 
     pub fn toRefiller(self: *@This()) Refiller {
         return .{
+            .id = "stdin",
             .callback = refill,
             .userdata = self,
         };
