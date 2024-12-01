@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
@@ -25,6 +26,9 @@ const DataStack = stack.DataStack;
 const ReturnStack = stack.ReturnStack;
 
 const bytecodes = @import("bytecodes.zig");
+
+const externals = @import("externals.zig");
+const External = externals.External;
 
 // ===
 
@@ -113,8 +117,7 @@ pub const Runtime = struct {
     should_bye: bool,
     should_quit: bool,
 
-    externals_callback: ?ExternalsCallback,
-    externals_userdata: ?*anyopaque,
+    externals: ArrayList(External),
 
     last_evaluated_word: ?[]const u8,
 
@@ -124,6 +127,8 @@ pub const Runtime = struct {
 
         self.interpreter.init(self.memory);
         self.input_buffer.init(self.allocator, self.memory);
+
+        self.externals = ArrayList(External).init(allocator);
 
         self.last_evaluated_word = null;
 
@@ -143,6 +148,7 @@ pub const Runtime = struct {
         ) catch unreachable;
     }
 
+    // TODO these could probably be in Dictionary
     fn defineInternalConstants(self: *@This()) !void {
         try self.defineMemoryLocationConstant("here");
         try self.defineMemoryLocationConstant("latest");
@@ -319,9 +325,7 @@ pub const Runtime = struct {
             if (bytecodes.getBytecode(token)) |definition| {
                 try definition.callback(self);
             } else {
-                if (self.externals_callback) |cb| {
-                    try cb(self, token, self.externals_userdata);
-                }
+                try self.processExternals(token);
             }
         }
     }
@@ -335,6 +339,30 @@ pub const Runtime = struct {
     pub fn advancePC(self: *@This(), offset: Cell) !void {
         try mem.assertOffsetInBounds(self.program_counter, offset);
         self.program_counter += offset;
+    }
+
+    // ===
+
+    pub fn addExternal(self: *@This(), external: External) !void {
+        try self.externals.append(external);
+    }
+
+    fn processExternals(self: *@This(), token: Cell) !void {
+        if (self.externals.items.len > 0) {
+            // NOTE
+            // Starts at the end of the list so
+            //   later externals can override earlier ones
+            var i: usize = self.externals.items.len - 1;
+            while (i >= 0) : (i -= 1) {
+                var external = self.externals.items[i];
+                if (try external.call(self, token)) {
+                    break;
+                }
+            }
+
+            // TODO could raise an 'unhandled external' error
+
+        }
     }
 };
 

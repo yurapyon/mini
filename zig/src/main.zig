@@ -6,7 +6,9 @@ const mem = @import("memory.zig");
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
-const ExternalError = runtime.ExternalError;
+
+const externals = @import("externals.zig");
+const External = externals.External;
 
 const CliOptions = @import("repl/cli_options.zig").CliOptions;
 const Repl = @import("repl/repl.zig").Repl;
@@ -20,36 +22,6 @@ const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
 
 const base_file = @embedFile("base.mini.fth");
 
-fn external(rt: *Runtime, token: Cell, userdata: ?*anyopaque) ExternalError!void {
-    _ = userdata;
-    std.debug.print("from main {}\n", .{token});
-    std.debug.print("{}\n", .{rt.data_stack.top});
-}
-
-fn runVM(allocator: Allocator) !void {
-    const memory = try mem.allocateMemory(allocator);
-    defer allocator.free(memory);
-
-    var rt: Runtime = undefined;
-    rt.init(allocator, memory);
-
-    var stdin: StdInRefiller = undefined;
-    stdin.init();
-    try rt.input_buffer.pushRefiller(stdin.toRefiller());
-
-    stdin.prompt = "> ";
-
-    var buffer: BufferRefiller = undefined;
-    buffer.init(base_file);
-    try rt.input_buffer.pushRefiller(buffer.toRefiller());
-
-    rt.externals_callback = external;
-    const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
-    try rt.defineExternal("hi", wlidx, 500);
-
-    try rt.repl();
-}
-
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
 
@@ -57,7 +29,16 @@ pub fn main() !void {
     try cli_options.initFromProcessArgs(allocator);
     defer cli_options.deinit();
 
-    // TODO load and interpret each file in cli_options
+    const memory = try mem.allocateMemory(allocator);
+    defer allocator.free(memory);
+
+    var rt: Runtime = undefined;
+    rt.init(allocator, memory);
+
+    // TODO make sure this runs before going to the repl
+    var buffer: BufferRefiller = undefined;
+    buffer.init(base_file);
+    try rt.input_buffer.pushRefiller(buffer.toRefiller());
 
     if (cli_options.run_system) {
         // TODO run this in a separate thread
@@ -72,14 +53,9 @@ pub fn main() !void {
         defer system.deinit();
     } else {
         if (cli_options.interactive) {
-            try Repl.start(allocator);
+            try Repl.start(&rt);
         }
     }
-
-    // TODO
-    // note: the system or the repl will have thier own loops,
-    //   and this wont be called here
-    try runVM(std.heap.c_allocator);
 }
 
 test "lib-testing" {
@@ -95,5 +71,6 @@ test "lib-testing" {
 }
 
 test "end-to-end" {
-    try runVM(std.testing.allocator);
+    // TODO
+    // try runVM(std.testing.allocator);
 }
