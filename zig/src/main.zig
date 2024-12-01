@@ -35,10 +35,12 @@ pub fn main() !void {
     var rt: Runtime = undefined;
     rt.init(allocator, memory);
 
-    // TODO make sure this runs before going to the repl
     var buffer: BufferRefiller = undefined;
     buffer.init(base_file);
     try rt.input_buffer.pushRefiller(buffer.toRefiller());
+    try rt.runUntilRefillEmpty();
+
+    // TODO read input files
 
     if (cli_options.run_system) {
         // TODO run this in a separate thread

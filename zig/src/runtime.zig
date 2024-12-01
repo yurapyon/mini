@@ -92,16 +92,6 @@ pub const CompileState = enum(Cell) {
     }
 };
 
-pub const ExternalError = error{
-    ExternalPanic,
-};
-
-pub const ExternalsCallback = *const fn (
-    rt: *Runtime,
-    id: Cell,
-    userdata: ?*anyopaque,
-) ExternalError!void;
-
 pub const Runtime = struct {
     allocator: Allocator,
     memory: MemoryPtr,
@@ -114,6 +104,8 @@ pub const Runtime = struct {
     interpreter: Interpreter,
     input_buffer: InputBuffer,
 
+    // TODO
+    // should_bye is probably something that should be handled at the Repl/System level
     should_bye: bool,
     should_quit: bool,
 
@@ -239,6 +231,37 @@ pub const Runtime = struct {
 
     pub fn onBye(self: *@This()) !void {
         _ = self;
+    }
+
+    // TODO how does this handle this scenario:
+    // 1. push refiller that executes file
+    // 2. file imports another file
+    // 3. other file has 'quit' in it
+    pub fn runUntilRefillEmpty(self: *@This()) !void {
+        self.should_bye = false;
+        self.should_quit = false;
+
+        var did_refill = try self.input_buffer.refill(true);
+
+        while (did_refill and !self.should_quit and !self.should_bye) {
+            const word = self.input_buffer.readNextWord();
+            if (word) |w| {
+                self.evaluateString(w) catch |err| switch (err) {
+                    error.WordNotFound => {
+                        // TODO don't use debug
+                        // TODO printWordNotFound fn
+                        std.debug.print("Word not found: {s}\n", .{
+                            self.last_evaluated_word orelse unreachable,
+                        });
+                    },
+                    else => return err,
+                };
+            } else {
+                did_refill = try self.input_buffer.refill(true);
+            }
+        }
+
+        _ = self.input_buffer.popRefiller();
     }
 
     // ===
