@@ -30,6 +30,8 @@ const bytecodes = @import("bytecodes.zig");
 const externals = @import("externals.zig");
 const External = externals.External;
 
+const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+
 // ===
 
 comptime {
@@ -189,7 +191,8 @@ pub const Runtime = struct {
 
     // ===
 
-    pub fn repl(self: *@This()) !void {
+    // TODO can probably rename to interpretLoop
+    pub fn interpretLoop(self: *@This()) !void {
         self.should_bye = false;
 
         while (!self.should_bye) {
@@ -237,27 +240,23 @@ pub const Runtime = struct {
     // 1. push refiller that executes file
     // 2. file imports another file
     // 3. other file has 'quit' in it
-    pub fn runUntilRefillEmpty(self: *@This()) !void {
+    // might have to redefine 'quit' if 'interpret' is defined in forth
+    pub fn processBuffer(self: *@This(), file: []const u8) !void {
+        var buffer: BufferRefiller = undefined;
+        buffer.init(file);
+        try self.input_buffer.pushRefiller(buffer.toRefiller());
+
         self.should_bye = false;
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill(true);
+        var did_refill = try self.input_buffer.refill(false);
 
         while (did_refill and !self.should_quit and !self.should_bye) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
-                self.evaluateString(w) catch |err| switch (err) {
-                    error.WordNotFound => {
-                        // TODO don't use debug
-                        // TODO printWordNotFound fn
-                        std.debug.print("Word not found: {s}\n", .{
-                            self.last_evaluated_word orelse unreachable,
-                        });
-                    },
-                    else => return err,
-                };
+                try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill(true);
+                did_refill = try self.input_buffer.refill(false);
             }
         }
 

@@ -18,10 +18,22 @@ const StdInRefiller = @import("../refillers/stdin_refiller.zig").StdInRefiller;
 
 // ===
 
+const repl_file = @embedFile("repl.mini.fth");
+
 fn external_fn(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.Error!bool {
     _ = userdata;
-    std.debug.print("from main {}\n", .{token});
-    std.debug.print("{}\n", .{rt.data_stack.top});
+    switch (token) {
+        64 => {
+            const raw_char = rt.data_stack.pop();
+            const char = @as(u8, @truncate(raw_char & 0xff));
+            std.debug.print("{c}", .{char});
+        },
+        65 => {
+            const cell = rt.data_stack.pop();
+            std.debug.print("{d} ", .{cell});
+        },
+        else => return false,
+    }
     return true;
 }
 
@@ -41,11 +53,14 @@ pub const Repl = struct {
         };
         const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
         try rt.defineExternal("emit", wlidx, 64);
+        try rt.defineExternal(".", wlidx, 65);
         try rt.addExternal(external);
+
+        try rt.processBuffer(repl_file);
 
         try printBanner();
 
-        try rt.repl();
+        try rt.interpretLoop();
     }
 
     fn printBanner() !void {

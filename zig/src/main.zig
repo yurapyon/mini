@@ -35,10 +35,7 @@ pub fn main() !void {
     var rt: Runtime = undefined;
     rt.init(allocator, memory);
 
-    var buffer: BufferRefiller = undefined;
-    buffer.init(base_file);
-    try rt.input_buffer.pushRefiller(buffer.toRefiller());
-    try rt.runUntilRefillEmpty();
+    try rt.processBuffer(base_file);
 
     // TODO read input files
 
