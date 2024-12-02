@@ -60,7 +60,7 @@ pub const Interpreter = struct {
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
         const current_wordlist = state.toWordlistIndex() catch unreachable;
-        if (try self.dictionary.search(current_wordlist, string)) |word_info| {
+        if (try self.dictionary.findWord(current_wordlist, string)) |word_info| {
             return .{ .word = word_info };
         }
 

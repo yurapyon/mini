@@ -168,14 +168,14 @@ pub const Runtime = struct {
 
     fn defineSourceWord(self: *@This()) !void {
         const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
-        try self.interpreter.dictionary.define(wordlist_idx, "source");
+        try self.interpreter.dictionary.defineWord(wordlist_idx, "source");
         try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
-        const fetch_definition_addr = (try self.interpreter.dictionary.find(wordlist_idx, "@")) orelse unreachable;
+        const fetch_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "@")) orelse unreachable;
         const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
         try self.interpreter.dictionary.compileXt(fetch_cfa);
-        const exit_definition_addr = (try self.interpreter.dictionary.find(wordlist_idx, "exit")) orelse unreachable;
+        const exit_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "exit")) orelse unreachable;
         const exit_cfa = try self.interpreter.dictionary.toCfa(exit_definition_addr);
         try self.interpreter.dictionary.compileXt(exit_cfa);
     }
@@ -184,12 +184,13 @@ pub const Runtime = struct {
         if (id < bytecodes.bytecodes_count) {
             return error.ReservedBytecodeId;
         }
-        try self.interpreter.dictionary.define(wordlist_idx, name);
+        try self.interpreter.dictionary.defineWord(wordlist_idx, name);
         try self.interpreter.dictionary.here.comma(id);
     }
 
     // ===
 
+    // TODO this should take a 'handle errors' callback
     pub fn interpretLoop(self: *@This()) !void {
         self.should_bye = false;
 
@@ -203,8 +204,6 @@ pub const Runtime = struct {
                 if (word) |w| {
                     self.evaluateString(w) catch |err| switch (err) {
                         error.WordNotFound => {
-                            // TODO don't use debug
-                            // TODO printWordNotFound fn
                             std.debug.print("Word not found: {s}\n", .{
                                 self.last_evaluated_word orelse unreachable,
                             });

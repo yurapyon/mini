@@ -190,12 +190,11 @@ ascii
 
 :noname
   next-char dup [char] " <> if
-    read-char @ execute c,
-    recurse
+    read-char @ execute c, recurse
   then ;
 
 : string, next-char drop [ , ] drop ;
-: string,ct ( "string" -- addr len ) here @ string, dup dist ;
+: string,ct here @ string, dup dist ;
 
 compiler
 : "  (header), >r string,ct align here @ r> header! ;
@@ -209,19 +208,8 @@ forth
 
 quit
 
-hi
-
 \ ===
 
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
-
-\ ===
-
-: hello e" hellow\x0aasdf" ;
-
-hello ##type ##cr
-
-##.d
-

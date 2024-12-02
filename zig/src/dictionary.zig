@@ -60,9 +60,9 @@ pub const Dictionary = struct {
     }
 
     pub fn updateInternalAddresses(self: *@This()) !void {
-        const lit_definition_addr = (try self.find(0, "lit")) orelse return error.WordNotFound;
+        const lit_definition_addr = (try self.findWordInWordlist(0, "lit")) orelse return error.WordNotFound;
         self.tag_addresses.lit = try self.toCfa(lit_definition_addr);
-        const exit_definition_addr = (try self.find(0, "exit")) orelse return error.WordNotFound;
+        const exit_definition_addr = (try self.findWordInWordlist(0, "exit")) orelse return error.WordNotFound;
         self.tag_addresses.exit = try self.toCfa(exit_definition_addr);
     }
 
@@ -92,8 +92,7 @@ pub const Dictionary = struct {
 
     // ===
 
-    // TODO rename to findWord
-    pub fn find(
+    pub fn findWordInWordlist(
         self: @This(),
         wordlist_idx: Cell,
         to_find: []const u8,
@@ -111,8 +110,7 @@ pub const Dictionary = struct {
         return null;
     }
 
-    // TODO probably rename this to findWord and the above to findWordInWordlist
-    pub fn search(
+    pub fn findWord(
         self: @This(),
         starting_wordlist_idx: Cell,
         to_find: []const u8,
@@ -120,7 +118,7 @@ pub const Dictionary = struct {
         var i: Cell = 0;
         while (i <= starting_wordlist_idx) : (i += 1) {
             const wordlist_idx = starting_wordlist_idx - i;
-            if (try self.find(wordlist_idx, to_find)) |definition_addr| {
+            if (try self.findWordInWordlist(wordlist_idx, to_find)) |definition_addr| {
                 return .{
                     .definition_addr = definition_addr,
                     .wordlist_idx = wordlist_idx,
@@ -131,11 +129,10 @@ pub const Dictionary = struct {
         return null;
     }
 
-    // TODO rename to defineWord
     // TODO NOTE this checks memory bounds, so for other functions that rely on
     //   name_len being in bounds, it's technically always going to be
     //   there are ways to break this in forth though
-    pub fn define(
+    pub fn defineWord(
         self: *@This(),
         wordlist_idx: Cell,
         name: []const u8,
@@ -211,7 +208,7 @@ pub const Dictionary = struct {
         value: Cell,
     ) !void {
         const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
-        self.define(wordlist_idx, name) catch |err| switch (err) {
+        self.defineWord(wordlist_idx, name) catch |err| switch (err) {
             error.InvalidWordlist => unreachable,
             else => |e| return e,
         };
@@ -232,7 +229,7 @@ test "dictionary" {
     var dictionary: Dictionary = undefined;
     dictionary.init(memory);
 
-    try dictionary.define(0, "name");
+    try dictionary.defineWord(0, "name");
 
     try testing.expectEqual(
         dictionary.here.fetch() - dictionary_start,
@@ -245,17 +242,17 @@ test "dictionary" {
         memory[dictionary_start..][0..7],
     );
 
-    try dictionary.define(0, "hellow");
+    try dictionary.defineWord(0, "hellow");
 
-    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
-    try testing.expectEqual(null, try dictionary.find(0, "wow"));
+    try testing.expectEqual(dictionary_start, try dictionary.findWordInWordlist(0, "name"));
+    try testing.expectEqual(null, try dictionary.findWordInWordlist(0, "wow"));
 
     const noname_addr = dictionary.here.alignForward();
-    try dictionary.define(0, "");
-    try testing.expectEqual(dictionary_start, try dictionary.find(0, "name"));
-    try testing.expectEqual(null, try dictionary.find(0, "wow"));
+    try dictionary.defineWord(0, "");
+    try testing.expectEqual(dictionary_start, try dictionary.findWordInWordlist(0, "name"));
+    try testing.expectEqual(null, try dictionary.findWordInWordlist(0, "wow"));
 
-    try testing.expectEqual(noname_addr, try dictionary.find(0, ""));
+    try testing.expectEqual(noname_addr, try dictionary.findWordInWordlist(0, ""));
 
     // TODO more tests
 }

@@ -59,7 +59,7 @@ fn defineBuiltin(dict: *Dictionary, token: Cell) !void {
     const bytecode_definition = getBytecode(token) orelse return error.InvalidBytecode;
     const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
     if (bytecode_definition.name.len > 0) {
-        try dict.define(wordlist_idx, bytecode_definition.name);
+        try dict.defineWord(wordlist_idx, bytecode_definition.name);
         try dict.here.comma(token);
     }
 }
@@ -371,9 +371,8 @@ fn mod(rt: *Runtime) Error!void {
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
-    // TODO which wordlist should this use?
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
@@ -383,7 +382,9 @@ fn find(rt: *Runtime) Error!void {
 }
 
 fn nextWord(rt: *Runtime) Error!void {
-    // TODO should this try to refill?
+    // NOTE
+    // This doesnt try to refill,
+    //   because refilling invalidates what was stored in the input buffer
     const range = rt.input_buffer.readNextWordRange() orelse {
         return error.UnexpectedEndOfInput;
     };
@@ -395,11 +396,13 @@ fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    try rt.interpreter.dictionary.define(wordlist_idx, word);
+    try rt.interpreter.dictionary.defineWord(wordlist_idx, word);
 }
 
 fn nextChar(rt: *Runtime) Error!void {
-    // TODO should this try to refill?
+    // NOTE
+    // This doesnt try to refill,
+    //   because refilling invalidates what was stored in the input buffer
     const char = rt.input_buffer.readNextChar() orelse {
         return error.UnexpectedEndOfInput;
     };
@@ -412,17 +415,18 @@ fn refill(rt: *Runtime) Error!void {
 }
 
 fn tick(rt: *Runtime) Error!void {
-    // TODO should this try to refill?
+    // NOTE
+    // This doesnt try to refill,
+    //   because refilling invalidates what was stored in the input buffer
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.search(wordlist_idx, word)) |word_info| {
+    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);
     } else {
-        // TODO
-        @import("std").debug.print("word not found {}:{s}\n", .{ wordlist_idx, word });
+        rt.last_evaluated_word = word;
         return error.WordNotFound;
     }
 }
