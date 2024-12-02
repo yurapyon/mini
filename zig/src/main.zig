@@ -18,6 +18,8 @@ const System = @import("system/system.zig").System;
 const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
 const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
 
+const utils = @import("utils.zig");
+
 // ===
 
 const base_file = @embedFile("base.mini.fth");
@@ -37,7 +39,19 @@ pub fn main() !void {
 
     try rt.processBuffer(base_file);
 
-    // TODO read input files
+    for (cli_options.filepaths.items) |filepath| {
+        const file_buffer = try utils.readFile(allocator, filepath);
+        defer allocator.free(file_buffer);
+
+        rt.processBuffer(file_buffer) catch |err| switch (err) {
+            error.WordNotFound => {
+                std.debug.print("Word not found: {s}\n", .{
+                    rt.last_evaluated_word orelse unreachable,
+                });
+            },
+            else => return err,
+        };
+    }
 
     if (cli_options.run_system) {
         // TODO run this in a separate thread
