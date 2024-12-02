@@ -78,7 +78,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
-    .{ .name = "bye", .callback = bye },
 
     .{ .name = "lit", .callback = lit },
 
@@ -144,6 +143,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{},
     .{},
     .{},
+    .{},
 };
 
 fn nop(_: *Runtime) Error!void {}
@@ -188,11 +188,6 @@ fn jump0(rt: *Runtime) Error!void {
 fn quit(rt: *Runtime) Error!void {
     rt.program_counter = 0;
     rt.should_quit = true;
-}
-
-fn bye(rt: *Runtime) Error!void {
-    rt.program_counter = 0;
-    rt.should_bye = true;
 }
 
 fn eq(rt: *Runtime) Error!void {

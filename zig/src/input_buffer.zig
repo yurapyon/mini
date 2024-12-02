@@ -30,6 +30,7 @@ pub const InputBuffer = struct {
     at: Register(MainMemoryLayout.offsetOf("input_buffer_at")),
     len: Register(MainMemoryLayout.offsetOf("input_buffer_len")),
 
+    // TODO not sure that you need a refiller stack
     refiller_stack: ArrayList(Refiller),
 
     pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {

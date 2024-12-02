@@ -106,9 +106,6 @@ pub const Runtime = struct {
     interpreter: Interpreter,
     input_buffer: InputBuffer,
 
-    // TODO
-    // should_bye is probably something that should be handled at the Repl/System level
-    should_bye: bool,
     should_quit: bool,
 
     externals: ArrayList(External),
@@ -190,49 +187,6 @@ pub const Runtime = struct {
 
     // ===
 
-    // TODO this should take a 'handle errors' callback
-    pub fn interpretLoop(self: *@This()) !void {
-        self.should_bye = false;
-
-        while (!self.should_bye) {
-            self.should_quit = false;
-
-            var did_refill = try self.input_buffer.refill(true);
-
-            while (did_refill and !self.should_quit and !self.should_bye) {
-                const word = self.input_buffer.readNextWord();
-                if (word) |w| {
-                    self.evaluateString(w) catch |err| switch (err) {
-                        error.WordNotFound => {
-                            std.debug.print("Word not found: {s}\n", .{
-                                self.last_evaluated_word orelse unreachable,
-                            });
-                        },
-                        else => return err,
-                    };
-                } else {
-                    did_refill = try self.input_buffer.refill(true);
-                }
-            }
-
-            try self.onQuit();
-        }
-
-        try self.onBye();
-    }
-
-    pub fn onQuit(self: *@This()) !void {
-        const current_refiller = self.input_buffer.peekRefiller();
-        if (!std.mem.eql(u8, current_refiller.id, "stdin")) {
-            const should_continue = self.input_buffer.popRefiller();
-            self.should_bye = !should_continue;
-        }
-    }
-
-    pub fn onBye(self: *@This()) !void {
-        _ = self;
-    }
-
     // TODO how does this handle this scenario:
     // 1. push refiller that executes file
     // 2. file imports another file
@@ -243,21 +197,24 @@ pub const Runtime = struct {
         buffer.init(file);
         try self.input_buffer.pushRefiller(buffer.toRefiller());
 
-        self.should_bye = false;
+        try self.interpretUntilQuit(false);
+
+        _ = self.input_buffer.popRefiller();
+    }
+
+    pub fn interpretUntilQuit(self: *@This(), switch_refillers: bool) !void {
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill(false);
+        var did_refill = try self.input_buffer.refill(switch_refillers);
 
-        while (did_refill and !self.should_quit and !self.should_bye) {
+        while (did_refill and !self.should_quit) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
                 try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill(false);
+                did_refill = try self.input_buffer.refill(switch_refillers);
             }
         }
-
-        _ = self.input_buffer.popRefiller();
     }
 
     // ===

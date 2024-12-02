@@ -39,6 +39,9 @@ pub fn main() !void {
 
     try rt.processBuffer(base_file);
 
+    var repl: Repl = undefined;
+    try repl.init(&rt);
+
     for (cli_options.filepaths.items) |filepath| {
         const file_buffer = try utils.readFile(allocator, filepath);
         defer allocator.free(file_buffer);
@@ -66,8 +69,6 @@ pub fn main() !void {
         defer system.deinit();
     } else {
         if (cli_options.interactive) {
-            var repl: Repl = undefined;
-            repl.init();
             try repl.start(&rt);
         }
     }
