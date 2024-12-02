@@ -58,10 +58,10 @@ compiler
 : recurse jump, last cell + , ;
 forth
 
-: blank,     0 , ;
-: (later),   here @ blank, ;
-: something, lit, (later), ;
-: somewhere, jump, (later), ;
+: blank,       0 , ;
+: (later),     here @ blank, ;
+: (something), lit, (later), ;
+: (somewhere), jump, (later), ;
 
 : this  here @ swap ;
 : dist  this - ;
@@ -113,12 +113,13 @@ forth
 : decimal 10 base ! ;
 : hex 16 base ! ;
 
-: min 2dup > if swap then drop ;
-: max 2dup < if swap then drop ;
+: max>top 2dup < if swap then ;
+: min max>top nip ;
+: max max>top drop ;
 
 \ ( value min max -- value )
 : clamp rot min max ;
-: within[] rot tuck <= -rot >= and ;
+: within[] rot tuck >= -rot <= and ;
 : within[) 1- within[] ;
 
 : numeric?   [char] 0 [char] 9 within[] ;
@@ -138,9 +139,9 @@ forth
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
-: create word define enter-code , something, exit, blank, this! ;
+: create word define enter-code , (something), exit, blank, this! ;
 compiler
-: does>  something, ['] does! , exit, this! ;
+: does>  (something), ['] does! , exit, this! ;
 forth
 
 : variable create cell allot ;
@@ -155,11 +156,16 @@ forth
 
 \ ===
 
-\         push address, push length, jump over the data
-: header, something, something, somewhere, rot this! ;
+\ headers are
+\ lit [data address] lit [data length] jump [end of data *]
+: >addr cell + ;
+: >len  3 cells + ;
+: >jump 5 cells + ;
+: (header), here @ lit, blank, lit, blank, jump, blank, ;
+: header! >r r@ >jump ! r@ >len ! r> >addr ! ;
 
 compiler
-: assign something, ['] swap , ['] ! , exit, this! enter-code , ;
+: assign (something), ['] swap , ['] ! , exit, this! enter-code , ;
 forth
 
 : read-digit next-char char>digit ;
@@ -175,19 +181,31 @@ variable read-char
     dup case
       [char] n of drop 10 endof
       [char] x of drop read-byte endof
+      \ NOTE
+      \ \\ and \" are handled by the 'case' falling through
     endcase
   then ;
 
 ascii
 
-: read-str, next-char dup [char] " <> if read-char @ execute c, recurse then ;
-: string, next-char drop read-str, drop ;
+:noname
+  next-char dup [char] " <> if
+    read-char @ execute c,
+    recurse
+  then ;
+
+: string, next-char drop [ , ] drop ;
+: string,ct ( "string" -- addr len ) here @ string, dup dist ;
 
 compiler
-: "  header, swap here @ string, dist swap ! align this! ;
+: "  (header), >r string,ct align here @ r> header! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
+
+: "  string,ct over here ! ;
+: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
+: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 
 quit
 

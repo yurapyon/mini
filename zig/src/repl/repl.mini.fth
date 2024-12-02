@@ -1,5 +1,4 @@
-
-:noname ( end-addr addr )
+:noname
   2dup <= if
     2drop
   else
