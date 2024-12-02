@@ -21,16 +21,16 @@ const StdInRefiller = @import("../refillers/stdin_refiller.zig").StdInRefiller;
 const repl_file = @embedFile("repl.mini.fth");
 
 fn external_fn(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.Error!bool {
-    _ = userdata;
+    const repl = @as(*Repl, @ptrCast(@alignCast(userdata)));
     switch (token) {
         64 => {
             const raw_char = rt.data_stack.pop();
             const char = @as(u8, @truncate(raw_char & 0xff));
-            std.debug.print("{c}", .{char});
+            repl.emit(char) catch return error.ExternalPanic;
         },
         65 => {
             const cell = rt.data_stack.pop();
-            std.debug.print("{d} ", .{cell});
+            repl.dot(cell) catch return error.ExternalPanic;
         },
         else => return false,
     }
@@ -38,9 +38,15 @@ fn external_fn(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.Error!
 }
 
 pub const Repl = struct {
-    prompt_callback: ?Cell,
+    // TODO use this?
+    prompt_xt: ?Cell,
+    output_file: std.fs.File,
 
-    pub fn start(rt: *Runtime) !void {
+    pub fn init(self: *@This()) void {
+        self.output_file = std.io.getStdOut();
+    }
+
+    pub fn start(self: *@This(), rt: *Runtime) !void {
         var stdin: StdInRefiller = undefined;
         stdin.init();
         try rt.input_buffer.pushRefiller(stdin.toRefiller());
@@ -49,7 +55,7 @@ pub const Repl = struct {
 
         const external = External{
             .callback = external_fn,
-            .userdata = null,
+            .userdata = self,
         };
         const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
         try rt.defineExternal("emit", wlidx, 64);
@@ -58,15 +64,26 @@ pub const Repl = struct {
 
         try rt.processBuffer(repl_file);
 
-        try printBanner();
+        try self.printBanner();
 
         try rt.interpretLoop();
     }
 
-    fn printBanner() !void {
-        const stdout_file = std.io.getStdOut().writer();
-        var bw = std.io.bufferedWriter(stdout_file);
+    fn printBanner(self: *@This()) !void {
+        var bw = std.io.bufferedWriter(self.output_file.writer());
         try bw.writer().print("mini\n", .{});
+        try bw.flush();
+    }
+
+    fn emit(self: *@This(), char: u8) !void {
+        var bw = std.io.bufferedWriter(self.output_file.writer());
+        try bw.writer().print("{c}", .{char});
+        try bw.flush();
+    }
+
+    fn dot(self: *@This(), value: Cell) !void {
+        var bw = std.io.bufferedWriter(self.output_file.writer());
+        try bw.writer().print("{d} ", .{value});
         try bw.flush();
     }
 };

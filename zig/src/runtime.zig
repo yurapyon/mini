@@ -142,7 +142,6 @@ pub const Runtime = struct {
         ) catch unreachable;
     }
 
-    // TODO these could probably be in Dictionary
     fn defineInternalConstants(self: *@This()) !void {
         try self.defineMemoryLocationConstant("here");
         try self.defineMemoryLocationConstant("latest");
@@ -191,7 +190,6 @@ pub const Runtime = struct {
 
     // ===
 
-    // TODO can probably rename to interpretLoop
     pub fn interpretLoop(self: *@This()) !void {
         self.should_bye = false;
 
@@ -378,13 +376,12 @@ pub const Runtime = struct {
             while (i >= 0) : (i -= 1) {
                 var external = self.externals.items[i];
                 if (try external.call(self, token)) {
-                    break;
+                    return;
                 }
             }
-
-            // TODO could raise an 'unhandled external' error
-
         }
+
+        return error.UnhandledExternal;
     }
 };
 

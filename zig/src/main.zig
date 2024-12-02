@@ -52,7 +52,9 @@ pub fn main() !void {
         defer system.deinit();
     } else {
         if (cli_options.interactive) {
-            try Repl.start(&rt);
+            var repl: Repl = undefined;
+            repl.init();
+            try repl.start(&rt);
         }
     }
 }
