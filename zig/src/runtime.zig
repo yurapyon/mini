@@ -1,5 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
 const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
@@ -25,6 +26,11 @@ const DataStack = stack.DataStack;
 const ReturnStack = stack.ReturnStack;
 
 const bytecodes = @import("bytecodes.zig");
+
+const externals = @import("externals.zig");
+const External = externals.External;
+
+const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
 
 // ===
 
@@ -88,16 +94,6 @@ pub const CompileState = enum(Cell) {
     }
 };
 
-pub const ExternalError = error{
-    ExternalPanic,
-};
-
-pub const ExternalsCallback = *const fn (
-    rt: *Runtime,
-    id: Cell,
-    userdata: ?*anyopaque,
-) ExternalError!void;
-
 pub const Runtime = struct {
     allocator: Allocator,
     memory: MemoryPtr,
@@ -110,11 +106,12 @@ pub const Runtime = struct {
     interpreter: Interpreter,
     input_buffer: InputBuffer,
 
+    // TODO
+    // should_bye is probably something that should be handled at the Repl/System level
     should_bye: bool,
     should_quit: bool,
 
-    externals_callback: ?ExternalsCallback,
-    externals_userdata: ?*anyopaque,
+    externals: ArrayList(External),
 
     last_evaluated_word: ?[]const u8,
 
@@ -124,6 +121,8 @@ pub const Runtime = struct {
 
         self.interpreter.init(self.memory);
         self.input_buffer.init(self.allocator, self.memory);
+
+        self.externals = ArrayList(External).init(allocator);
 
         self.last_evaluated_word = null;
 
@@ -191,7 +190,7 @@ pub const Runtime = struct {
 
     // ===
 
-    pub fn repl(self: *@This()) !void {
+    pub fn interpretLoop(self: *@This()) !void {
         self.should_bye = false;
 
         while (!self.should_bye) {
@@ -233,6 +232,33 @@ pub const Runtime = struct {
 
     pub fn onBye(self: *@This()) !void {
         _ = self;
+    }
+
+    // TODO how does this handle this scenario:
+    // 1. push refiller that executes file
+    // 2. file imports another file
+    // 3. other file has 'quit' in it
+    // might have to redefine 'quit' if 'interpret' is defined in forth
+    pub fn processBuffer(self: *@This(), file: []const u8) !void {
+        var buffer: BufferRefiller = undefined;
+        buffer.init(file);
+        try self.input_buffer.pushRefiller(buffer.toRefiller());
+
+        self.should_bye = false;
+        self.should_quit = false;
+
+        var did_refill = try self.input_buffer.refill(false);
+
+        while (did_refill and !self.should_quit and !self.should_bye) {
+            const word = self.input_buffer.readNextWord();
+            if (word) |w| {
+                try self.evaluateString(w);
+            } else {
+                did_refill = try self.input_buffer.refill(false);
+            }
+        }
+
+        _ = self.input_buffer.popRefiller();
     }
 
     // ===
@@ -319,9 +345,7 @@ pub const Runtime = struct {
             if (bytecodes.getBytecode(token)) |definition| {
                 try definition.callback(self);
             } else {
-                if (self.externals_callback) |cb| {
-                    try cb(self, token, self.externals_userdata);
-                }
+                try self.processExternals(token);
             }
         }
     }
@@ -335,6 +359,29 @@ pub const Runtime = struct {
     pub fn advancePC(self: *@This(), offset: Cell) !void {
         try mem.assertOffsetInBounds(self.program_counter, offset);
         self.program_counter += offset;
+    }
+
+    // ===
+
+    pub fn addExternal(self: *@This(), external: External) !void {
+        try self.externals.append(external);
+    }
+
+    fn processExternals(self: *@This(), token: Cell) !void {
+        if (self.externals.items.len > 0) {
+            // NOTE
+            // Starts at the end of the list so
+            //   later externals can override earlier ones
+            var i: usize = self.externals.items.len - 1;
+            while (i >= 0) : (i -= 1) {
+                var external = self.externals.items[i];
+                if (try external.call(self, token)) {
+                    return;
+                }
+            }
+        }
+
+        return error.UnhandledExternal;
     }
 };
 
