@@ -381,7 +381,9 @@ fn nextWord(rt: *Runtime) Error!void {
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
     const range = rt.input_buffer.readNextWordRange() orelse {
-        return error.UnexpectedEndOfInput;
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
     };
     rt.data_stack.push(range.address);
     rt.data_stack.push(range.len);

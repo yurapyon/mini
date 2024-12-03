@@ -62,7 +62,15 @@ pub const Repl = struct {
         try rt.defineExternal(".", wlidx, 66);
         try rt.addExternal(external);
 
-        try rt.processBuffer(repl_file);
+        rt.processBuffer(repl_file) catch |err| switch (err) {
+            error.WordNotFound => {
+                std.debug.print("Word not found: {s}\n", .{
+                    rt.last_evaluated_word orelse unreachable,
+                });
+                return err;
+            },
+            else => return err,
+        };
     }
 
     pub fn start(self: *@This(), rt: *Runtime) !void {

@@ -153,6 +153,14 @@ pub const Runtime = struct {
             ">in",
             MainMemoryLayout.offsetOf("input_buffer_at"),
         );
+        try self.interpreter.dictionary.compileConstant(
+            "true",
+            cellFromBoolean(true),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "false",
+            cellFromBoolean(false),
+        );
         try self.defineSourceWord();
     }
 
