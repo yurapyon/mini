@@ -30,10 +30,9 @@ pub const InputBuffer = struct {
     at: Register(MainMemoryLayout.offsetOf("input_buffer_at")),
     len: Register(MainMemoryLayout.offsetOf("input_buffer_len")),
 
-    // TODO not sure that you need a refiller stack
-    refiller_stack: ArrayList(Refiller),
+    refiller: ?Refiller,
 
-    pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
+    pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
         self.at.init(memory);
         self.len.init(memory);
@@ -41,7 +40,7 @@ pub const InputBuffer = struct {
         self.at.store(0);
         self.len.store(0);
 
-        self.refiller_stack = ArrayList(Refiller).init(allocator);
+        self.refiller = null;
     }
 
     fn setInputBuffer(
@@ -63,38 +62,17 @@ pub const InputBuffer = struct {
         self.len.store(@intCast(buffer.len));
     }
 
-    pub fn pushRefiller(
-        self: *@This(),
-        refiller: Refiller,
-    ) !void {
-        try self.refiller_stack.append(refiller);
-    }
-
-    // Returns whether there are still refillers
-    pub fn popRefiller(self: *@This()) bool {
-        _ = self.refiller_stack.pop();
-        return self.refiller_stack.items.len > 0;
-    }
-
-    pub fn peekRefiller(self: *@This()) *Refiller {
-        return &self.refiller_stack
-            .items[self.refiller_stack.items.len - 1];
-    }
-
-    pub fn refill(self: *@This(), continue_on_empty: bool) !bool {
-        while (true) {
-            const refiller = self.peekRefiller();
+    pub fn refill(self: *@This()) !bool {
+        if (self.refiller) |*refiller| {
             const buffer = try refiller.refill();
             if (buffer) |buf| {
                 try self.setInputBuffer(buf);
                 return true;
             } else {
-                if (continue_on_empty and self.refiller_stack.items.len > 0) {
-                    _ = self.popRefiller();
-                } else {
-                    return false;
-                }
+                return false;
             }
+        } else {
+            return error.CannotRefill;
         }
     }
 

@@ -68,7 +68,7 @@ pub const Repl = struct {
     pub fn start(self: *@This(), rt: *Runtime) !void {
         var stdin: StdInRefiller = undefined;
         stdin.init();
-        try rt.input_buffer.pushRefiller(stdin.toRefiller());
+        rt.input_buffer.refiller = stdin.toRefiller();
 
         stdin.prompt = "> ";
 
@@ -77,7 +77,7 @@ pub const Repl = struct {
         self.should_bye = false;
 
         while (!self.should_bye) {
-            rt.interpretUntilQuit(true) catch |err| switch (err) {
+            rt.interpretUntilQuit() catch |err| switch (err) {
                 error.WordNotFound => {
                     std.debug.print("Word not found: {s}\n", .{
                         rt.last_evaluated_word orelse unreachable,

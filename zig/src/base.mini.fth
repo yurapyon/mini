@@ -206,6 +206,10 @@ forth
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 
+\ todo note
+\ if interpret/import is defined,
+\ quit has to be redefined in forth
+
 quit
 
 \ ===

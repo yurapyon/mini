@@ -117,7 +117,7 @@ pub const Runtime = struct {
         self.memory = memory;
 
         self.interpreter.init(self.memory);
-        self.input_buffer.init(self.allocator, self.memory);
+        self.input_buffer.init(self.memory);
 
         self.externals = ArrayList(External).init(allocator);
 
@@ -187,32 +187,27 @@ pub const Runtime = struct {
 
     // ===
 
-    // TODO how does this handle this scenario:
-    // 1. push refiller that executes file
-    // 2. file imports another file
-    // 3. other file has 'quit' in it
-    // might have to redefine 'quit' if 'interpret' is defined in forth
     pub fn processBuffer(self: *@This(), file: []const u8) !void {
         var buffer: BufferRefiller = undefined;
         buffer.init(file);
-        try self.input_buffer.pushRefiller(buffer.toRefiller());
+        self.input_buffer.refiller = buffer.toRefiller();
 
-        try self.interpretUntilQuit(false);
-
-        _ = self.input_buffer.popRefiller();
+        try self.interpretUntilQuit();
     }
 
-    pub fn interpretUntilQuit(self: *@This(), switch_refillers: bool) !void {
+    pub fn interpretUntilQuit(
+        self: *@This(),
+    ) !void {
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill(switch_refillers);
+        var did_refill = try self.input_buffer.refill();
 
         while (did_refill and !self.should_quit) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
                 try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill(switch_refillers);
+                did_refill = try self.input_buffer.refill();
             }
         }
     }
