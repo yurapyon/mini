@@ -78,7 +78,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
-    .{ .name = "bye", .callback = bye },
 
     .{ .name = "lit", .callback = lit },
 
@@ -135,8 +134,10 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
 
-    .{},
-    .{},
+    .{ .name = ">number", .callback = toNumber },
+    .{ .name = ".s", .callback = showStack },
+    .{ .name = "move", .callback = move },
+
     .{},
     .{},
     .{},
@@ -188,11 +189,6 @@ fn jump0(rt: *Runtime) Error!void {
 fn quit(rt: *Runtime) Error!void {
     rt.program_counter = 0;
     rt.should_quit = true;
-}
-
-fn bye(rt: *Runtime) Error!void {
-    rt.program_counter = 0;
-    rt.should_bye = true;
 }
 
 fn eq(rt: *Runtime) Error!void {
@@ -386,7 +382,9 @@ fn nextWord(rt: *Runtime) Error!void {
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
     const range = rt.input_buffer.readNextWordRange() orelse {
-        return error.UnexpectedEndOfInput;
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
     };
     rt.data_stack.push(range.address);
     rt.data_stack.push(range.len);
@@ -410,7 +408,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill(true);
+    const did_refill = try rt.input_buffer.refill();
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
@@ -436,4 +434,32 @@ fn lit(rt: *Runtime) Error!void {
     const value = try mem.readCell(rt.memory, rt.program_counter);
     rt.data_stack.push(value);
     try rt.advancePC(@sizeOf(Cell));
+}
+
+fn toNumber(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    // TODO
+    const base = 10;
+    const number_usize = utils.parseNumber(word, base) catch {
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
+    };
+    const cell = @as(Cell, @truncate(number_usize & 0xffff));
+    rt.data_stack.push(cell);
+    rt.data_stack.push(0xffff);
+}
+
+fn showStack(rt: *Runtime) Error!void {
+    const count = rt.data_stack.pop();
+    _ = count;
+}
+
+fn move(rt: *Runtime) Error!void {
+    const destination, const source = rt.data_stack.pop2();
+    const count = rt.data_stack.pop();
+    _ = source;
+    _ = destination;
+    _ = count;
 }

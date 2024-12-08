@@ -9,6 +9,7 @@ pub const StdInRefiller = struct {
 
     pub fn init(self: *@This()) void {
         self.stdin = std.io.getStdIn();
+        self.prompt = null;
     }
 
     fn refill(self_: ?*anyopaque) !?[]const u8 {
