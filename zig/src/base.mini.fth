@@ -56,6 +56,7 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : next,   here @ 2 cells + jump, , ;
 compiler
 : recurse jump, last cell + , ;
+: return exit, ;
 forth
 
 : blank,       0 , ;
@@ -134,7 +135,10 @@ forth
 
 \ ===
 
+: @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
+: c@+ dup 1+ swap c@ ;
+: c!+ tuck c! 1+ ;
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
@@ -192,8 +196,8 @@ ascii
   next-char dup [char] " <> if
     read-char @ execute c, recurse
   then ;
-
 : string, next-char drop [ , ] drop ;
+
 : string,ct here @ string, dup dist ;
 
 compiler

@@ -78,7 +78,7 @@ pub const Repl = struct {
         stdin.init();
         rt.input_buffer.refiller = stdin.toRefiller();
 
-        stdin.prompt = "> ";
+        // stdin.prompt = "> ";
 
         try self.printBanner();
 

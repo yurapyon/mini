@@ -1,21 +1,22 @@
-:noname
-  2dup <= if
-    2drop
-  else
-    dup c@ emit
-    1+ recurse
-  then ;
 
-: type ( addr ct -- )
-  over + swap [ , ] ;
+:noname 2dup > if c@+ emit recurse then ;
+: type over + swap [ , ] 2drop ;
 
-: cr 10 emit ;
+: bl 32 ;
+: nl 10 ;
+: space bl emit ;
+: cr nl emit ;
 
 : ." [compile] s" type ; \ "
 
 compiler
-: ." [compile] s" type ; \ "
+: ." [compile] s" ['] type , ; \ "
 forth
+
+: print-name cell + c@+ ?dup if type else drop then ;
+
+:noname ?dup if dup print-name space @ recurse then ;
+: words latest @ [ , ] ;
 
 \ ===
 
@@ -25,7 +26,7 @@ true source-user-input !
 
 variable prompt-hook
 
-: basic-prompt prompt-hook assign s" - " type ;
+: basic-prompt prompt-hook assign ." > " ;
 
 basic-prompt
 
@@ -35,21 +36,18 @@ basic-prompt
 
 : lookup find if >cfa execute true then ;
 
-: to-number
-  \ todo
-  ;
-
 : resolve
-  2dup lookup    ?dup if [ exit, ] then
-  \ 2dup to-number ?dup if exit then
+  cond
+  2dup lookup  if 2drop else
+  2dup >number if 2drop else
   ." word not found: " type cr
-  false ;
+  endcond ;
 
 : interpret
   word ?dup if
     resolve
   else
-    drop next-line
+    drop next-line 0= if return then
   then
-  if recurse then ;
+  recurse ;
 

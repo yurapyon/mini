@@ -134,9 +134,10 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
 
-    .{},
-    .{},
-    .{},
+    .{ .name = ">number", .callback = toNumber },
+    .{ .name = ".s", .callback = showStack },
+    .{ .name = "move", .callback = move },
+
     .{},
     .{},
     .{},
@@ -433,4 +434,32 @@ fn lit(rt: *Runtime) Error!void {
     const value = try mem.readCell(rt.memory, rt.program_counter);
     rt.data_stack.push(value);
     try rt.advancePC(@sizeOf(Cell));
+}
+
+fn toNumber(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    // TODO
+    const base = 10;
+    const number_usize = utils.parseNumber(word, base) catch {
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
+    };
+    const cell = @as(Cell, @truncate(number_usize & 0xffff));
+    rt.data_stack.push(cell);
+    rt.data_stack.push(0xffff);
+}
+
+fn showStack(rt: *Runtime) Error!void {
+    const count = rt.data_stack.pop();
+    _ = count;
+}
+
+fn move(rt: *Runtime) Error!void {
+    const destination, const source = rt.data_stack.pop2();
+    const count = rt.data_stack.pop();
+    _ = source;
+    _ = destination;
+    _ = count;
 }
