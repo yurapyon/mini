@@ -134,10 +134,12 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
 
+    // TODO this could be part of the io lib
     .{ .name = ">number", .callback = toNumber },
-    .{ .name = ".s", .callback = showStack },
+
     .{ .name = "move", .callback = move },
 
+    .{},
     .{},
     .{},
     .{},
@@ -449,11 +451,6 @@ fn toNumber(rt: *Runtime) Error!void {
     const cell = @as(Cell, @truncate(number_usize & 0xffff));
     rt.data_stack.push(cell);
     rt.data_stack.push(0xffff);
-}
-
-fn showStack(rt: *Runtime) Error!void {
-    const count = rt.data_stack.pop();
-    _ = count;
 }
 
 fn move(rt: *Runtime) Error!void {

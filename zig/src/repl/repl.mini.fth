@@ -13,10 +13,23 @@ compiler
 : ." [compile] s" ['] type , ; \ "
 forth
 
-: print-name cell + c@+ ?dup if type else drop then ;
+: print-name name ?dup if type else drop ." _" then ;
 
 :noname ?dup if dup print-name space @ recurse then ;
 : words latest @ [ , ] ;
+
+:noname 2dup < if @ recurse then ;
+: xt>def latest @ [ , ] nip ;
+
+:noname
+  dup @ ['] exit <> if
+    dup @ xt>def print-name space
+    cell + recurse
+  then ;
+
+: print-body >cfa cell + [ , ] ;
+
+: see word find if dup print-name ." : " print-body then cr ;
 
 \ ===
 

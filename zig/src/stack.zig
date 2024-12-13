@@ -13,6 +13,10 @@ const CircularStack = struct {
         return self.stack[self.idx];
     }
 
+    pub fn index(self: *@This(), idx: u8) Cell {
+        return self.stack[self.idx +% idx];
+    }
+
     fn setTop(self: *@This(), value: Cell) void {
         self.stack[self.idx] = value;
     }
@@ -41,6 +45,16 @@ pub const DataStack = struct {
 
     pub fn peek(self: *@This()) Cell {
         return self.top;
+    }
+
+    pub fn index(self: *@This(), idx: u8) Cell {
+        if (idx == 0) {
+            return self.top;
+        } else if (idx == 1) {
+            return self.second;
+        } else {
+            return self.inner.index(idx -% 2);
+        }
     }
 
     pub fn push(self: *@This(), value: Cell) void {

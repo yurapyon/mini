@@ -39,6 +39,11 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : cell 2 ;
 : cells cell * ;
 
+: @+ dup cell + swap @ ;
+: !+ tuck ! cell + ;
+: c@+ dup 1+ swap c@ ;
+: c!+ tuck c! 1+ ;
+
 : allot   here +! ;
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
@@ -47,13 +52,14 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : >cfa >name-len dup c@ + 1 + aligned ;
 : last latest @ >cfa ;
 
+: name >name-len c@+ ;
+
 \ tags
 : exit,  ['] exit , ;
 : jump0, ['] jump0 , ;
 : jump,  ['] jump , ;
 
 : :noname 0 0 define here @ enter-code , ] ;
-: next,   here @ 2 cells + jump, , ;
 compiler
 : recurse jump, last cell + , ;
 : return exit, ;
@@ -65,8 +71,8 @@ forth
 : (somewhere), jump, (later), ;
 
 : this  here @ swap ;
-: dist  this - ;
 : this! this ! ;
+: dist  this - ;
 
 \ basic syntax
 compiler
@@ -135,11 +141,6 @@ forth
 
 \ ===
 
-: @+ dup cell + swap @ ;
-: !+ tuck ! cell + ;
-: c@+ dup 1+ swap c@ ;
-: c!+ tuck c! 1+ ;
-
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
@@ -159,14 +160,6 @@ forth
 : field     swap aligned swap +field ;
 
 \ ===
-
-\ headers are
-\ lit [data address] lit [data length] jump [end of data *]
-: >addr cell + ;
-: >len  3 cells + ;
-: >jump 5 cells + ;
-: (header), here @ lit, blank, lit, blank, jump, blank, ;
-: header! >r r@ >jump ! r@ >len ! r> >addr ! ;
 
 compiler
 : assign (something), ['] swap , ['] ! , exit, this! enter-code , ;
@@ -192,21 +185,25 @@ variable read-char
 
 ascii
 
+: count @+ ;
+
+: (data), (something), (somewhere), swap this! ;
+
 :noname
   next-char dup [char] " <> if
     read-char @ execute c, recurse
   then ;
-: string, next-char drop [ , ] drop ;
+: "", next-char drop [ , ] drop ;
 
-: string,ct here @ string, dup dist ;
+: string, (later), here @ "", dist swap ! ;
 
 compiler
-: "  (header), >r string,ct align here @ r> header! ;
+: "  (data), string, align this! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
-: "  string,ct over here ! ;
+: "  here @ dup string, here ! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 
@@ -214,10 +211,14 @@ forth
 \ if interpret/import is defined,
 \ quit has to be redefined in forth
 
+:noname ?dup if 0 swap 1- recurse then ;
+: cls 33 [ , ] ;
+
 quit
 
 \ ===
 
+: next, (somewhere), this! ;
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
