@@ -7,10 +7,10 @@
 : space bl emit ;
 : cr nl emit ;
 
-: ." [compile] s" type ; \ "
+: ." [compile] s" count type ; \ "
 
 compiler
-: ." [compile] s" ['] type , ; \ "
+: ." [compile] s" ['] count , ['] type , ; \ "
 forth
 
 : print-name name ?dup if type else drop ." _" then ;
@@ -21,11 +21,17 @@ forth
 :noname 2dup < if @ recurse then ;
 : xt>def latest @ [ , ] nip ;
 
+: .inner ." (" cell + dup @ . ." )" ;
+
 :noname
-  dup @ ['] exit <> if
-    dup @ xt>def print-name space
-    cell + recurse
-  then ;
+  cond
+    dup @ ['] exit =  if ." ;" return else
+    dup @ ['] lit =   if ." lit" .inner else
+    dup @ ['] jump =  if ." jump" .inner else
+    dup @ ['] jump0 = if ." jump0" .inner else
+    dup @ xt>def print-name
+  endcond
+  space cell + recurse ;
 
 : print-body >cfa cell + [ , ] ;
 

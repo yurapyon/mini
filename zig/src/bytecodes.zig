@@ -133,13 +133,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
-
-    // TODO this could be part of the io lib
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
+    .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
     .{},
@@ -441,8 +439,8 @@ fn lit(rt: *Runtime) Error!void {
 fn toNumber(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
-    // TODO
-    const base = 10;
+    const base_addr = runtime.MainMemoryLayout.offsetOf("base");
+    const base = mem.readCell(rt.memory, base_addr) catch unreachable;
     const number_usize = utils.parseNumber(word, base) catch {
         rt.data_stack.push(0);
         rt.data_stack.push(0);
@@ -454,9 +452,35 @@ fn toNumber(rt: *Runtime) Error!void {
 }
 
 fn move(rt: *Runtime) Error!void {
-    const destination, const source = rt.data_stack.pop2();
+    const std = @import("std");
+
     const count = rt.data_stack.pop();
-    _ = source;
-    _ = destination;
-    _ = count;
+    const destination, const source = rt.data_stack.pop2();
+    const source_slice = try mem.constSliceFromAddrAndLen(
+        rt.memory,
+        source,
+        count,
+    );
+    const destination_slice = try mem.sliceFromAddrAndLen(
+        rt.memory,
+        destination,
+        count,
+    );
+
+    if (destination > source) {
+        std.mem.copyBackwards(u8, destination_slice, source_slice);
+    } else {
+        std.mem.copyForwards(u8, destination_slice, source_slice);
+    }
+}
+
+fn memEqual(rt: *Runtime) Error!void {
+    const std = @import("std");
+
+    const count = rt.data_stack.pop();
+    const b_addr, const a_addr = rt.data_stack.pop2();
+    const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, count);
+    const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, count);
+    const areEqual = std.mem.eql(u8, a_slice, b_slice);
+    rt.data_stack.push(runtime.cellFromBoolean(areEqual));
 }
