@@ -48,6 +48,8 @@ pub const DataStack = struct {
     }
 
     pub fn index(self: *@This(), idx: u8) Cell {
+        // TODO
+        // This has to wrap around 34
         if (idx == 0) {
             return self.top;
         } else if (idx == 1) {

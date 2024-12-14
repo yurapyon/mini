@@ -35,6 +35,9 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : 2dup  over over ;
 : 2drop drop drop ;
 : 3drop drop 2drop ;
+: save over -rot ;
+
+: /mod 2dup / -rot mod ;
 
 : cell 2 ;
 : cells cell * ;
@@ -139,6 +142,8 @@ forth
     dup lowercase? if [char] a - 10 + else
   endcond ;
 
+: digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
+
 \ ===
 
 : >body  5 cells + ;
@@ -158,6 +163,24 @@ forth
 : offsetter create , does> @ + ;
 : +field    over offsetter + ;
 : field     swap aligned swap +field ;
+
+\ ===
+
+:noname base @ / ?dup if swap 1+ swap recurse then ;
+: uwidth 1 swap [ , ] ;
+
+8 cells allot
+here @ constant .buf-end
+variable .buf-start
+
+: next.buf -1 .buf-start +! ;
+
+: chop-digit base @ /mod ;
+: digit>.buf digit>char .buf-start @ c! ;
+
+:noname chop-digit digit>.buf ?dup if next.buf recurse then ;
+: >.buf .buf-end 1- .buf-start ! [ , ] ;
+: .buf .buf-start @ .buf-end over - ;
 
 \ ===
 

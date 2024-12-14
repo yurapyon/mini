@@ -37,7 +37,15 @@ pub fn main() !void {
     var rt: Runtime = undefined;
     rt.init(allocator, memory);
 
-    try rt.processBuffer(base_file);
+    rt.processBuffer(base_file) catch |err| switch (err) {
+        error.WordNotFound => {
+            std.debug.print("Word not found: {s}\n", .{
+                rt.last_evaluated_word orelse unreachable,
+            });
+            return err;
+        },
+        else => return err,
+    };
 
     var repl: Repl = undefined;
     try repl.init(&rt);
