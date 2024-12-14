@@ -35,7 +35,7 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : 2dup  over over ;
 : 2drop drop drop ;
 : 3drop drop 2drop ;
-: save over -rot ;
+: save  over -rot ;
 
 : /mod 2dup / -rot mod ;
 
@@ -132,14 +132,10 @@ forth
 : within[] rot tuck >= -rot <= and ;
 : within[) 1- within[] ;
 
-: numeric?   [char] 0 [char] 9 within[] ;
-: capital?   [char] A [char] Z within[] ;
-: lowercase? [char] a [char] z within[] ;
-
 : char>digit cond
-    dup numeric?   if [char] 0 -      else
-    dup capital?   if [char] A - 10 + else
-    dup lowercase? if [char] a - 10 + else
+    dup [char] 0 [char] 9 within[] if [char] 0 -      else
+    dup [char] A [char] Z within[] if [char] A - 10 + else
+    dup [char] a [char] z within[] if [char] a - 10 + else
   endcond ;
 
 : digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
@@ -175,10 +171,10 @@ variable .buf-start
 
 : next.buf -1 .buf-start +! ;
 
-: chop-digit base @ /mod ;
+: chop base @ /mod ;
 : digit>.buf digit>char .buf-start @ c! ;
 
-:noname chop-digit digit>.buf ?dup if next.buf recurse then ;
+:noname chop digit>.buf ?dup if next.buf recurse then ;
 : >.buf .buf-end 1- .buf-start ! [ , ] ;
 : .buf .buf-start @ .buf-end over - ;
 
@@ -212,21 +208,20 @@ ascii
 
 : (data), (something), (somewhere), swap this! ;
 
-:noname
+: "",
   next-char dup [char] " <> if
     read-char @ execute c, recurse
-  then ;
-: "", next-char drop [ , ] drop ;
+  then drop ;
 
 : string, (later), here @ "", dist swap ! ;
 
 compiler
-: "  (data), string, align this! ;
+: "  next-char drop (data), string, align this! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
-: "  here @ dup string, here ! ;
+: "  next-char drop here @ dup string, here ! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 
@@ -236,6 +231,8 @@ forth
 
 :noname ?dup if 0 swap 1- recurse then ;
 : cls 33 [ , ] ;
+
+: wlatest context @ cells wordlists + @ ;
 
 quit
 

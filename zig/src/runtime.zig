@@ -145,6 +145,7 @@ pub const Runtime = struct {
         try self.defineMemoryLocationConstant("context");
         try self.defineMemoryLocationConstant("state");
         try self.defineMemoryLocationConstant("base");
+        try self.defineMemoryLocationConstant("wordlists");
         try self.interpreter.dictionary.compileConstant(
             "d0",
             MainMemoryLayout.offsetOf("dictionary_start"),

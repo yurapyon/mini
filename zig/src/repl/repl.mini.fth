@@ -24,39 +24,36 @@ forth
 
 : print-name name ?dup if type else drop ." _" then ;
 
-:noname ?dup if dup print-name space @ recurse then ;
-: words latest @ [ , ] ;
+: words ?dup if dup print-name space @ recurse then ;
 
-:noname 2dup < if @ recurse then ;
-: xt>def latest @ [ , ] nip ;
+: xt>def 2dup < if @ recurse then nip ;
 
 : .inner ." (" cell + dup @ . ." )" ;
 
-:noname
+: print-body
   cond
     dup @ ['] exit =  if ." ;" return else
     dup @ ['] lit =   if ." lit" .inner else
     dup @ ['] jump =  if ." jump" .inner else
     dup @ ['] jump0 = if ." jump0" .inner else
-    dup @ xt>def print-name
+    dup @ latest @ xt>def print-name
   endcond
   space cell + recurse ;
 
-: print-body >cfa cell + [ , ] ;
-
-: see word find if dup print-name ." : " print-body then cr ;
+: see word find if
+    dup print-name ." : "
+    >cfa cell + print-body
+  then cr ;
 
 : printable? 32 126 within[] ;
 : >printable dup printable? 0= if drop [char] . then ;
 
 : print-header 4 u.r ." : " ;
-:noname 2dup > if c@+ 2 u.0 space recurse then ;
-: print-bytes dup 16 + swap [ , ] 2drop ;
-:noname 2dup > if c@+ >printable emit recurse then ;
-: print-chars dup 16 + swap [ , ] 2drop ;
-: print-line dup print-header dup print-bytes print-chars ;
+: print-bytes 2dup > if c@+     2 u.0 space recurse then 2drop ;
+: print-chars 2dup > if c@+ >printable emit recurse then 2drop ;
+: print-line dup print-header 2dup print-bytes print-chars ;
 
-:noname 2dup > if dup print-line cr 16 + recurse then ;
+:noname 2dup > if dup 16 + swap save print-line cr recurse then ;
 : dump base @ >r hex over + swap [ , ] r> base ! ;
 
 quit
