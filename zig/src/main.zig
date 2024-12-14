@@ -18,6 +18,8 @@ const System = @import("system/system.zig").System;
 const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
 const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
 
+const utils = @import("utils.zig");
+
 // ===
 
 const base_file = @embedFile("base.mini.fth");
@@ -35,9 +37,32 @@ pub fn main() !void {
     var rt: Runtime = undefined;
     rt.init(allocator, memory);
 
-    try rt.processBuffer(base_file);
+    rt.processBuffer(base_file) catch |err| switch (err) {
+        error.WordNotFound => {
+            std.debug.print("Word not found: {s}\n", .{
+                rt.last_evaluated_word orelse unreachable,
+            });
+            return err;
+        },
+        else => return err,
+    };
 
-    // TODO read input files
+    var repl: Repl = undefined;
+    try repl.init(&rt);
+
+    for (cli_options.filepaths.items) |filepath| {
+        const file_buffer = try utils.readFile(allocator, filepath);
+        defer allocator.free(file_buffer);
+
+        rt.processBuffer(file_buffer) catch |err| switch (err) {
+            error.WordNotFound => {
+                std.debug.print("Word not found: {s}\n", .{
+                    rt.last_evaluated_word orelse unreachable,
+                });
+            },
+            else => return err,
+        };
+    }
 
     if (cli_options.run_system) {
         // TODO run this in a separate thread
@@ -52,8 +77,6 @@ pub fn main() !void {
         defer system.deinit();
     } else {
         if (cli_options.interactive) {
-            var repl: Repl = undefined;
-            repl.init();
             try repl.start(&rt);
         }
     }

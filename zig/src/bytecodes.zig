@@ -78,7 +78,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
-    .{ .name = "bye", .callback = bye },
 
     .{ .name = "lit", .callback = lit },
 
@@ -134,9 +133,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
+    .{ .name = ">number", .callback = toNumber },
 
-    .{},
-    .{},
+    .{ .name = "move", .callback = move },
+    .{ .name = "mem=", .callback = memEqual },
+
     .{},
     .{},
     .{},
@@ -188,11 +189,6 @@ fn jump0(rt: *Runtime) Error!void {
 fn quit(rt: *Runtime) Error!void {
     rt.program_counter = 0;
     rt.should_quit = true;
-}
-
-fn bye(rt: *Runtime) Error!void {
-    rt.program_counter = 0;
-    rt.should_bye = true;
 }
 
 fn eq(rt: *Runtime) Error!void {
@@ -386,7 +382,9 @@ fn nextWord(rt: *Runtime) Error!void {
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
     const range = rt.input_buffer.readNextWordRange() orelse {
-        return error.UnexpectedEndOfInput;
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
     };
     rt.data_stack.push(range.address);
     rt.data_stack.push(range.len);
@@ -410,7 +408,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill(true);
+    const did_refill = try rt.input_buffer.refill();
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
@@ -436,4 +434,53 @@ fn lit(rt: *Runtime) Error!void {
     const value = try mem.readCell(rt.memory, rt.program_counter);
     rt.data_stack.push(value);
     try rt.advancePC(@sizeOf(Cell));
+}
+
+fn toNumber(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+    const base_addr = runtime.MainMemoryLayout.offsetOf("base");
+    const base = mem.readCell(rt.memory, base_addr) catch unreachable;
+    const number_usize = utils.parseNumber(word, base) catch {
+        rt.data_stack.push(0);
+        rt.data_stack.push(0);
+        return;
+    };
+    const cell = @as(Cell, @truncate(number_usize & 0xffff));
+    rt.data_stack.push(cell);
+    rt.data_stack.push(0xffff);
+}
+
+fn move(rt: *Runtime) Error!void {
+    const std = @import("std");
+
+    const count = rt.data_stack.pop();
+    const destination, const source = rt.data_stack.pop2();
+    const source_slice = try mem.constSliceFromAddrAndLen(
+        rt.memory,
+        source,
+        count,
+    );
+    const destination_slice = try mem.sliceFromAddrAndLen(
+        rt.memory,
+        destination,
+        count,
+    );
+
+    if (destination > source) {
+        std.mem.copyBackwards(u8, destination_slice, source_slice);
+    } else {
+        std.mem.copyForwards(u8, destination_slice, source_slice);
+    }
+}
+
+fn memEqual(rt: *Runtime) Error!void {
+    const std = @import("std");
+
+    const count = rt.data_stack.pop();
+    const b_addr, const a_addr = rt.data_stack.pop2();
+    const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, count);
+    const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, count);
+    const areEqual = std.mem.eql(u8, a_slice, b_slice);
+    rt.data_stack.push(runtime.cellFromBoolean(areEqual));
 }

@@ -35,9 +35,17 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : 2dup  over over ;
 : 2drop drop drop ;
 : 3drop drop 2drop ;
+: save over -rot ;
+
+: /mod 2dup / -rot mod ;
 
 : cell 2 ;
 : cells cell * ;
+
+: @+ dup cell + swap @ ;
+: !+ tuck ! cell + ;
+: c@+ dup 1+ swap c@ ;
+: c!+ tuck c! 1+ ;
 
 : allot   here +! ;
 : aligned dup cell mod + ;
@@ -47,15 +55,17 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : >cfa >name-len dup c@ + 1 + aligned ;
 : last latest @ >cfa ;
 
+: name >name-len c@+ ;
+
 \ tags
 : exit,  ['] exit , ;
 : jump0, ['] jump0 , ;
 : jump,  ['] jump , ;
 
 : :noname 0 0 define here @ enter-code , ] ;
-: next,   here @ 2 cells + jump, , ;
 compiler
 : recurse jump, last cell + , ;
+: return exit, ;
 forth
 
 : blank,       0 , ;
@@ -64,8 +74,8 @@ forth
 : (somewhere), jump, (later), ;
 
 : this  here @ swap ;
-: dist  this - ;
 : this! this ! ;
+: dist  this - ;
 
 \ basic syntax
 compiler
@@ -132,9 +142,9 @@ forth
     dup lowercase? if [char] a - 10 + else
   endcond ;
 
-\ ===
+: digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
 
-: !+ tuck ! cell + ;
+\ ===
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
@@ -156,13 +166,23 @@ forth
 
 \ ===
 
-\ headers are
-\ lit [data address] lit [data length] jump [end of data *]
-: >addr cell + ;
-: >len  3 cells + ;
-: >jump 5 cells + ;
-: (header), here @ lit, blank, lit, blank, jump, blank, ;
-: header! >r r@ >jump ! r@ >len ! r> >addr ! ;
+:noname base @ / ?dup if swap 1+ swap recurse then ;
+: uwidth 1 swap [ , ] ;
+
+8 cells allot
+here @ constant .buf-end
+variable .buf-start
+
+: next.buf -1 .buf-start +! ;
+
+: chop-digit base @ /mod ;
+: digit>.buf digit>char .buf-start @ c! ;
+
+:noname chop-digit digit>.buf ?dup if next.buf recurse then ;
+: >.buf .buf-end 1- .buf-start ! [ , ] ;
+: .buf .buf-start @ .buf-end over - ;
+
+\ ===
 
 compiler
 : assign (something), ['] swap , ['] ! , exit, this! enter-code , ;
@@ -188,28 +208,40 @@ variable read-char
 
 ascii
 
+: count @+ ;
+
+: (data), (something), (somewhere), swap this! ;
+
 :noname
   next-char dup [char] " <> if
     read-char @ execute c, recurse
   then ;
+: "", next-char drop [ , ] drop ;
 
-: string, next-char drop [ , ] drop ;
-: string,ct here @ string, dup dist ;
+: string, (later), here @ "", dist swap ! ;
 
 compiler
-: "  (header), >r string,ct align here @ r> header! ;
+: "  (data), string, align this! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 forth
 
-: "  string,ct over here ! ;
+: "  here @ dup string, here ! ;
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
+
+\ todo note
+\ if interpret/import is defined,
+\ quit has to be redefined in forth
+
+:noname ?dup if 0 swap 1- recurse then ;
+: cls 33 [ , ] ;
 
 quit
 
 \ ===
 
+: next, (somewhere), this! ;
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
