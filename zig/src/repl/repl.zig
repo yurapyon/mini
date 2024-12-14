@@ -48,6 +48,8 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             repl.dot(cell) catch return error.ExternalPanic;
         },
         .showStack => {
+            // TODO
+            // something about this is broken
             const count = rt.data_stack.pop();
             const u8_count: u8 = @truncate(count);
             std.debug.print("<{d}>", .{u8_count});

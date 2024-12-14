@@ -59,6 +59,8 @@ forth
 :noname 2dup > if dup print-line cr 16 + recurse then ;
 : dump base @ >r hex over + swap [ , ] r> base ! ;
 
+quit
+
 \ ===
 
 variable source-user-input
