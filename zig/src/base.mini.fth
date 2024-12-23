@@ -58,9 +58,8 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : name >name-len c@+ ;
 
 \ tags
-: exit,  ['] exit , ;
-: jump0, ['] jump0 , ;
-: jump,  ['] jump , ;
+: exit, ['] exit , ;
+: jump, ['] jump , ;
 
 : :noname 0 0 define here @ enter-code , ] ;
 compiler
@@ -68,10 +67,10 @@ compiler
 : return exit, ;
 forth
 
-: blank,       0 , ;
-: (later),     here @ blank, ;
-: (something), lit, (later), ;
-: (somewhere), jump, (later), ;
+: blank,   0 , ;
+: (later), here @ blank, ;
+: (lit),   lit, (later), ;
+: (jump),  jump, (later), ;
 
 : this  here @ swap ;
 : this! this ! ;
@@ -81,8 +80,8 @@ forth
 compiler
 : [compile] ' , ;
 
-: if   jump0, (later), ;
-: else jump,  (later), swap this! ;
+: if   ['] jump0 , (later), ;
+: else (jump), swap this! ;
 : then this! ;
 
 : cond    0 ;
@@ -99,22 +98,15 @@ compiler
 : [char] lit, char , ;
 forth
 
-: +-() case
+:noname next-char case
     [char] ( of 1+ endof
     [char] ) of 1- endof
-  endcase ;
-
-:noname next-char +-() dup if recurse then ;
-: ( 1 [ , ] drop ;
+  endcase ?dup if recurse then ;
+: ( 1 [ , ] ;
 
 compiler
-\ redefine comment words to work in compile state
-
-:noname [compile] ( ;
-: ( [ , ] ; \ this comment is to fix vim syntax highlight )
-
-:noname [compile] \ ;
-: \ [ , ] ;
+' ( : ( [ , ] ; \ this comment is to fix vim syntax highlight )
+' \ : \ [ , ] ;
 forth
 
 \ ===
@@ -123,9 +115,8 @@ forth
 : decimal 10 base ! ;
 : hex 16 base ! ;
 
-: max>top 2dup < if swap then ;
-: min max>top nip ;
-: max max>top drop ;
+: min 2dup > if swap then drop ;
+: max 2dup < if swap then drop ;
 
 \ ( value min max -- value )
 : clamp rot min max ;
@@ -145,9 +136,9 @@ forth
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
-: create word define enter-code , (something), exit, blank, this! ;
+: create word define enter-code , (lit), exit, blank, this! ;
 compiler
-: does>  (something), ['] does! , exit, this! ;
+: does>  (lit), ['] does! , exit, this! ;
 forth
 
 : variable create cell allot ;
@@ -162,26 +153,8 @@ forth
 
 \ ===
 
-:noname base @ / ?dup if swap 1+ swap recurse then ;
-: uwidth 1 swap [ , ] ;
-
-8 cells allot
-here @ constant .buf-end
-variable .buf-start
-
-: next.buf -1 .buf-start +! ;
-
-: chop base @ /mod ;
-: digit>.buf digit>char .buf-start @ c! ;
-
-:noname chop digit>.buf ?dup if next.buf recurse then ;
-: >.buf .buf-end 1- .buf-start ! [ , ] ;
-: .buf .buf-start @ .buf-end over - ;
-
-\ ===
-
 compiler
-: assign (something), ['] swap , ['] ! , exit, this! enter-code , ;
+: assign (lit), ['] swap , ['] ! , exit, this! enter-code , ;
 forth
 
 : read-digit next-char char>digit ;
@@ -206,7 +179,7 @@ ascii
 
 : count @+ ;
 
-: (data), (something), (somewhere), swap this! ;
+: (data), (lit), (jump), swap this! ;
 
 : "",
   next-char dup [char] " <> if
@@ -225,20 +198,17 @@ forth
 : s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
 : e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
 
-\ todo note
-\ if interpret/import is defined,
-\ quit has to be redefined in forth
-
-:noname ?dup if 0 swap 1- recurse then ;
-: cls 33 [ , ] ;
+\ ===
 
 : wlatest context @ cells wordlists + @ ;
+
+: mem d0 dist ;
 
 quit
 
 \ ===
 
-: next, (somewhere), this! ;
+: next, (jump), this! ;
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;

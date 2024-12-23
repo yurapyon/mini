@@ -1,20 +1,10 @@
-:noname 2dup > if c@+ emit recurse then ;
-: type over + swap [ , ] 2drop ;
-
 : bl 32 ;
 : nl 10 ;
 : space bl emit ;
 : cr nl emit ;
 
-:noname ?dup if over emit 1- recurse then ;
-: repeat-char swap [ , ] drop ;
-
-: pad-ct   tuck >r uwidth 0 r> clamp - ;
-: pad-left -rot pad-ct swap repeat-char ;
-
-: u.  >.buf .buf type ;
-: u.r save       bl pad-left u. ;
-: u.0 save [char] 0 pad-left u. ;
+: .range 2dup > if c@+ emit recurse then 2drop ;
+: type over + swap .range ;
 
 : ." [compile] s" count type ; \ "
 
@@ -22,43 +12,66 @@ compiler
 : ." [compile] s" ['] count , ['] type , ; \ "
 forth
 
-: print-name name ?dup if type else drop ." _" then ;
+\ ===
 
-: words ?dup if dup print-name space @ recurse then ;
+: .name name ?dup if type else drop ." _" then ;
+: .words ?dup if dup .name space @ recurse then ;
+: words wlatest .words ;
 
-: xt>def 2dup < if @ recurse then nip ;
+\ ===
 
-: .inner ." (" cell + dup @ . ." )" ;
+: uwidth dup if base @ log then 1+ ;
+: chop base @ /mod ;
 
-: print-body
-  cond
-    dup @ ['] exit =  if ." ;" return else
-    dup @ ['] lit =   if ." lit" .inner else
-    dup @ ['] jump =  if ." jump" .inner else
-    dup @ ['] jump0 = if ." jump0" .inner else
-    dup @ latest @ xt>def print-name
-  endcond
-  space cell + recurse ;
+8 cells allot
+here @ constant temp-end
+variable temp-start
 
-: see word find if
-    dup print-name ." : "
-    >cfa cell + print-body
-  then cr ;
+: reset-temp temp-end 1- temp-start ! ;
+: next-temp -1 temp-start +! ;
+: temp! temp-start @ c! ;
 
-: printable? 32 126 within[] ;
-: >printable dup printable? 0= if drop [char] . then ;
+: >temp chop digit>char temp! ?dup if next-temp recurse then ;
+: .temp temp-end temp-start @ .range ;
 
-: print-header 4 u.r ." : " ;
-: print-bytes 2dup > if c@+     2 u.0 space recurse then 2drop ;
-: print-chars 2dup > if c@+ >printable emit recurse then 2drop ;
-: print-line dup print-header 2dup print-bytes print-chars ;
+\ ( char ct -- )
+: repeat ?dup if over emit 1- recurse then drop ;
 
-:noname 2dup > if dup 16 + swap save print-line cr recurse then ;
-: dump base @ >r hex over + swap [ , ] r> base ! ;
+\ ( u pad-ct char -- )
+: .pad >r
+    tuck >r uwidth 0 r> clamp -
+  r> swap repeat ;
+
+: u.  reset-temp >temp .temp ;
+: u.r save       bl .pad u. ;
+: u.0 save [char] 0 .pad u. ;
+
+\ ===
+
+: >printable dup 32 126 within[] 0= if drop [char] . then ;
+
+: .bytes     2dup > if c@+     2 u.0 space recurse then 2drop ;
+: .printable 2dup > if c@+ >printable emit recurse then 2drop ;
+: .lines
+  2dup > if
+    dup 16 + swap save dup 4 u.r ." : " 2dup .bytes .printable cr
+    recurse
+  then 2drop ;
+
+: dump
+  base @ >r
+  hex over + swap .lines
+  r> base ! ;
+
+: .ks 1024 /mod swap u. ." ." u. ;
 
 quit
 
 \ ===
+
+\ todo note
+\ if interpret/import is defined,
+\ quit has to be redefined in forth
 
 variable source-user-input
 
