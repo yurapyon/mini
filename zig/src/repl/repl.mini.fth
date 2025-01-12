@@ -3,8 +3,8 @@
 : space bl emit ;
 : cr nl emit ;
 
-: .range 2dup > if c@+ emit recurse then 2drop ;
-: type over + swap .range ;
+: .chars 2dup > if c@+ emit recurse then 2drop ;
+: type over + swap .chars ;
 
 : ." [compile] s" count type ; \ "
 
@@ -32,7 +32,7 @@ variable temp-start
 : temp! temp-start @ c! ;
 
 : >temp chop digit>char temp! ?dup if next-temp recurse then ;
-: .temp temp-end temp-start @ .range ;
+: .temp temp-end temp-start @ .chars ;
 
 \ ( char ct -- )
 : repeat ?dup if over emit 1- recurse then drop ;
