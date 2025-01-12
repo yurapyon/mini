@@ -23,6 +23,9 @@ const ExternalId = enum(Cell) {
     emit,
     dot,
     showStack,
+    log,
+    key,
+    rawMode,
     _,
 };
 
@@ -59,12 +62,22 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 std.debug.print(" {d}", .{rt.data_stack.index(i)});
             }
         },
+        .log => {
+            const base, const x = rt.data_stack.pop2();
+            if (base < 1 or x < 0) {
+                rt.data_stack.push(0);
+            }
+            const log_x = std.math.log(Cell, base, x);
+            rt.data_stack.push(log_x);
+        },
+        .key => {},
         else => return false,
     }
     return true;
 }
 
 pub const Repl = struct {
+    input_file: std.fs.File,
     output_file: std.fs.File,
     should_bye: bool,
 
@@ -73,6 +86,7 @@ pub const Repl = struct {
 
     // TODO maybe save the runtime in this as a field
     pub fn init(self: *@This(), rt: *Runtime) !void {
+        self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
 
         const external = External{
@@ -84,6 +98,9 @@ pub const Repl = struct {
         try rt.defineExternal("emit", wlidx, @intFromEnum(ExternalId.emit));
         try rt.defineExternal(".", wlidx, @intFromEnum(ExternalId.dot));
         try rt.defineExternal(".s", wlidx, @intFromEnum(ExternalId.showStack));
+        try rt.defineExternal("log", wlidx, @intFromEnum(ExternalId.log));
+        try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
+        try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
@@ -136,5 +153,13 @@ pub const Repl = struct {
         var bw = std.io.bufferedWriter(self.output_file.writer());
         try bw.writer().print("{d} ", .{value});
         try bw.flush();
+    }
+
+    fn key(_: *@This()) !Cell {
+        return 0;
+    }
+
+    fn rawMode(_: *@This(), _: bool) !void {
+        return 0;
     }
 };

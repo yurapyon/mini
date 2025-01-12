@@ -150,6 +150,9 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
             '0'...'9' => ch - '0',
             'A'...'Z' => ch - 'A' + 10,
             'a'...'z' => ch - 'a' + 10,
+            // TODO handle ignoring underscores in a better way
+            // right now '_' in forth evaluates to 0
+            '_' => continue,
             else => return error.InvalidNumber,
         };
         if (digit > effective_base) return error.InvalidNumber;
@@ -163,6 +166,7 @@ test "parse number" {
     const testing = @import("std").testing;
 
     try testing.expectEqual(0, try parseNumber("0", 10));
+    try testing.expectEqual(100, try parseNumber("1_0_0", 10));
     try testing.expectEqual(10, try parseNumber("0d10", 36));
     try testing.expectEqual(16, try parseNumber("10", 16));
     try testing.expectEqual(16, try parseNumber("0x10", 10));

@@ -332,15 +332,17 @@ pub const Runtime = struct {
             // NOTE
             // Starts at the end of the list so
             //   later externals can override earlier ones
-            var i: usize = self.externals.items.len - 1;
-            while (i >= 0) : (i -= 1) {
-                var external = self.externals.items[i];
+            var i: usize = 1;
+            while (i <= self.externals.items.len) : (i += 1) {
+                const at = self.externals.items.len - i;
+                var external = self.externals.items[at];
                 if (try external.call(self, token)) {
                     return;
                 }
             }
         }
 
+        std.debug.print("Unhandled external: {}\n", .{token});
         return error.UnhandledExternal;
     }
 };
