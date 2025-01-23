@@ -65,15 +65,15 @@ pub fn main() !void {
     }
 
     if (cli_options.run_system) {
-        // TODO run this in a separate thread
-        //         if (cli_options.interactive) {
-        //             try Repl.start(allocator);
-        //         }
+        // TODO NOTE
+        // could run this in a separate thread
+        // if (cli_options.interactive) {
+        //   try Repl.start(allocator);
+        // }
 
         var system: System = undefined;
         try system.init();
-        try system.start();
-        defer system.stop();
+        try system.loop();
         defer system.deinit();
     } else {
         if (cli_options.interactive) {

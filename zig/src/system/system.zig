@@ -1,27 +1,24 @@
 const c = @import("c.zig");
 
 pub const System = struct {
+    window: *c.GLFWwindow,
+
     pub fn init(self: *@This()) !void {
-        _ = self;
+        self.window = try c.gfx.init();
+        // TODO
+        //   load base file
+        //   find xts
     }
 
-    pub fn deinit(self: @This()) void {
-        _ = self;
+    pub fn deinit(_: @This()) void {
+        c.gfx.deinit();
     }
 
-    // ===
-
-    pub fn start(self: *@This()) !void {
-        // setup
-
-        try self.loop();
-    }
-
-    pub fn stop(self: *@This()) void {
-        _ = self;
-    }
-
-    fn loop(self: *@This()) !void {
-        _ = self;
+    pub fn loop(self: *@This()) !void {
+        while (c.glfwWindowShouldClose(self.window) == c.GL_FALSE) {
+            c.glClear(c.GL_COLOR_BUFFER_BIT);
+            c.glfwSwapBuffers(self.window);
+            c.glfwPollEvents();
+        }
     }
 };
