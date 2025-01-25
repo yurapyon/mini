@@ -15,9 +15,6 @@ const Repl = @import("repl/repl.zig").Repl;
 
 const System = @import("system/system.zig").System;
 
-const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
-const StdInRefiller = @import("refillers/stdin_refiller.zig").StdInRefiller;
-
 const utils = @import("utils.zig");
 
 // ===

@@ -12,7 +12,7 @@ const MainMemoryLayout = runtime.MainMemoryLayout;
 const register = @import("register.zig");
 const Register = register.Register;
 
-const Refiller = @import("refillers/refiller.zig").Refiller;
+const Refiller = @import("refiller.zig").Refiller;
 
 // ===
 

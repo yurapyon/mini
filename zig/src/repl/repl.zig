@@ -13,8 +13,9 @@ const External = externals.External;
 
 const CliOptions = @import("cli_options.zig").CliOptions;
 
-const BufferRefiller = @import("../refillers/buffer_refiller.zig").BufferRefiller;
-const StdInRefiller = @import("../refillers/stdin_refiller.zig").StdInRefiller;
+const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
+
+const DynamicMemory = @import("../dynamic/dynamic.zig").DynamicMemory;
 
 // ===
 
@@ -26,6 +27,13 @@ const ExternalId = enum(Cell) {
     log,
     key,
     rawMode,
+
+    allocate,
+    realloc,
+    free,
+    dynFetch,
+    dynStore,
+    dynStoreAdd,
     _,
 };
 
@@ -38,6 +46,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
     switch (external_id) {
         .bye => {
+            // TODO this should call rt.quit()
             rt.should_quit = true;
             repl.should_bye = true;
         },
@@ -71,6 +80,22 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             rt.data_stack.push(log_x);
         },
         .key => {},
+        .allocate => {
+            const size = rt.data_stack.pop();
+            const handle_id = repl.dynamic_memory.allocate(size) catch unreachable;
+            rt.data_stack.push(handle_id);
+        },
+        .realloc => {
+            const size, const handle_id = rt.data_stack.pop2();
+            repl.dynamic_memory.realloc(handle_id, size) catch unreachable;
+        },
+        .free => {
+            const handle_id = rt.data_stack.pop();
+            repl.dynamic_memory.free(handle_id);
+        },
+        .dynFetch => {},
+        .dynStore => {},
+        .dynStoreAdd => {},
         else => return false,
     }
     return true;
@@ -81,13 +106,18 @@ pub const Repl = struct {
     output_file: std.fs.File,
     should_bye: bool,
 
-    // TODO use this?
-    prompt_xt: ?Cell,
+    refiller: ReplRefiller,
+
+    dynamic_memory: DynamicMemory,
 
     // TODO maybe save the runtime in this as a field
     pub fn init(self: *@This(), rt: *Runtime) !void {
         self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
+
+        self.refiller.init();
+
+        self.dynamic_memory.init(rt.allocator);
 
         const external = External{
             .callback = externalsCallback,
@@ -101,6 +131,12 @@ pub const Repl = struct {
         try rt.defineExternal("log", wlidx, @intFromEnum(ExternalId.log));
         try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
         try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
+        try rt.defineExternal("allocate", wlidx, @intFromEnum(ExternalId.allocate));
+        try rt.defineExternal("realloc", wlidx, @intFromEnum(ExternalId.realloc));
+        try rt.defineExternal("free", wlidx, @intFromEnum(ExternalId.free));
+        try rt.defineExternal("dyn@", wlidx, @intFromEnum(ExternalId.dynFetch));
+        try rt.defineExternal("dyn!", wlidx, @intFromEnum(ExternalId.dynStore));
+        try rt.defineExternal("dyn+!", wlidx, @intFromEnum(ExternalId.dynStoreAdd));
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
@@ -115,11 +151,7 @@ pub const Repl = struct {
     }
 
     pub fn start(self: *@This(), rt: *Runtime) !void {
-        var stdin: StdInRefiller = undefined;
-        stdin.init();
-        rt.input_buffer.refiller = stdin.toRefiller();
-
-        // stdin.prompt = "> ";
+        rt.input_buffer.refiller = self.refiller.toRefiller();
 
         try self.printBanner();
 

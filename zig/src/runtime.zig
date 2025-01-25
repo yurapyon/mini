@@ -30,7 +30,7 @@ const bytecodes = @import("bytecodes.zig");
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+const BufferRefiller = @import("buffer_refiller.zig").BufferRefiller;
 
 // ===
 

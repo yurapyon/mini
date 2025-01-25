@@ -1,26 +1,28 @@
 const std = @import("std");
 
-const Refiller = @import("refiller.zig").Refiller;
+const runtime = @import("../runtime.zig");
+const Cell = runtime.Cell;
 
-pub const StdInRefiller = struct {
+const Refiller = @import("../refiller.zig").Refiller;
+
+pub const ReplRefiller = struct {
     buffer: [128]u8,
     stdin: std.fs.File,
-    prompt: ?[]const u8,
+    reading_user_input: bool,
+    // source: ?[]const u8,
+    // source_at: Cell,
 
     pub fn init(self: *@This()) void {
         self.stdin = std.io.getStdIn();
-        self.prompt = null;
+        self.reading_user_input = true;
     }
 
     fn refill(self_: ?*anyopaque) !?[]const u8 {
         const self: *@This() = @ptrCast(@alignCast(self_));
 
-        if (self.prompt) |prompt| {
-            // TODO Don't use debug
-            std.debug.print("{s}", .{prompt});
-        }
-
-        const slice = self.stdin.reader().readUntilDelimiterOrEof(
+        const reader = self.stdin.reader();
+        const slice =
+            reader.readUntilDelimiterOrEof(
             self.buffer[0..self.buffer.len],
             '\n',
         ) catch return error.CannotRefill;

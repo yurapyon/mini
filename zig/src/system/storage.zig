@@ -3,7 +3,10 @@ const std = @import("std");
 const runtime = @import("../runtime.zig");
 const Cell = runtime.Cell;
 
-// File is data that could be viewed all at once on screen
+// ===
+
+// Block memory
+// serialized/deserialized with plain text ?
 
 pub const Storage = struct {
     // based on screen resolution in video.zig
