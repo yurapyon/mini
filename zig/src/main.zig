@@ -72,7 +72,7 @@ pub fn main() !void {
         // }
 
         var system: System = undefined;
-        try system.init();
+        try system.init(&rt);
         try system.loop();
         defer system.deinit();
     } else {

@@ -65,42 +65,6 @@ variable temp-start
 
 : .ks 1024 /mod swap u. ." ." u. ;
 
-quit
-
 \ ===
 
-\ todo note
-\ if interpret/import is defined,
-\ quit has to be redefined in forth
-
-variable source-user-input
-
-true source-user-input !
-
-variable prompt-hook
-
-: basic-prompt prompt-hook assign ." > " ;
-
-basic-prompt
-
-: next-line
-  source-user-input @ if prompt-hook @ execute then
-  refill ;
-
-: lookup find if >cfa execute true then ;
-
-: resolve
-  cond
-  2dup lookup  if 2drop else
-  2dup >number if 2drop else
-  ." word not found: " type cr
-  endcond ;
-
-: interpret
-  word ?dup if
-    resolve
-  else
-    drop next-line 0= if return then
-  then
-  recurse ;
-
+:noname ." word not found: " type cr ; onwnf !

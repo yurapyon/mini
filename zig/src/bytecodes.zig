@@ -128,6 +128,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "-rot", .callback = nrot },
 
     .{ .name = "find", .callback = find },
+    .{ .name = "lookup", .callback = lookup },
     .{ .name = "word", .callback = nextWord },
     .{ .name = "define", .callback = define },
     .{ .name = "next-char", .callback = nextChar },
@@ -138,7 +139,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "move", .callback = move },
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
     .{},
@@ -367,11 +367,30 @@ fn mod(rt: *Runtime) Error!void {
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
     if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
+        rt.data_stack.push(0);
+        rt.data_stack.push(runtime.cellFromBoolean(false));
+    }
+}
+
+fn lookup(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+
+    // TODO error on invalid state
+    const state = CompileState.fromCell(rt.interpreter.state.fetch()) catch unreachable;
+    const wordlist_idx = state.toWordlistIndex() catch unreachable;
+    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+        rt.data_stack.push(word_info.definition_addr);
+        rt.data_stack.push(word_info.wordlist_idx);
+        rt.data_stack.push(runtime.cellFromBoolean(true));
+    } else {
+        rt.data_stack.push(0);
         rt.data_stack.push(0);
         rt.data_stack.push(runtime.cellFromBoolean(false));
     }

@@ -34,6 +34,7 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 
 : 2dup  over over ;
 : 2drop drop drop ;
+: 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
 : save  over -rot ;
 
@@ -147,6 +148,15 @@ forth
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
 
+: value create , does> @ ;
+: vname word find drop >cfa >body ;
+: to  vname ! ;
+: +to vname +! ;
+compiler
+: to  vname lit, , ['] ! , ;
+: +to vname lit, , ['] +! , ;
+forth
+
 : offsetter create , does> @ + ;
 : +field    over offsetter + ;
 : field     swap aligned swap +field ;
@@ -203,6 +213,32 @@ forth
 : wlatest context @ cells wordlists + @ ;
 
 : mem d0 dist ;
+
+\ ===
+
+\ todo note
+\ if interpret/import is defined,
+\ quit has to be redefined in forth ?
+\ it seems to work
+\ bye is broken though
+
+variable onwnf
+' 2drop onwnf !
+
+: onlookup 0= state @ and if >cfa , else >cfa execute then ;
+: onnumber state @ if lit, , then ;
+
+: resolve
+  cond
+  2dup lookup  if 2swap 2drop onlookup else 2drop
+  2dup >number if -rot  2drop onnumber else drop
+  onwnf @ execute
+  endcond ;
+
+: interpret
+  word ?dup if resolve recurse
+  else drop refill if recurse then
+  then ;
 
 quit
 
