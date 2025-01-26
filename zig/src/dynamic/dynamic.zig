@@ -7,9 +7,6 @@ const Cell = runtime.Cell;
 
 // ===
 
-// dynamic memory handles
-// dyn@ dyn!
-
 const Handle = struct {
     memory: ?[]u8,
 };
@@ -32,11 +29,12 @@ pub const DynamicMemory = struct {
     fn getNextAvailableHandleId(self: *@This()) !Cell {
         var first_available_handle_id: ?Cell = null;
 
-        for (self.lookup.items, 0..) |*handle, i| {
+        for (self.lookup.items, 0..) |handle, i| {
             if (handle.memory == null) {
                 // NOTE
-                // This intCast is okay as long as the only time Handles are added is
-                //   below, after the check that the length is never > maxInt(Cell)
+                // This intCast is okay as long as the only time Handles are
+                //   added is below, after the check that length is
+                //   never > maxInt(Cell)
                 first_available_handle_id = @intCast(i);
             }
         }
@@ -45,7 +43,6 @@ pub const DynamicMemory = struct {
             return handle_id;
         } else {
             if (self.lookup.items.len > std.math.maxInt(Cell)) {
-                // TODO error
                 return error.TooManyHandles;
             }
 
@@ -57,9 +54,15 @@ pub const DynamicMemory = struct {
 
     fn freeHandle(self: *@This(), handle_id: Cell) void {
         if (handle_id == self.lookup.items.len - 1) {
-            // TODO
-            // can just resize the list
-            // can also free all handles that are now unused from the end of the list
+            var last_null_idx = self.lookup.items.len - 1;
+            while (last_null_idx > 0) : (last_null_idx -= 1) {
+                if (self.lookup.items[last_null_idx - 1].memory != null) {
+                    break;
+                }
+            }
+
+            // TODO dont catch unreachable
+            self.lookup.resize(last_null_idx) catch unreachable;
         } else {
             self.lookup.items[handle_id].memory = null;
         }
@@ -88,5 +91,34 @@ pub const DynamicMemory = struct {
         }
 
         self.freeHandle(handle_id);
+    }
+
+    // ===
+
+    pub fn cellPtrAt(self: *@This(), handle_id: Cell, addr: Cell) *Cell {
+        // TODO
+        _ = self;
+        _ = handle_id;
+        _ = addr;
+    }
+
+    pub fn u8PtrAt(self: *@This(), handle_id: Cell, addr: Cell) *u8 {
+        // TODO
+        _ = self;
+        _ = handle_id;
+        _ = addr;
+    }
+
+    pub fn u8SliceAt(
+        self: *@This(),
+        handle_id: Cell,
+        addr: Cell,
+        len: Cell,
+    ) []u8 {
+        // TODO
+        _ = self;
+        _ = handle_id;
+        _ = addr;
+        _ = len;
     }
 };

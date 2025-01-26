@@ -34,6 +34,14 @@ const ExternalId = enum(Cell) {
     dynFetch,
     dynStore,
     dynStoreAdd,
+    // TODO
+    // dynFetchC,
+    // dynStoreC,
+    // dynStoreAddC,
+    // dynMove
+    // move to/from dictionary
+
+    sqrt,
     _,
 };
 
@@ -93,9 +101,33 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             const handle_id = rt.data_stack.pop();
             repl.dynamic_memory.free(handle_id);
         },
-        .dynFetch => {},
-        .dynStore => {},
-        .dynStoreAdd => {},
+        .dynFetch => {
+            const handle_id, const addr = rt.data_stack.pop2();
+            // TODO
+            _ = handle_id;
+            _ = addr;
+        },
+        .dynStore => {
+            const handle_id, const addr = rt.data_stack.pop2();
+            const value = rt.data_stack.pop();
+            // TODO
+            _ = handle_id;
+            _ = addr;
+            _ = value;
+        },
+        .dynStoreAdd => {
+            const handle_id, const addr = rt.data_stack.pop2();
+            const value = rt.data_stack.pop();
+            // TODO
+            _ = handle_id;
+            _ = addr;
+            _ = value;
+        },
+        .sqrt => {
+            const value = rt.data_stack.pop();
+            const root = std.math.sqrt(value);
+            rt.data_stack.push(root);
+        },
         else => return false,
     }
     return true;
@@ -137,6 +169,7 @@ pub const Repl = struct {
         try rt.defineExternal("dyn@", wlidx, @intFromEnum(ExternalId.dynFetch));
         try rt.defineExternal("dyn!", wlidx, @intFromEnum(ExternalId.dynStore));
         try rt.defineExternal("dyn+!", wlidx, @intFromEnum(ExternalId.dynStoreAdd));
+        try rt.defineExternal("sqrt", wlidx, @intFromEnum(ExternalId.sqrt));
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
