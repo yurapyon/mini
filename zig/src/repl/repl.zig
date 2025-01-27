@@ -15,7 +15,7 @@ const CliOptions = @import("cli_options.zig").CliOptions;
 
 const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
 
-const DynamicMemory = @import("../dynamic/dynamic.zig").DynamicMemory;
+const Handles = @import("../memory/handles.zig").Handles;
 
 // ===
 
@@ -34,14 +34,13 @@ const ExternalId = enum(Cell) {
     dynFetch,
     dynStore,
     dynStoreAdd,
+    dynFetchC,
+    dynStoreC,
+    dynStoreAddC,
     // TODO
-    // dynFetchC,
-    // dynStoreC,
-    // dynStoreAddC,
     // dynMove
-    // move to/from dictionary
-
-    sqrt,
+    // copy allocated memory to/from dictionary
+    // read file into dynamic memory
     _,
 };
 
@@ -90,43 +89,65 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
         .key => {},
         .allocate => {
             const size = rt.data_stack.pop();
-            const handle_id = repl.dynamic_memory.allocate(size) catch unreachable;
+            // TODO dont catch unreachable
+            const handle_id = repl.allocate(rt.allocator, size) catch unreachable;
             rt.data_stack.push(handle_id);
         },
-        .realloc => {
-            const size, const handle_id = rt.data_stack.pop2();
-            repl.dynamic_memory.realloc(handle_id, size) catch unreachable;
-        },
+        //         .realloc => {
+        //             const size, const handle_id = rt.data_stack.pop2();
+        //             repl.dynamic_memory.realloc(handle_id, size) catch unreachable;
+        //         },
         .free => {
             const handle_id = rt.data_stack.pop();
-            repl.dynamic_memory.free(handle_id);
+            repl.free(rt.allocator, handle_id);
+            repl.handles.freeHandle(handle_id);
         },
         .dynFetch => {
             const handle_id, const addr = rt.data_stack.pop2();
-            // TODO
-            _ = handle_id;
-            _ = addr;
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
+                const value = cell_ptr[addr / 2];
+                rt.data_stack.push(value);
+            }
         },
         .dynStore => {
             const handle_id, const addr = rt.data_stack.pop2();
             const value = rt.data_stack.pop();
-            // TODO
-            _ = handle_id;
-            _ = addr;
-            _ = value;
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
+                cell_ptr[addr / 2] = value;
+            }
         },
         .dynStoreAdd => {
             const handle_id, const addr = rt.data_stack.pop2();
             const value = rt.data_stack.pop();
-            // TODO
-            _ = handle_id;
-            _ = addr;
-            _ = value;
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
+                cell_ptr[addr / 2] +%= value;
+            }
         },
-        .sqrt => {
+        .dynFetchC => {
+            const handle_id, const addr = rt.data_stack.pop2();
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const value = slice[addr];
+                rt.data_stack.push(value);
+            }
+        },
+        .dynStoreC => {
+            const handle_id, const addr = rt.data_stack.pop2();
             const value = rt.data_stack.pop();
-            const root = std.math.sqrt(value);
-            rt.data_stack.push(root);
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const u8_value: u8 = @truncate(value);
+                slice[addr] = u8_value;
+            }
+        },
+        .dynStoreAddC => {
+            const handle_id, const addr = rt.data_stack.pop2();
+            const value = rt.data_stack.pop();
+            if (repl.getAllocatedSlice(handle_id)) |slice| {
+                const u8_value: u8 = @truncate(value);
+                slice[addr] +%= u8_value;
+            }
         },
         else => return false,
     }
@@ -140,7 +161,7 @@ pub const Repl = struct {
 
     refiller: ReplRefiller,
 
-    dynamic_memory: DynamicMemory,
+    handles: Handles,
 
     // TODO maybe save the runtime in this as a field
     pub fn init(self: *@This(), rt: *Runtime) !void {
@@ -149,7 +170,7 @@ pub const Repl = struct {
 
         self.refiller.init();
 
-        self.dynamic_memory.init(rt.allocator);
+        self.handles.init(rt.allocator);
 
         const external = External{
             .callback = externalsCallback,
@@ -169,7 +190,9 @@ pub const Repl = struct {
         try rt.defineExternal("dyn@", wlidx, @intFromEnum(ExternalId.dynFetch));
         try rt.defineExternal("dyn!", wlidx, @intFromEnum(ExternalId.dynStore));
         try rt.defineExternal("dyn+!", wlidx, @intFromEnum(ExternalId.dynStoreAdd));
-        try rt.defineExternal("sqrt", wlidx, @intFromEnum(ExternalId.sqrt));
+        try rt.defineExternal("dync@", wlidx, @intFromEnum(ExternalId.dynFetchC));
+        try rt.defineExternal("dync!", wlidx, @intFromEnum(ExternalId.dynStoreC));
+        try rt.defineExternal("dync+!", wlidx, @intFromEnum(ExternalId.dynStoreAddC));
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
@@ -220,11 +243,46 @@ pub const Repl = struct {
         try bw.flush();
     }
 
+    // TODO cleanup
     fn key(_: *@This()) !Cell {
         return 0;
     }
 
+    // TODO cleanup
     fn rawMode(_: *@This(), _: bool) !void {
         return 0;
+    }
+
+    fn allocate(self: *@This(), allocator: Allocator, size: Cell) !Cell {
+        const slice = try allocator.allocWithOptions(
+            u8,
+            size,
+            @alignOf(Cell),
+            null,
+        );
+        const ptr = try allocator.create([]u8);
+        ptr.* = slice;
+        const handle_id = try self.handles.getHandleForPtr(@ptrCast(ptr));
+        return handle_id;
+    }
+
+    fn getAllocatedSlice(self: *@This(), handle_id: Cell) ?[]u8 {
+        const maybe_any_ptr = self.handles.getHandlePtr(handle_id);
+        if (maybe_any_ptr) |any_ptr| {
+            const ptr = @as(*[]u8, @ptrCast(@alignCast(any_ptr)));
+            const slice = ptr.*;
+            return slice;
+        }
+        return null;
+    }
+
+    fn free(self: *@This(), allocator: Allocator, handle_id: Cell) void {
+        const maybe_any_ptr = self.handles.getHandlePtr(handle_id);
+        if (maybe_any_ptr) |any_ptr| {
+            const ptr = @as(*[]u8, @ptrCast(@alignCast(any_ptr)));
+            const slice = ptr.*;
+            allocator.free(slice);
+            allocator.destroy(ptr);
+        }
     }
 };

@@ -1,11 +1,11 @@
-: run mark open-file interpret reset ;
+\ : run mark open-file interpret reset ;
 
 
-create current-file 2048 allot
+\ create current-file 2048 allot
 
-: ekey ;
+\ : ekey ;
 
-: eloop key ekey recurse ;
+\ : eloop key ekey recurse ;
 
-eloop
+\ eloop
 
