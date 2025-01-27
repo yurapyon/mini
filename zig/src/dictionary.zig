@@ -18,7 +18,7 @@ const Wordlists = interpreter.Wordlists;
 const register = @import("register.zig");
 const Register = register.Register;
 
-const LinkedListIterator = @import("linked_list_iterator.zig").LinkedListIterator;
+const LinkedListIterator = @import("utils/linked_list_iterator.zig").LinkedListIterator;
 
 // ===
 

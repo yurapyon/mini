@@ -11,7 +11,11 @@ const externals = @import("externals.zig");
 const External = externals.External;
 
 const CliOptions = @import("repl/cli_options.zig").CliOptions;
-const Repl = @import("repl/repl.zig").Repl;
+
+const repl = @import("repl/repl.zig");
+const Repl = repl.Repl;
+
+const Dynamic = @import("lib/dynamic.zig").Dynamic;
 
 const System = @import("system/system.zig").System;
 
@@ -44,8 +48,12 @@ pub fn main() !void {
         else => return err,
     };
 
-    var repl: Repl = undefined;
-    try repl.init(&rt);
+    var lib_dynamic: Dynamic = undefined;
+    try lib_dynamic.init(&rt);
+    _ = try lib_dynamic.registerExternals(repl.max_external_id);
+
+    var lib_repl: Repl = undefined;
+    try lib_repl.init(&rt);
 
     for (cli_options.filepaths.items) |filepath| {
         const file_buffer = try utils.readFile(allocator, filepath);
@@ -74,7 +82,7 @@ pub fn main() !void {
         defer system.deinit();
     } else {
         if (cli_options.interactive) {
-            try repl.start(&rt);
+            try lib_repl.start(&rt);
         }
     }
 }
@@ -83,7 +91,7 @@ test "lib-testing" {
     _ = @import("bytecodes.zig");
     _ = @import("dictionary.zig");
     _ = @import("input_buffer.zig");
-    _ = @import("linked_list_iterator.zig");
+    _ = @import("utils/linked_list_iterator.zig");
     _ = @import("memory.zig");
     _ = @import("register.zig");
     _ = @import("runtime.zig");

@@ -460,11 +460,12 @@ fn toNumber(rt: *Runtime) Error!void {
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const base_addr = runtime.MainMemoryLayout.offsetOf("base");
     const base = mem.readCell(rt.memory, base_addr) catch unreachable;
-    const number_usize = utils.parseNumber(word, base) catch {
+    const number_usize = rt.interpreter.parseNumberCallback(word, base) catch {
         rt.data_stack.push(0);
         rt.data_stack.push(0);
         return;
     };
+
     const cell = @as(Cell, @truncate(number_usize & 0xffff));
     rt.data_stack.push(cell);
     rt.data_stack.push(0xffff);

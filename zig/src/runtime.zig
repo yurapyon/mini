@@ -8,6 +8,8 @@ const MemoryPtr = mem.MemoryPtr;
 
 const utils = @import("utils.zig");
 
+const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
+
 const register = @import("register.zig");
 const Register = register.Register;
 
@@ -51,7 +53,7 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
-pub const MainMemoryLayout = utils.MemoryLayout(struct {
+pub const MainMemoryLayout = MemoryLayout(struct {
     here: Cell,
     latest: Cell,
     context: Cell,
@@ -323,6 +325,8 @@ pub const Runtime = struct {
 
     // ===
 
+    // TODO
+    // this and defineExternal could take an offset?
     pub fn addExternal(self: *@This(), external: External) !void {
         try self.externals.append(external);
     }

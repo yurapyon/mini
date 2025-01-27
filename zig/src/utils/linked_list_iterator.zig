@@ -1,7 +1,7 @@
-const mem = @import("memory.zig");
+const mem = @import("../memory.zig");
 const ConstMemoryPtr = mem.ConstMemoryPtr;
 
-const runtime = @import("runtime.zig");
+const runtime = @import("../runtime.zig");
 const Cell = runtime.Cell;
 
 // ===

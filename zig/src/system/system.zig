@@ -10,7 +10,6 @@ const External = externals.External;
 
 const c = @import("c.zig");
 const Video = @import("video.zig").Video;
-const Blocks = @import("../memory/blocks.zig").Blocks;
 
 // ===
 
@@ -35,12 +34,10 @@ pub const System = struct {
 
     // devices
     video: Video,
-    blocks: Blocks,
 
     pub fn init(self: *@This(), rt: *Runtime) !void {
         self.window = try c.gfx.init();
         self.video.init();
-        self.blocks.init();
         rt.processBuffer(system_file) catch |err| switch (err) {
             error.WordNotFound => {
                 std.debug.print("Word not found: {s}\n", .{

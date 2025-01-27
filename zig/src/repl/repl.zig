@@ -1,8 +1,6 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const mem = @import("../memory.zig");
-
 const runtime = @import("../runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
@@ -15,8 +13,6 @@ const CliOptions = @import("cli_options.zig").CliOptions;
 
 const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
 
-const Handles = @import("../memory/handles.zig").Handles;
-
 // ===
 
 const ExternalId = enum(Cell) {
@@ -27,22 +23,11 @@ const ExternalId = enum(Cell) {
     log,
     key,
     rawMode,
-
-    allocate,
-    realloc,
-    free,
-    dynFetch,
-    dynStore,
-    dynStoreAdd,
-    dynFetchC,
-    dynStoreC,
-    dynStoreAddC,
-    // TODO
-    // dynMove
-    // copy allocated memory to/from dictionary
-    // read file into dynamic memory
+    _max,
     _,
 };
+
+pub const max_external_id = @intFromEnum(ExternalId._max);
 
 const repl_file = @embedFile("repl.mini.fth");
 
@@ -87,68 +72,6 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             rt.data_stack.push(log_x);
         },
         .key => {},
-        .allocate => {
-            const size = rt.data_stack.pop();
-            // TODO dont catch unreachable
-            const handle_id = repl.allocate(rt.allocator, size) catch unreachable;
-            rt.data_stack.push(handle_id);
-        },
-        //         .realloc => {
-        //             const size, const handle_id = rt.data_stack.pop2();
-        //             repl.dynamic_memory.realloc(handle_id, size) catch unreachable;
-        //         },
-        .free => {
-            const handle_id = rt.data_stack.pop();
-            repl.free(rt.allocator, handle_id);
-            repl.handles.freeHandle(handle_id);
-        },
-        .dynFetch => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
-                const value = cell_ptr[addr / 2];
-                rt.data_stack.push(value);
-            }
-        },
-        .dynStore => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
-                cell_ptr[addr / 2] = value;
-            }
-        },
-        .dynStoreAdd => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
-                cell_ptr[addr / 2] +%= value;
-            }
-        },
-        .dynFetchC => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const value = slice[addr];
-                rt.data_stack.push(value);
-            }
-        },
-        .dynStoreC => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const u8_value: u8 = @truncate(value);
-                slice[addr] = u8_value;
-            }
-        },
-        .dynStoreAddC => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
-            if (repl.getAllocatedSlice(handle_id)) |slice| {
-                const u8_value: u8 = @truncate(value);
-                slice[addr] +%= u8_value;
-            }
-        },
         else => return false,
     }
     return true;
@@ -161,16 +84,12 @@ pub const Repl = struct {
 
     refiller: ReplRefiller,
 
-    handles: Handles,
-
     // TODO maybe save the runtime in this as a field
     pub fn init(self: *@This(), rt: *Runtime) !void {
         self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
 
         self.refiller.init();
-
-        self.handles.init(rt.allocator);
 
         const external = External{
             .callback = externalsCallback,
@@ -184,15 +103,6 @@ pub const Repl = struct {
         try rt.defineExternal("log", wlidx, @intFromEnum(ExternalId.log));
         try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
         try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
-        try rt.defineExternal("allocate", wlidx, @intFromEnum(ExternalId.allocate));
-        try rt.defineExternal("realloc", wlidx, @intFromEnum(ExternalId.realloc));
-        try rt.defineExternal("free", wlidx, @intFromEnum(ExternalId.free));
-        try rt.defineExternal("dyn@", wlidx, @intFromEnum(ExternalId.dynFetch));
-        try rt.defineExternal("dyn!", wlidx, @intFromEnum(ExternalId.dynStore));
-        try rt.defineExternal("dyn+!", wlidx, @intFromEnum(ExternalId.dynStoreAdd));
-        try rt.defineExternal("dync@", wlidx, @intFromEnum(ExternalId.dynFetchC));
-        try rt.defineExternal("dync!", wlidx, @intFromEnum(ExternalId.dynStoreC));
-        try rt.defineExternal("dync+!", wlidx, @intFromEnum(ExternalId.dynStoreAddC));
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
@@ -251,38 +161,5 @@ pub const Repl = struct {
     // TODO cleanup
     fn rawMode(_: *@This(), _: bool) !void {
         return 0;
-    }
-
-    fn allocate(self: *@This(), allocator: Allocator, size: Cell) !Cell {
-        const slice = try allocator.allocWithOptions(
-            u8,
-            size,
-            @alignOf(Cell),
-            null,
-        );
-        const ptr = try allocator.create([]u8);
-        ptr.* = slice;
-        const handle_id = try self.handles.getHandleForPtr(@ptrCast(ptr));
-        return handle_id;
-    }
-
-    fn getAllocatedSlice(self: *@This(), handle_id: Cell) ?[]u8 {
-        const maybe_any_ptr = self.handles.getHandlePtr(handle_id);
-        if (maybe_any_ptr) |any_ptr| {
-            const ptr = @as(*[]u8, @ptrCast(@alignCast(any_ptr)));
-            const slice = ptr.*;
-            return slice;
-        }
-        return null;
-    }
-
-    fn free(self: *@This(), allocator: Allocator, handle_id: Cell) void {
-        const maybe_any_ptr = self.handles.getHandlePtr(handle_id);
-        if (maybe_any_ptr) |any_ptr| {
-            const ptr = @as(*[]u8, @ptrCast(@alignCast(any_ptr)));
-            const slice = ptr.*;
-            allocator.free(slice);
-            allocator.destroy(ptr);
-        }
     }
 };
