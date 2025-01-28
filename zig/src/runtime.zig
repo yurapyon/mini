@@ -44,6 +44,7 @@ comptime {
 }
 
 pub const Cell = u16;
+pub const DoubleCell = u32;
 
 pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;

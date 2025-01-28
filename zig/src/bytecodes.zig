@@ -4,6 +4,7 @@ const utils = @import("utils.zig");
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
+const DoubleCell = runtime.DoubleCell;
 const CompileState = runtime.CompileState;
 
 const dictionary = @import("dictionary.zig");
@@ -113,6 +114,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "*", .callback = multiply },
     .{ .name = "/", .callback = divide },
     .{ .name = "mod", .callback = mod },
+    .{ .name = "*/", .callback = muldiv },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -139,7 +141,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "move", .callback = move },
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
     .{},
@@ -362,6 +363,17 @@ fn divide(rt: *Runtime) Error!void {
 
 fn mod(rt: *Runtime) Error!void {
     rt.data_stack.mod();
+}
+
+fn muldiv(rt: *Runtime) Error!void {
+    const div = rt.data_stack.pop();
+    const mul = rt.data_stack.pop();
+    const value = rt.data_stack.pop();
+    const double_value: DoubleCell = @intCast(value);
+    const double_mul: DoubleCell = @intCast(mul);
+    const calc = double_value * double_mul / div;
+    // TODO should this be a truncate?
+    rt.data_stack.push(@truncate(calc));
 }
 
 fn find(rt: *Runtime) Error!void {

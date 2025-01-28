@@ -2,7 +2,7 @@
   dup
   dup decimal 3 u.r space
   dup hex 3 u.r space
-      >printable emit
+      print
       ."  | "
   32 + ;
 

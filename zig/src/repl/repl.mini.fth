@@ -1,7 +1,11 @@
-: bl 32 ;
-: nl 10 ;
+32 constant bl
+10 constant nl
 : space bl emit ;
-: cr nl emit ;
+: cr    nl emit ;
+: print dup 32 126 within[] 0= if drop [char] . then emit ;
+
+\ ( char ct -- )
+: repeat ?dup if over emit 1- recurse then drop ;
 
 : .chars 2dup > if c@+ emit recurse then 2drop ;
 : type over + swap .chars ;
@@ -14,54 +18,37 @@ forth
 
 \ ===
 
-: .name name ?dup if type else drop ." _" then ;
-: .words ?dup if dup .name space @ recurse then ;
+: .words ?dup if dup name tuck type if space then @ recurse then ;
 : words wlatest .words ;
 
 \ ===
 
 : uwidth dup if base @ log then 1+ ;
-: chop base @ /mod ;
 
 8 cells allot
-here @ constant temp-end
-variable temp-start
+here @ constant tend
+0 value tstart
+: treset tend 1- to tstart ;
+: tnext  -1 +to tstart ;
 
-: reset-temp temp-end 1- temp-start ! ;
-: next-temp -1 temp-start +! ;
-: temp! temp-start @ c! ;
-
-: >temp chop digit>char temp! ?dup if next-temp recurse then ;
-: .temp temp-end temp-start @ .chars ;
-
-\ ( char ct -- )
-: repeat ?dup if over emit 1- recurse then drop ;
+: u>temp base @ /mod digit>char tstart c! ?dup if tnext recurse then ;
+: .temp  tend tstart .chars ;
 
 \ ( u pad-ct char -- )
-: .pad >r
-    tuck >r uwidth 0 r> clamp -
-  r> swap repeat ;
+: .pad >r dup rot uwidth min - r> swap repeat ;
 
-: u.  reset-temp >temp .temp ;
+: u.  treset u>temp .temp ;
 : u.r save       bl .pad u. ;
 : u.0 save [char] 0 .pad u. ;
 
 \ ===
 
-: >printable dup 32 126 within[] 0= if drop [char] . then ;
-
-: .bytes     2dup > if c@+     2 u.0 space recurse then 2drop ;
-: .printable 2dup > if c@+ >printable emit recurse then 2drop ;
-: .lines
-  2dup > if
-    dup 16 + swap save dup 4 u.r ." : " 2dup .bytes .printable cr
-    recurse
+: .bytes 2dup > if c@+ 2 u.0 space recurse then 2drop ;
+: .print 2dup > if c@+       print recurse then 2drop ;
+: .lines 2dup > if
+    dup 16 + dup rot dup 4 u.r ." : " 2dup .bytes .print cr recurse
   then 2drop ;
-
-: dump
-  base @ >r
-  hex over + swap .lines
-  r> base ! ;
+: dump base @ >r hex over + swap .lines r> base ! ;
 
 : .ks 1024 /mod swap u. ." ." u. ;
 
