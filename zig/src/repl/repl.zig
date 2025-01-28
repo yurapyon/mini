@@ -18,7 +18,6 @@ const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
 const ExternalId = enum(Cell) {
     bye = 64,
     emit,
-    dot,
     showStack,
     log,
     key,
@@ -47,10 +46,6 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             const raw_char = rt.data_stack.pop();
             const char = @as(u8, @truncate(raw_char & 0xff));
             repl.emit(char) catch return error.ExternalPanic;
-        },
-        .dot => {
-            const cell = rt.data_stack.pop();
-            repl.dot(cell) catch return error.ExternalPanic;
         },
         .showStack => {
             // TODO
@@ -104,7 +99,6 @@ pub const Repl = struct {
         const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
         try rt.defineExternal("bye", wlidx, @intFromEnum(ExternalId.bye));
         try rt.defineExternal("emit", wlidx, @intFromEnum(ExternalId.emit));
-        try rt.defineExternal(".", wlidx, @intFromEnum(ExternalId.dot));
         try rt.defineExternal(".s", wlidx, @intFromEnum(ExternalId.showStack));
         try rt.defineExternal("log", wlidx, @intFromEnum(ExternalId.log));
         try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
@@ -151,12 +145,6 @@ pub const Repl = struct {
     fn emit(self: *@This(), char: u8) !void {
         var bw = std.io.bufferedWriter(self.output_file.writer());
         try bw.writer().print("{c}", .{char});
-        try bw.flush();
-    }
-
-    fn dot(self: *@This(), value: Cell) !void {
-        var bw = std.io.bufferedWriter(self.output_file.writer());
-        try bw.writer().print("{d} ", .{value});
         try bw.flush();
     }
 

@@ -181,6 +181,9 @@ pub const Runtime = struct {
         try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
+        // TODO catch unreachable on findWordInWordlist calls
+        // errors are 'invalid wordlist'
+        //        and out of bounds error for finding definition name
         const fetch_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "@")) orelse unreachable;
         const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
         try self.interpreter.dictionary.compileXt(fetch_cfa);

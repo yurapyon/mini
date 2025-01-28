@@ -68,10 +68,7 @@ compiler
 : return exit, ;
 forth
 
-: blank,   0 , ;
-: (later), here @ blank, ;
-: (lit),   lit, (later), ;
-: (jump),  jump, (later), ;
+: (later), here @ 0 , ;
 
 : this  here @ swap ;
 : this! this ! ;
@@ -82,7 +79,7 @@ compiler
 : [compile] ' , ;
 
 : if   ['] jump0 , (later), ;
-: else (jump), swap this! ;
+: else jump, (later), swap this! ;
 : then this! ;
 
 : cond    0 ;
@@ -120,15 +117,14 @@ forth
 : max 2dup < if swap then drop ;
 
 \ ( value min max -- value )
-: clamp rot min max ;
+\ : clamp rot min max ;
 : within[] rot tuck >= -rot <= and ;
-: within[) 1- within[] ;
+\ : within[) 1- within[] ;
 
-: char>digit cond
-    dup [char] 0 [char] 9 within[] if [char] 0 -      else
-    dup [char] A [char] Z within[] if [char] A - 10 + else
-    dup [char] a [char] z within[] if [char] a - 10 + else
-  endcond ;
+: char>digit
+  dup [char] 0 >= if [char] 0 - then
+  dup 17 >= if  7 - then
+  dup 42 >= if 32 - then ;
 
 : digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
 
@@ -137,9 +133,9 @@ forth
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
-: create word define enter-code , (lit), exit, blank, this! ;
+: create word define enter-code , lit, (later), exit, 0 , this! ;
 compiler
-: does>  (lit), ['] does! , exit, this! ;
+: does>  lit, (later), ['] does! , exit, this! ;
 forth
 
 : variable create cell allot ;
@@ -157,56 +153,39 @@ compiler
 : +to vname lit, , ['] +! , ;
 forth
 
-: offsetter create , does> @ + ;
-: +field    over offsetter + ;
-: field     swap aligned swap +field ;
+: +field over create , + does> @ + ;
+: field  swap aligned swap +field ;
 
 \ ===
-
-compiler
-: assign (lit), ['] swap , ['] ! , exit, this! enter-code , ;
-forth
 
 : read-digit next-char char>digit ;
 : read-byte read-digit 16 * read-digit + ;
 
-variable read-char
-
-: ascii read-char assign ;
-
-: escaped read-char assign
-  dup [char] \ = if
-    drop next-char
-    dup case
-      [char] n of drop 10 endof
-      [char] x of drop read-byte endof
-      \ NOTE
-      \ \\ and \" are handled by the 'case' falling through
-    endcase
-  then ;
-
-ascii
-
 : count @+ ;
 
-: (data), (lit), (jump), swap this! ;
+: (data), lit, (later), jump, (later), swap this! ;
 
 : "",
   next-char dup [char] " <> if
-    read-char @ execute c, recurse
+    dup [char] \ = if drop next-char
+      dup case
+        [char] 0 of drop 0 endof
+        [char] n of drop 10 endof
+        [char] x of drop read-byte endof
+        \ NOTE
+        \ \\ and \" are handled by the 'case' falling through
+      endcase
+    then
+    c, recurse
   then drop ;
 
 : string, (later), here @ "", dist swap ! ;
 
-compiler
-: "  next-char drop (data), string, align this! ;
-: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
-: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
-forth
+: s" next-char drop here @ dup string, here ! ;
 
-: "  next-char drop here @ dup string, here ! ;
-: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
-: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
+compiler
+: s"  next-char drop (data), string, align this! ;
+forth
 
 \ ===
 
@@ -242,9 +221,11 @@ variable onwnf
 
 quit
 
-\ ===
+compiler
+: assign lit, (later), ['] swap , ['] ! , exit, this! enter-code , ;
+forth
 
-: next, (jump), this! ;
+: next, jump, here @ cell + , ;
 : dyn, define enter-code , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
