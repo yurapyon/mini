@@ -111,12 +111,12 @@ pub const Dynamic = struct {
     start_token: Cell,
     handles: Handles,
 
-    pub fn init(self: *@This(), rt: *Runtime) !void {
+    pub fn init(self: *@This(), rt: *Runtime) void {
         self.rt = rt;
         self.handles.init(rt.allocator);
     }
 
-    pub fn registerExternals(self: *@This(), start_token: Cell) !Cell {
+    pub fn initLibrary(self: *@This(), start_token: Cell) !Cell {
         const external = External{
             .callback = externalsCallback,
             .userdata = self,

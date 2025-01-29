@@ -16,6 +16,7 @@ const repl = @import("repl/repl.zig");
 const Repl = repl.Repl;
 
 const Dynamic = @import("lib/dynamic.zig").Dynamic;
+const Blocks = @import("lib/blocks.zig").Blocks;
 
 const System = @import("system/system.zig").System;
 
@@ -49,8 +50,22 @@ pub fn main() !void {
     };
 
     var lib_dynamic: Dynamic = undefined;
-    try lib_dynamic.init(&rt);
-    _ = try lib_dynamic.registerExternals(repl.max_external_id);
+    lib_dynamic.init(&rt);
+
+    var lib_blocks: Blocks = undefined;
+    lib_blocks.init(&rt, "src/testing/image.mini");
+
+    var start_token = repl.max_external_id;
+    start_token = try lib_dynamic.initLibrary(start_token);
+    start_token = lib_blocks.initLibrary(start_token) catch |err| switch (err) {
+        error.WordNotFound => {
+            std.debug.print("Word not found: {s}\n", .{
+                rt.last_evaluated_word orelse unreachable,
+            });
+            return err;
+        },
+        else => return err,
+    };
 
     var lib_repl: Repl = undefined;
     try lib_repl.init(&rt);
