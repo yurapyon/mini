@@ -7,6 +7,7 @@ const MemoryPtr = mem.MemoryPtr;
 
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
+const Runtime = runtime.Runtime;
 const MainMemoryLayout = runtime.MainMemoryLayout;
 
 const register = @import("register.zig");
@@ -62,9 +63,9 @@ pub const InputBuffer = struct {
         self.len.store(@intCast(buffer.len));
     }
 
-    pub fn refill(self: *@This()) !bool {
+    pub fn refill(self: *@This(), rt: *Runtime) !bool {
         if (self.refiller) |*refiller| {
-            const buffer = try refiller.refill();
+            const buffer = try refiller.refill(rt);
             if (buffer) |buf| {
                 try self.setInputBuffer(buf);
                 return true;

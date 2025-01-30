@@ -187,6 +187,18 @@ compiler
 : s"  next-char drop (data), string, align this! ;
 forth
 
+: string= rot over = if mem= else 3drop false then ;
+
+\ ===
+
+: tilword word ?dup 0= if drop refill if recurse then panic then ;
+
+\ TODO this string= needs to be case insensitve
+:noname tilword s" [then]" count string= 0= if recurse then ;
+: [if] 0= if [ swap , ] then ;
+: [then] ;
+: [defined] word find nip ;
+
 \ ===
 
 : wlatest context @ cells wordlists + @ ;
@@ -214,10 +226,9 @@ variable onwnf
   onwnf @ execute
   endcond ;
 
-: interpret
-  word ?dup if resolve recurse
-  else drop refill if recurse then
-  then ;
+: interpret tilword resolve recurse ;
+
+: fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
 
 quit
 

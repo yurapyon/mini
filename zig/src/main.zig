@@ -49,23 +49,25 @@ pub fn main() !void {
         else => return err,
     };
 
+    var start_token = repl.max_external_id;
+
     var lib_dynamic: Dynamic = undefined;
     lib_dynamic.init(&rt);
+    start_token = try lib_dynamic.initLibrary(start_token);
 
     var lib_blocks: Blocks = undefined;
-    lib_blocks.init(&rt, "src/testing/image.mini");
-
-    var start_token = repl.max_external_id;
-    start_token = try lib_dynamic.initLibrary(start_token);
-    start_token = lib_blocks.initLibrary(start_token) catch |err| switch (err) {
-        error.WordNotFound => {
-            std.debug.print("Word not found: {s}\n", .{
-                rt.last_evaluated_word orelse unreachable,
-            });
-            return err;
-        },
-        else => return err,
-    };
+    if (cli_options.image_filepath) |image_filepath| {
+        lib_blocks.init(&rt, image_filepath);
+        start_token = lib_blocks.initLibrary(start_token) catch |err| switch (err) {
+            error.WordNotFound => {
+                std.debug.print("Word not found: {s}\n", .{
+                    rt.last_evaluated_word orelse unreachable,
+                });
+                return err;
+            },
+            else => return err,
+        };
+    }
 
     var lib_repl: Repl = undefined;
     try lib_repl.init(&rt);
@@ -74,11 +76,14 @@ pub fn main() !void {
         const file_buffer = try utils.readFile(allocator, filepath);
         defer allocator.free(file_buffer);
 
+        // TODO if you comment out line 85 and there is a wnf error thrown but the code
+        // it puts the repl in a weird state
         rt.processBuffer(file_buffer) catch |err| switch (err) {
             error.WordNotFound => {
                 std.debug.print("Word not found: {s}\n", .{
                     rt.last_evaluated_word orelse unreachable,
                 });
+                return err;
             },
             else => return err,
         };

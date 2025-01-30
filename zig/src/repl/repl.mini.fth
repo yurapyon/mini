@@ -7,7 +7,7 @@
 compiler
 : ." [compile] s" ['] count , ['] type , ;
 forth
-:noname ." word not found: " type cr ; onwnf !
+:noname type [char] ? emit cr ; onwnf !
 8 cells allot here @ constant tend
 0 value tstart
 : u>temp base @ /mod digit>char tstart c! ?dup if -1 +to tstart recurse then ;
@@ -26,3 +26,22 @@ forth
 : dump base @ >r hex over + swap .lines r> base ! ;
 : .words ?dup if dup name tuck type if space then @ recurse then ;
 : words wlatest .words ;
+
+[defined] block [if]
+0 value lnum
+: lnum+ lnum 2 u.r space 1 +to lnum ;
+: .l 2dup > if lnum+ dup dup 64 + swap .print cr 64 + recurse then 2drop ;
+: showb base @ >r decimal 0 to lnum dup 1024 + swap .l r> base ! ;
+: list block showb ;
+
+\ editor
+
+: l b0 showb ;
+0 value cx
+0 value cy
+: t 0 to cx to cy b0 cy 64 * + dup 64 + swap .print cy . cr ;
+: putc b0 cy 64 * + cx + c! 1 +to cx ;
+: readp 2dup > if next-char putc 1+ recurse then 2drop ;
+: p next-char source >in @ readp update ;
+
+[then]

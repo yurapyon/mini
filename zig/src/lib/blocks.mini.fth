@@ -1,19 +1,21 @@
-\ 0   8   16
+\ -16 -8  0
 \ |upd|id-|mem...
-: buf, here @ 0xff00 , 1024 allot ;
-buf, value buf0
-buf, value buf1
-: bswap buf1 buf0 to buf1 to buf0 ;
-: trysave dup c@ if 0 over c! dup 1+ c@ swap 2 + bwrite else drop then ;
-: buffer buf1 trysave buf1 1+ c! buf1 2 + ;
-: update 1 buf0 c! ;
+: buf 0xff00 , here @ 1024 allot value ;
+buf b0 buf b1
+: bswap b1 b0 to b1 to b0 ;
+: update 1 b0 2 - c! ;
+: clrupd 2 - 0 swap c! ;
+: trysave dup 2 - c@ if dup clrupd dup 1- c@ swap bwrite else drop then ;
+: bsave b0 trysave b1 trysave ;
+: bempty 0xff00 b0 2 - ! 0xff00 b1 2 - ! ;
+: flush bsave bempty ;
+: buffer b1 trysave b1 1- c! b1 ;
 : block cond
-  dup buf0 1+ c@ = if  drop else
-  dup buf1 1+ c@ = if bswap else
-  dup buffer bread bswap
-  endcond buf0 2 + ;
-: save-buffers buf0 trysave buf1 trysave ;
-: flush save-buffers 0xff00 buf0 ! 0xff00 buf1 ! ;
-: blk buf0 2 + ;
-\ TODO
+    dup b0 1- c@ = if drop else
+    dup b1 1- c@ = if drop bswap else
+    dup buffer bread bswap
+  endcond b0 ;
+0 value blk
+
+\ TODO buffer load
 : load ;

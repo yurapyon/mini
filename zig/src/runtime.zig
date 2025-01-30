@@ -215,14 +215,14 @@ pub const Runtime = struct {
     ) !void {
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill();
+        var did_refill = try self.input_buffer.refill(self);
 
         while (did_refill and !self.should_quit) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
                 try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill();
+                did_refill = try self.input_buffer.refill(self);
             }
         }
     }

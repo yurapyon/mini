@@ -30,6 +30,7 @@ const ExternalId = enum(Cell) {
 pub const max_external_id = @intFromEnum(ExternalId._max);
 
 const repl_file = @embedFile("repl.mini.fth");
+const repl_start_file = @embedFile("repl-start.mini.fth");
 
 fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.Error!bool {
     const repl = @as(*Repl, @ptrCast(@alignCast(userdata)));
@@ -118,9 +119,17 @@ pub const Repl = struct {
     }
 
     pub fn start(self: *@This(), rt: *Runtime) !void {
-        rt.input_buffer.refiller = self.refiller.toRefiller();
+        rt.processBuffer(repl_start_file) catch |err| switch (err) {
+            error.WordNotFound => {
+                std.debug.print("Word not found: {s}\n", .{
+                    rt.last_evaluated_word orelse unreachable,
+                });
+                return err;
+            },
+            else => return err,
+        };
 
-        try self.printBanner();
+        rt.input_buffer.refiller = self.refiller.toRefiller();
 
         self.should_bye = false;
 
@@ -134,12 +143,6 @@ pub const Repl = struct {
                 else => return err,
             };
         }
-    }
-
-    fn printBanner(self: *@This()) !void {
-        var bw = std.io.bufferedWriter(self.output_file.writer());
-        try bw.writer().print("mini\n", .{});
-        try bw.flush();
     }
 
     fn emit(self: *@This(), char: u8) !void {

@@ -73,6 +73,7 @@ pub fn initBuiltins(dict: *Dictionary) !void {
 
 const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "nop", .callback = nop },
+    .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
     .{ .name = "enter", .callback = enter },
     .{ .name = "execute", .callback = execute },
@@ -133,6 +134,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "lookup", .callback = lookup },
     .{ .name = "word", .callback = nextWord },
     .{ .name = "define", .callback = define },
+    // TODO rename next-char ?
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
@@ -141,7 +143,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "move", .callback = move },
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
     .{},
@@ -439,7 +440,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill();
+    const did_refill = try rt.input_buffer.refill(rt);
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
