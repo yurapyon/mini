@@ -36,7 +36,6 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : 2drop drop drop ;
 : 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
-: save  over -rot ;
 
 : /mod 2dup / -rot mod ;
 
@@ -47,6 +46,8 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : !+ tuck ! cell + ;
 : c@+ dup 1+ swap c@ ;
 : c!+ tuck c! 1+ ;
+: split over + tuck swap ;
+: range over + swap ;
 
 : allot   here +! ;
 : aligned dup cell mod + ;
@@ -145,6 +146,7 @@ forth
 : flag     dup constant 1 lshift ;
 
 : value create , does> @ ;
+\ TODO this could error on not found
 : vname word find drop >cfa >body ;
 : to  vname ! ;
 : +to vname +! ;
@@ -184,10 +186,22 @@ forth
 : s" next-char drop here @ dup string, here ! ;
 
 compiler
-: s"  next-char drop (data), string, align this! ;
+: s" next-char drop (data), string, align this! ;
 forth
 
 : string= rot over = if mem= else 3drop false then ;
+
+\ ===
+
+32 allot here @ constant #end
+0 value #start
+: <# #end to #start ;
+: #> drop #start #end #start - ;
+: hold -1 +to #start #start c! ;
+: # base @ /mod digit>char hold ;
+:noname # dup if recurse then ;
+: #s dup 0= if # else [ swap , ] then ;
+: #pad dup #end #start - > if over hold recurse then 2drop ;
 
 \ ===
 

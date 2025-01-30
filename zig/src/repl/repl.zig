@@ -19,7 +19,6 @@ const ExternalId = enum(Cell) {
     bye = 64,
     emit,
     showStack,
-    log,
     key,
     rawMode,
     sqrt,
@@ -60,14 +59,6 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 std.debug.print(" {d}", .{rt.data_stack.index(i)});
             }
         },
-        .log => {
-            const base, const x = rt.data_stack.pop2();
-            if (base < 1 or x < 0) {
-                rt.data_stack.push(0);
-            }
-            const log_x = std.math.log(Cell, base, x);
-            rt.data_stack.push(log_x);
-        },
         .key => {},
         .sqrt => {
             const value = rt.data_stack.pop();
@@ -101,7 +92,6 @@ pub const Repl = struct {
         try rt.defineExternal("bye", wlidx, @intFromEnum(ExternalId.bye));
         try rt.defineExternal("emit", wlidx, @intFromEnum(ExternalId.emit));
         try rt.defineExternal(".s", wlidx, @intFromEnum(ExternalId.showStack));
-        try rt.defineExternal("log", wlidx, @intFromEnum(ExternalId.log));
         try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
         try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
         try rt.defineExternal("sqrt", wlidx, @intFromEnum(ExternalId.sqrt));
