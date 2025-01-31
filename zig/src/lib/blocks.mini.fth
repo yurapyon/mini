@@ -24,6 +24,8 @@ constant saved
 
 create load-stack 8 saved * allot
 
+quit
+
 : save-blk
   srcblk> saved-tos >block-id !
   line>   saved-tos >block-line !
