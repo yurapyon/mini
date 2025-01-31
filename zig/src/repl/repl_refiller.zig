@@ -48,8 +48,6 @@ pub const ReplRefiller = struct {
 
     pub fn toRefiller(self: *@This()) Refiller {
         return .{
-            // TODO pretty sure this isnt needed
-            .id = "stdin",
             .callback = refill,
             .userdata = self,
         };

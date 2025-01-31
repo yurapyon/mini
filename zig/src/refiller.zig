@@ -4,7 +4,6 @@ const Runtime = runtime.Runtime;
 pub const RefillFn = *const fn (userdata: ?*anyopaque, rt: *Runtime) error{CannotRefill}!?[]const u8;
 
 pub const Refiller = struct {
-    id: []const u8,
     callback: RefillFn,
     userdata: *anyopaque,
 

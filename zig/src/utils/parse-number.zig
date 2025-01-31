@@ -1,7 +1,4 @@
 const std = @import("std");
-const Allocator = std.mem.Allocator;
-
-// ===
 
 pub const ParseNumberError = error{
     InvalidNumber,
@@ -89,37 +86,4 @@ test "parse number" {
 
     try testing.expectEqual(5, try parseNumber("11111", 1));
     try testing.expectEqual(0, try parseNumber("", 1));
-}
-
-// ===
-
-/// Case insensitive string compare
-pub fn stringsEqual(a: []const u8, b: []const u8) bool {
-    if (a.len != b.len) {
-        return false;
-    }
-
-    for (a, b) |a_ch, b_ch| {
-        if (std.ascii.toLower(a_ch) != std.ascii.toLower(b_ch)) {
-            return false;
-        }
-    }
-
-    return true;
-}
-
-test "string compare" {
-    const testing = std.testing;
-
-    try testing.expect(stringsEqual("asdf", "asdf"));
-    try testing.expect(stringsEqual("asdf", "Asdf"));
-    try testing.expect(!stringsEqual("asdf ", "asdf"));
-}
-
-// ===
-
-pub fn readFile(allocator: Allocator, filename: []const u8) ![]u8 {
-    var file = try std.fs.cwd().openFile(filename, .{ .mode = .read_only });
-    defer file.close();
-    return file.readToEndAlloc(allocator, std.math.maxInt(usize));
 }

@@ -75,6 +75,8 @@ forth
 : this! this ! ;
 : dist  this - ;
 
+: (data), lit, (later), jump, (later), swap this! ;
+
 \ basic syntax
 compiler
 : [compile] ' , ;
@@ -85,24 +87,11 @@ compiler
 
 : cond    0 ;
 : endcond ?dup if [compile] then recurse then ;
-
-: case    [compile] cond    ['] >r , ;
-: endcase [compile] endcond ['] r> , ['] drop , ;
-: of      ['] r@ , ['] = , [compile] if ;
-: endof   [compile] else ;
 forth
 
 : char word drop c@ ;
 compiler
 : [char] lit, char , ;
-forth
-
-:noname next-char [char] ) = 0= if recurse then ;
-: ( 1 [ , ] ;
-
-compiler
-' ( : ( [ , ] ; \ this comment is to fix vim syntax highlight )
-' \ : \ [ , ] ;
 forth
 
 \ ===
@@ -116,7 +105,7 @@ forth
 
 \ ( value min max -- value )
 \ : clamp rot min max ;
-: within[] rot tuck >= -rot <= and ;
+\ : within[] rot tuck >= -rot <= and ;
 \ : within[) 1- within[] ;
 
 : char>digit
@@ -138,6 +127,12 @@ forth
 
 : variable create cell allot ;
 
+variable ``
+compiler
+: `     here @ `` ! ;
+: loop` jump, `` @ , ;
+forth
+
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
@@ -155,51 +150,48 @@ forth
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
 
-variable mark
+\ ===
+
+: ( 1 ` next-char [char] ) = 0= if loop` then ;
+' \ ' (
 compiler
-: ` here @ mark ! ;
-: loop` jump, mark @ , ;
+: ( [ , ] ;
+: \ [ , ] ;
 forth
 
 \ ===
 
 : read-digit next-char char>digit ;
 : read-byte read-digit 16 * read-digit + ;
+: read-esc next-char cond
+    dup [char] 0 = if drop 0 else
+    dup [char] n = if drop 10 else
+    dup [char] x = if drop read-byte else
+    \ NOTE
+    \ \\ and \" are handled by the 'cond' falling through
+  endcond ;
 
-: count @+ ;
-
-: (data), lit, (later), jump, (later), swap this! ;
-
-: "",
-  next-char drop `
-  next-char dup [char] " <> if
-    dup [char] \ = if drop next-char
-      dup case
-        [char] 0 of drop 0 endof
-        [char] n of drop 10 endof
-        [char] x of drop read-byte endof
-        \ NOTE
-        \ \\ and \" are handled by the 'case' falling through
-      endcase
-    then
-    c, loop`
-  then drop ;
-
-: string, (later), here @ "", dist swap ! ;
-
-: s" here @ dup string, here ! ;
-
-compiler
-: s" (data), string, align this! ;
-forth
-
-: string= rot over = if mem= else 3drop false then ;
+: "", next-char drop `
+  next-char cond
+    dup [char] " = if drop return else
+    dup [char] \ = if drop read-esc else
+  endcond c,
+  loop` then drop ;
 
 : d" here @ dup "", here ! ;
 compiler
 : d" (data), "", align this! ;
 forth
-: [] ( i spc addr -- ) flip over * rot + swap ;
+\ ( i spacing addr -- addr[i*spacing] spacing )
+: [] flip over * rot + swap ;
+
+: count @+ ;
+: string, (later), here @ "", dist swap ! ;
+: s" here @ dup string, here ! ;
+compiler
+: s" (data), string, align this! ;
+forth
+: string= rot over = if mem= else 3drop false then ;
 
 \ ===
 
@@ -216,10 +208,10 @@ forth
 
 \ ===
 
-: tilword word ?dup 0= if drop refill if recurse then panic then ;
+: word! word ?dup 0= if drop refill if recurse then panic then ;
 
 \ TODO this string= needs to be case insensitve
-: [if] 0= if ` tilword s" [then]" count string= 0= if loop` then then ;
+: [if] 0= if ` word! s" [then]" count string= 0= if loop` then then ;
 : [then] ;
 : [defined] word find nip ;
 
@@ -243,14 +235,13 @@ variable onwnf
 : onlookup 0= state @ and if >cfa , else >cfa execute then ;
 : onnumber state @ if lit, , then ;
 
-: resolve
-  cond
-  2dup lookup  if 2swap 2drop onlookup else 2drop
-  2dup >number if -rot  2drop onnumber else drop
-  onwnf @ execute
+: resolve cond
+    2dup lookup  if 2swap 2drop onlookup else 2drop
+    2dup >number if -rot  2drop onnumber else drop
+    onwnf @ execute
   endcond ;
 
-: interpret tilword resolve recurse ;
+: interpret word! resolve recurse ;
 
 : fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
 

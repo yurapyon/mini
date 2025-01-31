@@ -1,7 +1,5 @@
 const std = @import("std");
 
-const utils = @import("utils.zig");
-
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
@@ -19,6 +17,7 @@ const register = @import("register.zig");
 const Register = register.Register;
 
 const LinkedListIterator = @import("utils/linked_list_iterator.zig").LinkedListIterator;
+const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
 
 // ===
 
@@ -102,7 +101,7 @@ pub const Dictionary = struct {
 
         while (try iter.next()) |definition_addr| {
             const name = try self.getDefinitionName(definition_addr);
-            if (utils.stringsEqual(to_find, name)) {
+            if (stringsEqual(to_find, name)) {
                 return definition_addr;
             }
         }

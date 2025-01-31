@@ -9,8 +9,6 @@ const ExternalError = runtime.ExternalError;
 const externals = @import("../externals.zig");
 const External = externals.External;
 
-const CliOptions = @import("cli_options.zig").CliOptions;
-
 const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
 
 // ===

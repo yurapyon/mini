@@ -6,8 +6,6 @@ const builtin = @import("builtin");
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
-const utils = @import("utils.zig");
-
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const register = @import("register.zig");
@@ -63,8 +61,16 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     base: Cell,
     execute: [2]Cell,
     input_buffer: [128]u8,
+    // TODO get rid of
     input_buffer_at: Cell,
+    // TODO get rid of
     input_buffer_len: Cell,
+    // TODO
+    // zero for input buffer
+    // anything else for string
+    source_ptr: Cell,
+    source_len: Cell,
+    source_at: Cell,
     dictionary_start: u0,
 });
 

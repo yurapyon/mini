@@ -28,7 +28,6 @@ pub const BufferRefiller = struct {
 
     pub fn toRefiller(self: *@This()) Refiller {
         return .{
-            .id = "buffer",
             .callback = refill,
             .userdata = self,
         };

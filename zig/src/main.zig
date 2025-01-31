@@ -10,7 +10,7 @@ const Cell = runtime.Cell;
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const CliOptions = @import("repl/cli_options.zig").CliOptions;
+const CliOptions = @import("cli_options.zig").CliOptions;
 
 const repl = @import("repl/repl.zig");
 const Repl = repl.Repl;
@@ -20,7 +20,7 @@ const Blocks = @import("lib/blocks.zig").Blocks;
 
 const System = @import("system/system.zig").System;
 
-const utils = @import("utils.zig");
+const readFile = @import("utils/read-file.zig").readFile;
 
 // ===
 
@@ -73,7 +73,7 @@ pub fn main() !void {
     try lib_repl.init(&rt);
 
     for (cli_options.filepaths.items) |filepath| {
-        const file_buffer = try utils.readFile(allocator, filepath);
+        const file_buffer = try readFile(allocator, filepath);
         defer allocator.free(file_buffer);
 
         // TODO if you comment out line 85 and there is a wnf error thrown but the code
@@ -116,7 +116,7 @@ test "lib-testing" {
     _ = @import("register.zig");
     _ = @import("runtime.zig");
     _ = @import("stack.zig");
-    _ = @import("utils.zig");
+    // _ = @import("utils.zig");
 }
 
 test "end-to-end" {

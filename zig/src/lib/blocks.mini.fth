@@ -15,7 +15,32 @@ buf b0 buf b1
     dup b1 1- c@ = if drop bswap else
     dup buffer bread bswap
   endcond b0 ;
+
+0 cell field >block-id
+  cell field >block-line
+  cell field >block-in
+constant saved
+0 value saved-tos
+
+create load-stack 8 saved * allot
+
+: save-blk
+  srcblk> saved-tos >block-id !
+  line>   saved-tos >block-line !
+  >in @   saved-tos >block-in !
+  saved +to saved-tos ;
+
+: restore-blk
+  saved negate +to saved-tos
+  saved-tos >block-id @   >srcblk
+  \ todo
+  \ load line into line buffer on >line
+  saved-tos >block-line @ >line
+  saved-tos >block-in @   >in ! ;
+
+: evaluate ;
+
 0 value blk
 
 \ TODO buffer load
-: load ;
+: load save-blk dup to blk block evaluate restore-blk ;

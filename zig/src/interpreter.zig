@@ -1,5 +1,6 @@
-const utils = @import("utils.zig");
-const ParseNumberError = utils.ParseNumberError;
+const parse_number = @import("utils/parse-number.zig");
+const parseNumber = parse_number.parseNumber;
+const ParseNumberError = parse_number.ParseNumberError;
 
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
@@ -60,7 +61,7 @@ pub const Interpreter = struct {
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
 
-        self.parseNumberCallback = &utils.parseNumber;
+        self.parseNumberCallback = &parseNumber;
     }
 
     //

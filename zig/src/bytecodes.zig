@@ -1,5 +1,6 @@
 const mem = @import("memory.zig");
-const utils = @import("utils.zig");
+
+const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
 
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
@@ -47,7 +48,7 @@ pub fn getBytecode(token: Cell) ?BytecodeDefinition {
 
 pub fn getBytecodeToken(name: []const u8) ?Cell {
     for (bytecodes, 0..) |definition, i| {
-        const equal = utils.stringsEqual(definition.name, name);
+        const equal = stringsEqual(definition.name, name);
         if (equal) {
             return i;
         }
@@ -134,13 +135,14 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "lookup", .callback = lookup },
     .{ .name = "word", .callback = nextWord },
     .{ .name = "define", .callback = define },
-    // TODO rename next-char ?
+    // TODO rename next-char?
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
+    // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
 
     .{},
