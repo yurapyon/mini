@@ -97,10 +97,7 @@ compiler
 : [char] lit, char , ;
 forth
 
-:noname next-char case
-    [char] ( of 1+ endof
-    [char] ) of 1- endof
-  endcase ?dup if recurse then ;
+:noname next-char [char] ) = 0= if recurse then ;
 : ( 1 [ , ] ;
 
 compiler
@@ -146,8 +143,8 @@ forth
 : flag     dup constant 1 lshift ;
 
 : value create , does> @ ;
-\ TODO this could error on not found
-: vname word find drop >cfa >body ;
+\ TODO better error
+: vname word find 0= if panic then >cfa >body ;
 : to  vname ! ;
 : +to vname +! ;
 compiler
@@ -157,6 +154,12 @@ forth
 
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
+
+variable mark
+compiler
+: ` here @ mark ! ;
+: loop` jump, mark @ , ;
+forth
 
 \ ===
 
@@ -168,6 +171,7 @@ forth
 : (data), lit, (later), jump, (later), swap this! ;
 
 : "",
+  next-char drop `
   next-char dup [char] " <> if
     dup [char] \ = if drop next-char
       dup case
@@ -178,18 +182,24 @@ forth
         \ \\ and \" are handled by the 'case' falling through
       endcase
     then
-    c, recurse
+    c, loop`
   then drop ;
 
 : string, (later), here @ "", dist swap ! ;
 
-: s" next-char drop here @ dup string, here ! ;
+: s" here @ dup string, here ! ;
 
 compiler
-: s" next-char drop (data), string, align this! ;
+: s" (data), string, align this! ;
 forth
 
 : string= rot over = if mem= else 3drop false then ;
+
+: d" here @ dup "", here ! ;
+compiler
+: d" (data), "", align this! ;
+forth
+: [] ( i spc addr -- ) flip over * rot + swap ;
 
 \ ===
 
@@ -199,17 +209,17 @@ forth
 : #> drop #start #end #start - ;
 : hold -1 +to #start #start c! ;
 : # base @ /mod digit>char hold ;
-:noname # dup if recurse then ;
-: #s dup 0= if # else [ swap , ] then ;
+: #s dup 0= if # else ` # dup if loop` then then ;
 : #pad dup #end #start - > if over hold recurse then 2drop ;
+
+: h# 16 /mod digit>char hold ;
 
 \ ===
 
 : tilword word ?dup 0= if drop refill if recurse then panic then ;
 
 \ TODO this string= needs to be case insensitve
-:noname tilword s" [then]" count string= 0= if recurse then ;
-: [if] 0= if [ swap , ] then ;
+: [if] 0= if ` tilword s" [then]" count string= 0= if loop` then then ;
 : [then] ;
 : [defined] word find nip ;
 

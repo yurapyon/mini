@@ -1,3 +1,7 @@
-: .n dup dup dup decimal 3 u.r space hex 2 u.0 space print space space 32 + ;
-: .ls 2dup > if dup .n .n .n .n drop cr 1+ recurse then 2drop ;
-: ashy base @ >r 32 0 .ls r> base ! ;
+: s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
+: s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
+: ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
+  else dup 127 < if emit else drop ." del" endcond ;
+: next dup dup dup 3 u.r space b. space ascii space space 32 + ;
+: ashy 32 0 ` 2dup > if dup next next next next cr drop 1+ loop`
+  then 2drop ;

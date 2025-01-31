@@ -17,20 +17,22 @@ forth
 : . u. space ;
 : ? @ . ;
 
-: .bytes 2dup > if c@+ 2 u.0 space recurse then 2drop ;
-: .lines 2dup > if dup 4 u.r ." : "
-    16 split 2dup .bytes .print cr recurse
-  then 2drop ;
-: dump base @ >r hex range .lines r> base ! ;
+: b. <# h# h# #> type ;
+: c. <# h# h# h# h# #> type ;
+: .bytes 2dup > if c@+ b. space recurse then 2drop ;
 
-: .words ?dup if dup name tuck type if space then @ recurse then ;
-: words wlatest .words ;
+: dump range ` 2dup > if 16 split
+    dup c. space 2dup .bytes .print cr
+  loop` then 2drop ;
+
+: words wlatest ` ?dup if dup name tuck type if space then @ loop` then ;
+
+: line# create 0 , , does> dup @+ swap @ u.r space +! ;
 
 [defined] block [if]
-0 value lct
-: linum lct 2 u.r space 1 +to lct ;
-: .l 2dup > if 64 split linum .print cr recurse then 2drop ;
-: showb base @ >r decimal 0 to lct 1024 range .l r> base ! ;
+2 line# list#
+: .list 2dup > if 64 split 1 list# .print cr recurse then 2drop ;
+: showb base @ >r decimal 0 to list# 1024 range .list r> base ! ;
 : list block showb ;
 
 \ editor
