@@ -11,13 +11,13 @@
 : +dow 1 > leap? and if 1+ then ;
 : month1dow dup dows + c@ swap +dow jan1dow + 7 mod ;
 
-: .blanks 0 ` 2dup > if 3 spaces 1+ loop` then 2drop ;
+: .blanks 0 ` 2dup > if 3 spaces 1+ goto` then 2drop ;
 
 ( days currday dow -- )
-: ?cr over + 7 mod -rot = or 0= if cr then ;
+: ?cr over + 7 mod flip = or 0= if cr then ;
 ( month dow -- )
 : .days >r #days 1 ` 2dup >= if dup 2 u.r space 2dup r@ ?cr 1+
-  loop` then r> 3drop ;
+  goto` then r> 3drop ;
 
 : .dows ." m  t  w  t  f  s  s" ;
 : .name 3 d" janfebmaraprmayjunjulaugsepoctnovdec" [] type ;
@@ -26,6 +26,6 @@
 
 : 1cal 1- .month ;
 : 3cal 1- 3 range ` 2dup > if dup 12 mod .month 1+
-  loop` then 2drop ;
+  goto` then 2drop ;
 : 12cal to year 12 0 ` 2dup > if dup if cr then dup .month 1+
-  loop` then 2drop ;
+  goto` then 2drop ;

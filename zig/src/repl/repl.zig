@@ -6,10 +6,12 @@ const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 const ExternalError = runtime.ExternalError;
 
+const mem = @import("../memory.zig");
+
 const externals = @import("../externals.zig");
 const External = externals.External;
 
-const ReplRefiller = @import("repl_refiller.zig").ReplRefiller;
+const Refiller = @import("../refiller.zig").Refiller;
 
 // ===
 
@@ -73,14 +75,10 @@ pub const Repl = struct {
     output_file: std.fs.File,
     should_bye: bool,
 
-    refiller: ReplRefiller,
-
     // TODO maybe save the runtime in this as a field
     pub fn init(self: *@This(), rt: *Runtime) !void {
         self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
-
-        self.refiller.init();
 
         const external = External{
             .callback = externalsCallback,
@@ -117,7 +115,7 @@ pub const Repl = struct {
             else => return err,
         };
 
-        rt.input_buffer.refiller = self.refiller.toRefiller();
+        rt.input_buffer.refiller = self.toRefiller();
 
         self.should_bye = false;
 
@@ -147,5 +145,28 @@ pub const Repl = struct {
     // TODO cleanup
     fn rawMode(_: *@This(), _: bool) !void {
         return 0;
+    }
+
+    fn refill(self_: ?*anyopaque, out: []u8) !?usize {
+        const self: *@This() = @ptrCast(@alignCast(self_));
+
+        const reader = self.input_file.reader();
+        const slice =
+            reader.readUntilDelimiterOrEof(
+            out[0..out.len],
+            '\n',
+        ) catch return error.CannotRefill;
+        if (slice) |slc| {
+            return slc.len;
+        } else {
+            return null;
+        }
+    }
+
+    pub fn toRefiller(self: *@This()) Refiller {
+        return .{
+            .callback = refill,
+            .userdata = self,
+        };
     }
 };

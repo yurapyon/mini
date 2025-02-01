@@ -1,34 +1,20 @@
-word enter-code define ' enter @ , ' lit , ' enter @ , ' exit ,
+word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
-word ] define enter-code , ' lit , 1 , ' state , ' ! , ' exit ,
+word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
 1 context !
-word [ define enter-code , ' lit , 0 , ' state , ' ! , ' exit ,
+word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
 0 context !
 
-word \ define enter-code , ] source >in ! drop [ ' exit ,
-
-\ equivalent to
-\ : : word define enter-code , ] ;
-word : define enter-code , ] word define enter-code , ] [ ' exit ,
-
-\ equivalent to
-\ : lit, ['] lit , ;
-: lit, lit [ ' lit , ] , [ ' exit ,
-
+word : define enter# , ] word define enter# , ] [ ' exit ,
 1 context !
-
-\ equivalent to
-\ : ['] ' lit, , ;
-: ['] ' lit, , [ ' exit ,
-
-\ equivalent to
-\ : ; exit, [compile] [ ;
-: ; ['] exit , [ ' [ , ' exit ,
-
+: ; lit exit , [ ' [ , ' exit ,
 0 context !
 
 : forth    0 context ! ;
 : compiler 1 context ! ;
+
+: source source-ptr @ source-len @ ;
+: \ source-len @ >in ! ;
 
 : <> = 0= ;
 
@@ -54,19 +40,15 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : align   here @ aligned here ! ;
 
 : >name-len cell + ;
+: name >name-len c@+ ;
 : >cfa >name-len dup c@ + 1 + aligned ;
 : last latest @ >cfa ;
 
-: name >name-len c@+ ;
+: :noname 0 0 define here @ enter# , ] ;
 
-\ tags
-: exit, ['] exit , ;
-: jump, ['] jump , ;
-
-: :noname 0 0 define here @ enter-code , ] ;
+: lit, lit lit , ;
 compiler
-: recurse jump, last cell + , ;
-: return exit, ;
+: ['] lit, ' , ;
 forth
 
 : (later), here @ 0 , ;
@@ -75,15 +57,16 @@ forth
 : this! this ! ;
 : dist  this - ;
 
-: (data), lit, (later), jump, (later), swap this! ;
+: (data), lit, (later), ['] jump , (later), swap this! ;
 
-\ basic syntax
 compiler
 : [compile] ' , ;
 
 : if   ['] jump0 , (later), ;
-: else jump, (later), swap this! ;
+: else ['] jump , (later), swap this! ;
 : then this! ;
+
+: recurse ['] jump , last cell + , ;
 
 : cond    0 ;
 : endcond ?dup if [compile] then recurse then ;
@@ -120,17 +103,17 @@ forth
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
-: create word define enter-code , lit, (later), exit, 0 , this! ;
+: create word define enter# , lit, (later), ['] exit , 0 , this! ;
 compiler
-: does>  lit, (later), ['] does! , exit, this! ;
+: does>  lit, (later), ['] does! , ['] exit , this! ;
 forth
 
 : variable create cell allot ;
 
-variable ``
+variable goto*
 compiler
-: `     here @ `` ! ;
-: loop` jump, `` @ , ;
+: `     here @ goto* ! ;
+: goto` ['] jump , goto* @ , ;
 forth
 
 : constant create , does> @ ;
@@ -143,8 +126,8 @@ forth
 : to  vname ! ;
 : +to vname +! ;
 compiler
-: to  vname lit, , ['] ! , ;
-: +to vname lit, , ['] +! , ;
+: to  lit, vname , ['] ! , ;
+: +to lit, vname , ['] +! , ;
 forth
 
 : +field over create , + does> @ + ;
@@ -173,10 +156,10 @@ forth
 
 : "", next-char drop `
   next-char cond
-    dup [char] " = if drop return else
+    dup [char] " = if drop exit else
     dup [char] \ = if drop read-esc else
   endcond c,
-  loop` then drop ;
+  goto` then drop ;
 
 : d" here @ dup "", here ! ;
 compiler
@@ -201,17 +184,20 @@ forth
 : #> drop #start #end #start - ;
 : hold -1 +to #start #start c! ;
 : # base @ /mod digit>char hold ;
-: #s dup 0= if # else ` # dup if loop` then then ;
+: #s dup 0= if # else ` # dup if goto` then then ;
 : #pad dup #end #start - > if over hold recurse then 2drop ;
 
 : h# 16 /mod digit>char hold ;
 
 \ ===
 
-: word! word ?dup 0= if drop refill if recurse then panic then ;
+: word! word ?dup 0= if drop refill if recurse then 0 0 then ;
 
 \ TODO this string= needs to be case insensitve
-: [if] 0= if ` word! s" [then]" count string= 0= if loop` then then ;
+\ string~=
+\ TODO this behavior is weird and doeant panic on EoI
+: [if] 0= if ` word! ?dup 0= if panic then s" [then]" count string= 0= if
+  goto` then then ;
 : [then] ;
 : [defined] word find nip ;
 
@@ -220,6 +206,8 @@ forth
 : wlatest context @ cells wordlists + @ ;
 
 : mem d0 dist ;
+
+: fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
 
 \ ===
 
@@ -241,17 +229,39 @@ variable onwnf
     onwnf @ execute
   endcond ;
 
-: interpret word! resolve recurse ;
+: interpret word! ?dup if resolve recurse else drop then ;
 
-: fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
+0 cell field >saved-ptr
+  cell field >saved-len
+  cell field >saved-at
+constant saved-source
+
+8 constant saved-max
+create saved-stack saved-max saved-source * allot
+saved-stack value saved-tos
+
+: save-source
+  source-ptr @ saved-tos >saved-ptr !
+  source-len @ saved-tos >saved-len !
+  >in @        saved-tos >saved-at !
+  saved-source +to saved-tos ;
+
+: restore-source
+  saved-source negate +to saved-tos
+  saved-tos >saved-ptr @ source-ptr !
+  saved-tos >saved-len @ source-len !
+  saved-tos >saved-at @  >in ! ;
+
+: evaluate save-source source-len ! source-ptr ! 0 >in !
+  interpret restore-source ;
 
 quit
 
 compiler
-: assign lit, (later), ['] swap , ['] ! , exit, this! enter-code , ;
+: assign lit, (later), ['] swap , ['] ! , ['] exit , this! enter# , ;
 forth
 
-: next, jump, here @ cell + , ;
-: dyn, define enter-code , next, ;
+: next, ['] jump , here @ cell + , ;
+: dyn, define enter# , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;

@@ -1,6 +1,6 @@
 32 constant bl
 : space bl emit ;
-: spaces 0 ` 2dup > if space 1+ loop` then 2drop ;
+: spaces 0 ` 2dup > if space 1+ goto` then 2drop ;
 : cr 10 emit ;
 : print dup 32 < over 126 > or if drop [char] . then emit ;
 : .print 2dup > if c@+ print recurse then 2drop ;
@@ -24,23 +24,28 @@ forth
 
 : dump range ` 2dup > if 16 split
     dup c. space 2dup .bytes .print cr
-  loop` then 2drop ;
+  goto` then 2drop ;
 
 : words wlatest ` ?dup if dup name tuck type if space then @
-  loop` then ;
+  goto` then ;
 
 : s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
 : s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
 : ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
   else dup 127 < if emit else drop ." del" endcond ;
 : next dup dup dup 3 u.r space b. space ascii space space 32 + ;
-: ashy 32 0 ` 2dup > if dup next next next next cr drop 1+ loop`
+: ashy 32 0 ` 2dup > if dup next next next next cr drop 1+ goto`
   then 2drop ;
+
+\ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
+\   <# # # # drop # # # drop # # # [char] . hold #s #> type ;
+
+: .k 1000 1024 */ <# # # # [char] . hold #s #> type ;
 
 [defined] block [if]
 : .line swap 64 * + 64 range .print ;
 : .list >r 16 0 ` 2dup > if dup dup 2 u.r space r@ .line cr 1+
-  loop` then r> drop 2drop ;
+  goto` then r> drop 2drop ;
 : list block .list ;
 
 \ editor

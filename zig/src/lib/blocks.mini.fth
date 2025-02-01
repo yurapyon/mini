@@ -16,33 +16,22 @@ buf b0 buf b1
     dup buffer bread bswap
   endcond b0 ;
 
-0 cell field >block-id
-  cell field >block-line
-  cell field >block-in
-constant saved
-0 value saved-tos
 
-create load-stack 8 saved * allot
-
-quit
+create load-stack saved-max cells allot
+load-stack value ls-tos
 
 : save-blk
-  srcblk> saved-tos >block-id !
-  line>   saved-tos >block-line !
-  >in @   saved-tos >block-in !
-  saved +to saved-tos ;
-
+  b0 1- c@ ls-tos !
+  cell +to ls-tos
+;
 : restore-blk
-  saved negate +to saved-tos
-  saved-tos >block-id @   >srcblk
-  \ todo
-  \ load line into line buffer on >line
-  saved-tos >block-line @ >line
-  saved-tos >block-in @   >in ! ;
+  cell negate +to ls-tos
+  ls-tos @ block drop
+;
 
-: evaluate ;
+\ todo
+\ this would break if you 'list' a block from a block that's loading
+: blk b0 1- c@ ;
 
-0 value blk
-
-\ TODO buffer load
-: load save-blk dup to blk block evaluate restore-blk ;
+: load save-blk block 1024 evaluate restore-blk ;
+: thru swap ` 2dup >= if dup load 1+ goto` then 2drop ;

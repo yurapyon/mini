@@ -43,6 +43,7 @@ comptime {
 
 pub const Cell = u16;
 pub const DoubleCell = u32;
+pub const SignedCell = i16;
 
 pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;
@@ -60,17 +61,12 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     state: Cell,
     base: Cell,
     execute: [2]Cell,
-    input_buffer: [128]u8,
-    // TODO get rid of
-    input_buffer_at: Cell,
-    // TODO get rid of
-    input_buffer_len: Cell,
-    // TODO
     // zero for input buffer
     // anything else for string
     source_ptr: Cell,
     source_len: Cell,
     source_at: Cell,
+    input_buffer: [128]u8,
     dictionary_start: u0,
 });
 
@@ -160,8 +156,16 @@ pub const Runtime = struct {
             MainMemoryLayout.offsetOf("dictionary_start"),
         );
         try self.interpreter.dictionary.compileConstant(
+            "source-ptr",
+            MainMemoryLayout.offsetOf("source_ptr"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "source-len",
+            MainMemoryLayout.offsetOf("source_len"),
+        );
+        try self.interpreter.dictionary.compileConstant(
             ">in",
-            MainMemoryLayout.offsetOf("input_buffer_at"),
+            MainMemoryLayout.offsetOf("source_at"),
         );
         try self.interpreter.dictionary.compileConstant(
             "true",
@@ -171,7 +175,6 @@ pub const Runtime = struct {
             "false",
             cellFromBoolean(false),
         );
-        try self.defineSourceWord();
     }
 
     fn defineMemoryLocationConstant(self: *@This(), comptime name: []const u8) !void {
@@ -179,23 +182,6 @@ pub const Runtime = struct {
             name,
             MainMemoryLayout.offsetOf(name),
         );
-    }
-
-    fn defineSourceWord(self: *@This()) !void {
-        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
-        try self.interpreter.dictionary.defineWord(wordlist_idx, "source");
-        try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
-        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
-        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
-        // TODO catch unreachable on findWordInWordlist calls
-        // errors are 'invalid wordlist'
-        //        and out of bounds error for finding definition name
-        const fetch_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "@")) orelse unreachable;
-        const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
-        try self.interpreter.dictionary.compileXt(fetch_cfa);
-        const exit_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "exit")) orelse unreachable;
-        const exit_cfa = try self.interpreter.dictionary.toCfa(exit_definition_addr);
-        try self.interpreter.dictionary.compileXt(exit_cfa);
     }
 
     pub fn defineExternal(self: *@This(), name: []const u8, wordlist_idx: Cell, id: Cell) !void {
@@ -221,14 +207,14 @@ pub const Runtime = struct {
     ) !void {
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill(self);
+        var did_refill = try self.input_buffer.refill();
 
         while (did_refill and !self.should_quit) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
                 try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill(self);
+                did_refill = try self.input_buffer.refill();
             }
         }
     }

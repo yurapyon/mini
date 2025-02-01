@@ -1,5 +1,11 @@
 const c = @cImport({
     @cInclude("GLFW/glfw3.h");
+
+    // TODO
+    // @cInclude("epoxy/gl.h");
+    // @cInclude("GLFW/glfw3.h");
+    // @cInclude("stb_image.h");
+    // @cInclude("unistd.h");
 });
 
 pub usingnamespace c;
@@ -70,7 +76,6 @@ pub const gfx = struct {
                 // glGetShaderInfoLog(shader, info_len, null, buf.ptr);
                 // std.debug.print("shader info:\n{s}", .{buf});
                 // heap_alloc.free(buf);
-                return 0;
             }
 
             var success: c_int = undefined;

@@ -6,6 +6,7 @@ const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 const DoubleCell = runtime.DoubleCell;
+const SignedCell = runtime.SignedCell;
 const CompileState = runtime.CompileState;
 
 const dictionary = @import("dictionary.zig");
@@ -118,6 +119,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "mod", .callback = mod },
     .{ .name = "*/", .callback = muldiv },
     .{ .name = "*/mod", .callback = muldivmod },
+    .{ .name = "negate", .callback = negate },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -146,7 +148,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
 };
@@ -392,6 +393,14 @@ fn muldivmod(rt: *Runtime) Error!void {
     rt.data_stack.push(@truncate(r));
 }
 
+fn negate(rt: *Runtime) Error!void {
+    const value = rt.data_stack.pop();
+    const signed_value: SignedCell = @bitCast(value);
+    const negated_value = -signed_value;
+    const negated_unsigned: Cell = @bitCast(negated_value);
+    rt.data_stack.push(negated_unsigned);
+}
+
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
@@ -455,7 +464,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill(rt);
+    const did_refill = try rt.input_buffer.refill();
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 

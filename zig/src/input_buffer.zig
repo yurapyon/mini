@@ -21,6 +21,7 @@ pub fn isWhitespace(char: u8) bool {
     return char == ' ' or char == '\n';
 }
 
+// TODO move this into runtime.zig
 const input_buffer_len = 128;
 
 pub const InputBuffer = struct {
@@ -28,47 +29,42 @@ pub const InputBuffer = struct {
 
     memory: MemoryPtr,
 
-    at: Register(MainMemoryLayout.offsetOf("input_buffer_at")),
-    len: Register(MainMemoryLayout.offsetOf("input_buffer_len")),
+    ptr: Register(MainMemoryLayout.offsetOf("source_ptr")),
+    len: Register(MainMemoryLayout.offsetOf("source_len")),
+    at: Register(MainMemoryLayout.offsetOf("source_at")),
 
     refiller: ?Refiller,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
-        self.at.init(memory);
-        self.len.init(memory);
 
-        self.at.store(0);
+        self.ptr.init(memory);
+        self.len.init(memory);
+        self.at.init(memory);
+
+        self.ptr.store(0);
         self.len.store(0);
+        self.at.store(0);
 
         self.refiller = null;
     }
 
-    fn setInputBuffer(
-        self: *@This(),
-        buffer: []const u8,
-    ) !void {
-        if (buffer.len > input_buffer_len) {
-            return error.OversizeInputBuffer;
-        }
-        // NOTE
-        // this will always be in-bounds as long as buffer_offset + input_buffer_len is
-        const mem_slice = mem.sliceFromAddrAndLen(
-            self.memory,
-            buffer_offset,
-            @intCast(buffer.len),
-        ) catch unreachable;
-        @memcpy(mem_slice, buffer);
-        self.at.store(0);
-        self.len.store(@intCast(buffer.len));
-    }
-
-    pub fn refill(self: *@This(), rt: *Runtime) !bool {
+    pub fn refill(self: *@This()) !bool {
         if (self.refiller) |*refiller| {
-            const buffer = try refiller.refill(rt);
-            if (buffer) |buf| {
-                try self.setInputBuffer(buf);
-                return true;
+            if (self.ptr.fetch() == 0) {
+                const slice = try mem.sliceFromAddrAndLen(
+                    self.memory,
+                    buffer_offset,
+                    input_buffer_len,
+                );
+                const bytes_refilled = try refiller.refill(slice);
+                if (bytes_refilled) |byte_ct| {
+                    self.len.store(@intCast(byte_ct));
+                    self.at.store(0);
+                    return true;
+                } else {
+                    return false;
+                }
             } else {
                 return false;
             }
@@ -81,23 +77,40 @@ pub const InputBuffer = struct {
 
     // returns null on end of input
     pub fn readNextChar(self: *@This()) ?u8 {
-        const buffer_at = self.at.fetch();
-        // NOTE
-        // self.len is checked in setInputBuffer when the buffer is updated from zig
-        // however, self.len can be changed from forth, and thus can be invalid
-        //   i.e. greater than input_buffer_len
-        // instead of returning an error we just wrap it
-        const buffer_len = self.len.fetch() % input_buffer_len;
-
-        if (buffer_at < buffer_len) {
+        // TODO
+        // this logic is messy and maybe can be consolidated
+        const source_ptr = self.ptr.fetch();
+        const source_len = self.len.fetch();
+        const source_at = self.at.fetch();
+        if (source_ptr == 0) {
             // NOTE
-            // this access will be inbounds as long as
-            //   buffer_offset + input_buffer_len is in bounds
-            const ret = self.memory[buffer_offset + buffer_at];
-            self.at.storeAdd(1);
-            return ret;
+            // self.len can be changed from forth, and thus can be invalid
+            //   even if reading from the input buffer
+            // instead of returning an error we just wrap it
+            if (source_at < source_len % input_buffer_len) {
+                // NOTE
+                // this access will be inbounds as long as
+                //   buffer_offset + input_buffer_len is in bounds
+                const ret = self.memory[buffer_offset + source_at];
+                self.at.storeAdd(1);
+                return ret;
+            } else {
+                return null;
+            }
         } else {
-            return null;
+            if (source_at < source_len) {
+                // TODO dont catch unreachable
+                const slice = mem.constSliceFromAddrAndLen(
+                    self.memory,
+                    source_ptr,
+                    source_len,
+                ) catch unreachable;
+                const ret = slice[source_at];
+                self.at.storeAdd(1);
+                return ret;
+            } else {
+                return null;
+            }
         }
     }
 
@@ -117,6 +130,10 @@ pub const InputBuffer = struct {
     } {
         var char = self.skipWhitespace() orelse return null;
 
+        const source_ptr = self.ptr.fetch();
+
+        const buffer_addr = if (source_ptr == 0) buffer_offset else source_ptr;
+
         // NOTE
         // self.at.fetch() is >=1 because we didnt return early after skipWhitespace
         const word_start = self.at.fetch() - 1;
@@ -131,7 +148,7 @@ pub const InputBuffer = struct {
 
         const word_end = self.at.fetch();
         return .{
-            .address = buffer_offset + word_start,
+            .address = buffer_addr + word_start,
             .len = word_end - word_start,
         };
     }
