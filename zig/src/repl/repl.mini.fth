@@ -1,5 +1,6 @@
 32 constant bl
 : space bl emit ;
+: spaces 0 ` 2dup > if space 1+ loop` then 2drop ;
 : cr 10 emit ;
 : print dup 32 < over 126 > or if drop [char] . then emit ;
 : .print 2dup > if c@+ print recurse then 2drop ;

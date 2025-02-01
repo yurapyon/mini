@@ -117,6 +117,7 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "/", .callback = divide },
     .{ .name = "mod", .callback = mod },
     .{ .name = "*/", .callback = muldiv },
+    .{ .name = "*/mod", .callback = muldivmod },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -145,7 +146,6 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
     .{},
     .{},
     .{},
@@ -377,6 +377,19 @@ fn muldiv(rt: *Runtime) Error!void {
     const calc = double_value * double_mul / div;
     // TODO should this be a truncate?
     rt.data_stack.push(@truncate(calc));
+}
+
+fn muldivmod(rt: *Runtime) Error!void {
+    const div = rt.data_stack.pop();
+    const mul = rt.data_stack.pop();
+    const value = rt.data_stack.pop();
+    const double_value: DoubleCell = @intCast(value);
+    const double_mul: DoubleCell = @intCast(mul);
+    const q = double_value * double_mul / div;
+    const r = double_value * double_mul % div;
+    // TODO should this be a truncate?
+    rt.data_stack.push(@truncate(q));
+    rt.data_stack.push(@truncate(r));
 }
 
 fn find(rt: *Runtime) Error!void {

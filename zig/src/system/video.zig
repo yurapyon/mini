@@ -18,9 +18,16 @@ pub const Video = struct {
     palette: [256]RGB,
 
     texture: c.GLuint,
+    quad: c.GLuint,
+    vao: c.GLuint,
+    prog: c.GLuint,
 
     pub fn init(self: *@This()) void {
         self.texture = gfx.texture.createBlank(512, 384);
+        self.quad = gfx.buffer.createQuad();
+        self.prog = gfx.program.create();
+        // TODO set uniforms
+
     }
 
     pub fn putCharacter(self: *@This(), x: Cell, y: Cell, char: u8) void {

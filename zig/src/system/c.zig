@@ -5,6 +5,9 @@ const c = @cImport({
 pub usingnamespace c;
 
 pub const gfx = struct {
+    const vert_shader = @embedFile("shaders/vert.glsl");
+    const frag_shader = @embedFile("shaders/frag.glsl");
+
     pub fn init() !*c.GLFWwindow {
         if (c.glfwInit() != c.GL_TRUE) {
             return error.CannotInitGLFW;
@@ -42,6 +45,122 @@ pub const gfx = struct {
     pub fn deinit() void {
         c.glfwTerminate();
     }
+
+    pub const shader = struct {
+        pub fn create(str: []const u8, shader_type: c.GLenum) c.GLuint {
+            const shd = c.glCreateShader(shader_type);
+            if (shd == 0) {
+                // TODO error
+                return 0;
+            }
+
+            c.glShaderSource(
+                shd,
+                1,
+                &[_]*const u8{@ptrCast(str.ptr)},
+                &[_]c_int{@intCast(str.len)},
+            );
+            c.glCompileShader(shd);
+
+            var info_len: c_int = 0;
+            c.glGetShaderiv(shd, c.GL_INFO_LOG_LENGTH, &info_len);
+            if (info_len != 0) {
+                // TODO error
+                // var buf = try heap_alloc.alloc(u8, @intCast(usize, info_len));
+                // glGetShaderInfoLog(shader, info_len, null, buf.ptr);
+                // std.debug.print("shader info:\n{s}", .{buf});
+                // heap_alloc.free(buf);
+                return 0;
+            }
+
+            var success: c_int = undefined;
+            c.glGetShaderiv(shd, c.GL_COMPILE_STATUS, &success);
+            if (success != c.GL_TRUE) {
+                // TODO error
+                return 0;
+            }
+            return shd;
+        }
+
+        pub fn deinit(shd: c.GLuint) void {
+            // TODO
+            _ = shd;
+        }
+    };
+
+    pub const program = struct {
+        pub fn create() c.GLuint {
+            const vert = shader.create(vert_shader, c.GL_VERTEX_SHADER);
+            const frag = shader.create(frag_shader, c.GL_FRAGMENT_SHADER);
+            const shaders = [_]c.GLuint{
+                vert,
+                frag,
+            };
+            const prog = c.glCreateProgram();
+            errdefer c.glDeleteProgram(prog);
+
+            if (prog == 0) {
+                // TODO handle error
+                return 0;
+            }
+
+            for (shaders) |shd| {
+                c.glAttachShader(prog, shd);
+            }
+
+            c.glLinkProgram(prog);
+
+            var info_len: c_int = 0;
+            c.glGetProgramiv(prog, c.GL_INFO_LOG_LENGTH, &info_len);
+            if (info_len != 0) {
+                // TODO handle error
+                // var buf = try heap_alloc.alloc(u8, @intCast(usize, info_len));
+                // glGetProgramInfoLog(program, info_len, null, buf.ptr);
+                // std.debug.print("program info:\n{s}", .{buf});
+                // heap_alloc.free(buf);
+            }
+
+            var success: c_int = undefined;
+            c.glGetProgramiv(prog, c.GL_LINK_STATUS, &success);
+            if (success != c.GL_TRUE) {
+                // TODO handle error
+                return 0;
+            }
+
+            return prog;
+        }
+
+        pub fn deinit(prog: c.GLuint) void {
+            // TODO
+            _ = prog;
+        }
+    };
+
+    pub const buffer = struct {
+        pub fn createQuad() c.GLuint {
+            var buf: c.GLuint = undefined;
+            c.glGenBuffers(1, &buf);
+            c.glBindBuffer(c.GL_ARRAY_BUFFER, buf);
+            const data = [_]f32{
+                1.0, 1.0, 1.0, 1.0,
+                0.0, 1.0, 0.0, 1.0,
+                1.0, 0.0, 1.0, 0.0,
+                0.0, 0.0, 0.0, 0.0,
+            };
+            c.glBufferData(
+                c.GL_ARRAY_BUFFER,
+                @sizeOf(@TypeOf(data)),
+                &data,
+                c.GL_STATIC_DRAW,
+            );
+            return buf;
+        }
+
+        pub fn deinit(buf: c.GLuint) void {
+            // TODO
+            _ = buf;
+        }
+    };
 
     pub const texture = struct {
         pub fn createBlank(w: u32, h: u32) c.GLuint {

@@ -152,7 +152,7 @@ forth
 
 \ ===
 
-: ( 1 ` next-char [char] ) = 0= if loop` then ;
+: ( next-char [char] ) = 0= if recurse then ;
 ' \ ' (
 compiler
 : ( [ , ] ;
