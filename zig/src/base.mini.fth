@@ -86,6 +86,7 @@ forth
 : min 2dup > if swap then drop ;
 : max 2dup < if swap then drop ;
 
+\ todo cleanup
 \ ( value min max -- value )
 \ : clamp rot min max ;
 \ : within[] rot tuck >= -rot <= and ;
@@ -193,9 +194,10 @@ forth
 
 : word! word ?dup 0= if drop refill if recurse then 0 0 then ;
 
-\ TODO this string= needs to be case insensitve
-\ string~=
-\ TODO this behavior is weird and doeant panic on EoI
+\ TODO
+\ this string= needs to be case insensitve
+\   string~=
+\ this behavior is weird and doesnt panic on EoI
 : [if] 0= if ` word! ?dup 0= if panic then s" [then]" count string= 0= if
   goto` then then ;
 : [then] ;
@@ -210,12 +212,6 @@ forth
 : fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
 
 \ ===
-
-\ todo note
-\ if interpret/import is defined,
-\ quit has to be redefined in forth ?
-\ it seems to work
-\ bye is broken though
 
 variable onwnf
 ' 2drop onwnf !

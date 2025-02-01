@@ -25,6 +25,7 @@ pub const Error = error{
     CannotRefill,
     OversizeInputBuffer,
     WordNotFound,
+    InvalidCompileState,
 };
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
@@ -369,6 +370,7 @@ fn mod(rt: *Runtime) Error!void {
     rt.data_stack.mod();
 }
 
+// TODO move this into DataStack definiton
 fn muldiv(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const mul = rt.data_stack.pop();
@@ -376,10 +378,13 @@ fn muldiv(rt: *Runtime) Error!void {
     const double_value: DoubleCell = @intCast(value);
     const double_mul: DoubleCell = @intCast(mul);
     const calc = double_value * double_mul / div;
-    // TODO should this be a truncate?
+    // NOTE
+    // truncating
+    // this can happen when mul is big and div is small
     rt.data_stack.push(@truncate(calc));
 }
 
+// TODO move this into DataStack definiton
 fn muldivmod(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const mul = rt.data_stack.pop();
@@ -388,12 +393,16 @@ fn muldivmod(rt: *Runtime) Error!void {
     const double_mul: DoubleCell = @intCast(mul);
     const q = double_value * double_mul / div;
     const r = double_value * double_mul % div;
-    // TODO should this be a truncate?
+    // NOTE
+    // truncating
+    // this can happen when mul is big and div is small
     rt.data_stack.push(@truncate(q));
     rt.data_stack.push(@truncate(r));
 }
 
+// TODO move this into DataStack definiton
 fn negate(rt: *Runtime) Error!void {
+    // TODO use 0 -% value ?
     const value = rt.data_stack.pop();
     const signed_value: SignedCell = @bitCast(value);
     const negated_value = -signed_value;
@@ -419,8 +428,7 @@ fn lookup(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
-    // TODO error on invalid state
-    const state = CompileState.fromCell(rt.interpreter.state.fetch()) catch unreachable;
+    const state = try CompileState.fromCell(rt.interpreter.state.fetch());
     const wordlist_idx = state.toWordlistIndex() catch unreachable;
     if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
