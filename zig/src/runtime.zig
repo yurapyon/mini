@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
-const utils = @import("utils.zig");
+const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -30,7 +30,7 @@ const bytecodes = @import("bytecodes.zig");
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+const BufferRefiller = @import("buffer_refiller.zig").BufferRefiller;
 
 // ===
 
@@ -42,6 +42,7 @@ comptime {
 }
 
 pub const Cell = u16;
+pub const DoubleCell = u32;
 
 pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;
@@ -51,7 +52,7 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
-pub const MainMemoryLayout = utils.MemoryLayout(struct {
+pub const MainMemoryLayout = MemoryLayout(struct {
     here: Cell,
     latest: Cell,
     context: Cell,
@@ -60,8 +61,16 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     base: Cell,
     execute: [2]Cell,
     input_buffer: [128]u8,
+    // TODO get rid of
     input_buffer_at: Cell,
+    // TODO get rid of
     input_buffer_len: Cell,
+    // TODO
+    // zero for input buffer
+    // anything else for string
+    source_ptr: Cell,
+    source_len: Cell,
+    source_at: Cell,
     dictionary_start: u0,
 });
 
@@ -178,6 +187,9 @@ pub const Runtime = struct {
         try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
         try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
+        // TODO catch unreachable on findWordInWordlist calls
+        // errors are 'invalid wordlist'
+        //        and out of bounds error for finding definition name
         const fetch_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "@")) orelse unreachable;
         const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
         try self.interpreter.dictionary.compileXt(fetch_cfa);
@@ -209,14 +221,14 @@ pub const Runtime = struct {
     ) !void {
         self.should_quit = false;
 
-        var did_refill = try self.input_buffer.refill();
+        var did_refill = try self.input_buffer.refill(self);
 
         while (did_refill and !self.should_quit) {
             const word = self.input_buffer.readNextWord();
             if (word) |w| {
                 try self.evaluateString(w);
             } else {
-                did_refill = try self.input_buffer.refill();
+                did_refill = try self.input_buffer.refill(self);
             }
         }
     }
@@ -323,6 +335,8 @@ pub const Runtime = struct {
 
     // ===
 
+    // TODO
+    // this and defineExternal could take an offset?
     pub fn addExternal(self: *@This(), external: External) !void {
         try self.externals.append(external);
     }

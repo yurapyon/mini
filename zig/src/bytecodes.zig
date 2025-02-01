@@ -1,9 +1,11 @@
 const mem = @import("memory.zig");
-const utils = @import("utils.zig");
+
+const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
 
 const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
+const DoubleCell = runtime.DoubleCell;
 const CompileState = runtime.CompileState;
 
 const dictionary = @import("dictionary.zig");
@@ -46,7 +48,7 @@ pub fn getBytecode(token: Cell) ?BytecodeDefinition {
 
 pub fn getBytecodeToken(name: []const u8) ?Cell {
     for (bytecodes, 0..) |definition, i| {
-        const equal = utils.stringsEqual(definition.name, name);
+        const equal = stringsEqual(definition.name, name);
         if (equal) {
             return i;
         }
@@ -72,6 +74,7 @@ pub fn initBuiltins(dict: *Dictionary) !void {
 
 const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "nop", .callback = nop },
+    .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
     .{ .name = "enter", .callback = enter },
     .{ .name = "execute", .callback = execute },
@@ -113,6 +116,8 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "*", .callback = multiply },
     .{ .name = "/", .callback = divide },
     .{ .name = "mod", .callback = mod },
+    .{ .name = "*/", .callback = muldiv },
+    .{ .name = "*/mod", .callback = muldivmod },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -128,20 +133,19 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "-rot", .callback = nrot },
 
     .{ .name = "find", .callback = find },
+    .{ .name = "lookup", .callback = lookup },
     .{ .name = "word", .callback = nextWord },
     .{ .name = "define", .callback = define },
+    // TODO rename next-char?
     .{ .name = "next-char", .callback = nextChar },
     .{ .name = "refill", .callback = refill },
     .{ .name = "'", .callback = tick },
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
+    // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
 
-    .{},
-    .{},
-    .{},
-    .{},
     .{},
     .{},
     .{},
@@ -364,14 +368,57 @@ fn mod(rt: *Runtime) Error!void {
     rt.data_stack.mod();
 }
 
+fn muldiv(rt: *Runtime) Error!void {
+    const div = rt.data_stack.pop();
+    const mul = rt.data_stack.pop();
+    const value = rt.data_stack.pop();
+    const double_value: DoubleCell = @intCast(value);
+    const double_mul: DoubleCell = @intCast(mul);
+    const calc = double_value * double_mul / div;
+    // TODO should this be a truncate?
+    rt.data_stack.push(@truncate(calc));
+}
+
+fn muldivmod(rt: *Runtime) Error!void {
+    const div = rt.data_stack.pop();
+    const mul = rt.data_stack.pop();
+    const value = rt.data_stack.pop();
+    const double_value: DoubleCell = @intCast(value);
+    const double_mul: DoubleCell = @intCast(mul);
+    const q = double_value * double_mul / div;
+    const r = double_value * double_mul % div;
+    // TODO should this be a truncate?
+    rt.data_stack.push(@truncate(q));
+    rt.data_stack.push(@truncate(r));
+}
+
 fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
     if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
+        rt.data_stack.push(0);
+        rt.data_stack.push(runtime.cellFromBoolean(false));
+    }
+}
+
+fn lookup(rt: *Runtime) Error!void {
+    const len, const addr = rt.data_stack.pop2();
+    const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
+
+    // TODO error on invalid state
+    const state = CompileState.fromCell(rt.interpreter.state.fetch()) catch unreachable;
+    const wordlist_idx = state.toWordlistIndex() catch unreachable;
+    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+        rt.data_stack.push(word_info.definition_addr);
+        rt.data_stack.push(word_info.wordlist_idx);
+        rt.data_stack.push(runtime.cellFromBoolean(true));
+    } else {
+        rt.data_stack.push(0);
         rt.data_stack.push(0);
         rt.data_stack.push(runtime.cellFromBoolean(false));
     }
@@ -408,7 +455,7 @@ fn nextChar(rt: *Runtime) Error!void {
 }
 
 fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill();
+    const did_refill = try rt.input_buffer.refill(rt);
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
@@ -441,11 +488,12 @@ fn toNumber(rt: *Runtime) Error!void {
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const base_addr = runtime.MainMemoryLayout.offsetOf("base");
     const base = mem.readCell(rt.memory, base_addr) catch unreachable;
-    const number_usize = utils.parseNumber(word, base) catch {
+    const number_usize = rt.interpreter.parseNumberCallback(word, base) catch {
         rt.data_stack.push(0);
         rt.data_stack.push(0);
         return;
     };
+
     const cell = @as(Cell, @truncate(number_usize & 0xffff));
     rt.data_stack.push(cell);
     rt.data_stack.push(0xffff);

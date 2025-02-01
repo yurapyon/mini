@@ -2,10 +2,12 @@ const runtime = @import("runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
 
+const bytecodes = @import("bytecodes.zig");
+
 pub const External = struct {
     pub const Error = error{
         ExternalPanic,
-    };
+    } || bytecodes.Error;
 
     pub const Callback = *const fn (
         rt: *Runtime,
