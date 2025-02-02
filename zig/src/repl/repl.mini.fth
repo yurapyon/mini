@@ -7,7 +7,7 @@
 : .chars 2dup > if c@+ emit recurse then 2drop ;
 : type range .chars ;
 compiler
-: ." [compile] s" ['] count , ['] type , ;
+: ." [compile] s" ['] type , ;
 forth
 :noname type [char] ? emit cr ; onwnf !
 

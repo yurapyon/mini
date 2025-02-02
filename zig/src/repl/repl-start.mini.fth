@@ -1,4 +1,4 @@
-s" mini" count type cr
+s" mini" type cr
 
 0 value l0 0 value f0 0 value c0 0 value u0
 : empty l0 latest ! f0 wordlists !

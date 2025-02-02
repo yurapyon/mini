@@ -75,7 +75,6 @@ pub fn initBuiltins(dict: *Dictionary) !void {
 }
 
 const bytecodes = [bytecodes_count]BytecodeDefinition{
-    .{ .name = "nop", .callback = nop },
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
     .{ .name = "enter", .callback = enter },
@@ -118,9 +117,9 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "*", .callback = multiply },
     .{ .name = "/", .callback = divide },
     .{ .name = "mod", .callback = mod },
+    .{ .name = "/mod", .callback = divmod },
     .{ .name = "*/", .callback = muldiv },
     .{ .name = "*/mod", .callback = muldivmod },
-    .{ .name = "negate", .callback = negate },
     .{ .name = "1+", .callback = inc },
     .{ .name = "1-", .callback = dec },
 
@@ -151,9 +150,8 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
 
     .{},
     .{},
+    .{},
 };
-
-fn nop(_: *Runtime) Error!void {}
 
 fn panic(_: *Runtime) Error!void {
     return error.Panic;
@@ -371,6 +369,16 @@ fn mod(rt: *Runtime) Error!void {
 }
 
 // TODO move this into DataStack definiton
+fn divmod(rt: *Runtime) Error!void {
+    const div = rt.data_stack.pop();
+    const value = rt.data_stack.pop();
+    const q = value / div;
+    const r = value % div;
+    rt.data_stack.push(@truncate(q));
+    rt.data_stack.push(@truncate(r));
+}
+
+// TODO move this into DataStack definiton
 fn muldiv(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const mul = rt.data_stack.pop();
@@ -398,16 +406,6 @@ fn muldivmod(rt: *Runtime) Error!void {
     // this can happen when mul is big and div is small
     rt.data_stack.push(@truncate(q));
     rt.data_stack.push(@truncate(r));
-}
-
-// TODO move this into DataStack definiton
-fn negate(rt: *Runtime) Error!void {
-    // TODO use 0 -% value ?
-    const value = rt.data_stack.pop();
-    const signed_value: SignedCell = @bitCast(value);
-    const negated_value = -signed_value;
-    const negated_unsigned: Cell = @bitCast(negated_value);
-    rt.data_stack.push(negated_unsigned);
 }
 
 fn find(rt: *Runtime) Error!void {

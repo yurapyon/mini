@@ -76,8 +76,9 @@ pub fn main() !void {
         const file_buffer = try readFile(allocator, filepath);
         defer allocator.free(file_buffer);
 
-        // TODO if you comment out line 85 and there is a wnf error thrown but the code
-        // it puts the repl in a weird state
+        // TODO
+        // if you comment out the return when a wnf error is thrown
+        //   it puts the repl in a weird state
         rt.processBuffer(file_buffer) catch |err| switch (err) {
             error.WordNotFound => {
                 std.debug.print("Word not found: {s}\n", .{
@@ -90,12 +91,6 @@ pub fn main() !void {
     }
 
     if (cli_options.run_system) {
-        // TODO NOTE
-        // could run this in a separate thread
-        // if (cli_options.interactive) {
-        //   try Repl.start(allocator);
-        // }
-
         var system: System = undefined;
         try system.init(&rt);
         try system.loop();

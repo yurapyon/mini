@@ -16,18 +16,16 @@ buf b0 buf b1
     dup buffer bread bswap
   endcond b0 ;
 
-
 create load-stack saved-max cells allot
 load-stack value ls-tos
 
 : save-blk
   b0 1- c@ ls-tos !
-  cell +to ls-tos
-;
+  cell +to ls-tos ;
+
 : restore-blk
   cell negate +to ls-tos
-  ls-tos @ block drop
-;
+  ls-tos @ block drop ;
 
 \ todo
 \ this would break if you 'list' a block from a block that's loading
@@ -35,3 +33,5 @@ load-stack value ls-tos
 
 : load save-blk block 1024 evaluate restore-blk ;
 : thru swap ` 2dup >= if dup load 1+ goto` then 2drop ;
+
+\ todo '\' comments

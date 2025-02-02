@@ -13,27 +13,33 @@ word : define enter# , ] word define enter# , ] [ ' exit ,
 : forth    0 context ! ;
 : compiler 1 context ! ;
 
+: cell 2 ;
+: cells cell * ;
+
 : source source-ptr @ source-len @ ;
 : \ source-len @ >in ! ;
 
-: <> = 0= ;
+: (later), here @ 0 , ;
+: this  here @ swap ;
+: this! this ! ;
+: dist  this - ;
 
-: 2dup  over over ;
-: 2drop drop drop ;
-: 2swap flip >r flip r> ;
-: 3drop drop 2drop ;
+: lit, lit lit , ;
+: char word drop c@ ;
+compiler
+: ['] lit, ' , ;
+: [char] lit, char , ;
+: [compile] ' , ;
 
-: /mod 2dup / -rot mod ;
-
-: cell 2 ;
-: cells cell * ;
+: if   ['] jump0 , (later), ;
+: else ['] jump , (later), swap this! ;
+: then this! ;
+forth
 
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
 : c@+ dup 1+ swap c@ ;
 : c!+ tuck c! 1+ ;
-: split over + tuck swap ;
-: range over + swap ;
 
 : allot   here +! ;
 : aligned dup cell mod + ;
@@ -43,63 +49,6 @@ word : define enter# , ] word define enter# , ] [ ' exit ,
 : name >name-len c@+ ;
 : >cfa >name-len dup c@ + 1 + aligned ;
 : last latest @ >cfa ;
-
-: :noname 0 0 define here @ enter# , ] ;
-
-: lit, lit lit , ;
-compiler
-: ['] lit, ' , ;
-forth
-
-: (later), here @ 0 , ;
-
-: this  here @ swap ;
-: this! this ! ;
-: dist  this - ;
-
-: (data), lit, (later), ['] jump , (later), swap this! ;
-
-compiler
-: [compile] ' , ;
-
-: if   ['] jump0 , (later), ;
-: else ['] jump , (later), swap this! ;
-: then this! ;
-
-: recurse ['] jump , last cell + , ;
-
-: cond    0 ;
-: endcond ?dup if [compile] then recurse then ;
-forth
-
-: char word drop c@ ;
-compiler
-: [char] lit, char , ;
-forth
-
-\ ===
-
-: binary 2 base ! ;
-: decimal 10 base ! ;
-: hex 16 base ! ;
-
-: min 2dup > if swap then drop ;
-: max 2dup < if swap then drop ;
-
-\ todo cleanup
-\ ( value min max -- value )
-\ : clamp rot min max ;
-\ : within[] rot tuck >= -rot <= and ;
-\ : within[) 1- within[] ;
-
-: char>digit
-  dup [char] 0 >= if [char] 0 - then
-  dup 17 >= if  7 - then
-  dup 42 >= if 32 - then ;
-
-: digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
-
-\ ===
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
@@ -115,7 +64,21 @@ variable goto*
 compiler
 : `     here @ goto* ! ;
 : goto` ['] jump , goto* @ , ;
+
+: recurse ['] jump , last cell + , ;
+
+: cond    0 ;
+: endcond ?dup if [compile] then recurse then ;
 forth
+
+: ( next-char [char] ) = 0= if recurse then ;
+' \ ' (
+compiler
+: ( [ , ] ;
+: \ [ , ] ;
+forth
+
+\ types ===
 
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
@@ -134,16 +97,42 @@ forth
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
 
-\ ===
+\ math ===
 
-: ( next-char [char] ) = 0= if recurse then ;
-' \ ' (
-compiler
-: ( [ , ] ;
-: \ [ , ] ;
-forth
+: binary 2 base ! ;
+: decimal 10 base ! ;
+: hex 16 base ! ;
 
-\ ===
+: <> = 0= ;
+
+: 2dup  over over ;
+: 2drop drop drop ;
+: 2swap flip >r flip r> ;
+: 3drop drop 2drop ;
+
+: negate 0 swap - ;
+: min 2dup > if swap then drop ;
+: max 2dup < if swap then drop ;
+
+\ ( end start split -- end start+split start+split start )
+: split over + tuck swap ;
+\ ( addr ct -- end-addr start-addr )
+: range over + swap ;
+\ ( start end addr -- addr ct )
+: slice flip tuck - -rot + swap ;
+\ ( i spacing addr -- addr[i*spacing] spacing )
+: [] flip over * rot + swap ;
+
+: char>digit
+  dup [char] 0 >= if [char] 0 - then
+  dup 17 >= if  7 - then
+  dup 42 >= if 32 - then ;
+
+: digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
+
+\ strings ===
+
+: (data), lit, (later), ['] jump , (later), swap this! ;
 
 : read-digit next-char char>digit ;
 : read-byte read-digit 16 * read-digit + ;
@@ -166,27 +155,29 @@ forth
 compiler
 : d" (data), "", align this! ;
 forth
-\ ( i spacing addr -- addr[i*spacing] spacing )
-: [] flip over * rot + swap ;
 
 : count @+ ;
 : string, (later), here @ "", dist swap ! ;
-: s" here @ dup string, here ! ;
+: c" here @ dup string, here ! ;
+: s" [compile] c" count ;
 compiler
-: s" (data), string, align this! ;
+: c" (data), string, align this! ;
+: s" [compile] c" ['] count , ;
 forth
+
 : string= rot over = if mem= else 3drop false then ;
 
-\ ===
+\ number print ===
 
-32 allot here @ constant #end
+: pad here @ 64 + ;
+
 0 value #start
-: <# #end to #start ;
-: #> drop #start #end #start - ;
+: <# pad to #start ;
+: #> drop #start pad #start - ;
 : hold -1 +to #start #start c! ;
 : # base @ /mod digit>char hold ;
 : #s dup 0= if # else ` # dup if goto` then then ;
-: #pad dup #end #start - > if over hold recurse then 2drop ;
+: #pad dup pad #start - > if over hold recurse then 2drop ;
 
 : h# 16 /mod digit>char hold ;
 
@@ -198,7 +189,8 @@ forth
 \ this string= needs to be case insensitve
 \   string~=
 \ this behavior is weird and doesnt panic on EoI
-: [if] 0= if ` word! ?dup 0= if panic then s" [then]" count string= 0= if
+\ update: now it's panicing on: 0 [if] [then]
+: [if] 0= if ` word! ?dup 0= if panic then s" [then]" string= 0= if
   goto` then then ;
 : [then] ;
 : [defined] word find nip ;
@@ -209,9 +201,12 @@ forth
 
 : mem d0 dist ;
 
-: fill 2dup > if rot 2dup swap c! -rot 1+ recurse then 2drop ;
+: fill >r range ` 2dup > if r@ over c! 1+ goto` then r> 3drop ;
+: erase 0 fill ;
 
-\ ===
+: :noname 0 0 define here @ enter# , ] ;
+
+\ evaluation ===
 
 variable onwnf
 ' 2drop onwnf !
@@ -248,8 +243,9 @@ saved-stack value saved-tos
   saved-tos >saved-len @ source-len !
   saved-tos >saved-at @  >in ! ;
 
-: evaluate save-source source-len ! source-ptr ! 0 >in !
-  interpret restore-source ;
+: set-source source-len ! source-ptr ! 0 >in ! ;
+
+: evaluate save-source set-source interpret restore-source ;
 
 quit
 
@@ -261,3 +257,9 @@ forth
 : dyn, define enter# , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
+
+( value min max -- value )
+: clamp rot min max ;
+: within[] rot tuck >= -rot <= and ;
+: within[) 1- within[] ;
+

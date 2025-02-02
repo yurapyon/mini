@@ -1,6 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const mem = @import("../memory.zig");
+
 const runtime = @import("../runtime.zig");
 const Runtime = runtime.Runtime;
 const Cell = runtime.Cell;
@@ -40,8 +42,9 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
     switch (external_id) {
         .allocate => {
             const size = rt.data_stack.pop();
-            // TODO dont catch unreachable
-            const handle_id = dyn.allocate(rt.allocator, size) catch unreachable;
+            const handle_id = dyn.allocate(rt.allocator, size) catch {
+                return error.ExternalPanic;
+            };
             rt.data_stack.push(handle_id);
         },
         // TODO
@@ -174,9 +177,10 @@ pub const Dynamic = struct {
     }
 
     fn allocate(self: *@This(), allocator: Allocator, size: Cell) !Cell {
+        const adj_size: usize = if (size == 0) mem.memory_size else size;
         const slice = try allocator.allocWithOptions(
             u8,
-            size,
+            adj_size,
             @alignOf(Cell),
             null,
         );

@@ -1,3 +1,9 @@
+coroutines
+
+maybe locals
+
+---
+
 better errors in console when vm crashes
   need to keep track of 'last executed string'
   maybe have a debug mode flag
