@@ -32,6 +32,6 @@ load-stack value ls-tos
 : blk b0 1- c@ ;
 
 : load save-blk block 1024 evaluate restore-blk ;
-: thru swap ` 2dup >= if dup load 1+ goto` then 2drop ;
+: thru swap |: 2dup >= if dup load 1+ loop then 2drop ;
 
 \ todo '\' comments

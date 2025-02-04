@@ -1,5 +1,6 @@
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
+const SignedCell = runtime.SignedCell;
 
 // ===
 
@@ -94,27 +95,31 @@ pub const DataStack = struct {
         self.top = runtime.cellFromBoolean(self.top == 0);
     }
 
-    // TODO should this use signed cells?
     pub fn gt(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second > self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second > signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn gteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second >= self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second >= signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn lt(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second < self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second < signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn lteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second <= self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second <= signed_top);
         self.binop(value);
     }
 

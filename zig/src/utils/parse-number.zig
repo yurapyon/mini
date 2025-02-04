@@ -7,6 +7,10 @@ pub const ParseNumberError = error{
 };
 
 pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
+    if (str.len == 3 and str[0] == '\'' and str[2] == '\'') {
+        return str[1];
+    }
+
     if (base < 1 or base > 36) {
         return error.InvalidBase;
     }

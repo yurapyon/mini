@@ -79,6 +79,7 @@ pub fn main() !void {
         // TODO
         // if you comment out the return when a wnf error is thrown
         //   it puts the repl in a weird state
+        // i think it has to do with the intepreter crashing in compile state
         rt.processBuffer(file_buffer) catch |err| switch (err) {
             error.WordNotFound => {
                 std.debug.print("Word not found: {s}\n", .{
