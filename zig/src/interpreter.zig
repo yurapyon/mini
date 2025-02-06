@@ -1,4 +1,6 @@
-const utils = @import("utils.zig");
+const parse_number = @import("utils/parse-number.zig");
+const parseNumber = parse_number.parseNumber;
+const ParseNumberError = parse_number.ParseNumberError;
 
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
@@ -37,12 +39,17 @@ pub const Wordlists = enum(Cell) {
 
 pub const max_wordlists = 2;
 
+pub const ParseNumberCallback =
+    *const fn (str: []const u8, base: usize) ParseNumberError!usize;
+
 pub const Interpreter = struct {
     memory: MemoryPtr,
 
     dictionary: Dictionary,
     state: Register(MainMemoryLayout.offsetOf("state")),
     base: Register(MainMemoryLayout.offsetOf("base")),
+
+    parseNumberCallback: ParseNumberCallback,
 
     pub fn init(self: *@This(), memory: MemoryPtr) void {
         self.memory = memory;
@@ -53,6 +60,8 @@ pub const Interpreter = struct {
 
         self.state.store(@intFromEnum(CompileState.interpret));
         self.base.store(10);
+
+        self.parseNumberCallback = &parseNumber;
     }
 
     //
@@ -74,7 +83,7 @@ pub const Interpreter = struct {
     }
 
     fn maybeParseNumber(self: @This(), word: []const u8) !?Cell {
-        const number_or_error = utils.parseNumber(word, self.base.fetch());
+        const number_or_error = self.parseNumberCallback(word, self.base.fetch());
         const maybe_number = number_or_error catch |err| switch (err) {
             error.InvalidNumber => null,
             else => return err,

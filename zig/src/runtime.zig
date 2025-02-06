@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
-const utils = @import("utils.zig");
+const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -30,7 +30,7 @@ const bytecodes = @import("bytecodes.zig");
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const BufferRefiller = @import("refillers/buffer_refiller.zig").BufferRefiller;
+const BufferRefiller = @import("buffer_refiller.zig").BufferRefiller;
 
 // ===
 
@@ -42,6 +42,8 @@ comptime {
 }
 
 pub const Cell = u16;
+pub const DoubleCell = u32;
+pub const SignedCell = i16;
 
 pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;
@@ -51,7 +53,7 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
-pub const MainMemoryLayout = utils.MemoryLayout(struct {
+pub const MainMemoryLayout = MemoryLayout(struct {
     here: Cell,
     latest: Cell,
     context: Cell,
@@ -59,9 +61,12 @@ pub const MainMemoryLayout = utils.MemoryLayout(struct {
     state: Cell,
     base: Cell,
     execute: [2]Cell,
+    // zero for input buffer
+    // anything else for string
+    source_ptr: Cell,
+    source_len: Cell,
+    source_at: Cell,
     input_buffer: [128]u8,
-    input_buffer_at: Cell,
-    input_buffer_len: Cell,
     dictionary_start: u0,
 });
 
@@ -151,8 +156,16 @@ pub const Runtime = struct {
             MainMemoryLayout.offsetOf("dictionary_start"),
         );
         try self.interpreter.dictionary.compileConstant(
+            "source-ptr",
+            MainMemoryLayout.offsetOf("source_ptr"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "source-len",
+            MainMemoryLayout.offsetOf("source_len"),
+        );
+        try self.interpreter.dictionary.compileConstant(
             ">in",
-            MainMemoryLayout.offsetOf("input_buffer_at"),
+            MainMemoryLayout.offsetOf("source_at"),
         );
         try self.interpreter.dictionary.compileConstant(
             "true",
@@ -162,7 +175,6 @@ pub const Runtime = struct {
             "false",
             cellFromBoolean(false),
         );
-        try self.defineSourceWord();
     }
 
     fn defineMemoryLocationConstant(self: *@This(), comptime name: []const u8) !void {
@@ -170,20 +182,6 @@ pub const Runtime = struct {
             name,
             MainMemoryLayout.offsetOf(name),
         );
-    }
-
-    fn defineSourceWord(self: *@This()) !void {
-        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
-        try self.interpreter.dictionary.defineWord(wordlist_idx, "source");
-        try self.interpreter.dictionary.here.comma(bytecodes.enter_code);
-        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer"));
-        try self.interpreter.dictionary.compileLit(MainMemoryLayout.offsetOf("input_buffer_len"));
-        const fetch_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "@")) orelse unreachable;
-        const fetch_cfa = try self.interpreter.dictionary.toCfa(fetch_definition_addr);
-        try self.interpreter.dictionary.compileXt(fetch_cfa);
-        const exit_definition_addr = (try self.interpreter.dictionary.findWordInWordlist(wordlist_idx, "exit")) orelse unreachable;
-        const exit_cfa = try self.interpreter.dictionary.toCfa(exit_definition_addr);
-        try self.interpreter.dictionary.compileXt(exit_cfa);
     }
 
     pub fn defineExternal(self: *@This(), name: []const u8, wordlist_idx: Cell, id: Cell) !void {
@@ -323,6 +321,8 @@ pub const Runtime = struct {
 
     // ===
 
+    // TODO
+    // this and defineExternal could take an offset?
     pub fn addExternal(self: *@This(), external: External) !void {
         try self.externals.append(external);
     }

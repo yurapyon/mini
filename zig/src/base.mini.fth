@@ -1,43 +1,38 @@
-word enter-code define ' enter @ , ' lit , ' enter @ , ' exit ,
+word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
-word ] define enter-code , ' lit , 1 , ' state , ' ! , ' exit ,
+word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
 1 context !
-word [ define enter-code , ' lit , 0 , ' state , ' ! , ' exit ,
+word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
 0 context !
 
-word \ define enter-code , ] source >in ! drop [ ' exit ,
-
-\ equivalent to
-\ : : word define enter-code , ] ;
-word : define enter-code , ] word define enter-code , ] [ ' exit ,
-
-\ equivalent to
-\ : lit, ['] lit , ;
-: lit, lit [ ' lit , ] , [ ' exit ,
-
+word : define enter# , ] word define enter# , ] [ ' exit ,
 1 context !
-
-\ equivalent to
-\ : ['] ' lit, , ;
-: ['] ' lit, , [ ' exit ,
-
-\ equivalent to
-\ : ; exit, [compile] [ ;
-: ; ['] exit , [ ' [ , ' exit ,
-
+: ; lit exit , [ ' [ , ' exit ,
 0 context !
 
 : forth    0 context ! ;
 : compiler 1 context ! ;
 
-: <> = 0= ;
+: source source-ptr @ source-len @ ;
+: \ source nip >in ! ;
+\ redefine for compiler
+' \ compiler : \ [ , ] ; forth
 
-: 2dup  over over ;
-: 2drop drop drop ;
-: 3drop drop 2drop ;
-: save  over -rot ;
+: (later), here @ 0 , ;
+: this  here @ swap ;
+: this! this ! ;
+: dist  this - ;
 
-: /mod 2dup / -rot mod ;
+: lit, lit lit , ;
+: (lit), lit, (later), ;
+compiler
+: ['] lit, ' , ;
+: [compile] ' , ;
+
+: if   ['] jump0 , (later), ;
+: else ['] jump , (later), swap this! ;
+: then this! ;
+forth
 
 : cell 2 ;
 : cells cell * ;
@@ -51,152 +46,178 @@ word : define enter-code , ] word define enter-code , ] [ ' exit ,
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
-: >name-len cell + ;
-: >cfa >name-len dup c@ + 1 + aligned ;
+: name cell + c@+ ;
+: >cfa name + aligned ;
 : last latest @ >cfa ;
-
-: name >name-len c@+ ;
-
-\ tags
-: exit, ['] exit , ;
-: jump, ['] jump , ;
-
-: :noname 0 0 define here @ enter-code , ] ;
-compiler
-: recurse jump, last cell + , ;
-: return exit, ;
-forth
-
-: blank,   0 , ;
-: (later), here @ blank, ;
-: (lit),   lit, (later), ;
-: (jump),  jump, (later), ;
-
-: this  here @ swap ;
-: this! this ! ;
-: dist  this - ;
-
-\ basic syntax
-compiler
-: [compile] ' , ;
-
-: if   ['] jump0 , (later), ;
-: else (jump), swap this! ;
-: then this! ;
-
-: cond    0 ;
-: endcond ?dup if [compile] then recurse then ;
-
-: case    [compile] cond    ['] >r , ;
-: endcase [compile] endcond ['] r> , ['] drop , ;
-: of      ['] r@ , ['] = , [compile] if ;
-: endof   [compile] else ;
-forth
-
-: char word drop c@ ;
-compiler
-: [char] lit, char , ;
-forth
-
-:noname next-char case
-    [char] ( of 1+ endof
-    [char] ) of 1- endof
-  endcase ?dup if recurse then ;
-: ( 1 [ , ] ;
-
-compiler
-' ( : ( [ , ] ; \ this comment is to fix vim syntax highlight )
-' \ : \ [ , ] ;
-forth
-
-\ ===
-
-: binary 2 base ! ;
-: decimal 10 base ! ;
-: hex 16 base ! ;
-
-: min 2dup > if swap then drop ;
-: max 2dup < if swap then drop ;
-
-\ ( value min max -- value )
-: clamp rot min max ;
-: within[] rot tuck >= -rot <= and ;
-: within[) 1- within[] ;
-
-: char>digit cond
-    dup [char] 0 [char] 9 within[] if [char] 0 -      else
-    dup [char] A [char] Z within[] if [char] A - 10 + else
-    dup [char] a [char] z within[] if [char] a - 10 + else
-  endcond ;
-
-: digit>char dup 10 < if [char] 0 else 10 - [char] a then + ;
-
-\ ===
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
-: create word define enter-code , (lit), exit, blank, this! ;
+: create word define enter# , (lit), ['] exit , 0 , this! ;
 compiler
-: does>  (lit), ['] does! , exit, this! ;
+: does>  (lit), ['] does! , ['] exit , this! ;
 forth
 
 : variable create cell allot ;
+
+variable loop*
+: set-loop here @ loop* ! ;
+compiler
+: |:    set-loop ;
+\ todo rename to '<:' ?
+: loop ['] jump , loop* @ , ;
+forth
+\ redefining :
+' : : : [ , ] set-loop ;
+
+compiler
+: cond    0 ;
+: endcond ?dup if [compile] then loop then ;
+forth
+
+: ( next-char ')' = 0= if loop then ;
+\ redefine for compiler
+' ( compiler : ( [ , ] ; forth \ )
+
+\ types ===
 
 : constant create , does> @ ;
 : enum     dup constant 1+ ;
 : flag     dup constant 1 lshift ;
 
-: offsetter create , does> @ + ;
-: +field    over offsetter + ;
-: field     swap aligned swap +field ;
-
-\ ===
-
+: value create , does> @ ;
+\ TODO better error
+: vname word find 0= if panic then >cfa >body ;
+: to  vname ! ;
+: +to vname +! ;
 compiler
-: assign (lit), ['] swap , ['] ! , exit, this! enter-code , ;
+: to  lit, vname , ['] ! , ;
+: +to lit, vname , ['] +! , ;
 forth
+
+: +field over create , + does> @ + ;
+: field  swap aligned swap +field ;
+
+\ math ===
+
+: binary 2 base ! ;
+: decimal 10 base ! ;
+: hex 16 base ! ;
+
+: negate 0 swap - ;
+
+: 2dup  over over ;
+: 2drop drop drop ;
+: 2swap flip >r flip r> ;
+: 3drop drop 2drop ;
+
+: <> = 0= ;
+: min 2dup > if swap then drop ;
+: max 2dup < if swap then drop ;
+
+-1 enum %lt enum %eq constant %gt
+: compare  2dup = if 2drop %eq else > if %gt else %lt then then ;
+: 2compare >r swap >r compare r> r> compare ;
+
+\ ( value min max -- value )
+: clamp rot min max ;
+: in[,] rot tuck >= -rot <= and ;
+: in[,) 1- in[,] ;
+
+: char word drop c@ ;
+
+: char>digit cond
+    dup '0' '9' in[,] if '0' - else
+    dup 'A' 'Z' in[,] if '7' - else
+    dup 'a' 'z' in[,] if 'W' - else
+  endcond ;
+
+: digit>char dup 10 < if '0' else 10 - 'a' then + ;
+
+\ ( end start split -- end start+split start+split start )
+: split over + tuck swap ;
+\ ( addr ct -- end-addr start-addr )
+: range over + swap ;
+\ ( start end addr -- addr ct )
+: slice flip tuck - -rot + swap ;
+\ ( i spacing addr -- addr[i*spacing] spacing )
+: [] flip over * rot + swap ;
+
+\ strings ===
+
+: (data), (lit), ['] jump , (later), swap this! ;
 
 : read-digit next-char char>digit ;
 : read-byte read-digit 16 * read-digit + ;
+: read-esc next-char cond
+    dup '0' = if drop 0 else
+    dup 'n' = if drop 10 else
+    dup 'x' = if drop read-byte else
+    \ NOTE
+    \ \\ and \" are handled by the 'cond' falling through
+  endcond ;
 
-variable read-char
+: "", next-char drop |:
+  next-char cond
+    dup '"' = if drop exit else
+    dup '\' = if drop read-esc else
+  endcond c, loop then ;
 
-: ascii read-char assign ;
-
-: escaped read-char assign
-  dup [char] \ = if
-    drop next-char
-    dup case
-      [char] n of drop 10 endof
-      [char] x of drop read-byte endof
-      \ NOTE
-      \ \\ and \" are handled by the 'case' falling through
-    endcase
-  then ;
-
-ascii
-
-: count @+ ;
-
-: (data), (lit), (jump), swap this! ;
-
-: "",
-  next-char dup [char] " <> if
-    read-char @ execute c, recurse
-  then drop ;
-
-: string, (later), here @ "", dist swap ! ;
-
+: d" here @ dup "", here ! ;
 compiler
-: "  next-char drop (data), string, align this! ;
-: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
-: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
+: d" (data), "", align this! ;
 forth
 
-: "  next-char drop here @ dup string, here ! ;
-: s" ascii   [compile] " ; \ this comment is to fix vim syntax highlight "
-: e" escaped [compile] " ; \ this comment is to fix vim syntax highlight "
+: count @+ ;
+: string, (later), here @ "", dist swap ! ;
+: c" here @ dup string, here ! ;
+: s" [compile] c" count ;
+compiler
+: c" (data), string, align this! ;
+: s" [compile] c" ['] count , ;
+forth
+
+: string= rot over = if mem= else 3drop false then ;
+
+\ number print ===
+
+: pad here @ 64 + ;
+
+0 value #start
+: <# pad to #start ;
+: #> drop #start pad #start - ;
+: hold -1 +to #start #start c! ;
+: # base @ /mod digit>char hold ;
+: #s dup 0= if # else |: # dup if loop then then ;
+: #pad dup pad #start - > if over hold loop then 2drop ;
+
+\ todo
+\   holds
+\   sign
+
+: h# 16 /mod digit>char hold ;
+
+\ ===
+
+: get-word word ?dup 0= if drop refill if loop else 0 0 then then ;
+
+\ TODO
+\ this string= needs to be case insensitve
+\   string~=
+\ this behavior is weird and doesnt panic on EoF
+: [if] 0= if |: get-word ?dup 0= if panic then
+  s" [then]" string= 0= if loop then then ;
+: [then] ;
+: [defined] word find nip ;
+
+\ ===
+
+: :noname 0 0 define here @ enter# , set-loop ] ;
+
+compiler
+: [: lit, here @ 6 + , ['] jump , (later), enter# , ;
+: ;] ['] exit , this! ;
+forth
 
 \ ===
 
@@ -204,11 +225,64 @@ forth
 
 : mem d0 dist ;
 
-quit
+: fill   >r range |: 2dup > if r@ swap c!+ loop then r> 3drop ;
+: fill16 >r range |: 2dup > if r@ swap  !+ loop then r> 3drop ;
+: erase 0 fill ;
 
-\ ===
+: s[ 0 ;
+: ]s constant ;
 
-: next, (jump), this! ;
-: dyn, define enter-code , next, ;
+\ evaluation ===
+
+variable onwnf
+' 2drop onwnf !
+
+: onlookup 0= state @ and if >cfa , else >cfa execute then ;
+: onnumber state @ if lit, , then ;
+
+: resolve cond
+    2dup lookup  if 2swap 2drop onlookup else 2drop
+    2dup >number if -rot  2drop onnumber else drop
+    onwnf @ execute
+  endcond ;
+
+: interpret get-word ?dup if resolve loop else drop then ;
+
+s[
+  cell field >saved-ptr
+  cell field >saved-len
+  cell field >saved-at
+]s saved-source
+
+8 constant saved-max
+create saved-stack saved-max saved-source * allot
+saved-stack value saved-tos
+
+: save-source
+  source-ptr @ saved-tos >saved-ptr !
+  source-len @ saved-tos >saved-len !
+  >in @        saved-tos >saved-at !
+  saved-source +to saved-tos ;
+
+: restore-source
+  saved-source negate +to saved-tos
+  saved-tos >saved-ptr @ source-ptr !
+  saved-tos >saved-len @ source-len !
+  saved-tos >saved-at @  >in ! ;
+
+: set-source source-len ! source-ptr ! 0 >in ! ;
+
+: evaluate save-source set-source interpret restore-source ;
+
+0 [if]
+
+compiler
+: assign (lit), ['] swap , ['] ! , ['] exit , this! enter# , ;
+forth
+
+: next, ['] jump , here @ cell + , ;
+: dyn, define enter# , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
+
+[then]

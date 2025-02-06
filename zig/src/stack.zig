@@ -1,9 +1,10 @@
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
+const SignedCell = runtime.SignedCell;
 
 // ===
 
-const stack_inner_depth = 32;
+const stack_inner_depth = 64;
 
 const CircularStack = struct {
     stack: [stack_inner_depth]Cell,
@@ -49,7 +50,7 @@ pub const DataStack = struct {
 
     pub fn index(self: *@This(), idx: u8) Cell {
         // TODO
-        // This has to wrap around 34
+        // This has to wrap around 66
         if (idx == 0) {
             return self.top;
         } else if (idx == 1) {
@@ -94,27 +95,31 @@ pub const DataStack = struct {
         self.top = runtime.cellFromBoolean(self.top == 0);
     }
 
-    // TODO should this use signed cells?
     pub fn gt(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second > self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second > signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn gteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second >= self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second >= signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn lt(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second < self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second < signed_top);
         self.binop(value);
     }
 
-    // TODO should this use signed cells?
     pub fn lteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second <= self.top);
+        const signed_top: SignedCell = @bitCast(self.top);
+        const signed_second: SignedCell = @bitCast(self.second);
+        const value = runtime.cellFromBoolean(signed_second <= signed_top);
         self.binop(value);
     }
 

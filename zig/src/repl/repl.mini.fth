@@ -1,106 +1,65 @@
-: bl 32 ;
-: nl 10 ;
+32 constant bl
 : space bl emit ;
-: cr nl emit ;
-
-: .chars 2dup > if c@+ emit recurse then 2drop ;
-: type over + swap .chars ;
-
-: ." [compile] s" count type ; \ "
-
+: spaces 0 |: 2dup > if space 1+ loop then 2drop ;
+: cr 10 emit ;
+: printable 32 126 in[,] ;
+: print dup printable 0= if drop '.' then emit ;
+: .print 2dup > if c@+ print loop then 2drop ;
+: .chars 2dup > if c@+ emit loop then 2drop ;
+: type range .chars ;
 compiler
-: ." [compile] s" ['] count , ['] type , ; \ "
+: ." [compile] s" ['] type , ;
 forth
+:noname type '?' emit cr ; onwnf !
 
-\ ===
+: u. <# #s #> type ;
+: u.pad rot <# #s flip #pad #> type ;
+: u.r bl u.pad ;
+: u.0 '0' u.pad ;
+: . u. space ;
+: ? @ . ;
 
-: .name name ?dup if type else drop ." _" then ;
-: .words ?dup if dup .name space @ recurse then ;
-: words wlatest .words ;
+: .2 swap . . ;
 
-\ ===
+: h8.  <# h# h# #> type ;
+: h16. <# h# h# h# h# #> type ;
+: .bytes 2dup > if c@+ h8. space loop then 2drop ;
 
-: uwidth dup if base @ log then 1+ ;
-: chop base @ /mod ;
+: dump range |: 2dup > if 16 split
+    dup h16. space 2dup .bytes .print cr
+  loop then 2drop ;
 
-8 cells allot
-here @ constant temp-end
-variable temp-start
+: words wlatest |: ?dup if dup name tuck type if space then @
+  loop then ;
 
-: reset-temp temp-end 1- temp-start ! ;
-: next-temp -1 temp-start +! ;
-: temp! temp-start @ c! ;
-
-: >temp chop digit>char temp! ?dup if next-temp recurse then ;
-: .temp temp-end temp-start @ .chars ;
-
-\ ( char ct -- )
-: repeat ?dup if over emit 1- recurse then drop ;
-
-\ ( u pad-ct char -- )
-: .pad >r
-    tuck >r uwidth 0 r> clamp -
-  r> swap repeat ;
-
-: u.  reset-temp >temp .temp ;
-: u.r save       bl .pad u. ;
-: u.0 save [char] 0 .pad u. ;
-
-\ ===
-
-: >printable dup 32 126 within[] 0= if drop [char] . then ;
-
-: .bytes     2dup > if c@+     2 u.0 space recurse then 2drop ;
-: .printable 2dup > if c@+ >printable emit recurse then 2drop ;
-: .lines
-  2dup > if
-    dup 16 + swap save dup 4 u.r ." : " 2dup .bytes .printable cr
-    recurse
+: s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
+: s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
+: ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
+  else dup 127 < if emit else drop ." del" endcond ;
+: next dup dup dup 3 u.r space h8. space ascii 2 spaces 32 + ;
+: ashy 32 0 |: 2dup > if dup next next next next cr drop 1+ loop
   then 2drop ;
 
-: dump
-  base @ >r
-  hex over + swap .lines
-  r> base ! ;
+\ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
+\   <# # # # drop # # # drop # # # '.' hold #s #> type ;
 
-: .ks 1024 /mod swap u. ." ." u. ;
+: .k 1000 1024 */ <# # # # '.' hold #s #> type ;
 
-quit
+[defined] block [if]
+: .line swap 64 * + 64 range .print ;
+: .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
+  loop then r> drop 2drop ;
+: list block .list ;
 
-\ ===
+\ editor
 
-\ todo note
-\ if interpret/import is defined,
-\ quit has to be redefined in forth
+: l b0 .list ;
+0 value cx
+0 value cy
+: t 0 to cx to cy cy b0 .line space cy . cr ;
+: putc b0 cy 64 * + cx + c! 1 +to cx ;
+: readp 2dup > if next-char putc 1+ loop then 2drop ;
+: p next-char source >in @ readp update ;
+: wipe bl swap block 1024 range fill update ;
 
-variable source-user-input
-
-true source-user-input !
-
-variable prompt-hook
-
-: basic-prompt prompt-hook assign ." > " ;
-
-basic-prompt
-
-: next-line
-  source-user-input @ if prompt-hook @ execute then
-  refill ;
-
-: lookup find if >cfa execute true then ;
-
-: resolve
-  cond
-  2dup lookup  if 2drop else
-  2dup >number if 2drop else
-  ." word not found: " type cr
-  endcond ;
-
-: interpret
-  word ?dup if
-    resolve
-  else
-    drop next-line 0= if return then
-  then
-  recurse ;
-
+[then]

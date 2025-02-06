@@ -1,3 +1,19 @@
+probably
+  doubles and unsigned
+    may need to extend bytecode count
+  rework stacks to be in forth memory
+    still circular
+
+maybe
+  rethink wordlists/vocabularies
+    'current'
+
+probably not
+  coroutines
+  locals
+
+---
+
 better errors in console when vm crashes
   need to keep track of 'last executed string'
   maybe have a debug mode flag
