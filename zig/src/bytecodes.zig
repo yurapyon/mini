@@ -153,33 +153,33 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{},
 };
 
-fn panic(_: *Runtime) Error!void {
+pub fn panic(_: *Runtime) Error!void {
     return error.Panic;
 }
 
-fn enter(rt: *Runtime) Error!void {
+pub fn enter(rt: *Runtime) Error!void {
     rt.return_stack.push(rt.program_counter);
     rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
 }
 
-fn exit(rt: *Runtime) Error!void {
+pub fn exit(rt: *Runtime) Error!void {
     rt.program_counter = rt.return_stack.pop();
 }
 
-fn execute(rt: *Runtime) Error!void {
+pub fn execute(rt: *Runtime) Error!void {
     const cfa_addr = rt.data_stack.pop();
     rt.return_stack.push(rt.program_counter);
     rt.setCfaToExecute(cfa_addr);
 }
 
-fn jump(rt: *Runtime) Error!void {
+pub fn jump(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
     const addr = try mem.readCell(rt.memory, rt.program_counter);
     try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
     rt.program_counter = addr;
 }
 
-fn jump0(rt: *Runtime) Error!void {
+pub fn jump0(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
 
     const conditional = rt.data_stack.pop();
@@ -190,186 +190,186 @@ fn jump0(rt: *Runtime) Error!void {
     }
 }
 
-fn quit(rt: *Runtime) Error!void {
+pub fn quit(rt: *Runtime) Error!void {
     rt.program_counter = 0;
     rt.should_quit = true;
 }
 
-fn eq(rt: *Runtime) Error!void {
+pub fn eq(rt: *Runtime) Error!void {
     rt.data_stack.eq();
 }
 
-fn eq0(rt: *Runtime) Error!void {
+pub fn eq0(rt: *Runtime) Error!void {
     rt.data_stack.eq0();
 }
 
-fn gt(rt: *Runtime) Error!void {
+pub fn gt(rt: *Runtime) Error!void {
     rt.data_stack.gt();
 }
 
-fn gteq(rt: *Runtime) Error!void {
+pub fn gteq(rt: *Runtime) Error!void {
     rt.data_stack.gteq();
 }
 
-fn lt(rt: *Runtime) Error!void {
+pub fn lt(rt: *Runtime) Error!void {
     rt.data_stack.lt();
 }
 
-fn lteq(rt: *Runtime) Error!void {
+pub fn lteq(rt: *Runtime) Error!void {
     rt.data_stack.lteq();
 }
 
-fn and_(rt: *Runtime) Error!void {
+pub fn and_(rt: *Runtime) Error!void {
     rt.data_stack.and_();
 }
 
-fn or_(rt: *Runtime) Error!void {
+pub fn or_(rt: *Runtime) Error!void {
     rt.data_stack.ior();
 }
 
-fn xor(rt: *Runtime) Error!void {
+pub fn xor(rt: *Runtime) Error!void {
     rt.data_stack.xor();
 }
 
-fn invert(rt: *Runtime) Error!void {
+pub fn invert(rt: *Runtime) Error!void {
     rt.data_stack.invert();
 }
 
-fn lshift(rt: *Runtime) Error!void {
+pub fn lshift(rt: *Runtime) Error!void {
     rt.data_stack.lshift();
 }
 
-fn rshift(rt: *Runtime) Error!void {
+pub fn rshift(rt: *Runtime) Error!void {
     rt.data_stack.rshift();
 }
 
-fn inc(rt: *Runtime) Error!void {
+pub fn inc(rt: *Runtime) Error!void {
     rt.data_stack.inc();
 }
 
-fn dec(rt: *Runtime) Error!void {
+pub fn dec(rt: *Runtime) Error!void {
     rt.data_stack.dec();
 }
 
-fn drop(rt: *Runtime) Error!void {
+pub fn drop(rt: *Runtime) Error!void {
     rt.data_stack.drop();
 }
 
-fn dup(rt: *Runtime) Error!void {
+pub fn dup(rt: *Runtime) Error!void {
     rt.data_stack.dup();
 }
 
-fn maybeDup(rt: *Runtime) Error!void {
+pub fn maybeDup(rt: *Runtime) Error!void {
     const top = rt.data_stack.peek();
     if (runtime.isTruthy(top)) {
         rt.data_stack.dup();
     }
 }
 
-fn swap(rt: *Runtime) Error!void {
+pub fn swap(rt: *Runtime) Error!void {
     rt.data_stack.swap();
 }
 
-fn flip(rt: *Runtime) Error!void {
+pub fn flip(rt: *Runtime) Error!void {
     rt.data_stack.flip();
 }
 
-fn over(rt: *Runtime) Error!void {
+pub fn over(rt: *Runtime) Error!void {
     rt.data_stack.over();
 }
 
-fn nip(rt: *Runtime) Error!void {
+pub fn nip(rt: *Runtime) Error!void {
     rt.data_stack.nip();
 }
 
-fn tuck(rt: *Runtime) Error!void {
+pub fn tuck(rt: *Runtime) Error!void {
     rt.data_stack.tuck();
 }
 
-fn rot(rt: *Runtime) Error!void {
+pub fn rot(rt: *Runtime) Error!void {
     rt.data_stack.rot();
 }
 
-fn nrot(rt: *Runtime) Error!void {
+pub fn nrot(rt: *Runtime) Error!void {
     rt.data_stack.nrot();
 }
 
-fn store(rt: *Runtime) Error!void {
+pub fn store(rt: *Runtime) Error!void {
     const addr, const value = rt.data_stack.pop2();
     try mem.writeCell(rt.memory, addr, value);
 }
 
-fn fetchAdd(rt: *Runtime) Error!void {
+pub fn fetchAdd(rt: *Runtime) Error!void {
     const addr, const value = rt.data_stack.pop2();
     (try mem.cellPtr(rt.memory, addr)).* +%= value;
 }
 
-fn fetch(rt: *Runtime) Error!void {
+pub fn fetch(rt: *Runtime) Error!void {
     const addr = rt.data_stack.pop();
     rt.data_stack.push(try mem.readCell(rt.memory, addr));
 }
 
-fn comma(rt: *Runtime) Error!void {
+pub fn comma(rt: *Runtime) Error!void {
     const value = rt.data_stack.pop();
     try rt.interpreter.dictionary.here.comma(value);
 }
 
-fn storeC(rt: *Runtime) Error!void {
+pub fn storeC(rt: *Runtime) Error!void {
     const addr, const value = rt.data_stack.pop2();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] = value_u8;
 }
 
-fn fetchAddC(rt: *Runtime) Error!void {
+pub fn fetchAddC(rt: *Runtime) Error!void {
     const addr, const value = rt.data_stack.pop2();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] +%= value_u8;
 }
 
-fn fetchC(rt: *Runtime) Error!void {
+pub fn fetchC(rt: *Runtime) Error!void {
     const addr = rt.data_stack.pop();
     rt.data_stack.push(rt.memory[addr]);
 }
 
-fn commaC(rt: *Runtime) Error!void {
+pub fn commaC(rt: *Runtime) Error!void {
     const value = rt.data_stack.pop();
     try rt.interpreter.dictionary.here.commaC(@truncate(value));
 }
 
-fn toR(rt: *Runtime) Error!void {
+pub fn toR(rt: *Runtime) Error!void {
     rt.return_stack.push(rt.data_stack.pop());
 }
 
-fn fromR(rt: *Runtime) Error!void {
+pub fn fromR(rt: *Runtime) Error!void {
     rt.data_stack.push(rt.return_stack.pop());
 }
 
-fn fetchR(rt: *Runtime) Error!void {
+pub fn fetchR(rt: *Runtime) Error!void {
     rt.data_stack.push(rt.return_stack.peek());
 }
 
-fn plus(rt: *Runtime) Error!void {
+pub fn plus(rt: *Runtime) Error!void {
     rt.data_stack.add();
 }
 
-fn minus(rt: *Runtime) Error!void {
+pub fn minus(rt: *Runtime) Error!void {
     rt.data_stack.subtract();
 }
 
-fn multiply(rt: *Runtime) Error!void {
+pub fn multiply(rt: *Runtime) Error!void {
     rt.data_stack.multiply();
 }
 
-fn divide(rt: *Runtime) Error!void {
+pub fn divide(rt: *Runtime) Error!void {
     rt.data_stack.divide();
 }
 
-fn mod(rt: *Runtime) Error!void {
+pub fn mod(rt: *Runtime) Error!void {
     rt.data_stack.mod();
 }
 
 // TODO move this into DataStack definiton
-fn divmod(rt: *Runtime) Error!void {
+pub fn divmod(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const value = rt.data_stack.pop();
     const q = value / div;
@@ -379,7 +379,7 @@ fn divmod(rt: *Runtime) Error!void {
 }
 
 // TODO move this into DataStack definiton
-fn muldiv(rt: *Runtime) Error!void {
+pub fn muldiv(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const mul = rt.data_stack.pop();
     const value = rt.data_stack.pop();
@@ -393,7 +393,7 @@ fn muldiv(rt: *Runtime) Error!void {
 }
 
 // TODO move this into DataStack definiton
-fn muldivmod(rt: *Runtime) Error!void {
+pub fn muldivmod(rt: *Runtime) Error!void {
     const div = rt.data_stack.pop();
     const mul = rt.data_stack.pop();
     const value = rt.data_stack.pop();
@@ -408,7 +408,7 @@ fn muldivmod(rt: *Runtime) Error!void {
     rt.data_stack.push(@truncate(r));
 }
 
-fn find(rt: *Runtime) Error!void {
+pub fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
@@ -422,7 +422,7 @@ fn find(rt: *Runtime) Error!void {
     }
 }
 
-fn lookup(rt: *Runtime) Error!void {
+pub fn lookup(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
@@ -439,7 +439,7 @@ fn lookup(rt: *Runtime) Error!void {
     }
 }
 
-fn nextWord(rt: *Runtime) Error!void {
+pub fn nextWord(rt: *Runtime) Error!void {
     // NOTE
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
@@ -452,14 +452,14 @@ fn nextWord(rt: *Runtime) Error!void {
     rt.data_stack.push(range.len);
 }
 
-fn define(rt: *Runtime) Error!void {
+pub fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const wordlist_idx = rt.interpreter.dictionary.context.fetch();
     try rt.interpreter.dictionary.defineWord(wordlist_idx, word);
 }
 
-fn nextChar(rt: *Runtime) Error!void {
+pub fn nextChar(rt: *Runtime) Error!void {
     // NOTE
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
@@ -469,12 +469,12 @@ fn nextChar(rt: *Runtime) Error!void {
     rt.data_stack.push(char);
 }
 
-fn refill(rt: *Runtime) Error!void {
+pub fn refill(rt: *Runtime) Error!void {
     const did_refill = try rt.input_buffer.refill();
     rt.data_stack.push(runtime.cellFromBoolean(did_refill));
 }
 
-fn tick(rt: *Runtime) Error!void {
+pub fn tick(rt: *Runtime) Error!void {
     // NOTE
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
@@ -491,14 +491,14 @@ fn tick(rt: *Runtime) Error!void {
     }
 }
 
-fn lit(rt: *Runtime) Error!void {
+pub fn lit(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
     const value = try mem.readCell(rt.memory, rt.program_counter);
     rt.data_stack.push(value);
     try rt.advancePC(@sizeOf(Cell));
 }
 
-fn toNumber(rt: *Runtime) Error!void {
+pub fn toNumber(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const base_addr = runtime.MainMemoryLayout.offsetOf("base");
@@ -514,7 +514,7 @@ fn toNumber(rt: *Runtime) Error!void {
     rt.data_stack.push(0xffff);
 }
 
-fn move(rt: *Runtime) Error!void {
+pub fn move(rt: *Runtime) Error!void {
     const std = @import("std");
 
     const count = rt.data_stack.pop();
@@ -537,7 +537,7 @@ fn move(rt: *Runtime) Error!void {
     }
 }
 
-fn memEqual(rt: *Runtime) Error!void {
+pub fn memEqual(rt: *Runtime) Error!void {
     const std = @import("std");
 
     const count = rt.data_stack.pop();

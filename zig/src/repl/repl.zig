@@ -40,8 +40,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
     switch (external_id) {
         .bye => {
-            // TODO this should call rt.quit()
-            rt.should_quit = true;
+            try bytecodes.quit(rt);
             repl.should_bye = true;
         },
         .emit => {

@@ -199,14 +199,14 @@ forth
 
 \ ===
 
-: word! word ?dup 0= if drop refill if loop else 0 0 then then ;
+: get-word word ?dup 0= if drop refill if loop else 0 0 then then ;
 
 \ TODO
 \ this string= needs to be case insensitve
 \   string~=
 \ this behavior is weird and doesnt panic on EoF
-: [if] 0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if
-  loop then then ;
+: [if] 0= if |: get-word ?dup 0= if panic then
+  s" [then]" string= 0= if loop then then ;
 : [then] ;
 : [defined] word find nip ;
 
@@ -246,7 +246,7 @@ variable onwnf
     onwnf @ execute
   endcond ;
 
-: interpret word! ?dup if resolve loop else drop then ;
+: interpret get-word ?dup if resolve loop else drop then ;
 
 s[
   cell field >saved-ptr

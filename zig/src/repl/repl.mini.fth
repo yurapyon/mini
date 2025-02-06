@@ -19,6 +19,8 @@ forth
 : . u. space ;
 : ? @ . ;
 
+: .2 swap . . ;
+
 : h8.  <# h# h# #> type ;
 : h16. <# h# h# h# h# #> type ;
 : .bytes 2dup > if c@+ h8. space loop then 2drop ;
