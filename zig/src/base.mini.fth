@@ -48,10 +48,11 @@ forth
 
 : name cell + c@+ ;
 : >cfa name + aligned ;
+: last latest @ >cfa ;
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
-: does!  latest @ >cfa >does ['] jump swap !+ ! ;
+: does!  last >does ['] jump swap !+ ! ;
 : create word define enter# , (lit), ['] exit , 0 , this! ;
 compiler
 : does>  (lit), ['] does! , ['] exit , this! ;
@@ -63,7 +64,7 @@ variable loop*
 : set-loop here @ loop* ! ;
 compiler
 : |:    set-loop ;
-\ todo rename '<:' ?
+\ todo rename to '<:' ?
 : loop ['] jump , loop* @ , ;
 forth
 \ redefining :
@@ -120,15 +121,15 @@ forth
 
 \ ( value min max -- value )
 : clamp rot min max ;
-: in[] rot tuck >= -rot <= and ;
-: in[) 1- in[] ;
+: in[,] rot tuck >= -rot <= and ;
+: in[,) 1- in[,] ;
 
 : char word drop c@ ;
 
 : char>digit cond
-    dup '0' '9' in[] if '0' - else
-    dup 'A' 'Z' in[] if '7' - else
-    dup 'a' 'z' in[] if 'W' - else
+    dup '0' '9' in[,] if '0' - else
+    dup 'A' 'Z' in[,] if '7' - else
+    dup 'a' 'z' in[,] if 'W' - else
   endcond ;
 
 : digit>char dup 10 < if '0' else 10 - 'a' then + ;
@@ -211,6 +212,15 @@ forth
 
 \ ===
 
+: :noname 0 0 define here @ enter# , set-loop ] ;
+
+compiler
+: [: lit, here @ 6 + , ['] jump , (later), enter# , ;
+: ;] ['] exit , this! ;
+forth
+
+\ ===
+
 : wlatest context @ cells wordlists + @ ;
 
 : mem d0 dist ;
@@ -218,8 +228,6 @@ forth
 : fill   >r range |: 2dup > if r@ swap c!+ loop then r> 3drop ;
 : fill16 >r range |: 2dup > if r@ swap  !+ loop then r> 3drop ;
 : erase 0 fill ;
-
-: :noname 0 0 define here @ enter# , set-loop ] ;
 
 : s[ 0 ;
 : ]s constant ;

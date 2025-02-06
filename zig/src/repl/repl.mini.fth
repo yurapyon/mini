@@ -2,7 +2,8 @@
 : space bl emit ;
 : spaces 0 |: 2dup > if space 1+ loop then 2drop ;
 : cr 10 emit ;
-: print dup 32 126 in[] 0= if drop '.' then emit ;
+: printable 32 126 in[,] ;
+: print dup printable 0= if drop '.' then emit ;
 : .print 2dup > if c@+ print loop then 2drop ;
 : .chars 2dup > if c@+ emit loop then 2drop ;
 : type range .chars ;

@@ -4,7 +4,7 @@ const SignedCell = runtime.SignedCell;
 
 // ===
 
-const stack_inner_depth = 32;
+const stack_inner_depth = 64;
 
 const CircularStack = struct {
     stack: [stack_inner_depth]Cell,
@@ -50,7 +50,7 @@ pub const DataStack = struct {
 
     pub fn index(self: *@This(), idx: u8) Cell {
         // TODO
-        // This has to wrap around 34
+        // This has to wrap around 66
         if (idx == 0) {
             return self.top;
         } else if (idx == 1) {

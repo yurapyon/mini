@@ -8,6 +8,8 @@ const ExternalError = runtime.ExternalError;
 
 const mem = @import("../memory.zig");
 
+const bytecodes = @import("../bytecodes.zig");
+
 const externals = @import("../externals.zig");
 const External = externals.External;
 
@@ -16,7 +18,7 @@ const Refiller = @import("../refiller.zig").Refiller;
 // ===
 
 const ExternalId = enum(Cell) {
-    bye = 64,
+    bye = bytecodes.bytecodes_count,
     emit,
     showStack,
     key,

@@ -1,9 +1,16 @@
-rethink wordlists/vocabularies
-  'current'
+probably
+  doubles and unsigned
+    may need to extend bytecode count
+  rework stacks to be in forth memory
+    still circular
 
-coroutines
+maybe
+  rethink wordlists/vocabularies
+    'current'
 
-maybe locals
+probably not
+  coroutines
+  locals
 
 ---
 

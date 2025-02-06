@@ -48,19 +48,27 @@ pub fn parseNumber(str: []const u8, base: usize) ParseNumberError!usize {
         }
     }
 
+    var only_underscores = true;
+
     while (read_at < str.len) : (read_at += 1) {
         const ch = str[read_at];
         const digit = switch (ch) {
             '0'...'9' => ch - '0',
             'A'...'Z' => ch - 'A' + 10,
             'a'...'z' => ch - 'a' + 10,
-            // TODO handle ignoring underscores in a better way
-            // right now '_' in forth evaluates to 0
             '_' => continue,
             else => return error.InvalidNumber,
         };
+        // NOTE
+        // If this code is reached, you know the 'continue'
+        //   wasn't called above
+        only_underscores = false;
         if (digit > effective_base) return error.InvalidNumber;
         acc = try std.math.add(usize, acc * effective_base, digit);
+    }
+
+    if (only_underscores) {
+        return error.InvalidNumber;
     }
 
     return if (is_negative) 0 -% acc else acc;
