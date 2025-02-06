@@ -53,13 +53,12 @@ forth
 
 \ editor
 
-: l b0 .list ;
+: l blk .list ;
 0 value cx
 0 value cy
-: t 0 to cx to cy cy b0 .line space cy . cr ;
-: putc b0 cy 64 * + cx + c! 1 +to cx ;
+: t 0 to cx to cy cy blk .line space cy . cr ;
+: putc blk cy 64 * + cx + c! 1 +to cx ;
 : readp 2dup > if next-char putc 1+ loop then 2drop ;
 : p next-char source >in @ readp update ;
-: wipe bl swap block 1024 range fill update ;
 
 [then]

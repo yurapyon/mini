@@ -53,7 +53,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
 pub const Blocks = struct {
     const block_size = 1024;
-    const block_count = 64;
+    const block_count = 256;
 
     rt: *Runtime,
     start_token: Cell,
@@ -111,7 +111,7 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(block_id * block_size);
+        try file.seekTo(@as(usize, block_id) * block_size);
         _ = try file.read(buffer);
     }
 
@@ -134,7 +134,7 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(block_id * block_size);
+        try file.seekTo(@as(usize, block_id) * block_size);
         _ = try file.write(buffer);
     }
 };
