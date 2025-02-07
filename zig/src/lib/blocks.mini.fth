@@ -8,10 +8,10 @@ s[ cell field >id cell field >upd 1024 field >data
 create blkbufs blkbuf blkbuf-ct * allot
 blkbufs variable b0 blkbufs blkbuf + variable b1
 
-: bswap b0 b1 swapmem ;
+: bb.swap b0 b1 swapmem ;
 : clrupd >upd false swap ! ;
 : empty dup clrupd >id 0xffff swap ! ;
-: save dup clrupd dup >id @ swap >data bwrite ;
+: save dup clrupd dup >id @ swap >data bb.write ;
 : trysave dup >upd @ if save else drop then ;
 
 forth definitions
@@ -28,13 +28,16 @@ blkstack value blkstack-top
 forth definitions
 blocks
 
+: bb.front b0 @ >data ;
+: bb.back  b1 @ >data ;
+
 : update b0 @ >upd true swap ! ;
 : buffer b1 @ dup trysave tuck >id ! >data ;
 : block cond
     dup b0 @ >id @ = if drop else
-    dup b1 @ >id @ = if drop bswap else
-    dup buffer bread bswap
-  endcond b0 @ >data ;
+    dup b1 @ >id @ = if drop bb.swap else
+    dup buffer bb.read bb.swap
+  endcond bb.front ;
 : save-buffers b0 @ trysave b1 @ trysave ;
 : empty-buffers b0 @ empty b1 @ empty ;
 : flush save-buffers empty-buffers ;

@@ -1,21 +1,24 @@
 word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
 word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
-compiler-latest current !
+compiler-latest context !
+context @ current !
 word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
-forth-latest current !
+forth-latest context !
+context @ current !
 
 word : define enter# , ] word define enter# , ] [ ' exit ,
-compiler-latest current !
+compiler-latest context !
+context @ current !
 : ; lit exit , [ ' [ , ' exit ,
-forth-latest current !
+forth-latest context !
+context @ current !
 
 : forth       forth-latest context ! ;
 : compiler    compiler-latest context ! ;
 : definitions context @ current ! ;
 
-: source source-ptr @ source-len @ ;
-: \ source nip >in ! ;
+: \ source-len @ >in ! ;
 \ redefine for compiler
 ' \
 compiler definitions
@@ -37,6 +40,9 @@ compiler definitions
 : else ['] jump , (later), swap this! ;
 : then this! ;
 forth definitions
+
+: source source-ptr @ ?dup 0= if input-buffer then
+  source-len @ ;
 
 : cell 2 ;
 : cells cell * ;
@@ -209,7 +215,8 @@ forth definitions
 
 \ ===
 
-: get-word word ?dup 0= if drop refill if loop else 0 0 then then ;
+: get-word word ?dup 0= if drop refill
+  if loop else 0 0 then then ;
 
 \ TODO
 \ this string= needs to be case insensitve

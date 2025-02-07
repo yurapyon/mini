@@ -75,12 +75,12 @@ pub const Blocks = struct {
         };
         const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
         try self.rt.defineExternal(
-            "bwrite",
+            "bb.write",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.bwrite) + start_token,
         );
         try self.rt.defineExternal(
-            "bread",
+            "bb.read",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.bread) + start_token,
         );

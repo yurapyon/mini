@@ -158,6 +158,10 @@ pub const Runtime = struct {
             MainMemoryLayout.offsetOf("dictionary_start"),
         );
         try self.interpreter.dictionary.compileConstant(
+            "input-buffer",
+            MainMemoryLayout.offsetOf("input_buffer"),
+        );
+        try self.interpreter.dictionary.compileConstant(
             "source-ptr",
             MainMemoryLayout.offsetOf("source_ptr"),
         );

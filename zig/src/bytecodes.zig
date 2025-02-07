@@ -429,22 +429,27 @@ pub fn lookup(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
-    const state = try CompileState.fromCell(rt.interpreter.state.fetch());
+    const maybe_lookup_result = rt.interpreter.lookupString(word) catch |err| switch (err) {
+        error.InvalidBase, error.Overflow => null,
+        else => |e| return e,
+    };
 
-    const context_vocabulary_addr = if (state == .interpret)
-        rt.interpreter.dictionary.context.fetch()
-    else
-        Dictionary.compiler_vocabulary_addr;
-
-    if (try rt.interpreter.dictionary.findWord(context_vocabulary_addr, word)) |word_info| {
-        rt.data_stack.push(word_info.definition_addr);
-        rt.data_stack.push(word_info.context_addr);
-        rt.data_stack.push(runtime.cellFromBoolean(true));
-    } else {
-        rt.data_stack.push(0);
-        rt.data_stack.push(0);
-        rt.data_stack.push(runtime.cellFromBoolean(false));
+    if (maybe_lookup_result) |lookup_result| {
+        switch (lookup_result) {
+            .word => |word_info| {
+                const is_compile_word = word_info.context_addr == Dictionary.compiler_vocabulary_addr;
+                rt.data_stack.push(word_info.definition_addr);
+                rt.data_stack.push(runtime.cellFromBoolean(is_compile_word));
+                rt.data_stack.push(runtime.cellFromBoolean(true));
+                return;
+            },
+            else => {},
+        }
     }
+
+    rt.data_stack.push(0);
+    rt.data_stack.push(0);
+    rt.data_stack.push(runtime.cellFromBoolean(false));
 }
 
 pub fn nextWord(rt: *Runtime) Error!void {
@@ -489,7 +494,7 @@ pub fn tick(rt: *Runtime) Error!void {
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
-    const vocabulary_addr = rt.interpreter.dictionary.current.fetch();
+    const vocabulary_addr = rt.interpreter.dictionary.context.fetch();
     if (try rt.interpreter.dictionary.findWord(vocabulary_addr, word)) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);

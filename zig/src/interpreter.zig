@@ -91,7 +91,7 @@ pub const Interpreter = struct {
         const number_or_error = self.parseNumberCallback(word, self.base.fetch());
         const maybe_number = number_or_error catch |err| switch (err) {
             error.InvalidNumber => null,
-            else => return err,
+            else => |e| return e,
         };
         if (maybe_number) |value| {
             // NOTE

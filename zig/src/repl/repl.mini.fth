@@ -7,6 +7,7 @@
 : .print 2dup > if c@+ print loop then 2drop ;
 : .chars 2dup > if c@+ emit loop then 2drop ;
 : type range .chars ;
+: ." [compile] s" type ;
 compiler definitions
 : ." [compile] s" ['] type , ;
 forth definitions
@@ -70,40 +71,50 @@ forth definitions
 
 [defined] block [if]
 
-blocks
 0 variable scr
 : .line swap 64 * + 64 range .print ;
 : .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
   loop then r> drop 2drop ;
 : list dup scr ! block .list ;
-\ forth
 
-\ editor
+vocabulary editor
+editor definitions
 
-\ vocabulary editor
+create efind 64 allot
+create einsert 64 allot
 
-\ editor definitions
-\ blocks
+: blank-line 64 bl fill ;
 
-: l b0 @ >data .list ;
-: line# b0 @ >data swap 64 * + 64 ;
-: blank-line line# bl fill update ;
+: rest-line >in @ dup source-len @ swap - ;
+
+: read-line rest-line
+  ?dup if 1- swap 1+ swap true else false then ;
+
+: >insert> read-line if einsert blank-line
+  einsert swap move then einsert 64 ;
+
+: >find> read-line if efind blank-line
+  efind swap move then efind 64 ;
+
+: l bb.front .list ;
+: line# bb.front swap 64 * + ;
+: blank# line# blank-line update ;
 
 0 value cx 0 value cy
-: t to cy 0 to cx cy line# range .print space cy . cr ;
-: p cy blank-line ;
+: t 256 mod to cy 0 to cx cy line# 64 range .print space cy . cr ;
+: p cy blank# ;
 
 
-\ : putc b0 @ >data cy 64 * + cx + c! 1 +to cx ;
-\ : readp 2dup > if next-char putc 1+ loop then 2drop ;
-\ : p next-char source >in @ readp update 0 to cx ;
-: wipe b0 @ >data 1024 bl fill update ;
+ : putc bb.front cy 64 * + cx + c! 1 +to cx ;
+ : readp 2dup > if next-char putc 1+ loop then 2drop ;
+ : p next-char source >in @ readp update 0 to cx ;
+: wipe bb.front 1024 bl fill update ;
 
-\ forth definitions
-\ editor
+forth definitions
+editor
 
-\ ' l
-\ : l editor [ , ] ;
+' l
+: l editor [ , ] ;
 
 forth
 
