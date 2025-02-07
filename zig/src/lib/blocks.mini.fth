@@ -1,34 +1,47 @@
-s[ cell field >bb.id cell field >bb.upd 1024 field >bb.data
+vocabulary blocks
+blocks definitions
+
+s[ cell field >id cell field >upd 1024 field >data
 ]s blkbuf
 
 2 constant blkbuf-ct
 create blkbufs blkbuf blkbuf-ct * allot
 blkbufs variable b0 blkbufs blkbuf + variable b1
 
-: bb.swap b0 b1 swapvars ;
-: bb.clrupd >bb.upd false swap ! ;
-: bb.empty dup bb.clrupd >bb.id 0xffff swap ! ;
-: bb.save dup bb.clrupd dup >bb.id @ swap >bb.data bwrite ;
-: bb.trysave dup >bb.upd @ if bb.save else drop then ;
+: bswap b0 b1 swapvars ;
+: clrupd >upd false swap ! ;
+: empty dup clrupd >id 0xffff swap ! ;
+: save dup clrupd dup >id @ swap >data bwrite ;
+: trysave dup >upd @ if save else drop then ;
+
+forth definitions
 
 0 variable blk
+
+blocks definitions
+
 create blkstack saved-max cells allot
 blkstack value blkstack-top
-: bb.pushblk blk @ blkstack-top ! cell +to blkstack-top ;
-: bb.popblk  cell negate +to blkstack-top blkstack-top @ blk ! ;
+: pushblk blk @ blkstack-top ! cell +to blkstack-top ;
+: popblk  cell negate +to blkstack-top blkstack-top @ blk ! ;
 
-: update b0 @ >bb.upd true swap ! ;
-: buffer b1 @ dup bb.trysave tuck >bb.id ! >bb.data ;
+forth definitions
+blocks
+
+: update b0 @ >upd true swap ! ;
+: buffer b1 @ dup trysave tuck >id ! >data ;
 : block cond
-    dup b0 @ >bb.id @ = if drop else
-    dup b1 @ >bb.id @ = if drop bb.swap else
-    dup buffer bread bb.swap
-  endcond b0 @ >bb.data ;
-: save-buffers b0 @ bb.trysave b1 @ bb.trysave ;
-: empty-buffers b0 @ bb.empty b1 @ bb.empty ;
+    dup b0 @ >id @ = if drop else
+    dup b1 @ >id @ = if drop bswap else
+    dup buffer bread bswap
+  endcond b0 @ >data ;
+: save-buffers b0 @ trysave b1 @ trysave ;
+: empty-buffers b0 @ empty b1 @ empty ;
 : flush save-buffers empty-buffers ;
 
-: load dup blk ! bb.pushblk block 1024 evaluate bb.popblk ;
+: load dup blk ! pushblk block 1024 evaluate popblk ;
 : thru swap |: 2dup >= if dup load 1+ loop then 2drop ;
+
+forth
 
 \ todo '\' comments

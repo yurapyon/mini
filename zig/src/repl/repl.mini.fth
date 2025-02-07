@@ -7,9 +7,9 @@
 : .print 2dup > if c@+ print loop then 2drop ;
 : .chars 2dup > if c@+ emit loop then 2drop ;
 : type range .chars ;
-compiler
+compiler definitions
 : ." [compile] s" ['] type , ;
-forth
+forth definitions
 :noname type '?' emit cr ; onwnf !
 
 : u. <# #s #> type ;
@@ -29,7 +29,7 @@ forth
     dup h16. space 2dup .bytes .print cr
   loop then 2drop ;
 
-: words wlatest |: ?dup if dup name tuck type if space then @
+: words context @ @ |: ?dup if dup name tuck type if space then @
   loop then ;
 
 : s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
@@ -46,6 +46,7 @@ forth
 : ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
 
 [defined] block [if]
+blocks
 0 variable scr
 : .line swap 64 * + 64 range .print ;
 : .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
@@ -54,13 +55,14 @@ forth
 
 \ editor
 
-: l b0 @ >bb.data .list ;
+: l b0 @ >data .list ;
 0 value cx
 0 value cy
-: t 0 to cx to cy cy b0 @ >bb.data .line space cy . cr ;
-: putc b0 @ >bb.data cy 64 * + cx + c! 1 +to cx ;
+: t 0 to cx to cy cy b0 @ >data .line space cy . cr ;
+: putc b0 @ >data cy 64 * + cx + c! 1 +to cx ;
 : readp 2dup > if next-char putc 1+ loop then 2drop ;
 : p next-char source >in @ readp update ;
-: wipe b0 @ >bb.data 1024 32 fill update ;
+: wipe b0 @ >data 1024 32 fill update ;
+forth
 
 [then]

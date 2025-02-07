@@ -1,3 +1,5 @@
+const std_ = @import("std");
+
 const mem = @import("memory.zig");
 
 const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
@@ -461,8 +463,8 @@ pub fn nextWord(rt: *Runtime) Error!void {
 pub fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    try rt.interpreter.dictionary.defineWord(wordlist_idx, word);
+    const vocabulary_addr = rt.interpreter.dictionary.current.fetch();
+    try rt.interpreter.dictionary.defineWord(vocabulary_addr, word);
 }
 
 pub fn nextChar(rt: *Runtime) Error!void {
@@ -487,8 +489,8 @@ pub fn tick(rt: *Runtime) Error!void {
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+    const vocabulary_addr = rt.interpreter.dictionary.current.fetch();
+    if (try rt.interpreter.dictionary.findWord(vocabulary_addr, word)) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);
     } else {

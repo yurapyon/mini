@@ -25,10 +25,6 @@ compiler definitions
 : \ [ , ] ;
 forth definitions
 
-\ test
-
-quit
-
 : (later), here @ 0 , ;
 : this  here @ swap ;
 : this! this ! ;
@@ -36,14 +32,14 @@ quit
 
 : lit, lit lit , ;
 : (lit), lit, (later), ;
-compiler
+compiler definitions
 : ['] lit, ' , ;
 : [compile] ' , ;
 
 : if   ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
-forth
+forth definitions
 
 : cell 2 ;
 : cells cell * ;
@@ -59,36 +55,45 @@ forth
 
 : name cell + c@+ ;
 : >cfa name + aligned ;
-: last current @ >cfa ;
+: last current @ @ >cfa ;
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
 : create word define enter# , (lit), ['] exit , 0 , this! ;
-compiler
+compiler definitions
 : does>  (lit), ['] does! , ['] exit , this! ;
-forth
+forth definitions
 
-: variable create , allot ;
+: variable create , ;
 
 0 variable loop*
 : set-loop here @ loop* ! ;
-compiler
+compiler definitions
 : |:    set-loop ;
 \ todo rename to '<:' ?
 : loop ['] jump , loop* @ , ;
-forth
+forth definitions
 \ redefining :
 ' : : : [ , ] set-loop ;
 
-compiler
+compiler definitions
 : cond    0 ;
 : endcond ?dup if [compile] then loop then ;
-forth
+forth definitions
 
 : ( next-char ')' = 0= if loop then ;
 \ redefine for compiler
-' ( compiler : ( [ , ] ; forth \ )
+' (
+compiler definitions
+: ( [ , ] ;
+forth definitions
+
+\ todo
+\ compiler definitions
+\ forth
+\ : ( ( ;
+\ forth definitions
 
 \ types ===
 
@@ -101,13 +106,15 @@ forth
 : vname word find 0= if panic then >cfa >body ;
 : to  vname ! ;
 : +to vname +! ;
-compiler
+compiler definitions
 : to  lit, vname , ['] ! , ;
 : +to lit, vname , ['] +! , ;
-forth
+forth definitions
 
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
+
+constant test
 
 \ math ===
 
@@ -175,18 +182,18 @@ forth
   endcond c, loop then ;
 
 : d" here @ dup "", here ! ;
-compiler
+compiler definitions
 : d" (data), "", align this! ;
-forth
+forth definitions
 
 : count @+ ;
 : string, (later), here @ "", dist swap ! ;
 : c" here @ dup string, here ! ;
 : s" [compile] c" count ;
-compiler
+compiler definitions
 : c" (data), string, align this! ;
 : s" [compile] c" ['] count , ;
-forth
+forth definitions
 
 : string= rot over = if mem= else 3drop false then ;
 
@@ -225,14 +232,14 @@ forth
 
 : :noname 0 0 define here @ enter# , set-loop ] ;
 
-compiler
+compiler definitions
 : [: lit, here @ 6 + , ['] jump , (later), enter# , ;
 : ;] ['] exit , this! ;
-forth
+forth definitions
 
 \ ===
 
-: wlatest context @ cells wordlists + @ ;
+\ : wlatest context @ cells wordlists + @ ;
 
 : mem d0 dist ;
 

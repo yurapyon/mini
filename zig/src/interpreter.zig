@@ -62,10 +62,16 @@ pub const Interpreter = struct {
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
 
-        const context_vocabulary_addr = if (state == .interpret)
-            self.dictionary.context.fetch()
-        else
-            Dictionary.compiler_vocabulary_addr;
+        if (state == .compile) {
+            if (try self.dictionary.findWord(
+                Dictionary.compiler_vocabulary_addr,
+                string,
+            )) |word_info| {
+                return .{ .word = word_info };
+            }
+        }
+
+        const context_vocabulary_addr = self.dictionary.context.fetch();
 
         if (try self.dictionary.findWord(context_vocabulary_addr, string)) |word_info| {
             return .{ .word = word_info };
