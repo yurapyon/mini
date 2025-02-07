@@ -23,18 +23,21 @@ const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
 
 pub const WordInfo = struct {
     definition_addr: Cell,
-    wordlist_idx: Cell,
+    context_addr: Cell,
 };
 
 pub const Dictionary = struct {
     const dictionary_start = MainMemoryLayout.offsetOf("dictionary_start");
+    pub const forth_vocabulary_addr = MainMemoryLayout.offsetOf("forth_vocabulary");
+    pub const compiler_vocabulary_addr = MainMemoryLayout.offsetOf("compiler_vocabulary");
 
     memory: MemoryPtr,
 
     here: Register(MainMemoryLayout.offsetOf("here")),
-    latest: Register(MainMemoryLayout.offsetOf("latest")),
+    forth_vocabulary: Register(MainMemoryLayout.offsetOf("forth_vocabulary")),
+    compiler_vocabulary: Register(MainMemoryLayout.offsetOf("compiler_vocabulary")),
     context: Register(MainMemoryLayout.offsetOf("context")),
-    wordlists: Register(MainMemoryLayout.offsetOf("wordlists")),
+    current: Register(MainMemoryLayout.offsetOf("current")),
 
     tag_addresses: struct {
         lit: Cell,
@@ -45,59 +48,46 @@ pub const Dictionary = struct {
         self.memory = memory;
 
         self.here.init(self.memory);
-        self.latest.init(self.memory);
+        self.forth_vocabulary.init(self.memory);
+        self.compiler_vocabulary.init(self.memory);
         self.context.init(self.memory);
-        self.wordlists.init(self.memory);
+        self.current.init(self.memory);
 
         self.here.store(dictionary_start);
-        self.latest.store(0);
-        const forth_wordlist_idx = @intFromEnum(Wordlists.forth);
-        const compiler_wordlist_idx = @intFromEnum(Wordlists.compiler);
-        self.context.store(forth_wordlist_idx);
-        self.storeWordlistLatest(forth_wordlist_idx, 0) catch unreachable;
-        self.storeWordlistLatest(compiler_wordlist_idx, 0) catch unreachable;
+        self.forth_vocabulary.store(0);
+        self.compiler_vocabulary.store(0);
+        self.context.store(forth_vocabulary_addr);
+        self.current.store(forth_vocabulary_addr);
     }
 
     pub fn updateInternalAddresses(self: *@This()) !void {
-        const lit_definition_addr = (try self.findWordInWordlist(0, "lit")) orelse return error.WordNotFound;
+        const forth_latest_addr = (try mem.cellPtr(self.memory, forth_vocabulary_addr)).*;
+        const lit_definition_addr = (try self.findWordInVocabulary(forth_latest_addr, "lit")) orelse
+            return error.WordNotFound;
         self.tag_addresses.lit = try self.toCfa(lit_definition_addr);
-        const exit_definition_addr = (try self.findWordInWordlist(0, "exit")) orelse return error.WordNotFound;
+        const exit_definition_addr = (try self.findWordInVocabulary(forth_latest_addr, "exit")) orelse
+            return error.WordNotFound;
         self.tag_addresses.exit = try self.toCfa(exit_definition_addr);
     }
 
     // ===
 
-    fn assertValidWordlist(wordlist_idx: Cell) !void {
-        if (wordlist_idx >= interpreter.max_wordlists) {
-            return error.InvalidWordlist;
-        }
+    pub fn getContextVocabulary(self: *@This()) !*Cell {
+        const addr = self.context.fetch();
+        return try mem.cellPtr(self.memory, addr);
     }
 
-    fn storeWordlistLatest(
-        self: *@This(),
-        wordlist_idx: Cell,
-        value: Cell,
-    ) !void {
-        try assertValidWordlist(wordlist_idx);
-        const wordlist_addr = wordlist_idx * @sizeOf(Cell);
-        self.wordlists.storeWithOffset(wordlist_addr, value) catch unreachable;
+    pub fn getCurrentVocabulary(self: *@This()) *Cell {
+        const addr = self.current.fetch();
+        return try mem.cellPtr(self.memory, addr);
     }
 
-    fn fetchWordlistLatest(self: @This(), wordlist_idx: Cell) !Cell {
-        try assertValidWordlist(wordlist_idx);
-        const wordlist_addr = wordlist_idx * @sizeOf(Cell);
-        return self.wordlists.fetchWithOffset(wordlist_addr) catch unreachable;
-    }
-
-    // ===
-
-    pub fn findWordInWordlist(
+    pub fn findWordInVocabulary(
         self: @This(),
-        wordlist_idx: Cell,
+        vocabulary_latest_addr: Cell,
         to_find: []const u8,
     ) !?Cell {
-        const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
-        var iter = LinkedListIterator.from(self.memory, wordlist_latest);
+        var iter = LinkedListIterator.from(self.memory, vocabulary_latest_addr);
 
         while (try iter.next()) |definition_addr| {
             const name = try self.getDefinitionName(definition_addr);
@@ -111,16 +101,24 @@ pub const Dictionary = struct {
 
     pub fn findWord(
         self: @This(),
-        starting_wordlist_idx: Cell,
+        vocabulary_addr: Cell,
         to_find: []const u8,
     ) !?WordInfo {
-        var i: Cell = 0;
-        while (i <= starting_wordlist_idx) : (i += 1) {
-            const wordlist_idx = starting_wordlist_idx - i;
-            if (try self.findWordInWordlist(wordlist_idx, to_find)) |definition_addr| {
+        const vocabulary_latest_addr = (try mem.cellPtr(self.memory, vocabulary_addr)).*;
+
+        if (try self.findWordInVocabulary(vocabulary_latest_addr, to_find)) |definition_addr| {
+            return .{
+                .definition_addr = definition_addr,
+                .context_addr = vocabulary_addr,
+            };
+        }
+
+        if (vocabulary_addr != forth_vocabulary_addr) {
+            const forth_latest_addr = (try mem.cellPtr(self.memory, forth_vocabulary_addr)).*;
+            if (try self.findWordInVocabulary(forth_latest_addr, to_find)) |definition_addr| {
                 return .{
                     .definition_addr = definition_addr,
-                    .wordlist_idx = wordlist_idx,
+                    .context_addr = forth_vocabulary_addr,
                 };
             }
         }
@@ -133,7 +131,7 @@ pub const Dictionary = struct {
     //   there are ways to break this in forth though
     pub fn defineWord(
         self: *@This(),
-        wordlist_idx: Cell,
+        vocabulary_addr: Cell,
         name: []const u8,
     ) !void {
         if (name.len > std.math.maxInt(u8)) {
@@ -142,12 +140,11 @@ pub const Dictionary = struct {
 
         const definition_start = self.here.alignForward();
 
-        const wordlist_latest = try self.fetchWordlistLatest(wordlist_idx);
+        const current_vocabulary = try mem.cellPtr(self.memory, vocabulary_addr);
+        const current_latest_addr = current_vocabulary.*;
+        current_vocabulary.* = definition_start;
 
-        self.latest.store(definition_start);
-        self.storeWordlistLatest(wordlist_idx, definition_start) catch unreachable;
-
-        try self.here.comma(wordlist_latest);
+        try self.here.comma(current_latest_addr);
         try self.here.commaC(@intCast(name.len));
         self.here.commaString(name) catch |err| switch (err) {
             error.StringTooLong => unreachable,
@@ -206,11 +203,8 @@ pub const Dictionary = struct {
         name: []const u8,
         value: Cell,
     ) !void {
-        const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
-        self.defineWord(wordlist_idx, name) catch |err| switch (err) {
-            error.InvalidWordlist => unreachable,
-            else => |e| return e,
-        };
+        const vocabulary_addr = self.current.fetch();
+        try self.defineWord(vocabulary_addr, name);
         try self.here.comma(bytecodes.enter_code);
         try self.compileLit(value);
         try self.compileXt(self.tag_addresses.exit);

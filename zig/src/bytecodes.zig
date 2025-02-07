@@ -61,9 +61,9 @@ pub fn getBytecodeToken(name: []const u8) ?Cell {
 
 fn defineBuiltin(dict: *Dictionary, token: Cell) !void {
     const bytecode_definition = getBytecode(token) orelse return error.InvalidBytecode;
-    const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+    const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
     if (bytecode_definition.name.len > 0) {
-        try dict.defineWord(wordlist_idx, bytecode_definition.name);
+        try dict.defineWord(forth_vocabulary_addr, bytecode_definition.name);
         try dict.here.comma(token);
     }
 }
@@ -412,8 +412,9 @@ pub fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+    const context_vocabulary_addr = rt.interpreter.dictionary.context.fetch();
+
+    if (try rt.interpreter.dictionary.findWord(context_vocabulary_addr, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
@@ -427,10 +428,15 @@ pub fn lookup(rt: *Runtime) Error!void {
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
     const state = try CompileState.fromCell(rt.interpreter.state.fetch());
-    const wordlist_idx = state.toWordlistIndex() catch unreachable;
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+
+    const context_vocabulary_addr = if (state == .interpret)
+        rt.interpreter.dictionary.context.fetch()
+    else
+        Dictionary.compiler_vocabulary_addr;
+
+    if (try rt.interpreter.dictionary.findWord(context_vocabulary_addr, word)) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
-        rt.data_stack.push(word_info.wordlist_idx);
+        rt.data_stack.push(word_info.context_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
         rt.data_stack.push(0);

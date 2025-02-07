@@ -43,22 +43,24 @@ forth
 \ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
 \   <# # # # drop # # # drop # # # '.' hold #s #> type ;
 
-: .k 1000 1024 */ <# # # # '.' hold #s #> type ;
+: ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
 
 [defined] block [if]
+0 variable scr
 : .line swap 64 * + 64 range .print ;
 : .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
   loop then r> drop 2drop ;
-: list block .list ;
+: list dup scr ! block .list ;
 
 \ editor
 
-: l blk .list ;
+: l b0 @ >bb.data .list ;
 0 value cx
 0 value cy
-: t 0 to cx to cy cy blk .line space cy . cr ;
-: putc blk cy 64 * + cx + c! 1 +to cx ;
+: t 0 to cx to cy cy b0 @ >bb.data .line space cy . cr ;
+: putc b0 @ >bb.data cy 64 * + cx + c! 1 +to cx ;
 : readp 2dup > if next-char putc 1+ loop then 2drop ;
 : p next-char source >in @ readp update ;
+: wipe b0 @ >bb.data 1024 32 fill update ;
 
 [then]

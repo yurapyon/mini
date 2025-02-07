@@ -13,6 +13,9 @@ const bytecodes = @import("../bytecodes.zig");
 const externals = @import("../externals.zig");
 const External = externals.External;
 
+const dictionary = @import("../dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
 const Refiller = @import("../refiller.zig").Refiller;
 
 // ===
@@ -85,13 +88,37 @@ pub const Repl = struct {
             .callback = externalsCallback,
             .userdata = self,
         };
-        const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
-        try rt.defineExternal("bye", wlidx, @intFromEnum(ExternalId.bye));
-        try rt.defineExternal("emit", wlidx, @intFromEnum(ExternalId.emit));
-        try rt.defineExternal(".s", wlidx, @intFromEnum(ExternalId.showStack));
-        try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
-        try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
-        try rt.defineExternal("sqrt", wlidx, @intFromEnum(ExternalId.sqrt));
+        const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
+        try rt.defineExternal(
+            "bye",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.bye),
+        );
+        try rt.defineExternal(
+            "emit",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.emit),
+        );
+        try rt.defineExternal(
+            ".s",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.showStack),
+        );
+        try rt.defineExternal(
+            "key",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.key),
+        );
+        try rt.defineExternal(
+            "raw-mode",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.rawMode),
+        );
+        try rt.defineExternal(
+            "sqrt",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sqrt),
+        );
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {

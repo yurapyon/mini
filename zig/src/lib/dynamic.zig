@@ -11,6 +11,9 @@ const ExternalError = runtime.ExternalError;
 const externals = @import("../externals.zig");
 const External = externals.External;
 
+const dictionary = @import("../dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
 const Handles = @import("../utils/handles.zig").Handles;
 
 // ===
@@ -124,50 +127,50 @@ pub const Dynamic = struct {
             .callback = externalsCallback,
             .userdata = self,
         };
-        const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
+        const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
         try self.rt.defineExternal(
             "allocate",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.allocate) + start_token,
         );
         try self.rt.defineExternal(
             "realloc",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.realloc) + start_token,
         );
         try self.rt.defineExternal(
             "free",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.free) + start_token,
         );
         try self.rt.defineExternal(
             "dyn@",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynFetch) + start_token,
         );
         try self.rt.defineExternal(
             "dyn!",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynStore) + start_token,
         );
         try self.rt.defineExternal(
             "dyn+!",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynStoreAdd) + start_token,
         );
         try self.rt.defineExternal(
             "dync@",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynFetchC) + start_token,
         );
         try self.rt.defineExternal(
             "dync!",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynStoreC) + start_token,
         );
         try self.rt.defineExternal(
             "dync+!",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynStoreAddC) + start_token,
         );
         try self.rt.addExternal(external);

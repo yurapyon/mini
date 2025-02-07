@@ -31,14 +31,6 @@ pub const LookupResult = union(enum) {
     number: Cell,
 };
 
-pub const Wordlists = enum(Cell) {
-    forth = 0,
-    compiler,
-    _,
-};
-
-pub const max_wordlists = 2;
-
 pub const ParseNumberCallback =
     *const fn (str: []const u8, base: usize) ParseNumberError!usize;
 
@@ -66,10 +58,16 @@ pub const Interpreter = struct {
 
     //
 
+    // TODO move into dictionary?
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
-        const current_wordlist = state.toWordlistIndex() catch unreachable;
-        if (try self.dictionary.findWord(current_wordlist, string)) |word_info| {
+
+        const context_vocabulary_addr = if (state == .interpret)
+            self.dictionary.context.fetch()
+        else
+            Dictionary.compiler_vocabulary_addr;
+
+        if (try self.dictionary.findWord(context_vocabulary_addr, string)) |word_info| {
             return .{ .word = word_info };
         }
 
@@ -82,6 +80,7 @@ pub const Interpreter = struct {
         return null;
     }
 
+    // TODO move into runtime?
     fn maybeParseNumber(self: @This(), word: []const u8) !?Cell {
         const number_or_error = self.parseNumberCallback(word, self.base.fetch());
         const maybe_number = number_or_error catch |err| switch (err) {

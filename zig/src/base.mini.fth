@@ -1,22 +1,33 @@
+forth-latest context !
+context @ current !
+
 word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
 word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
-1 context !
+compiler-latest current !
 word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
-0 context !
+forth-latest current !
 
 word : define enter# , ] word define enter# , ] [ ' exit ,
-1 context !
+compiler-latest current !
 : ; lit exit , [ ' [ , ' exit ,
-0 context !
+forth-latest current !
 
-: forth    0 context ! ;
-: compiler 1 context ! ;
+: forth       forth-latest context ! ;
+: compiler    compiler-latest context ! ;
+: definitions context @ current ! ;
 
 : source source-ptr @ source-len @ ;
 : \ source nip >in ! ;
 \ redefine for compiler
-' \ compiler : \ [ , ] ; forth
+' \
+compiler definitions
+: \ [ , ] ;
+forth definitions
+
+\ test
+
+quit
 
 : (later), here @ 0 , ;
 : this  here @ swap ;
@@ -48,7 +59,7 @@ forth
 
 : name cell + c@+ ;
 : >cfa name + aligned ;
-: last latest @ >cfa ;
+: last current @ >cfa ;
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
@@ -58,9 +69,9 @@ compiler
 : does>  (lit), ['] does! , ['] exit , this! ;
 forth
 
-: variable create cell allot ;
+: variable create , allot ;
 
-variable loop*
+0 variable loop*
 : set-loop here @ loop* ! ;
 compiler
 : |:    set-loop ;
@@ -116,7 +127,7 @@ forth
 : max 2dup < if swap then drop ;
 
 -1 enum %lt enum %eq constant %gt
-: compare  2dup = if 2drop %eq else > if %gt else %lt then then ;
+: compare 2dup = if 2drop %eq else > if %gt else %lt then then ;
 : 2compare >r swap >r compare r> r> compare ;
 
 \ ( value min max -- value )
@@ -232,10 +243,11 @@ forth
 : s[ 0 ;
 : ]s constant ;
 
+: swapvars over @ over @ 2swap >r ! r> ! ;
+
 \ evaluation ===
 
-variable onwnf
-' 2drop onwnf !
+' 2drop variable onwnf
 
 : onlookup 0= state @ and if >cfa , else >cfa execute then ;
 : onnumber state @ if lit, , then ;
@@ -254,6 +266,8 @@ s[
   cell field >saved-at
 ]s saved-source
 
+\ note
+\ saved-max is also used for blkstack
 8 constant saved-max
 create saved-stack saved-max saved-source * allot
 saved-stack value saved-tos
@@ -273,6 +287,10 @@ saved-stack value saved-tos
 : set-source source-len ! source-ptr ! 0 >in ! ;
 
 : evaluate save-source set-source interpret restore-source ;
+
+\ ===
+
+: vocabulary create 0 , does> context ! ;
 
 0 [if]
 

@@ -9,6 +9,9 @@ const mem = @import("../memory.zig");
 const externals = @import("../externals.zig");
 const External = externals.External;
 
+const dictionary = @import("../dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
 // ===
 
 const blocks_file = @embedFile("blocks.mini.fth");
@@ -70,16 +73,15 @@ pub const Blocks = struct {
             .callback = externalsCallback,
             .userdata = self,
         };
-        const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
-
+        const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
         try self.rt.defineExternal(
             "bwrite",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.bwrite) + start_token,
         );
         try self.rt.defineExternal(
             "bread",
-            wlidx,
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.bread) + start_token,
         );
 
