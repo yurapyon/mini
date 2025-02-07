@@ -1,6 +1,3 @@
-forth-latest context !
-context @ current !
-
 word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
 word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
@@ -89,11 +86,8 @@ compiler definitions
 : ( [ , ] ;
 forth definitions
 
-\ todo
-\ compiler definitions
-\ forth
-\ : ( ( ;
-\ forth definitions
+\ $ forth something
+\ : $ word find drop
 
 \ types ===
 
@@ -113,8 +107,6 @@ forth definitions
 
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
-
-constant test
 
 \ math ===
 

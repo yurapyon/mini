@@ -150,7 +150,7 @@ pub const Repl = struct {
         while (!self.should_bye) {
             rt.interpretUntilQuit() catch |err| switch (err) {
                 error.WordNotFound => {
-                    std.debug.print("Word not found: {s}\n", .{
+                    std.debug.print(">> {s}?\n", .{
                         rt.last_evaluated_word orelse unreachable,
                     });
                 },

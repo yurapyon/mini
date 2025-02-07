@@ -29,8 +29,8 @@ forth definitions
     dup h16. space 2dup .bytes .print cr
   loop then 2drop ;
 
-: words context @ @ |: ?dup if dup name tuck type if space then @
-  loop then ;
+: .word name tuck type if space then ;
+: words context @ @ |: ?dup if dup .word @ loop then ;
 
 : s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
 : s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
@@ -66,3 +66,18 @@ blocks
 forth
 
 [then]
+
+compiler definitions
+: \" lit, 27 , ['] emit , [compile] ." ;
+forth definitions
+
+\ : \" 27 emit [compile] ." ;
+
+: clr \" [2J" ;
+: home \" [H" ;
+
+: hide \" [?25l" ;
+: show \" [?25h" ;
+
+: clrterm clr home show ;
+

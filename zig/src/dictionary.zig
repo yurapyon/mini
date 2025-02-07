@@ -34,8 +34,8 @@ pub const Dictionary = struct {
     memory: MemoryPtr,
 
     here: Register(MainMemoryLayout.offsetOf("here")),
-    forth_vocabulary: Register(MainMemoryLayout.offsetOf("forth_vocabulary")),
-    compiler_vocabulary: Register(MainMemoryLayout.offsetOf("compiler_vocabulary")),
+    forth_vocabulary: Register(forth_vocabulary_addr),
+    compiler_vocabulary: Register(compiler_vocabulary_addr),
     context: Register(MainMemoryLayout.offsetOf("context")),
     current: Register(MainMemoryLayout.offsetOf("current")),
 
@@ -82,6 +82,7 @@ pub const Dictionary = struct {
         return try mem.cellPtr(self.memory, addr);
     }
 
+    // TODO could take vocabulary addr
     pub fn findWordInVocabulary(
         self: @This(),
         vocabulary_latest_addr: Cell,
