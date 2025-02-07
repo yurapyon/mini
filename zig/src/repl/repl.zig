@@ -27,6 +27,9 @@ const ExternalId = enum(Cell) {
     key,
     rawMode,
     sqrt,
+    sleep,
+    sleepS,
+    time,
     _max,
     _,
 };
@@ -64,10 +67,28 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             }
         },
         .key => {},
+        .rawMode => {},
         .sqrt => {
             const value = rt.data_stack.pop();
             const sqrt_value = std.math.sqrt(value);
             rt.data_stack.push(sqrt_value);
+        },
+        .sleep => {
+            const value: u64 = rt.data_stack.pop();
+            std.time.sleep(value * 1000000);
+        },
+        .sleepS => {
+            const value: u64 = rt.data_stack.pop();
+            std.time.sleep(value * 1000000000);
+        },
+        .time => {
+            const timestamp = std.time.timestamp();
+            const seconds = @rem(timestamp, 60);
+            const minutes = @rem(@divFloor(timestamp, 60), 60);
+            const hours = @rem(@divFloor(timestamp, 3600), 24);
+            rt.data_stack.push(@intCast(hours));
+            rt.data_stack.push(@intCast(minutes));
+            rt.data_stack.push(@intCast(seconds));
         },
         else => return false,
     }
@@ -118,6 +139,21 @@ pub const Repl = struct {
             "sqrt",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.sqrt),
+        );
+        try rt.defineExternal(
+            "sleep",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sleep),
+        );
+        try rt.defineExternal(
+            "sleeps",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sleepS),
+        );
+        try rt.defineExternal(
+            "time-utc",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.time),
         );
         try rt.addExternal(external);
 

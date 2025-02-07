@@ -231,8 +231,6 @@ forth definitions
 
 \ ===
 
-\ : wlatest context @ cells wordlists + @ ;
-
 : mem d0 dist ;
 
 : fill   >r range |: 2dup > if r@ swap c!+ loop then r> 3drop ;
@@ -242,7 +240,7 @@ forth definitions
 : s[ 0 ;
 : ]s constant ;
 
-: swapvars over @ over @ 2swap >r ! r> ! ;
+: swapmem over @ over @ 2swap >r ! r> ! ;
 
 \ evaluation ===
 

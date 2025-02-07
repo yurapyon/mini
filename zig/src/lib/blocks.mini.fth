@@ -8,7 +8,7 @@ s[ cell field >id cell field >upd 1024 field >data
 create blkbufs blkbuf blkbuf-ct * allot
 blkbufs variable b0 blkbufs blkbuf + variable b1
 
-: bswap b0 b1 swapvars ;
+: bswap b0 b1 swapmem ;
 : clrupd >upd false swap ! ;
 : empty dup clrupd >id 0xffff swap ! ;
 : save dup clrupd dup >id @ swap >data bwrite ;

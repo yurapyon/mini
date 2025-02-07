@@ -45,28 +45,6 @@ forth definitions
 
 : ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
 
-[defined] block [if]
-blocks
-0 variable scr
-: .line swap 64 * + 64 range .print ;
-: .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
-  loop then r> drop 2drop ;
-: list dup scr ! block .list ;
-
-\ editor
-
-: l b0 @ >data .list ;
-0 value cx
-0 value cy
-: t 0 to cx to cy cy b0 @ >data .line space cy . cr ;
-: putc b0 @ >data cy 64 * + cx + c! 1 +to cx ;
-: readp 2dup > if next-char putc 1+ loop then 2drop ;
-: p next-char source >in @ readp update ;
-: wipe b0 @ >data 1024 32 fill update ;
-forth
-
-[then]
-
 compiler definitions
 : \" lit, 27 , ['] emit , [compile] ." ;
 forth definitions
@@ -80,4 +58,56 @@ forth definitions
 : show \" [?25h" ;
 
 : clrterm clr home show ;
+
+\ ===
+
+0 value hour-adj
+: time time-utc flip hour-adj + flip ;
+: 00: # # drop ':' hold ;
+: .time time <# 00: 00: # # #> type ;
+
+\ ===
+
+[defined] block [if]
+
+blocks
+0 variable scr
+: .line swap 64 * + 64 range .print ;
+: .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
+  loop then r> drop 2drop ;
+: list dup scr ! block .list ;
+\ forth
+
+\ editor
+
+\ vocabulary editor
+
+\ editor definitions
+\ blocks
+
+: l b0 @ >data .list ;
+: line# b0 @ >data swap 64 * + 64 ;
+: blank-line line# bl fill update ;
+
+0 value cx 0 value cy
+: t to cy 0 to cx cy line# range .print space cy . cr ;
+: p cy blank-line ;
+
+
+\ : putc b0 @ >data cy 64 * + cx + c! 1 +to cx ;
+\ : readp 2dup > if next-char putc 1+ loop then 2drop ;
+\ : p next-char source >in @ readp update 0 to cx ;
+: wipe b0 @ >data 1024 bl fill update ;
+
+\ forth definitions
+\ editor
+
+\ ' l
+\ : l editor [ , ] ;
+
+forth
+
+[then]
+
+\ ===
 
