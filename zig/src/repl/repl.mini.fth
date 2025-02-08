@@ -67,7 +67,8 @@ forth definitions
 : 00: # # drop ':' hold ;
 : .time time <# 00: 00: # # #> type ;
 
-: $ source-rest shell [compile] \ ;
+: $ source-rest -leading 2dup shell
+  cr ." executed: " type cr [compile] \ ;
 
 \ ===
 
