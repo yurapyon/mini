@@ -44,6 +44,10 @@ forth definitions
 : source source-ptr @ ?dup 0= if input-buffer then
   source-len @ ;
 
+\ todo test with blocks on load
+: source-rest >in @ dup source drop + swap
+  source-len @ swap - ;
+
 : cell 2 ;
 : cells cell * ;
 
@@ -248,6 +252,10 @@ forth definitions
 : ]s constant ;
 
 : swapmem over @ over @ 2swap >r ! r> ! ;
+
+( addr0 addr1 len -- )
+: swapstrs >r over pad r@ move tuck swap r@ move
+  pad swap r@ move r> drop ;
 
 \ evaluation ===
 

@@ -67,6 +67,8 @@ forth definitions
 : 00: # # drop ':' hold ;
 : .time time <# 00: 00: # # #> type ;
 
+: $ source-rest shell [compile] \ ;
+
 \ ===
 
 [defined] block [if]
@@ -75,39 +77,53 @@ forth definitions
 : .line swap 64 * + 64 range .print ;
 : .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
   loop then r> drop 2drop ;
-: list dup scr ! block .list ;
+: list dup scr ! dup . cr block .list ;
 
 vocabulary editor
 editor definitions
 
-create efind 64 allot
-create einsert 64 allot
+create e.find   0 , 64 allot
+create e.insert 0 , 64 allot
+
+: .editor
+  ." b: " scr @ . cr
+  ." f: " e.find count type '|' emit cr
+  ." i: " e.insert count type '|' emit cr ;
 
 : blank-line 64 bl fill ;
+( addr len line -- )
+: >line 2dup ! cell + dup blank-line swap move ;
+: rest>line source-rest ?dup if 1- swap 1+ swap rot >line else drop then
+  source nip >in ! ;
 
-: rest-line >in @ dup source-len @ swap - ;
+: >find> e.find dup rest>line count ;
+: >insert> e.insert dup rest>line count ;
 
-: read-line rest-line
-  ?dup if 1- swap 1+ swap true else false then ;
-
-: >insert> read-line if einsert blank-line
-  einsert swap move then einsert 64 ;
-
-: >find> read-line if efind blank-line
-  efind swap move then efind 64 ;
-
-: l bb.front .list ;
+: l scr @ . cr bb.front .list ;
 : line# bb.front swap 64 * + ;
-: blank# line# blank-line update ;
 
-0 value cx 0 value cy
-: t 256 mod to cy 0 to cx cy line# 64 range .print space cy . cr ;
-: p cy blank# ;
+0 variable chr
+64 variable extent
+
+: to-start 64 / 64 * ;
+: next-line 64 + to-start ;
+: next-wrap next-line 1024 mod ;
+
+( chr -- )
+: delete-line
+  dup next-line swap to-start over 1024 swap -
+  rot bb.front + rot bb.front + rot move
+  15 line# blank-line ;
+
+: .line# chr @ 64 / . ;
+: t 16 mod 64 * chr ! bb.front chr @ + 64 range .print space .line# cr ;
+: p >insert> drop bb.front chr @ to-start + 64 move update ;
+: u >insert> drop bb.front chr @ next-wrap + 64 move update ;
+: x bb.front chr @ to-start + 64 e.insert >line
+  chr @ delete-line update ;
 
 
- : putc bb.front cy 64 * + cx + c! 1 +to cx ;
- : readp 2dup > if next-char putc 1+ loop then 2drop ;
- : p next-char source >in @ readp update 0 to cx ;
+: k e.find e.insert 66 swapstrs ;
 : wipe bb.front 1024 bl fill update ;
 
 forth definitions
@@ -115,6 +131,9 @@ editor
 
 ' l
 : l editor [ , ] ;
+
+' t
+: t editor [ , ] ;
 
 forth
 

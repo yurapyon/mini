@@ -12,6 +12,7 @@ blkbufs variable b0 blkbufs blkbuf + variable b1
 : clrupd >upd false swap ! ;
 : empty dup clrupd >id 0xffff swap ! ;
 : save dup clrupd dup >id @ swap >data bb.write ;
+\ todo dont save empty buffers
 : trysave dup >upd @ if save else drop then ;
 
 forth definitions

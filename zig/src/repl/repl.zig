@@ -18,6 +18,11 @@ const Dictionary = dictionary.Dictionary;
 
 const Refiller = @import("../refiller.zig").Refiller;
 
+const c = @cImport({
+    @cInclude("stdio.h");
+    @cInclude("stdlib.h");
+});
+
 // ===
 
 const ExternalId = enum(Cell) {
@@ -30,6 +35,7 @@ const ExternalId = enum(Cell) {
     sleep,
     sleepS,
     time,
+    shell,
     _max,
     _,
 };
@@ -89,6 +95,19 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             rt.data_stack.push(@intCast(hours));
             rt.data_stack.push(@intCast(minutes));
             rt.data_stack.push(@intCast(seconds));
+        },
+        .shell => {
+            const len, const addr = rt.data_stack.pop2();
+            const command = try mem.constSliceFromAddrAndLen(
+                rt.memory,
+                addr,
+                len,
+            );
+            // TODO don't catch unreachable
+            const temp = rt.allocator.alloc(u8, len + 1) catch unreachable;
+            std.mem.copyForwards(u8, temp, command);
+            temp[len] = 0;
+            _ = c.system(temp.ptr);
         },
         else => return false,
     }
@@ -154,6 +173,11 @@ pub const Repl = struct {
             "time-utc",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.time),
+        );
+        try rt.defineExternal(
+            "shell",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.shell),
         );
         try rt.addExternal(external);
 
