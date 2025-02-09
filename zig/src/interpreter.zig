@@ -58,14 +58,20 @@ pub const Interpreter = struct {
 
     //
 
-    // TODO move into dictionary?
+    // TODO
+    //   move into dictionary?
+    //   could have this ignore context.head when in compile mode
+    //     ignoring the most recent definition
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
+
+        const ignore_last_defined_word = state == .compile;
 
         if (state == .compile) {
             if (try self.dictionary.findWord(
                 Dictionary.compiler_vocabulary_addr,
                 string,
+                ignore_last_defined_word,
             )) |word_info| {
                 return .{ .word = word_info };
             }
@@ -73,7 +79,11 @@ pub const Interpreter = struct {
 
         const context_vocabulary_addr = self.dictionary.context.fetch();
 
-        if (try self.dictionary.findWord(context_vocabulary_addr, string)) |word_info| {
+        if (try self.dictionary.findWord(
+            context_vocabulary_addr,
+            string,
+            ignore_last_defined_word,
+        )) |word_info| {
             return .{ .word = word_info };
         }
 

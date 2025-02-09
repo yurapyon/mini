@@ -416,7 +416,11 @@ pub fn find(rt: *Runtime) Error!void {
 
     const context_vocabulary_addr = rt.interpreter.dictionary.context.fetch();
 
-    if (try rt.interpreter.dictionary.findWord(context_vocabulary_addr, word)) |word_info| {
+    if (try rt.interpreter.dictionary.findWord(
+        context_vocabulary_addr,
+        word,
+        false,
+    )) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
@@ -491,11 +495,18 @@ pub fn tick(rt: *Runtime) Error!void {
     // NOTE
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
+
+    const state = try CompileState.fromCell(rt.interpreter.state.fetch());
+
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
     const vocabulary_addr = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.findWord(vocabulary_addr, word)) |word_info| {
+    if (try rt.interpreter.dictionary.findWord(
+        vocabulary_addr,
+        word,
+        state == .compile,
+    )) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);
     } else {

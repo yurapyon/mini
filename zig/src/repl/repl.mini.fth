@@ -1,5 +1,4 @@
-32 constant bl
-: space bl emit ;
+32 constant bl : space bl emit ;
 : spaces 0 |: 2dup > if space 1+ loop then 2drop ;
 : cr 10 emit ;
 : printable 32 126 in[,] ;
@@ -46,29 +45,20 @@ forth definitions
 
 : ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
 
-compiler definitions
-: \" lit, 27 , ['] emit , [compile] ." ;
-forth definitions
-
-\ : \" 27 emit [compile] ." ;
-
-: clr \" [2J" ;
-: home \" [H" ;
-
-: hide \" [?25l" ;
-: show \" [?25h" ;
-
-: clrterm clr home show ;
+: blank bl fill ;
 
 \ ===
+
+: 24>12 12 mod dup 0= if drop 12 then ;
 
 0 value hour-adj
 : time time-utc flip hour-adj + flip ;
 : 00: # # drop ':' hold ;
-: .time time <# 00: 00: # # #> type ;
+: .time24 <# 00: 00: # # #> type ;
+: .time12hm drop <# 00: 24>12 # # #> type ;
 
 : $ source-rest -leading 2dup shell
-  cr ." executed: " type cr [compile] \ ;
+  ." exec: " type cr [compile] \ ;
 
 \ ===
 
@@ -79,6 +69,8 @@ forth definitions
 : .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
   loop then r> drop 2drop ;
 : list dup scr ! dup . cr block .list ;
+
+: scrbuf scr @ block ;
 
 vocabulary editor
 editor definitions
@@ -91,41 +83,38 @@ create e.insert 0 , 64 allot
   ." f: " e.find count type '|' emit cr
   ." i: " e.insert count type '|' emit cr ;
 
-: blank-line 64 bl fill ;
+: blank-line 64 blank ;
 ( addr len line -- )
 : >line 2dup ! cell + dup blank-line swap move ;
-: rest>line source-rest ?dup if 1- swap 1+ swap rot >line else drop then
-  source nip >in ! ;
+: rest>line source-rest ?dup if 1 /string rot >line else
+  drop then source nip >in ! ;
 
 : >find> e.find dup rest>line count ;
 : >insert> e.insert dup rest>line count ;
 
-: l scr @ . cr bb.front .list ;
-: line# bb.front swap 64 * + ;
+: l scr @ . cr scrbuf .list ;
+: line# scrbuf swap 64 * + ;
 
 0 variable chr
 64 variable extent
 
-: to-start 64 / 64 * ;
-: next-line 64 + to-start ;
-: next-wrap next-line 1024 mod ;
+: next-wrap bb.next-line 1024 mod ;
 
 ( chr -- )
 : delete-line
-  dup next-line swap to-start over 1024 swap -
-  rot bb.front + rot bb.front + rot move
+  dup bb.next-line swap bb.this-line over 1024 swap -
+  rot scrbuf + rot scrbuf + rot move
   15 line# blank-line ;
 
 : .line# chr @ 64 / . ;
-: t 16 mod 64 * chr ! bb.front chr @ + 64 range .print space .line# cr ;
-: p >insert> drop bb.front chr @ to-start + 64 move update ;
-: u >insert> drop bb.front chr @ next-wrap + 64 move update ;
-: x bb.front chr @ to-start + 64 e.insert >line
+: t 16 mod 64 * chr ! scrbuf chr @ + 64 range .print space .line# cr ;
+: p >insert> drop scrbuf chr @ bb.this-line + 64 move update ;
+: u >insert> drop scrbuf chr @ next-wrap + 64 move update ;
+: x scrbuf chr @ bb.this-line + 64 e.insert >line
   chr @ delete-line update ;
 
-
 : k e.find e.insert 66 swapstrs ;
-: wipe bb.front 1024 bl fill update ;
+: wipe scrbuf 1024 bl fill update ;
 
 forth definitions
 editor

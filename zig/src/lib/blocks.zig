@@ -99,7 +99,7 @@ pub const Blocks = struct {
         block_id: Cell,
         buffer: []u8,
     ) !void {
-        if (block_id >= block_count) {
+        if (block_id > block_count) {
             return error.InvalidBlockId;
         }
 
@@ -113,7 +113,8 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(@as(usize, block_id) * block_size);
+        const seek_pt: usize = (block_id - 1) * block_size;
+        try file.seekTo(seek_pt);
         _ = try file.read(buffer);
     }
 
@@ -122,7 +123,7 @@ pub const Blocks = struct {
         block_id: Cell,
         buffer: []const u8,
     ) !void {
-        if (block_id >= block_count) {
+        if (block_id > block_count) {
             return error.InvalidBlockId;
         }
 
@@ -136,7 +137,8 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(@as(usize, block_id) * block_size);
+        const seek_pt: usize = (block_id - 1) * block_size;
+        try file.seekTo(seek_pt);
         _ = try file.write(buffer);
     }
 };

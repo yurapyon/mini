@@ -37,6 +37,7 @@ const BufferRefiller = @import("buffer_refiller.zig").BufferRefiller;
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
     if (native_endianness != .little) {
+        // TODO i'm not sure this is strictly required
         @compileError("native endianness must be .little");
     }
 }
@@ -79,6 +80,7 @@ comptime {
     }
 }
 
+// TODO state could just be a boolean
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,

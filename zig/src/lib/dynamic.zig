@@ -180,6 +180,7 @@ pub const Dynamic = struct {
     }
 
     fn allocate(self: *@This(), allocator: Allocator, size: Cell) !Cell {
+        // TODO allocate these with functions from memory.zig ?
         const adj_size: usize = if (size == 0) mem.memory_size else size;
         const slice = try allocator.allocWithOptions(
             u8,

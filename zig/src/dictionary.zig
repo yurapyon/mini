@@ -38,6 +38,7 @@ pub const Dictionary = struct {
     compiler_vocabulary: Register(compiler_vocabulary_addr),
     context: Register(MainMemoryLayout.offsetOf("context")),
     current: Register(MainMemoryLayout.offsetOf("current")),
+    last_defined_word_addr: Cell,
 
     tag_addresses: struct {
         lit: Cell,
@@ -58,14 +59,23 @@ pub const Dictionary = struct {
         self.compiler_vocabulary.store(0);
         self.context.store(forth_vocabulary_addr);
         self.current.store(forth_vocabulary_addr);
+        self.last_defined_word_addr = 0;
     }
 
     pub fn updateInternalAddresses(self: *@This()) !void {
         const forth_latest_addr = (try mem.cellPtr(self.memory, forth_vocabulary_addr)).*;
-        const lit_definition_addr = (try self.findWordInVocabulary(forth_latest_addr, "lit")) orelse
+        const lit_definition_addr = (try self.findWordInVocabulary(
+            forth_latest_addr,
+            "lit",
+            false,
+        )) orelse
             return error.WordNotFound;
         self.tag_addresses.lit = try self.toCfa(lit_definition_addr);
-        const exit_definition_addr = (try self.findWordInVocabulary(forth_latest_addr, "exit")) orelse
+        const exit_definition_addr = (try self.findWordInVocabulary(
+            forth_latest_addr,
+            "exit",
+            false,
+        )) orelse
             return error.WordNotFound;
         self.tag_addresses.exit = try self.toCfa(exit_definition_addr);
     }
@@ -87,12 +97,15 @@ pub const Dictionary = struct {
         self: @This(),
         vocabulary_latest_addr: Cell,
         to_find: []const u8,
+        ignore_last_defined_word: bool,
     ) !?Cell {
         var iter = LinkedListIterator.from(self.memory, vocabulary_latest_addr);
 
         while (try iter.next()) |definition_addr| {
             const name = try self.getDefinitionName(definition_addr);
-            if (stringsEqual(to_find, name)) {
+            const ignore_addr = ignore_last_defined_word and
+                definition_addr == self.last_defined_word_addr;
+            if (!ignore_addr and stringsEqual(to_find, name)) {
                 return definition_addr;
             }
         }
@@ -104,10 +117,15 @@ pub const Dictionary = struct {
         self: @This(),
         vocabulary_addr: Cell,
         to_find: []const u8,
+        ignore_last_defined_word: bool,
     ) !?WordInfo {
         const vocabulary_latest_addr = (try mem.cellPtr(self.memory, vocabulary_addr)).*;
 
-        if (try self.findWordInVocabulary(vocabulary_latest_addr, to_find)) |definition_addr| {
+        if (try self.findWordInVocabulary(
+            vocabulary_latest_addr,
+            to_find,
+            ignore_last_defined_word,
+        )) |definition_addr| {
             return .{
                 .definition_addr = definition_addr,
                 .context_addr = vocabulary_addr,
@@ -116,7 +134,11 @@ pub const Dictionary = struct {
 
         if (vocabulary_addr != forth_vocabulary_addr) {
             const forth_latest_addr = (try mem.cellPtr(self.memory, forth_vocabulary_addr)).*;
-            if (try self.findWordInVocabulary(forth_latest_addr, to_find)) |definition_addr| {
+            if (try self.findWordInVocabulary(
+                forth_latest_addr,
+                to_find,
+                ignore_last_defined_word,
+            )) |definition_addr| {
                 return .{
                     .definition_addr = definition_addr,
                     .context_addr = forth_vocabulary_addr,
@@ -144,6 +166,7 @@ pub const Dictionary = struct {
         const current_vocabulary = try mem.cellPtr(self.memory, vocabulary_addr);
         const current_latest_addr = current_vocabulary.*;
         current_vocabulary.* = definition_start;
+        self.last_defined_word_addr = definition_start;
 
         try self.here.comma(current_latest_addr);
         try self.here.commaC(@intCast(name.len));

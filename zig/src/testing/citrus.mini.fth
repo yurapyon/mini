@@ -1,30 +1,22 @@
-: time 12 30 59 ;
-: 24>12 12 mod dup 0= if drop 12 then ;
-: bprop ;
+: bprop 2drop 100 ;
 
 \ ===
 
+: .batt
+  s" capacity" bprop u.
+  s" status" bprop cond
+    dup 'D' = if drop ."  " else
+    dup 'C' = if drop ." +" else
+    dup 'F' = if drop ." +" else
+    dup 'U' = if drop ." !" else
+  drop ." ?"
+  endcond ;
+
 0 value anim-at
 
-: bar
-  time drop swap 24>12 u. [char] : emit u.
-  space
+: .anim anim-at 4 d" *(oo (oo (oo" [] type
+  anim-at 1+ 3 mod to anim-at ;
 
-  s" capacity" bprop u.
-  s" status" bprop case
-    [char] D of ."  " endof
-    [char] C of ." +" endof
-    [char] F of ." +" endof
-    [char] U of ." !" endof
-  ." ?"
-  endcase
-  space
+: bar time .time12hm space .batt space .anim cr ;
+: main bar 1 sleeps loop ;
 
-  s" *(oo (oo (oo" cell + anim-at 4 * + 4 type
-  anim-at 1+ 3 mod to anim-at
-  cr
-
-  \ 1 sleep recurse
-  ;
-
-bar

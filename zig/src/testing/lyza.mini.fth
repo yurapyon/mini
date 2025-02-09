@@ -1,3 +1,27 @@
+vocabulary lyza
+lyza definitions
+
+\ use blocks
+
+\ collision map
+\ 4b flags, 2b, 2b cycle
+\   0           0 1 2 3
+\ 3 _ 1
+\   2
+create collisions 1024 allot
+
+1024 double-buffer notes
+
+
+forth definitions
+lyza
+
+
+
+
+
+quit
+
 here @ constant _start
 
 \ main

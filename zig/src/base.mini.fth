@@ -19,10 +19,8 @@ context @ current !
 : definitions context @ current ! ;
 
 : \ source-len @ >in ! ;
-\ redefine for compiler
-' \
 compiler definitions
-: \ [ , ] ;
+: \ \ ;
 forth definitions
 
 : (later), here @ 0 , ;
@@ -81,8 +79,7 @@ compiler definitions
 \ todo rename to '<:' ?
 : loop ['] jump , loop* @ , ;
 forth definitions
-\ redefining :
-' : : : [ , ] set-loop ;
+: : : set-loop ;
 
 compiler definitions
 : cond    0 ;
@@ -90,20 +87,15 @@ compiler definitions
 forth definitions
 
 : ( next-char ')' = 0= if loop then ;
-\ redefine for compiler
-' (
 compiler definitions
-: ( [ , ] ;
+: ( ( ; \ )
 forth definitions
-
-\ $ forth something
-\ : $ word find drop
 
 \ types ===
 
 : constant create , does> @ ;
-: enum     dup constant 1+ ;
-: flag     dup constant 1 lshift ;
+: enum dup constant 1+ ;
+: flag dup constant 1 lshift ;
 
 : value create , does> @ ;
 \ TODO better error
@@ -183,16 +175,14 @@ forth definitions
     dup '\' = if drop read-esc else
   endcond c, loop then ;
 
-: d" here @ dup "", here ! ;
-compiler definitions
-: d" (data), "", align this! ;
-forth definitions
-
 : count @+ ;
 : string, (later), here @ "", dist swap ! ;
+
+: d" here @ dup "", here ! ;
 : c" here @ dup string, here ! ;
 : s" [compile] c" count ;
 compiler definitions
+: d" (data), "", align this! ;
 : c" (data), string, align this! ;
 : s" [compile] c" ['] count , ;
 forth definitions
@@ -324,9 +314,17 @@ saved-stack value saved-tos
 : -trailing 2dup range whitespace rtrim nip over - ;
 
 ( addr len -- addr len )
-\ TODO broken
-: -leading 2dup range whitespace ltrim nip over - ;
-: -leading ;
+: -leading 2dup range whitespace ltrim -rot + over - ;
+
+( addr len n -- addr len )
+: /string tuck - -rot + swap ;
+
+\ ===
+
+: double-buffer create false , dup , 2 * allot ;
+: db.>s @+ swap @+ swap ;
+: db.swap dup @ invert swap ! ;
+: db.get db.>s rot >r rot r> xor if nip else + then ;
 
 0 [if]
 
