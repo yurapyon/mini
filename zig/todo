@@ -2,7 +2,8 @@ probably
   doubles and unsigned
     may need to extend bytecode count
   set images from within forth
-     load block vocab by default
+    load block vocab by default
+  random
 
 maybe
   rework stacks to be in forth memory
