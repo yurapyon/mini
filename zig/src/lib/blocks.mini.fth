@@ -1,37 +1,53 @@
-\ -16 -8  0
-\ |upd|id-|mem...
-: buf 0xff00 , here @ 1024 allot value ;
-buf b0 buf b1
-: bswap b1 b0 to b1 to b0 ;
-: update 1 b0 2 - c! ;
-: clrupd 2 - 0 swap c! ;
-: trysave dup 2 - c@ if dup clrupd dup 1- c@ swap bwrite else drop then ;
-: bsave b0 trysave b1 trysave ;
-: bempty 0xff00 b0 2 - ! 0xff00 b1 2 - ! ;
-: flush bsave bempty ;
-: buffer b1 trysave b1 1- c! b1 ;
+vocabulary blocks
+blocks definitions
+
+s[ cell field >id cell field >upd 1024 field >data
+]s blkbuf
+
+blkbuf double-buffer blkbufs
+: bb.swap blkbufs db.swap ;
+: b0 true blkbufs db.get ;
+: b1 false blkbufs db.get ;
+
+: clrupd >upd false swap ! ;
+: empty dup clrupd >id 0 swap ! ;
+: save dup clrupd dup >id @ swap >data bb.write ;
+: trysave dup >upd @ over >id @ and if save else drop then ;
+
+forth definitions
+
+0 variable blk
+
+blocks definitions
+
+create blkstack saved-max cells allot
+blkstack value blkstack-top
+: pushblk blk @ blkstack-top ! cell +to blkstack-top ;
+: popblk  cell negate +to blkstack-top blkstack-top @ blk ! ;
+
+forth definitions
+blocks
+
+: update b0 >upd true swap ! ;
+: buffer b1 dup trysave tuck >id ! >data ;
 : block cond
-    dup b0 1- c@ = if drop else
-    dup b1 1- c@ = if drop bswap else
-    dup buffer bread bswap
-  endcond b0 ;
+    dup b0 >id @ = if drop else
+    dup b1 >id @ = if drop bb.swap else
+    dup buffer bb.read bb.swap
+  endcond b0 >data ;
+: save-buffers b0 trysave b1 trysave ;
+: empty-buffers b0 empty b1 empty ;
+: flush save-buffers empty-buffers ;
 
-create load-stack saved-max cells allot
-load-stack value ls-tos
-
-: save-blk
-  b0 1- c@ ls-tos !
-  cell +to ls-tos ;
-
-: restore-blk
-  cell negate +to ls-tos
-  ls-tos @ block drop ;
-
-\ todo
-\ this would break if you 'list' a block from a block that's loading
-: blk b0 1- c@ ;
-
-: load save-blk block 1024 evaluate restore-blk ;
+: load pushblk dup blk ! block 1024 evaluate popblk ;
 : thru swap |: 2dup >= if dup load 1+ loop then 2drop ;
 
-\ todo '\' comments
+: bb.this-line 64 / 64 * ;
+: bb.next-line 64 + bb.this-line ;
+
+: \ blk @ if >in @ bb.next-line >in ! else [compile] \ then ;
+
+compiler definitions
+: \ [compile] \ ;
+
+forth definitions

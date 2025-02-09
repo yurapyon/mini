@@ -212,7 +212,7 @@ pub const DataStack = struct {
     }
 
     pub fn multiply(self: *@This()) void {
-        const value = self.second * self.top;
+        const value = self.second *% self.top;
         self.binop(value);
     }
 

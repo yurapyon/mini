@@ -9,3 +9,9 @@
 
 \ eloop
 
+\ graphics
+
+\ think of sriptes as 1d arrays of colors
+\ : put-sprite ( addr len wrap-span -- )
+\ len is technically w*h, wrap-span is w
+

@@ -1,26 +1,22 @@
-.   | \ \ ` | \ `   .
-.   | | | | | | |   ,
-
-a forth
+: mini ;
 
 goals:
-  easy
+  classic
+    a 16 bit forth
+    prefer 'traditional' over 'modern'
+  nice
     easy to write/read mini code
     easy to implement/port
-  small memory footprint
-  embeddable
+    clean implementation
 
 roadmap:
   planned:
-    self-hosted version
-      it would be fun
     io
       graphics
       keyboard/mouse
+    cross-compiler for avr/pic
   maybe:
-    usable for games?
     io
-      file system
       audio
 
 you need:

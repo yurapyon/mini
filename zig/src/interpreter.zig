@@ -31,14 +31,6 @@ pub const LookupResult = union(enum) {
     number: Cell,
 };
 
-pub const Wordlists = enum(Cell) {
-    forth = 0,
-    compiler,
-    _,
-};
-
-pub const max_wordlists = 2;
-
 pub const ParseNumberCallback =
     *const fn (str: []const u8, base: usize) ParseNumberError!usize;
 
@@ -66,10 +58,35 @@ pub const Interpreter = struct {
 
     //
 
+    // TODO
+    //   move into dictionary?
+    //   could have this ignore context.head when in compile mode
+    //     ignoring the most recent definition
     pub fn lookupString(self: @This(), string: []const u8) !?LookupResult {
         const state = try CompileState.fromCell(self.state.fetch());
-        const current_wordlist = state.toWordlistIndex() catch unreachable;
-        if (try self.dictionary.findWord(current_wordlist, string)) |word_info| {
+
+        const ignore_last_defined_word = state == .compile;
+
+        if (state == .compile) {
+            if (try self.dictionary.findWordInVocabulary(
+                Dictionary.compiler_vocabulary_addr,
+                string,
+                ignore_last_defined_word,
+            )) |definition_addr| {
+                return .{ .word = .{
+                    .definition_addr = definition_addr,
+                    .context_addr = Dictionary.compiler_vocabulary_addr,
+                } };
+            }
+        }
+
+        const context_vocabulary_addr = self.dictionary.context.fetch();
+
+        if (try self.dictionary.findWord(
+            context_vocabulary_addr,
+            string,
+            ignore_last_defined_word,
+        )) |word_info| {
             return .{ .word = word_info };
         }
 
@@ -82,11 +99,12 @@ pub const Interpreter = struct {
         return null;
     }
 
+    // TODO move into runtime?
     fn maybeParseNumber(self: @This(), word: []const u8) !?Cell {
         const number_or_error = self.parseNumberCallback(word, self.base.fetch());
         const maybe_number = number_or_error catch |err| switch (err) {
             error.InvalidNumber => null,
-            else => return err,
+            else => |e| return e,
         };
         if (maybe_number) |value| {
             // NOTE

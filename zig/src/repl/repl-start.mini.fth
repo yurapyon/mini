@@ -1,7 +1,13 @@
 s" mini" type cr
 
-0 value l0 0 value f0 0 value c0 0 value u0
-: empty l0 latest ! f0 wordlists !
-        u0 here !   c0 wordlists cell + ! ;
-latest @ to l0 wordlists @ to f0
-here @ to u0   wordlists cell + @ to c0
+\ todo reset blocks vocab
+0 value f0 0 value c0 0 value u0
+: empty f0 forth-latest ! c0 compiler-latest ! u0 here ! ;
+forth-latest @ to f0 compiler-latest @ to c0 here @ to u0
+
+[defined] empty-buffers [if] empty-buffers [then]
+
+-6 to hour-adj
+
+forth definitions
+

@@ -3,28 +3,6 @@
 ( x y x y -- ordering )
 : direction 2compare dup 0= if drop else nip then ;
 
-( v dv max -- newv )
-: keepin -rot + 0 rot clamp ;
-
-( end start 'c' -- t/f )
-: in[]c >r |: 2dup > if dup c@ r@ <> if 1+ loop then then
-  r> drop <> ;
-( addr len 'c' -- t/f )
-: in-string -rot range rot in[]c ;
-: in-pad pad count rot in-string ;
-: s>pad dup pad !+ swap move ;
-: whitespace s"  \n\t" s>pad ;
-
-( end start -- addr )
-: token 2dup > if c@+ in-pad 0= if loop then then nip ;
-: ltrim 2dup > if dup c@ in-pad if 1+ loop then then nip ;
-: rtrim swap 1- |: 2dup <= if dup 1- c@ in-pad if 1- loop then
-  then nip ;
-
-( addr len -- addr len )
-: -trailing 2dup range whitespace rtrim nip over - ;
-
-
 \ 1024 constant max-len
 
 ( addr -- n t/f )

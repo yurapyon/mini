@@ -1,22 +1,27 @@
 word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
 word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
-1 context !
+compiler-latest context !
+context @ current !
 word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
-0 context !
+forth-latest context !
+context @ current !
 
 word : define enter# , ] word define enter# , ] [ ' exit ,
-1 context !
+compiler-latest context !
+context @ current !
 : ; lit exit , [ ' [ , ' exit ,
-0 context !
+forth-latest context !
+context @ current !
 
-: forth    0 context ! ;
-: compiler 1 context ! ;
+: forth       forth-latest context ! ;
+: compiler    compiler-latest context ! ;
+: definitions context @ current ! ;
 
-: source source-ptr @ source-len @ ;
-: \ source nip >in ! ;
-\ redefine for compiler
-' \ compiler : \ [ , ] ; forth
+: \ source-len @ >in ! ;
+compiler definitions
+: \ \ ;
+forth definitions
 
 : (later), here @ 0 , ;
 : this  here @ swap ;
@@ -25,14 +30,21 @@ word : define enter# , ] word define enter# , ] [ ' exit ,
 
 : lit, lit lit , ;
 : (lit), lit, (later), ;
-compiler
+compiler definitions
 : ['] lit, ' , ;
 : [compile] ' , ;
 
 : if   ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
-forth
+forth definitions
+
+: source source-ptr @ ?dup 0= if input-buffer then
+  source-len @ ;
+
+\ todo test with blocks on load
+: source-rest >in @ dup source drop + swap
+  source-len @ swap - ;
 
 : cell 2 ;
 : cells cell * ;
@@ -48,52 +60,52 @@ forth
 
 : name cell + c@+ ;
 : >cfa name + aligned ;
-: last latest @ >cfa ;
+: last current @ @ >cfa ;
 
 : >body  5 cells + ;
 : >does  >body 2 cells - ;
 : does!  last >does ['] jump swap !+ ! ;
 : create word define enter# , (lit), ['] exit , 0 , this! ;
-compiler
+compiler definitions
 : does>  (lit), ['] does! , ['] exit , this! ;
-forth
+forth definitions
 
-: variable create cell allot ;
+: variable create , ;
 
-variable loop*
+0 variable loop*
 : set-loop here @ loop* ! ;
-compiler
+compiler definitions
 : |:    set-loop ;
 \ todo rename to '<:' ?
 : loop ['] jump , loop* @ , ;
-forth
-\ redefining :
-' : : : [ , ] set-loop ;
+forth definitions
+: : : set-loop ;
 
-compiler
+compiler definitions
 : cond    0 ;
 : endcond ?dup if [compile] then loop then ;
-forth
+forth definitions
 
 : ( next-char ')' = 0= if loop then ;
-\ redefine for compiler
-' ( compiler : ( [ , ] ; forth \ )
+compiler definitions
+: ( ( ; \ )
+forth definitions
 
 \ types ===
 
 : constant create , does> @ ;
-: enum     dup constant 1+ ;
-: flag     dup constant 1 lshift ;
+: enum dup constant 1+ ;
+: flag dup constant 1 lshift ;
 
 : value create , does> @ ;
 \ TODO better error
 : vname word find 0= if panic then >cfa >body ;
 : to  vname ! ;
 : +to vname +! ;
-compiler
+compiler definitions
 : to  lit, vname , ['] ! , ;
 : +to lit, vname , ['] +! , ;
-forth
+forth definitions
 
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
@@ -116,7 +128,7 @@ forth
 : max 2dup < if swap then drop ;
 
 -1 enum %lt enum %eq constant %gt
-: compare  2dup = if 2drop %eq else > if %gt else %lt then then ;
+: compare 2dup = if 2drop %eq else > if %gt else %lt then then ;
 : 2compare >r swap >r compare r> r> compare ;
 
 \ ( value min max -- value )
@@ -163,19 +175,17 @@ forth
     dup '\' = if drop read-esc else
   endcond c, loop then ;
 
-: d" here @ dup "", here ! ;
-compiler
-: d" (data), "", align this! ;
-forth
-
 : count @+ ;
 : string, (later), here @ "", dist swap ! ;
+
+: d" here @ dup "", here ! ;
 : c" here @ dup string, here ! ;
 : s" [compile] c" count ;
-compiler
+compiler definitions
+: d" (data), "", align this! ;
 : c" (data), string, align this! ;
 : s" [compile] c" ['] count , ;
-forth
+forth definitions
 
 : string= rot over = if mem= else 3drop false then ;
 
@@ -199,7 +209,8 @@ forth
 
 \ ===
 
-: get-word word ?dup 0= if drop refill if loop else 0 0 then then ;
+: get-word word ?dup 0= if drop refill
+  if loop else 0 0 then then ;
 
 \ TODO
 \ this string= needs to be case insensitve
@@ -214,14 +225,12 @@ forth
 
 : :noname 0 0 define here @ enter# , set-loop ] ;
 
-compiler
+compiler definitions
 : [: lit, here @ 6 + , ['] jump , (later), enter# , ;
 : ;] ['] exit , this! ;
-forth
+forth definitions
 
 \ ===
-
-: wlatest context @ cells wordlists + @ ;
 
 : mem d0 dist ;
 
@@ -232,10 +241,15 @@ forth
 : s[ 0 ;
 : ]s constant ;
 
+: swapmem over @ over @ 2swap >r ! r> ! ;
+
+( addr0 addr1 len -- )
+: swapstrs >r over pad r@ move tuck swap r@ move
+  pad swap r@ move r> drop ;
+
 \ evaluation ===
 
-variable onwnf
-' 2drop onwnf !
+' 2drop variable onwnf
 
 : onlookup 0= state @ and if >cfa , else >cfa execute then ;
 : onnumber state @ if lit, , then ;
@@ -254,6 +268,8 @@ s[
   cell field >saved-at
 ]s saved-source
 
+\ note
+\ saved-max is also used for blkstack
 8 constant saved-max
 create saved-stack saved-max saved-source * allot
 saved-stack value saved-tos
@@ -273,6 +289,55 @@ saved-stack value saved-tos
 : set-source source-len ! source-ptr ! 0 >in ! ;
 
 : evaluate save-source set-source interpret restore-source ;
+
+\ ===
+
+: vocabulary create 0 , does> context ! ;
+
+\ ===
+
+: in[]c >r |: 2dup > if dup c@ r@ <> if 1+ loop then then
+  r> drop <> ;
+( addr len 'c' -- t/f )
+: in-string -rot range rot in[]c ;
+: in-pad pad count rot in-string ;
+: s>pad dup pad !+ swap move ;
+: whitespace s"  \n\t" s>pad ;
+
+( end start -- addr )
+: token 2dup > if c@+ in-pad 0= if loop then then nip ;
+: ltrim 2dup > if dup c@ in-pad if 1+ loop then then nip ;
+: rtrim swap 1- |: 2dup <= if dup 1- c@ in-pad if 1- loop then
+  then nip ;
+
+( addr len -- addr len )
+: -trailing 2dup range whitespace rtrim nip over - ;
+
+( addr len -- addr len )
+: -leading 2dup range whitespace ltrim -rot + over - ;
+
+( addr len n -- addr len )
+: /string tuck - -rot + swap ;
+
+\ duoble buffers ===
+
+\ todo db.fill
+: double-buffer create false , dup , 2 * allot ;
+: db.>s @+ swap @+ swap ;
+: db.erase db.>s swap 2 * erase drop ;
+: db.swap dup @ invert swap ! ;
+: db.get db.>s rot >r rot r> xor if nip else + then ;
+
+\ grid stuff ===
+
+: lastcol? ( i width -- t/f ) swap 1+ swap mod 0= ;
+: xy+      ( x y dx dy -- x y ) >r swap >r + r> r> + ;
+: xy>i     ( x y w -- i ) * + ;
+: i>xy     ( i w -- x y ) /mod swap ;
+: wrap     ( val max -- ) tuck + swap mod ;
+: wrapxy   ( x y w h -- x y ) >r swap >r wrap r> r> wrap ;
+
+: keepin   ( v dv max -- newv ) -rot + 0 rot clamp ;
 
 0 [if]
 

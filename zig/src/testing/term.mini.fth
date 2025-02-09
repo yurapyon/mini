@@ -1,8 +1,8 @@
-compiler
+compiler definitions
 : \" lit, 27 , ['] emit , [compile] ." ;
-forth
+forth definitions
 
-: \" 27 emit [compile] ." ;
+\ : \" 27 emit [compile] ." ;
 
 : clr \" [2J" ;
 : home \" [H" ;
@@ -10,5 +10,4 @@ forth
 : hide \" [?25l" ;
 : show \" [?25h" ;
 
-: reset clr home show ;
-
+: clrterm clr home show ;

@@ -9,6 +9,9 @@ const mem = @import("../memory.zig");
 const externals = @import("../externals.zig");
 const External = externals.External;
 
+const dictionary = @import("../dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
 // ===
 
 const blocks_file = @embedFile("blocks.mini.fth");
@@ -53,7 +56,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
 pub const Blocks = struct {
     const block_size = 1024;
-    const block_count = 64;
+    const block_count = 256;
 
     rt: *Runtime,
     start_token: Cell,
@@ -70,16 +73,15 @@ pub const Blocks = struct {
             .callback = externalsCallback,
             .userdata = self,
         };
-        const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
-
+        const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
         try self.rt.defineExternal(
-            "bwrite",
-            wlidx,
+            "bb.write",
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.bwrite) + start_token,
         );
         try self.rt.defineExternal(
-            "bread",
-            wlidx,
+            "bb.read",
+            forth_vocabulary_addr,
             @intFromEnum(ExternalId.bread) + start_token,
         );
 
@@ -97,7 +99,7 @@ pub const Blocks = struct {
         block_id: Cell,
         buffer: []u8,
     ) !void {
-        if (block_id >= block_count) {
+        if (block_id > block_count) {
             return error.InvalidBlockId;
         }
 
@@ -111,7 +113,8 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(block_id * block_size);
+        const seek_pt: usize = (block_id - 1) * block_size;
+        try file.seekTo(seek_pt);
         _ = try file.read(buffer);
     }
 
@@ -120,7 +123,7 @@ pub const Blocks = struct {
         block_id: Cell,
         buffer: []const u8,
     ) !void {
-        if (block_id >= block_count) {
+        if (block_id > block_count) {
             return error.InvalidBlockId;
         }
 
@@ -134,7 +137,8 @@ pub const Blocks = struct {
 
         // TODO
         // check file size ?
-        try file.seekTo(block_id * block_size);
+        const seek_pt: usize = (block_id - 1) * block_size;
+        try file.seekTo(seek_pt);
         _ = try file.write(buffer);
     }
 };

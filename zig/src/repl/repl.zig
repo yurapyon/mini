@@ -13,7 +13,15 @@ const bytecodes = @import("../bytecodes.zig");
 const externals = @import("../externals.zig");
 const External = externals.External;
 
+const dictionary = @import("../dictionary.zig");
+const Dictionary = dictionary.Dictionary;
+
 const Refiller = @import("../refiller.zig").Refiller;
+
+const c = @cImport({
+    @cInclude("stdio.h");
+    @cInclude("stdlib.h");
+});
 
 // ===
 
@@ -24,6 +32,10 @@ const ExternalId = enum(Cell) {
     key,
     rawMode,
     sqrt,
+    sleep,
+    sleepS,
+    time,
+    shell,
     _max,
     _,
 };
@@ -61,10 +73,41 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             }
         },
         .key => {},
+        .rawMode => {},
         .sqrt => {
             const value = rt.data_stack.pop();
             const sqrt_value = std.math.sqrt(value);
             rt.data_stack.push(sqrt_value);
+        },
+        .sleep => {
+            const value: u64 = rt.data_stack.pop();
+            std.time.sleep(value * 1000000);
+        },
+        .sleepS => {
+            const value: u64 = rt.data_stack.pop();
+            std.time.sleep(value * 1000000000);
+        },
+        .time => {
+            const timestamp = std.time.timestamp();
+            const seconds = @rem(timestamp, 60);
+            const minutes = @rem(@divFloor(timestamp, 60), 60);
+            const hours = @rem(@divFloor(timestamp, 3600), 24);
+            rt.data_stack.push(@intCast(hours));
+            rt.data_stack.push(@intCast(minutes));
+            rt.data_stack.push(@intCast(seconds));
+        },
+        .shell => {
+            const len, const addr = rt.data_stack.pop2();
+            const command = try mem.constSliceFromAddrAndLen(
+                rt.memory,
+                addr,
+                len,
+            );
+            // TODO don't catch unreachable
+            const temp = rt.allocator.alloc(u8, len + 1) catch unreachable;
+            std.mem.copyForwards(u8, temp, command);
+            temp[len] = 0;
+            _ = c.system(temp.ptr);
         },
         else => return false,
     }
@@ -85,13 +128,57 @@ pub const Repl = struct {
             .callback = externalsCallback,
             .userdata = self,
         };
-        const wlidx = runtime.CompileState.interpret.toWordlistIndex() catch unreachable;
-        try rt.defineExternal("bye", wlidx, @intFromEnum(ExternalId.bye));
-        try rt.defineExternal("emit", wlidx, @intFromEnum(ExternalId.emit));
-        try rt.defineExternal(".s", wlidx, @intFromEnum(ExternalId.showStack));
-        try rt.defineExternal("key", wlidx, @intFromEnum(ExternalId.key));
-        try rt.defineExternal("raw-mode", wlidx, @intFromEnum(ExternalId.rawMode));
-        try rt.defineExternal("sqrt", wlidx, @intFromEnum(ExternalId.sqrt));
+        const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
+        try rt.defineExternal(
+            "bye",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.bye),
+        );
+        try rt.defineExternal(
+            "emit",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.emit),
+        );
+        try rt.defineExternal(
+            ".s",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.showStack),
+        );
+        try rt.defineExternal(
+            "key",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.key),
+        );
+        try rt.defineExternal(
+            "raw-mode",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.rawMode),
+        );
+        try rt.defineExternal(
+            "sqrt",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sqrt),
+        );
+        try rt.defineExternal(
+            "sleep",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sleep),
+        );
+        try rt.defineExternal(
+            "sleeps",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.sleepS),
+        );
+        try rt.defineExternal(
+            "time-utc",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.time),
+        );
+        try rt.defineExternal(
+            "shell",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.shell),
+        );
         try rt.addExternal(external);
 
         rt.processBuffer(repl_file) catch |err| switch (err) {
@@ -123,7 +210,7 @@ pub const Repl = struct {
         while (!self.should_bye) {
             rt.interpretUntilQuit() catch |err| switch (err) {
                 error.WordNotFound => {
-                    std.debug.print("Word not found: {s}\n", .{
+                    std.debug.print(">> {s}?\n", .{
                         rt.last_evaluated_word orelse unreachable,
                     });
                 },

@@ -1,3 +1,5 @@
+const std_ = @import("std");
+
 const mem = @import("memory.zig");
 
 const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
@@ -61,9 +63,9 @@ pub fn getBytecodeToken(name: []const u8) ?Cell {
 
 fn defineBuiltin(dict: *Dictionary, token: Cell) !void {
     const bytecode_definition = getBytecode(token) orelse return error.InvalidBytecode;
-    const wordlist_idx = CompileState.interpret.toWordlistIndex() catch unreachable;
+    const forth_vocabulary_addr = Dictionary.forth_vocabulary_addr;
     if (bytecode_definition.name.len > 0) {
-        try dict.defineWord(wordlist_idx, bytecode_definition.name);
+        try dict.defineWord(forth_vocabulary_addr, bytecode_definition.name);
         try dict.here.comma(token);
     }
 }
@@ -412,8 +414,13 @@ pub fn find(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+    const context_vocabulary_addr = rt.interpreter.dictionary.context.fetch();
+
+    if (try rt.interpreter.dictionary.findWord(
+        context_vocabulary_addr,
+        word,
+        false,
+    )) |word_info| {
         rt.data_stack.push(word_info.definition_addr);
         rt.data_stack.push(runtime.cellFromBoolean(true));
     } else {
@@ -426,17 +433,27 @@ pub fn lookup(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
-    const state = try CompileState.fromCell(rt.interpreter.state.fetch());
-    const wordlist_idx = state.toWordlistIndex() catch unreachable;
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
-        rt.data_stack.push(word_info.definition_addr);
-        rt.data_stack.push(word_info.wordlist_idx);
-        rt.data_stack.push(runtime.cellFromBoolean(true));
-    } else {
-        rt.data_stack.push(0);
-        rt.data_stack.push(0);
-        rt.data_stack.push(runtime.cellFromBoolean(false));
+    const maybe_lookup_result = rt.interpreter.lookupString(word) catch |err| switch (err) {
+        error.InvalidBase, error.Overflow => null,
+        else => |e| return e,
+    };
+
+    if (maybe_lookup_result) |lookup_result| {
+        switch (lookup_result) {
+            .word => |word_info| {
+                const is_compile_word = word_info.context_addr == Dictionary.compiler_vocabulary_addr;
+                rt.data_stack.push(word_info.definition_addr);
+                rt.data_stack.push(runtime.cellFromBoolean(is_compile_word));
+                rt.data_stack.push(runtime.cellFromBoolean(true));
+                return;
+            },
+            else => {},
+        }
     }
+
+    rt.data_stack.push(0);
+    rt.data_stack.push(0);
+    rt.data_stack.push(runtime.cellFromBoolean(false));
 }
 
 pub fn nextWord(rt: *Runtime) Error!void {
@@ -455,8 +472,8 @@ pub fn nextWord(rt: *Runtime) Error!void {
 pub fn define(rt: *Runtime) Error!void {
     const len, const addr = rt.data_stack.pop2();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    try rt.interpreter.dictionary.defineWord(wordlist_idx, word);
+    const vocabulary_addr = rt.interpreter.dictionary.current.fetch();
+    try rt.interpreter.dictionary.defineWord(vocabulary_addr, word);
 }
 
 pub fn nextChar(rt: *Runtime) Error!void {
@@ -478,11 +495,18 @@ pub fn tick(rt: *Runtime) Error!void {
     // NOTE
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
+
+    const state = try CompileState.fromCell(rt.interpreter.state.fetch());
+
     const word = rt.input_buffer.readNextWord() orelse {
         return error.UnexpectedEndOfInput;
     };
-    const wordlist_idx = rt.interpreter.dictionary.context.fetch();
-    if (try rt.interpreter.dictionary.findWord(wordlist_idx, word)) |word_info| {
+    const vocabulary_addr = rt.interpreter.dictionary.context.fetch();
+    if (try rt.interpreter.dictionary.findWord(
+        vocabulary_addr,
+        word,
+        state == .compile,
+    )) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
         rt.data_stack.push(cfa_addr);
     } else {

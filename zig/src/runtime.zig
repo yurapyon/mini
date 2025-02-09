@@ -37,6 +37,7 @@ const BufferRefiller = @import("buffer_refiller.zig").BufferRefiller;
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
     if (native_endianness != .little) {
+        // TODO i'm not sure this is strictly required
         @compileError("native endianness must be .little");
     }
 }
@@ -55,9 +56,12 @@ pub fn isTruthy(value: Cell) bool {
 
 pub const MainMemoryLayout = MemoryLayout(struct {
     here: Cell,
-    latest: Cell,
+    forth_vocabulary: Cell,
+    compiler_vocabulary: Cell,
+    // current and context are
+    // pointers to pointers
     context: Cell,
-    wordlists: [2]Cell,
+    current: Cell,
     state: Cell,
     base: Cell,
     execute: [2]Cell,
@@ -76,6 +80,7 @@ comptime {
     }
 }
 
+// TODO state could just be a boolean
 pub const CompileState = enum(Cell) {
     interpret = 0,
     compile,
@@ -88,14 +93,6 @@ pub const CompileState = enum(Cell) {
             _ => return error.InvalidCompileState,
         }
         return state;
-    }
-
-    pub fn toWordlistIndex(self: @This()) !Cell {
-        return switch (self) {
-            .interpret => 0,
-            .compile => 1,
-            _ => return error.InvalidCompileState,
-        };
     }
 };
 
@@ -146,14 +143,25 @@ pub const Runtime = struct {
 
     fn defineInternalConstants(self: *@This()) !void {
         try self.defineMemoryLocationConstant("here");
-        try self.defineMemoryLocationConstant("latest");
+        try self.interpreter.dictionary.compileConstant(
+            "forth-latest",
+            MainMemoryLayout.offsetOf("forth_vocabulary"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "compiler-latest",
+            MainMemoryLayout.offsetOf("compiler_vocabulary"),
+        );
         try self.defineMemoryLocationConstant("context");
+        try self.defineMemoryLocationConstant("current");
         try self.defineMemoryLocationConstant("state");
         try self.defineMemoryLocationConstant("base");
-        try self.defineMemoryLocationConstant("wordlists");
         try self.interpreter.dictionary.compileConstant(
             "d0",
             MainMemoryLayout.offsetOf("dictionary_start"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "input-buffer",
+            MainMemoryLayout.offsetOf("input_buffer"),
         );
         try self.interpreter.dictionary.compileConstant(
             "source-ptr",
@@ -184,11 +192,11 @@ pub const Runtime = struct {
         );
     }
 
-    pub fn defineExternal(self: *@This(), name: []const u8, wordlist_idx: Cell, id: Cell) !void {
+    pub fn defineExternal(self: *@This(), name: []const u8, vocabulary_addr: Cell, id: Cell) !void {
         if (id < bytecodes.bytecodes_count) {
             return error.ReservedBytecodeId;
         }
-        try self.interpreter.dictionary.defineWord(wordlist_idx, name);
+        try self.interpreter.dictionary.defineWord(vocabulary_addr, name);
         try self.interpreter.dictionary.here.comma(id);
     }
 
@@ -259,8 +267,8 @@ pub const Runtime = struct {
             .word => |word| {
                 const cfa_addr = try self.interpreter.dictionary.toCfa(word.definition_addr);
 
-                const compiler_wordlist = try CompileState.compile.toWordlistIndex();
-                if (word.wordlist_idx == compiler_wordlist) {
+                const compiler_vocabulary_addr = Dictionary.compiler_vocabulary_addr;
+                if (word.context_addr == compiler_vocabulary_addr) {
                     try self.setupExecuteLoop(cfa_addr);
                     try self.executeLoop();
                 } else {
