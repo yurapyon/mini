@@ -1,4 +1,5 @@
-32 constant bl : space bl emit ;
+32 constant bl
+: space bl emit ;
 : spaces 0 |: 2dup > if space 1+ loop then 2drop ;
 : cr 10 emit ;
 : printable 32 126 in[,] ;

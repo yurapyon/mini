@@ -1,10 +1,12 @@
 probably
   doubles and unsigned
     may need to extend bytecode count
-  rework stacks to be in forth memory
-    still circular
+  set images from within forth
+     load block vocab by default
 
 maybe
+  rework stacks to be in forth memory
+    still circular
 
 probably not
   coroutines

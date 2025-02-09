@@ -321,8 +321,10 @@ saved-stack value saved-tos
 
 \ ===
 
+\ todo db.fill
 : double-buffer create false , dup , 2 * allot ;
 : db.>s @+ swap @+ swap ;
+: db.erase db.>s swap 2 * erase drop ;
 : db.swap dup @ invert swap ! ;
 : db.get db.>s rot >r rot r> xor if nip else + then ;
 
