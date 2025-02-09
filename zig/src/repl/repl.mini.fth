@@ -61,6 +61,8 @@ forth definitions
 : $ source-rest -leading 2dup shell
   ." exec: " type cr [compile] \ ;
 
+: ?cr ( i width -- ) lastcol? if cr then ;
+
 \ ===
 
 [defined] block [if]

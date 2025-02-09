@@ -1,0 +1,30 @@
+todo
+
+probably
+  doubles and unsigned
+    may need to extend bytecode count
+  set images from within forth
+    load block vocab by default
+  random numbers
+  search-order
+  errors
+    better errors in console when vm crashes
+    less crashes in general
+      if some internal state can be invalidated from forth,
+        just truncate/wrap the value in zig ie state, base
+    maybe have a debug mode cli option
+
+maybe
+  rework stacks to be in forth memory
+    still circular
+
+probably not
+  coroutines
+  locals
+
+---
+
+notes
+
+repl can use files but system mostly works with images
+

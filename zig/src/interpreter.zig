@@ -68,12 +68,15 @@ pub const Interpreter = struct {
         const ignore_last_defined_word = state == .compile;
 
         if (state == .compile) {
-            if (try self.dictionary.findWord(
+            if (try self.dictionary.findWordInVocabulary(
                 Dictionary.compiler_vocabulary_addr,
                 string,
                 ignore_last_defined_word,
-            )) |word_info| {
-                return .{ .word = word_info };
+            )) |definition_addr| {
+                return .{ .word = .{
+                    .definition_addr = definition_addr,
+                    .context_addr = Dictionary.compiler_vocabulary_addr,
+                } };
             }
         }
 

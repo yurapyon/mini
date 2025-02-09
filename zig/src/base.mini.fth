@@ -319,7 +319,7 @@ saved-stack value saved-tos
 ( addr len n -- addr len )
 : /string tuck - -rot + swap ;
 
-\ ===
+\ duoble buffers ===
 
 \ todo db.fill
 : double-buffer create false , dup , 2 * allot ;
@@ -327,6 +327,17 @@ saved-stack value saved-tos
 : db.erase db.>s swap 2 * erase drop ;
 : db.swap dup @ invert swap ! ;
 : db.get db.>s rot >r rot r> xor if nip else + then ;
+
+\ grid stuff ===
+
+: lastcol? ( i width -- t/f ) swap 1+ swap mod 0= ;
+: xy+      ( x y dx dy -- x y ) >r swap >r + r> r> + ;
+: xy>i     ( x y w -- i ) * + ;
+: i>xy     ( i w -- x y ) /mod swap ;
+: wrap     ( val max -- ) tuck + swap mod ;
+: wrapxy   ( x y w h -- x y ) >r swap >r wrap r> r> wrap ;
+
+: keepin   ( v dv max -- newv ) -rot + 0 rot clamp ;
 
 0 [if]
 

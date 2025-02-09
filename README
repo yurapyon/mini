@@ -1,9 +1,9 @@
-mini
+: mini ;
 
 goals:
   classic
     a 16 bit forth
-    reject modernity embrace tradition by default
+    prefer 'traditional' over 'modern'
   nice
     easy to write/read mini code
     easy to implement/port

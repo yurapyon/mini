@@ -92,13 +92,14 @@ pub const Dictionary = struct {
         return try mem.cellPtr(self.memory, addr);
     }
 
-    // TODO could take vocabulary addr
     pub fn findWordInVocabulary(
         self: @This(),
-        vocabulary_latest_addr: Cell,
+        vocabulary_addr: Cell,
         to_find: []const u8,
         ignore_last_defined_word: bool,
     ) !?Cell {
+        const vocabulary_latest_addr = (try mem.cellPtr(self.memory, vocabulary_addr)).*;
+
         var iter = LinkedListIterator.from(self.memory, vocabulary_latest_addr);
 
         while (try iter.next()) |definition_addr| {
@@ -119,10 +120,8 @@ pub const Dictionary = struct {
         to_find: []const u8,
         ignore_last_defined_word: bool,
     ) !?WordInfo {
-        const vocabulary_latest_addr = (try mem.cellPtr(self.memory, vocabulary_addr)).*;
-
         if (try self.findWordInVocabulary(
-            vocabulary_latest_addr,
+            vocabulary_addr,
             to_find,
             ignore_last_defined_word,
         )) |definition_addr| {
@@ -133,9 +132,8 @@ pub const Dictionary = struct {
         }
 
         if (vocabulary_addr != forth_vocabulary_addr) {
-            const forth_latest_addr = (try mem.cellPtr(self.memory, forth_vocabulary_addr)).*;
             if (try self.findWordInVocabulary(
-                forth_latest_addr,
+                forth_vocabulary_addr,
                 to_find,
                 ignore_last_defined_word,
             )) |definition_addr| {
