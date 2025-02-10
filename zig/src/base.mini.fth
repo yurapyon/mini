@@ -1,18 +1,14 @@
 word enter# define ' enter @ , ' lit , ' enter @ , ' exit ,
 
 word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
-compiler-latest context !
-context @ current !
+compiler-latest context ! context @ current !
 word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
-forth-latest context !
-context @ current !
+forth-latest context ! context @ current !
 
 word : define enter# , ] word define enter# , ] [ ' exit ,
-compiler-latest context !
-context @ current !
+compiler-latest context ! context @ current !
 : ; lit exit , [ ' [ , ' exit ,
-forth-latest context !
-context @ current !
+forth-latest context ! context @ current !
 
 : forth       forth-latest context ! ;
 : compiler    compiler-latest context ! ;
@@ -43,6 +39,7 @@ forth definitions
   source-len @ ;
 
 \ todo test with blocks on load
+\ maybe this should just return the rest of lie line? like '\'
 : source-rest >in @ dup source drop + swap
   source-len @ swap - ;
 
@@ -76,7 +73,6 @@ forth definitions
 : set-loop here @ loop* ! ;
 compiler definitions
 : |:    set-loop ;
-\ todo rename to '<:' ?
 : loop ['] jump , loop* @ , ;
 forth definitions
 : : : set-loop ;
@@ -194,12 +190,13 @@ forth definitions
 : pad here @ 64 + ;
 
 0 value #start
-: <# pad to #start ;
-: #> drop #start pad #start - ;
+: #len pad #start - ;
+: <#   pad to #start ;
+: #>   drop #start #len ;
 : hold -1 +to #start #start c! ;
-: # base @ /mod digit>char hold ;
-: #s dup 0= if # else |: # dup if loop then then ;
-: #pad dup pad #start - > if over hold loop then 2drop ;
+: #    base @ /mod digit>char hold ;
+: #s   dup 0= if # else |: # dup if loop then then ;
+: #pad dup #len > if over hold loop then 2drop ;
 
 \ todo
 \   holds
@@ -319,7 +316,7 @@ saved-stack value saved-tos
 ( addr len n -- addr len )
 : /string tuck - -rot + swap ;
 
-\ duoble buffers ===
+\ double buffers ===
 
 \ todo db.fill
 : double-buffer create false , dup , 2 * allot ;
