@@ -220,7 +220,6 @@ pub const Dictionary = struct {
         try self.here.comma(value);
     }
 
-    // TODO this can use const_code instead of enter_code
     pub fn compileConstant(
         self: *@This(),
         name: []const u8,
@@ -228,9 +227,8 @@ pub const Dictionary = struct {
     ) !void {
         const vocabulary_addr = self.current.fetch();
         try self.defineWord(vocabulary_addr, name);
-        try self.here.comma(bytecodes.cfa_codes.enter);
-        try self.compileLit(value);
-        try self.compileXt(self.tag_addresses.exit);
+        try self.here.comma(bytecodes.cfa_codes.docon);
+        try self.here.comma(value);
     }
 };
 

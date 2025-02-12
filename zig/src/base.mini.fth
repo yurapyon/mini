@@ -1,11 +1,11 @@
-word enter# define ' const @ , ' enter @ ,
+word docol# define ' docon @ , ' docol @ ,
 
-word ] define enter# , ' lit , 1 , ' state , ' ! , ' exit ,
+word ] define docol# , ' lit , 1 , ' state , ' ! , ' exit ,
 compiler-latest context ! context @ current !
-word [ define enter# , ' lit , 0 , ' state , ' ! , ' exit ,
+word [ define docol# , ' lit , 0 , ' state , ' ! , ' exit ,
 forth-latest context ! context @ current !
 
-word : define enter# , ] word define enter# , ] [ ' exit ,
+word : define docol# , ] word define docol# , ] [ ' exit ,
 compiler-latest context ! context @ current !
 : ; lit exit , [ ' [ , ' exit ,
 forth-latest context ! context @ current !
@@ -18,18 +18,23 @@ forth-latest context ! context @ current !
 
 : lit, lit lit , ;
 compiler definitions
-: ['] lit, ' , ;
+: literal lit, , ;
 : [compile] ' , ;
+: ['] ' [compile] literal ;
 forth definitions
 
-: cell  2 ;
+: constant word define ['] docon @ , , ;
+: enum dup constant 1+ ;
+: flag dup constant 1 lshift ;
+
+2 constant cell
 : cells cell * ;
 
 : allot   here +! ;
 : aligned dup cell mod + ;
 : align   here @ aligned here ! ;
 
-: create word define ['] credo @ , ['] exit , ;
+: create word define ['] docre @ , ['] exit , ;
 
 : variable create , ;
 
@@ -53,7 +58,7 @@ compiler definitions
 : else ['] jump , (later), swap this! ;
 : then this! ;
 
-: cond    0 ;
+0 constant cond
 : endcond ?dup if [compile] then loop then ;
 forth definitions
 
@@ -65,24 +70,11 @@ forth definitions
 
 \ defining words ===
 
-: constant word define ['] const @ , , ;
-: enum dup constant 1+ ;
-: flag dup constant 1 lshift ;
-
-: value constant ;
-: vname ' cell + ;
-: to  vname ! ;
-: +to vname +! ;
-compiler definitions
-: to  lit, vname , ['] ! , ;
-: +to lit, vname , ['] +! , ;
-forth definitions
-
 \ math ===
 
 compiler definitions
 : [by2] \ >r swap >r __ r> r> __
-' dup ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
+  ' dup ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
 forth definitions
 
 : binary 2 base ! ;
@@ -96,9 +88,8 @@ forth definitions
 : 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
 
-\ todo
-\ : third ( abc -- abca )
-\ : fourth ( abcd -- abcda )
+: third  ( a b c -- a b c a )     flip dup >r flip r> ;
+: fourth ( a b c d -- a b c d a ) >r third r> swap ;
 
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
@@ -153,21 +144,21 @@ forth definitions
     \ \\ and \" are handled by the 'cond' falling through
   endcond ;
 
-: "", next-char drop |:
+: string next-char drop |:
   next-char cond
     dup '"' = if drop exit else
     dup '\' = if drop read-esc else
   endcond c, loop then ;
 
 : count @+ ;
-: string, (later), here @ "", dist swap ! ;
+: cstring (later), here @ string dist swap ! ;
 
-: d" here @ dup "", here ! ;
-: c" here @ dup string, here ! ;
+: d" here @ dup string here ! ;
+: c" here @ dup cstring here ! ;
 : s" [compile] c" count ;
 compiler definitions
-: d" (data), "", align this! ;
-: c" (data), string, align this! ;
+: d" (data), string align this! ;
+: c" (data), cstring align this! ;
 : s" [compile] c" ['] count , ;
 forth definitions
 
@@ -177,11 +168,11 @@ forth definitions
 
 : pad here @ 64 + ;
 
-0 value #start
-: #len pad #start - ;
-: <#   pad to #start ;
-: #>   drop #start #len ;
-: hold -1 +to #start #start c! ;
+0 variable #start
+: #len pad #start @ - ;
+: <#   pad #start ! ;
+: #>   drop #start @ #len ;
+: hold -1 #start +! #start @ c! ;
 : #    base @ /mod digit>char hold ;
 : #s   dup 0= if # else |: # dup if loop then then ;
 : #pad dup #len > if over hold loop then 2drop ;
@@ -215,22 +206,31 @@ forth definitions
 : >does cell + ;
 compiler definitions
 : does> (lit), ['] last , ['] >does , ['] ! , ['] exit ,
-  this! enter# , ;
+  this! docol# , ;
+forth definitions
+
+: value create , does> @ ;
+: vname ' cell + ;
+: to  vname ! ;
+: +to vname +! ;
+compiler definitions
+: to  lit, vname , ['] ! , ;
+: +to lit, vname , ['] +! , ;
 forth definitions
 
 : vocabulary create 0 , does> context ! ;
 
-: s[     0 ;
-: ]s     constant ;
+0 constant s[
+: ]s constant ;
 : +field over create , + does> @ + ;
 : field  swap aligned swap +field ;
 
-\ ===
+\ xts ===
 
-: :noname 0 0 define here @ enter# , set-loop ] ;
+: :noname 0 0 define here @ docol# , set-loop ] ;
 
 compiler definitions
-: [: lit, here @ 6 + , ['] jump , (later), enter# , ;
+: [: lit, here @ 6 + , ['] jump , (later), docol# , ;
 : ;] ['] exit , this! ;
 forth definitions
 
@@ -357,11 +357,11 @@ saved-stack value saved-tos
 0 [if]
 
 compiler
-: assign (lit), ['] swap , ['] ! , ['] exit , this! enter# , ;
+: assign (lit), ['] swap , ['] ! , ['] exit , this! docol# , ;
 forth
 
 : next, ['] jump , here @ cell + , ;
-: dyn, define enter# , next, ;
+: dyn, define docol# , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
 

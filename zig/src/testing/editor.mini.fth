@@ -3,10 +3,17 @@
 ( x y x y -- ordering )
 : direction [by2] compare dup if swap then drop ;
 
-: -trailing dup if 2dup + 1- c@ bl = if 1- loop then then ;
+compiler definitions
+: literal lit, , ;
+forth definitions
 
-( addr len -- len )
-: line-len -trailing nip ;
+: this-line [ 63 invert ] literal and ;
+
+( addr -- len )
+: line-len this-line 64 -trailing nip ;
+
+( i -- len )
+: line#len line@# line-len ;
 
 \ 1024 constant max-len
 
@@ -64,7 +71,6 @@ s[ cell field >p.x cell field >p.y ]s point
 : p.compare >r p.>s r> p.>s 2compare ;
 
 \ ===
-
 
 0 [if]
 s[ ]s line-buffer

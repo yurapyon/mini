@@ -35,15 +35,14 @@ pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 pub const bytecodes_count = bytecodes.len;
 
 pub const cfa_codes = struct {
-    pub const enter = getBytecodeToken("enter") orelse unreachable;
-    pub const constant = getBytecodeToken("const") orelse unreachable;
-    pub const create_does = getBytecodeToken("credo") orelse unreachable;
+    pub const docol = getBytecodeToken("docol") orelse unreachable;
+    pub const docon = getBytecodeToken("docon") orelse unreachable;
+    pub const docre = getBytecodeToken("docre") orelse unreachable;
 };
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     callback: BytecodeFn = panic,
-    // TODO tag_only: bool,  ?
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeDefinition {
@@ -81,10 +80,9 @@ pub fn initBuiltins(dict: *Dictionary) !void {
 }
 
 const bytecodes = [_]BytecodeDefinition{
-    // TODO could rename docol
-    .{ .name = "enter", .callback = enter },
-    .{ .name = "const", .callback = constant },
-    .{ .name = "credo", .callback = createDoes },
+    .{ .name = "docol", .callback = docol },
+    .{ .name = "docon", .callback = docon },
+    .{ .name = "docre", .callback = createDoes },
 
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
@@ -159,12 +157,12 @@ const bytecodes = [_]BytecodeDefinition{
     .{ .name = "mem=", .callback = memEqual },
 };
 
-pub fn enter(rt: *Runtime) Error!void {
+pub fn docol(rt: *Runtime) Error!void {
     rt.return_stack.push(rt.program_counter);
     rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
 }
 
-pub fn constant(rt: *Runtime) Error!void {
+pub fn docon(rt: *Runtime) Error!void {
     const addr = rt.current_token_addr + @sizeOf(Cell);
     const value = mem.readCell(rt.memory, addr) catch unreachable;
     rt.data_stack.push(value);
