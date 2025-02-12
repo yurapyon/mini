@@ -2,7 +2,7 @@
 
 goals:
   clear simple and obvious
-    both code and implementation
+    both forth code and implementation
   balanced
     don't sacrifice readibility for performance
   evolution of a classic

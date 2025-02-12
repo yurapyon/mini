@@ -216,6 +216,7 @@ pub const DataStack = struct {
         self.binop(value);
     }
 
+    // TODO these should be signed
     pub fn divide(self: *@This()) void {
         var value: Cell = 0;
         if (self.top != 0) {
@@ -224,6 +225,7 @@ pub const DataStack = struct {
         self.binop(value);
     }
 
+    // TODO these should be signed
     pub fn mod(self: *@This()) void {
         var value: Cell = 0;
         if (self.top != 0) {

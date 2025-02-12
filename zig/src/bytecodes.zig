@@ -32,9 +32,13 @@ pub const Error = error{
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
-pub const bytecodes_count = 64;
+pub const bytecodes_count = bytecodes.len;
 
-pub const enter_code = getBytecodeToken("enter") orelse unreachable;
+pub const cfa_codes = struct {
+    pub const enter = getBytecodeToken("enter") orelse unreachable;
+    pub const constant = getBytecodeToken("const") orelse unreachable;
+    pub const create_does = getBytecodeToken("credo") orelse unreachable;
+};
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
@@ -76,10 +80,14 @@ pub fn initBuiltins(dict: *Dictionary) !void {
     }
 }
 
-const bytecodes = [bytecodes_count]BytecodeDefinition{
+const bytecodes = [_]BytecodeDefinition{
+    // TODO could rename docol
+    .{ .name = "enter", .callback = enter },
+    .{ .name = "const", .callback = constant },
+    .{ .name = "credo", .callback = createDoes },
+
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
-    .{ .name = "enter", .callback = enter },
     .{ .name = "execute", .callback = execute },
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
@@ -149,19 +157,30 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "move", .callback = move },
     // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
-
-    .{},
-    .{},
-    .{},
 };
-
-pub fn panic(_: *Runtime) Error!void {
-    return error.Panic;
-}
 
 pub fn enter(rt: *Runtime) Error!void {
     rt.return_stack.push(rt.program_counter);
     rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
+}
+
+pub fn constant(rt: *Runtime) Error!void {
+    const addr = rt.current_token_addr + @sizeOf(Cell);
+    const value = mem.readCell(rt.memory, addr) catch unreachable;
+    rt.data_stack.push(value);
+}
+
+pub fn createDoes(rt: *Runtime) Error!void {
+    const does_addr = rt.current_token_addr + @sizeOf(Cell);
+    const body_addr = does_addr + @sizeOf(Cell);
+    const does = mem.readCell(rt.memory, does_addr) catch unreachable;
+    rt.data_stack.push(body_addr);
+    rt.return_stack.push(rt.program_counter);
+    rt.setCfaToExecute(does);
+}
+
+pub fn panic(_: *Runtime) Error!void {
+    return error.Panic;
 }
 
 pub fn exit(rt: *Runtime) Error!void {

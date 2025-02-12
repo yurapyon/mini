@@ -1,7 +1,12 @@
 : test-str s" asdf\nqwerty\nzxc\n\0" ;
 
 ( x y x y -- ordering )
-: direction 2compare dup 0= if drop else nip then ;
+: direction [by2] compare dup if swap then drop ;
+
+: -trailing dup if 2dup + 1- c@ bl = if 1- loop then then ;
+
+( addr len -- len )
+: line-len -trailing nip ;
 
 \ 1024 constant max-len
 
