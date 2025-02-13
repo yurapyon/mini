@@ -154,11 +154,6 @@ pub const Runtime = struct {
         self.data_stack2.init(self.memory);
         self.return_stack2.init(self.memory);
 
-        self.data_stack2.pushCell(1234);
-        self.data_stack2.pushCell(1234);
-        self.data_stack2.gt();
-        // self.data_stack2.debugPrint();
-
         self.externals = ArrayList(External).init(allocator);
 
         self.last_evaluated_word = null;

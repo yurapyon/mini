@@ -22,8 +22,9 @@ pub fn Stack(
         //   This can get messed up from forth though
         top: Register(top_ptr_addr),
 
-        // TODO comptime check that stack_size is Cell aligned
+        // TODO comptime check that stack_size is 32
         const stack_size = stack_top - stack_bottom;
+        const wrap_mask = 0x3f;
 
         pub fn init(self: *@This(), memory: MemoryPtr) void {
             self.memory = memory;
@@ -32,17 +33,18 @@ pub fn Stack(
             self.top.store(stack_bottom);
         }
 
-        fn wrappedIndex(self: *@This(), offset: isize) Cell {
-            const top = self.top.fetch();
-            const idx = top - stack_bottom;
-            const new_idx = idx + offset * @sizeOf(Cell);
-            const wrapped_idx: Cell = @intCast(@mod(new_idx, stack_size));
-            return wrapped_idx + stack_bottom;
-        }
+        //         fn wrappedIndex(self: *@This(), offset: isize) Cell {
+        //             const top = self.top.fetch();
+        //             const idx = top - stack_bottom;
+        //             const new_idx = idx + offset * @sizeOf(Cell);
+        //             const wrapped_idx: Cell = @intCast(@mod(new_idx, stack_size));
+        //             return wrapped_idx + stack_bottom;
+        //         }
 
         pub fn peek(self: *@This(), at: isize) *Cell {
-            const idx = self.wrappedIndex(at);
-            return mem.cellPtr(self.memory, idx) catch unreachable;
+            // const idx = self.wrappedIndex(at);
+            const idx = self.top.fetch() + stack_bottom + at;
+            return mem.cellPtr(self.memory, idx & wrap_mask) catch unreachable;
         }
 
         pub fn peekSigned(self: *@This(), at: isize) *SignedCell {
@@ -52,13 +54,13 @@ pub fn Stack(
         }
 
         pub fn pop(self: *@This()) void {
-            const new_idx = self.wrappedIndex(-1);
-            self.top.store(new_idx);
+            self.top.storeSubtract(@sizeOf(Cell));
+            self.top.mask(wrap_mask);
         }
 
         pub fn push(self: *@This()) void {
-            const new_idx = self.wrappedIndex(1);
-            self.top.store(new_idx);
+            self.top.storeAdd(@sizeOf(Cell));
+            self.top.mask(wrap_mask);
         }
 
         // ===

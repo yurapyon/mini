@@ -88,8 +88,8 @@ forth definitions
 : 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
 
-: third  ( a b c -- a b c a )     flip dup >r flip r> ;
-: fourth ( a b c d -- a b c d a ) >r third r> swap ;
+\ : third  flip dup >r flip r> ;
+\ : fourth >r third r> swap ;
 
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
@@ -188,12 +188,10 @@ forth definitions
 : get-word word ?dup 0= if drop refill if loop else
   0 0 then then ;
 
-\ TODO
-\ this string= needs to be case insensitve
-\   string~=
+\ todo
 \ this behavior is weird and doesnt panic on EoF
 : [if] 0= if |: get-word ?dup 0= if panic then
-  s" [then]" string= 0= if loop then then ;
+  s" [then]" string~= 0= if loop then then ;
 : [then] ;
 : [defined] word find nip ;
 
@@ -210,7 +208,7 @@ compiler definitions
 forth definitions
 
 : value create , does> @ ;
-: vname ' cell + ;
+: vname ' 2 cells + ;
 : to  vname ! ;
 : +to vname +! ;
 compiler definitions
@@ -260,6 +258,9 @@ forth definitions
 : source-rest >in @ dup source drop + swap
   source-len @ swap - ;
 
+vocabulary interpreter
+interpreter definitions
+
 ' 2drop variable onwnf
 
 : onlookup 0= state @ and if >cfa , else >cfa execute then ;
@@ -270,8 +271,6 @@ forth definitions
     2dup >number if -rot  2drop onnumber else drop
     onwnf @ execute
   endcond ;
-
-: interpret get-word ?dup if resolve loop else drop then ;
 
 s[
   cell field >saved-ptr
@@ -299,9 +298,15 @@ saved-stack value saved-tos
 
 : set-source source-len ! source-ptr ! 0 >in ! ;
 
+forth definitions
+interpreter
+
+: saved-max saved-max ;
+: onwnf onwnf ;
+: interpret get-word ?dup if resolve loop else drop then ;
 : evaluate save-source set-source interpret restore-source ;
 
-\ ===
+forth
 
 \ ===
 

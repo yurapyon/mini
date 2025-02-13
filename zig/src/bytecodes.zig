@@ -82,11 +82,13 @@ pub fn initBuiltins(dict: *Dictionary) !void {
 const bytecodes = [_]BytecodeDefinition{
     .{ .name = "docol", .callback = docol },
     .{ .name = "docon", .callback = docon },
-    .{ .name = "docre", .callback = createDoes },
+    .{ .name = "docre", .callback = docre },
 
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
     .{ .name = "execute", .callback = execute },
+    // TODO
+    // .{ .name = "@execute", .callback = fetchExecute },
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
@@ -153,8 +155,8 @@ const bytecodes = [_]BytecodeDefinition{
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
-    // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
+    .{ .name = "string~=", .callback = stringEqual },
 };
 
 pub fn docol(rt: *Runtime) Error!void {
@@ -168,7 +170,7 @@ pub fn docon(rt: *Runtime) Error!void {
     rt.data_stack.push(value);
 }
 
-pub fn createDoes(rt: *Runtime) Error!void {
+pub fn docre(rt: *Runtime) Error!void {
     const does_addr = rt.current_token_addr + @sizeOf(Cell);
     const body_addr = does_addr + @sizeOf(Cell);
     const does = mem.readCell(rt.memory, does_addr) catch unreachable;
@@ -586,5 +588,18 @@ pub fn memEqual(rt: *Runtime) Error!void {
     const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, count);
     const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, count);
     const areEqual = std.mem.eql(u8, a_slice, b_slice);
+    rt.data_stack.push(runtime.cellFromBoolean(areEqual));
+}
+
+pub fn stringEqual(rt: *Runtime) Error!void {
+    const a_len = rt.data_stack.pop();
+    const a_addr = rt.data_stack.pop();
+    const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, a_len);
+
+    const b_len = rt.data_stack.pop();
+    const b_addr = rt.data_stack.pop();
+    const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, b_len);
+
+    const areEqual = stringsEqual(a_slice, b_slice);
     rt.data_stack.push(runtime.cellFromBoolean(areEqual));
 }
