@@ -9,8 +9,8 @@ const Cell = runtime.Cell;
 const page_size = 64 * 1024;
 const page_ct = 3;
 
-pub const width = 512;
-pub const height = 384;
+pub const screen_width = 512;
+pub const screen_height = 384;
 
 // 256 color palette with 24bit color
 const RGB = [3]u8;
@@ -22,13 +22,23 @@ pub const Video = struct {
     texture: c.GLuint,
     vbo: c.GLuint,
     vao: c.GLuint,
-    prog: c.GLuint,
+    program: c.GLuint,
 
     pub fn init(self: *@This()) void {
         self.makeTexture();
         self.makeQuad();
         self.makeProgram();
-        // TODO set uniforms
+
+        const tex_location = c.glGetUniformLocation(self.program, "diffuse");
+        c.glUseProgram(self.program);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
+        c.glActiveTexture(c.GL_TEXTURE0);
+        c.glUniform1i(tex_location, 0);
+
+        self.clearBuffer();
+        self.updateTexture();
+
+        //   init default palette
     }
 
     pub fn deinit(_: *@This()) void {
@@ -46,8 +56,8 @@ pub const Video = struct {
             c.GL_TEXTURE_2D,
             0,
             c.GL_RGB,
-            width,
-            height,
+            screen_width,
+            screen_height,
             0,
             c.GL_RGB,
             c.GL_UNSIGNED_BYTE,
@@ -86,10 +96,10 @@ pub const Video = struct {
         c.glGenBuffers(1, &vbo);
         c.glBindBuffer(c.GL_ARRAY_BUFFER, vbo);
         const data = [_]f32{
-            1.0, 1.0, 1.0, 1.0,
-            0.0, 1.0, 0.0, 1.0,
-            1.0, 0.0, 1.0, 0.0,
-            0.0, 0.0, 0.0, 0.0,
+            1.0,  1.0,  1.0, 1.0,
+            -1.0, 1.0,  0.0, 1.0,
+            1.0,  -1.0, 1.0, 0.0,
+            -1.0, -1.0, 0.0, 0.0,
         };
         c.glBufferData(
             c.GL_ARRAY_BUFFER,
@@ -97,14 +107,64 @@ pub const Video = struct {
             &data,
             c.GL_STATIC_DRAW,
         );
+
         self.vbo = vbo;
+
+        var vao: c.GLuint = undefined;
+        c.glGenVertexArrays(1, &vao);
+        c.glBindVertexArray(vao);
+
+        c.glEnableVertexAttribArray(0);
+        c.glVertexAttribPointer(
+            0,
+            2,
+            c.GL_FLOAT,
+            c.GL_FALSE,
+            4 * @sizeOf(f32),
+            @ptrFromInt(0),
+        );
+
+        c.glEnableVertexAttribArray(1);
+        c.glVertexAttribPointer(
+            1,
+            2,
+            c.GL_FLOAT,
+            c.GL_FALSE,
+            4 * @sizeOf(f32),
+            @ptrFromInt(2 * @sizeOf(f32)),
+        );
+
+        c.glBindVertexArray(0);
+
+        self.vao = vao;
     }
 
     fn makeProgram(self: *@This()) void {
-        _ = self;
+        const vert_shader = gfx.shader.create(
+            gfx.vert_shader_string,
+            c.GL_VERTEX_SHADER,
+        );
+        defer gfx.shader.deinit(vert_shader);
+
+        const frag_shader = gfx.shader.create(
+            gfx.frag_shader_string,
+            c.GL_FRAGMENT_SHADER,
+        );
+        defer gfx.shader.deinit(frag_shader);
+
+        const program = gfx.program.create(vert_shader, frag_shader);
+        self.program = program;
     }
 
     // ===
+
+    fn clearBuffer(self: *@This()) void {
+        for (&self.buffer) |*pixel| {
+            pixel[0] = 0;
+            pixel[1] = 0;
+            pixel[2] = 255;
+        }
+    }
 
     pub fn putPixel(
         self: *@This(),
@@ -112,53 +172,77 @@ pub const Video = struct {
         addr: Cell,
         palette_idx: u8,
     ) void {
-        const color = self.palette[palette_idx];
+        const color = &self.palette[palette_idx];
         const page_at = page % page_ct;
-        const buffer_color = self.buffer[page_at * page_size + addr][0..2];
+        const buffer_at = @as(usize, page_at) * page_size + addr;
+        const buffer_color = self.buffer[buffer_at][0..3];
         @memcpy(buffer_color, color);
     }
 
-    pub fn setPalette(self: *@This(), at: u8, r: u8, g: u8, b: u8) void {
+    pub fn setPalette(
+        self: *@This(),
+        at: u8,
+        r: u8,
+        g: u8,
+        b: u8,
+    ) void {
         self.palette[at][0] = r;
         self.palette[at][1] = g;
         self.palette[at][2] = b;
     }
 
+    pub fn updateTexture(self: *@This()) void {
+        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
+        c.glTexSubImage2D(
+            c.GL_TEXTURE_2D,
+            0,
+            0,
+            0,
+            screen_width,
+            screen_height,
+            c.GL_RGB,
+            c.GL_UNSIGNED_BYTE,
+            &self.buffer,
+        );
+    }
+
     pub fn draw(self: *@This()) void {
-        _ = self;
-        // copy buffer to texture
-        // show texture
+        c.glUseProgram(self.program);
+        c.glBindVertexArray(self.vao);
+        c.glDrawArrays(c.GL_TRIANGLE_STRIP, 0, 4);
+        c.glBindVertexArray(0);
     }
 };
 
 const gfx = struct {
-    const vert_shader = @embedFile("shaders/vert.glsl");
-    const frag_shader = @embedFile("shaders/frag.glsl");
+    const std = @import("std");
 
-    pub const shader = struct {
-        pub fn create(str: []const u8, shader_type: c.GLenum) c.GLuint {
+    const vert_shader_string = @embedFile("shaders/vert.glsl");
+    const frag_shader_string = @embedFile("shaders/frag.glsl");
+
+    const error_allocator = std.heap.c_allocator;
+
+    const shader = struct {
+        fn create(str: []const u8, shader_type: c.GLenum) c.GLuint {
             const shd = c.glCreateShader(shader_type);
             if (shd == 0) {
                 // TODO error
                 return 0;
             }
 
-            c.glShaderSource(
-                shd,
-                1,
-                &[_]*const u8{@ptrCast(str.ptr)},
-                &[_]c_int{@intCast(str.len)},
-            );
+            const ptrs = [_]*const u8{@ptrCast(str.ptr)};
+            const lens = [_]c_int{@intCast(str.len)};
+
+            c.glShaderSource(shd, 1, &ptrs, &lens);
             c.glCompileShader(shd);
 
             var info_len: c_int = 0;
             c.glGetShaderiv(shd, c.GL_INFO_LOG_LENGTH, &info_len);
             if (info_len != 0) {
-                // TODO error
-                // var buf = try heap_alloc.alloc(u8, @intCast(usize, info_len));
-                // glGetShaderInfoLog(shader, info_len, null, buf.ptr);
-                // std.debug.print("shader info:\n{s}", .{buf});
-                // heap_alloc.free(buf);
+                const buf = error_allocator.alloc(u8, @intCast(info_len)) catch unreachable;
+                c.glGetShaderInfoLog(shd, info_len, null, buf.ptr);
+                std.debug.print("Shader info:\n{s}", .{buf});
+                error_allocator.free(buf);
             }
 
             var success: c_int = undefined;
@@ -170,19 +254,17 @@ const gfx = struct {
             return shd;
         }
 
-        pub fn deinit(shd: c.GLuint) void {
+        fn deinit(shd: c.GLuint) void {
             // TODO
             _ = shd;
         }
     };
 
-    pub const program = struct {
-        pub fn create() c.GLuint {
-            const vert = shader.create(vert_shader, c.GL_VERTEX_SHADER);
-            const frag = shader.create(frag_shader, c.GL_FRAGMENT_SHADER);
+    const program = struct {
+        fn create(vert_shader: c.GLuint, frag_shader: c.GLuint) c.GLuint {
             const shaders = [_]c.GLuint{
-                vert,
-                frag,
+                vert_shader,
+                frag_shader,
             };
             const prog = c.glCreateProgram();
             errdefer c.glDeleteProgram(prog);
@@ -201,11 +283,10 @@ const gfx = struct {
             var info_len: c_int = 0;
             c.glGetProgramiv(prog, c.GL_INFO_LOG_LENGTH, &info_len);
             if (info_len != 0) {
-                // TODO handle error
-                // var buf = try heap_alloc.alloc(u8, @intCast(usize, info_len));
-                // glGetProgramInfoLog(program, info_len, null, buf.ptr);
-                // std.debug.print("program info:\n{s}", .{buf});
-                // heap_alloc.free(buf);
+                const buf = error_allocator.alloc(u8, @intCast(info_len)) catch unreachable;
+                c.glGetProgramInfoLog(prog, info_len, null, buf.ptr);
+                std.debug.print("Program info:\n{s}", .{buf});
+                error_allocator.free(buf);
             }
 
             var success: c_int = undefined;
@@ -218,7 +299,7 @@ const gfx = struct {
             return prog;
         }
 
-        pub fn deinit(prog: c.GLuint) void {
+        fn deinit(prog: c.GLuint) void {
             // TODO
             _ = prog;
         }

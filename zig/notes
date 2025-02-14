@@ -12,6 +12,7 @@ probably
     less crashes in general
       if some internal state can be invalidated from forth,
         just truncate/wrap the value in zig ie state, base
+        do it on read ie >> const state = state_from_forth & 1;
     maybe have a debug mode cli option
 
 maybe

@@ -386,6 +386,28 @@ pub const Runtime = struct {
         std.debug.print("Unhandled external: {}\n", .{token});
         return error.UnhandledExternal;
     }
+
+    // ===
+
+    // TODO search all vocabularies somehow
+    pub fn getXt(self: @This(), name: []const u8) !?Cell {
+        const definition_addr = try self.interpreter.dictionary.findWordInVocabulary(
+            Dictionary.forth_vocabulary_addr,
+            name,
+            false,
+        );
+
+        if (definition_addr) |daddr| {
+            return try self.interpreter.dictionary.toCfa(daddr);
+        } else {
+            return null;
+        }
+    }
+
+    pub fn callXt(self: *@This(), xt: Cell) !void {
+        try self.setupExecuteLoop(xt);
+        try self.executeLoop();
+    }
 };
 
 test "runtime" {
