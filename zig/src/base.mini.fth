@@ -88,8 +88,8 @@ forth definitions
 : 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
 
-\ : third  flip dup >r flip r> ;
-\ : fourth >r third r> swap ;
+: third  flip dup >r flip r> ;
+: fourth >r third r> swap ;
 
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;

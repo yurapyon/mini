@@ -102,6 +102,11 @@ const bytecodes = [_]BytecodeDefinition{
     .{ .name = "<", .callback = lt },
     .{ .name = "<=", .callback = lteq },
 
+    .{ .name = "u>", .callback = ugt },
+    .{ .name = "u>=", .callback = ugteq },
+    .{ .name = "u<", .callback = ult },
+    .{ .name = "u<=", .callback = ulteq },
+
     .{ .name = "and", .callback = and_ },
     .{ .name = "or", .callback = or_ },
     .{ .name = "xor", .callback = xor },
@@ -238,6 +243,22 @@ pub fn lt(rt: *Runtime) Error!void {
 
 pub fn lteq(rt: *Runtime) Error!void {
     rt.data_stack.lteq();
+}
+
+pub fn ugt(rt: *Runtime) Error!void {
+    rt.data_stack.ugt();
+}
+
+pub fn ugteq(rt: *Runtime) Error!void {
+    rt.data_stack.ugteq();
+}
+
+pub fn ult(rt: *Runtime) Error!void {
+    rt.data_stack.ult();
+}
+
+pub fn ulteq(rt: *Runtime) Error!void {
+    rt.data_stack.ulteq();
 }
 
 pub fn and_(rt: *Runtime) Error!void {

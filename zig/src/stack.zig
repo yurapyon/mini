@@ -123,6 +123,26 @@ pub const DataStack = struct {
         self.binop(value);
     }
 
+    pub fn ugt(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second > self.top);
+        self.binop(value);
+    }
+
+    pub fn ugteq(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second >= self.top);
+        self.binop(value);
+    }
+
+    pub fn ult(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second < self.top);
+        self.binop(value);
+    }
+
+    pub fn ulteq(self: *@This()) void {
+        const value = runtime.cellFromBoolean(self.second <= self.top);
+        self.binop(value);
+    }
+
     pub fn and_(self: *@This()) void {
         const value = self.second & self.top;
         self.binop(value);

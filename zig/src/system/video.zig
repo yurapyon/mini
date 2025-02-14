@@ -7,17 +7,20 @@ const Cell = runtime.Cell;
 
 // 64k * 3 can max 512 x 384 x 8bit
 const page_size = 64 * 1024;
-const page_ct = 3;
+const page_ct = 2;
 
-pub const screen_width = 512;
-pub const screen_height = 384;
+pub const screen_width = 416;
+pub const screen_height = 314;
 
-// 256 color palette with 24bit color
 const RGB = [3]u8;
+const Character = [6]u8;
+// const Sprite = [64]u8;
 
 pub const Video = struct {
     buffer: [page_size * page_ct]RGB,
     palette: [256]RGB,
+    characters: [256]Character,
+    // sprites: [256]Sprite,
 
     texture: c.GLuint,
     vbo: c.GLuint,
@@ -37,8 +40,6 @@ pub const Video = struct {
 
         self.clearBuffer();
         self.updateTexture();
-
-        //   init default palette
     }
 
     pub fn deinit(_: *@This()) void {
@@ -159,10 +160,14 @@ pub const Video = struct {
     // ===
 
     fn clearBuffer(self: *@This()) void {
+        const std = @import("std");
+        var xo = std.rand.Xoshiro256.init(0xdeadbeef);
         for (&self.buffer) |*pixel| {
-            pixel[0] = 0;
-            pixel[1] = 0;
-            pixel[2] = 255;
+            const value1 = xo.random().int(u8);
+            const value2 = xo.random().int(u8);
+            pixel[0] = value1 / 2;
+            pixel[1] = value1 / 2;
+            pixel[2] = value2 / 2;
         }
     }
 
@@ -179,6 +184,36 @@ pub const Video = struct {
         @memcpy(buffer_color, color);
     }
 
+    pub fn putCharacter(
+        self: *@This(),
+        x: Cell,
+        y: Cell,
+        character_idx: u8,
+        palette_idx: u8,
+    ) void {
+        const character = self.characters[character_idx];
+        const color = &self.palette[palette_idx];
+
+        for (0..6) |i| {
+            // TODO maybe do scr_w and scr_h adjustment in forth
+            const at_x = x + i + (screen_width - 400) / 2;
+            var col = character[i];
+
+            for (0..8) |j| {
+                const at_y = y + j + (screen_height - 300) / 2;
+                const value = col & 0x80;
+
+                if (value != 0) {
+                    const buffer_at = at_x + at_y * screen_width;
+                    const buffer_color = self.buffer[buffer_at][0..3];
+                    @memcpy(buffer_color, color);
+                }
+
+                col <<= 1;
+            }
+        }
+    }
+
     pub fn setPalette(
         self: *@This(),
         at: u8,
@@ -189,6 +224,22 @@ pub const Video = struct {
         self.palette[at][0] = r;
         self.palette[at][1] = g;
         self.palette[at][2] = b;
+    }
+
+    pub fn setCharacter(
+        self: *@This(),
+        at: u8,
+        character: []const u8,
+    ) void {
+        @memcpy(&self.characters[at], character);
+    }
+
+    pub fn getCharacter(
+        self: *@This(),
+        at: u8,
+        character_buf: []u8,
+    ) void {
+        @memcpy(character_buf, &self.characters[at]);
     }
 
     pub fn updateTexture(self: *@This()) void {
