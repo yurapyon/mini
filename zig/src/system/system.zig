@@ -88,56 +88,56 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
         },
         .put_character => {
             // TODO order for this?
-            const color = rt.data_stack.pop();
-            const character = rt.data_stack.pop();
-            const y = rt.data_stack.pop();
-            const x = rt.data_stack.pop();
-
-            system.video.putCharacter(
-                x,
-                y,
-                @truncate(character),
-                @truncate(color),
-            );
+            //             const color = rt.data_stack.pop();
+            //             const character = rt.data_stack.pop();
+            //             const y = rt.data_stack.pop();
+            //             const x = rt.data_stack.pop();
+            //
+            //             system.video.putCharacter(
+            //                 x,
+            //                 y,
+            //                 @truncate(character),
+            //                 @truncate(color),
+            //             );
         },
         .set_palette => {
-            const at = rt.data_stack.pop();
-            const b = rt.data_stack.pop();
-            const g = rt.data_stack.pop();
-            const r = rt.data_stack.pop();
-
-            system.video.setPalette(
-                @truncate(at),
-                @truncate(r),
-                @truncate(g),
-                @truncate(b),
-            );
+            //             const at = rt.data_stack.pop();
+            //             const b = rt.data_stack.pop();
+            //             const g = rt.data_stack.pop();
+            //             const r = rt.data_stack.pop();
+            //
+            //             system.video.setPalette(
+            //                 @truncate(at),
+            //                 @truncate(r),
+            //                 @truncate(g),
+            //                 @truncate(b),
+            //             );
         },
         .set_character => {
-            const at = rt.data_stack.pop();
-            const buffer_addr = rt.data_stack.pop();
-            const slice = try mem.constSliceFromAddrAndLen(
-                rt.memory,
-                buffer_addr,
-                6,
-            );
-            system.video.setCharacter(
-                @truncate(at),
-                slice,
-            );
+            //             const at = rt.data_stack.pop();
+            //             const buffer_addr = rt.data_stack.pop();
+            //             const slice = try mem.constSliceFromAddrAndLen(
+            //                 rt.memory,
+            //                 buffer_addr,
+            //                 6,
+            //             );
+            //             system.video.setCharacter(
+            //                 @truncate(at),
+            //                 slice,
+            //             );
         },
         .get_character => {
-            const at = rt.data_stack.pop();
-            const buffer_addr = rt.data_stack.pop();
-            const slice = try mem.sliceFromAddrAndLen(
-                rt.memory,
-                buffer_addr,
-                6,
-            );
-            system.video.getCharacter(
-                @truncate(at),
-                slice,
-            );
+            //             const at = rt.data_stack.pop();
+            //             const buffer_addr = rt.data_stack.pop();
+            //             const slice = try mem.sliceFromAddrAndLen(
+            //                 rt.memory,
+            //                 buffer_addr,
+            //                 6,
+            //             );
+            //             system.video.getCharacter(
+            //                 @truncate(at),
+            //                 slice,
+            //             );
         },
         .video_update => {
             system.video.updateTexture();

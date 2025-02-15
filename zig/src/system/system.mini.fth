@@ -15,14 +15,16 @@ compiler definitions
 forth definitions
 :noname type '?' emit cr ; onwnf !
 
-\ ===
-
 : u. <# #s #> type ;
 : u.pad rot <# #s flip #pad #> type ;
 : u.r bl u.pad ;
 : u.0 '0' u.pad ;
 : . u. space ;
 : ? @ . ;
+
+\ ===
+
+0 [if]
 
 : fillpage >r
   0xffff 0 |: 2dup u> if third over r@ putp 1+ loop then 2drop
@@ -36,38 +38,16 @@ forth definitions
 : defchars
   d" \x0f\x3f\xff\xff\x3f\x0f" 0 setchar
   d" \x08\x48\x88\x88\x48\x08" 1 setchar
-  d" \x08\x48\x88\x88\x48\x08" 65 setchar
   ;
 
-hex
-: defpal
-  00 00 00 0 setpal
-  ff ff ff 1 setpal
-  ;
+: defpal [ hex ]
+  00 00 00 0 setpal ff ff ff 1 setpal 80 80 80 2 setpal
+  00 00 ff 2 setpal 00 ff 00 3 setpal ff 00 00 4 setpal
+  00 ff ff 5 setpal ff ff 00 6 setpal ff 00 ff 7 setpal
+  [ decimal ] ;
 
-decimal
+: init-video defchars defpal blankscr v-up ;
 
-: init-video
-  defchars defpal
-  blankscr
-  \ 0 0 0 1 putc
-  \ 6 0 1 1 putc
-  v-up
-  ;
-
-0 [if]
-: __frame
-  first-frame if frame0 false to first-frame then
-  ;
-
-: __keydown
-  \ panic
-  ;
-
-: __mousemove
-  \ swap . . cr
-  2drop
-  \ panic
-  ;
+\ todo show boot image
 
 [then]

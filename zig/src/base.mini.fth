@@ -38,6 +38,7 @@ forth definitions
 
 : variable create , ;
 
+\ todo loop could be called recurse
 0 variable loop*
 : set-loop here @ loop* ! ;
 compiler definitions

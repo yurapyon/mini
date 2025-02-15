@@ -5,38 +5,65 @@ const Cell = runtime.Cell;
 
 // ===
 
-// 64k * 3 can max 512 x 384 x 8bit
-const page_size = 64 * 1024;
-const page_ct = 2;
+// Inspired by pc-98
+// 640x400, 4bit color, 24bit palette
+// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
+//   7x11 characters, drawn in 8x16 boxes
+// 80x40 character mode
+//   7x9 characters, drawn in 8x10 boxes
 
-pub const screen_width = 416;
-pub const screen_height = 314;
+// Character buffer on top of pixel buffer
 
-const RGB = [3]u8;
-const Character = [6]u8;
-// const Sprite = [64]u8;
+// Note
+// Pixel buffer isn't exposed to forth
+//   pixel writes are done through pixelSet(x, y, color)-type
+//     interfaces only
+// Other buffers & palettes are directly accesible from forth
+
+pub const screen_width = 640;
+pub const screen_height = 400;
+
+const Attributes = packed struct {
+    _0: u1,
+    _1: u1,
+    _2: u1,
+    reverse: u1,
+    bold: u1,
+    color: u3,
+};
 
 pub const Video = struct {
-    buffer: [page_size * page_ct]RGB,
-    palette: [256]RGB,
-    characters: [256]Character,
-    // sprites: [256]Sprite,
+    pixels: struct {
+        palette: [16 * 3]u8,
+        buffer: [256 * 1024]u8,
+    },
+
+    characters: struct {
+        palette: [8 * 3]u8,
+        sprites: [256 * 10]u8,
+        buffer: [80 * 40 * 2]u8,
+    },
 
     texture: c.GLuint,
     vbo: c.GLuint,
     vao: c.GLuint,
     program: c.GLuint,
 
+    locations: struct {
+        diffuse: c.GLint,
+        palette: c.GLint,
+        character_palette: c.GLint,
+    },
+
     pub fn init(self: *@This()) void {
         self.makeTexture();
         self.makeQuad();
         self.makeProgram();
 
-        const tex_location = c.glGetUniformLocation(self.program, "diffuse");
+        self.initLocations();
+
         c.glUseProgram(self.program);
-        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
-        c.glActiveTexture(c.GL_TEXTURE0);
-        c.glUniform1i(tex_location, 0);
+        c.glUniform1i(self.locations.diffuse, 0);
 
         self.clearBuffer();
         self.updateTexture();
@@ -157,90 +184,119 @@ pub const Video = struct {
         self.program = program;
     }
 
+    fn initLocations(self: *@This()) void {
+        self.locations.diffuse = c.glGetUniformLocation(
+            self.program,
+            "diffuse",
+        );
+        self.locations.palette = c.glGetUniformLocation(
+            self.program,
+            "palette",
+        );
+        self.locations.character_palette = c.glGetUniformLocation(
+            self.program,
+            "character_palette",
+        );
+    }
+
+    // ===
+
+    pub fn storeToPixels(self: *@This(), addr: Cell, value: u8) void {
+        if (addr < @sizeOf(self.pixels.palette)) {
+            self.pixels.palette[addr] = value;
+        }
+    }
+
+    pub fn fetchFromPixels(self: *@This(), addr: Cell) u8 {
+        if (addr < @sizeOf(self.pixels.palette)) {
+            return self.pixels.palette[addr];
+        } else {
+            return 0;
+        }
+    }
+
+    pub fn storeToCharacters(self: *@This(), addr: Cell, value: u8) void {
+        const break0 = @sizeOf(self.characters.palette);
+        const break1 = break0 + @sizeOf(self.characters.sprites);
+        const break2 = break1 + @sizeOf(self.characters.buffer);
+        if (addr < break0) {
+            self.characters.palette[addr] = value;
+        } else if (addr < break1) {
+            self.characters.sprites[addr - break0] = value;
+        } else if (addr < break2) {
+            self.characters.buffer[addr - break1] = value;
+        }
+    }
+
+    pub fn fetchFromCharacters(self: *@This(), addr: Cell) u8 {
+        const break0 = @sizeOf(self.characters.palette);
+        const break1 = break0 + @sizeOf(self.characters.sprites);
+        const break2 = break1 + @sizeOf(self.characters.buffer);
+        if (addr < break0) {
+            return self.characters.palette[addr];
+        } else if (addr < break1) {
+            return self.characters.sprites[addr - break0];
+        } else if (addr < break2) {
+            return self.characters.buffer[addr - break1];
+        }
+    }
+
     // ===
 
     fn clearBuffer(self: *@This()) void {
         const std = @import("std");
         var xo = std.rand.Xoshiro256.init(0xdeadbeef);
-        for (&self.buffer) |*pixel| {
-            const value1 = xo.random().int(u8);
-            const value2 = xo.random().int(u8);
-            pixel[0] = value1 / 2;
-            pixel[1] = value1 / 2;
-            pixel[2] = value2 / 2;
+        for (&self.pixels.buffer) |*pixel| {
+            pixel.* = xo.random().int(u8);
         }
     }
 
+    // TODO
     pub fn putPixel(
-        self: *@This(),
-        page: Cell,
-        addr: Cell,
-        palette_idx: u8,
-    ) void {
-        const color = &self.palette[palette_idx];
-        const page_at = page % page_ct;
-        const buffer_at = @as(usize, page_at) * page_size + addr;
-        const buffer_color = self.buffer[buffer_at][0..3];
-        @memcpy(buffer_color, color);
-    }
-
-    pub fn putCharacter(
         self: *@This(),
         x: Cell,
         y: Cell,
-        character_idx: u8,
-        palette_idx: u8,
+        palette_idx: u4,
     ) void {
-        const character = self.characters[character_idx];
-        const color = &self.palette[palette_idx];
-
-        for (0..6) |i| {
-            // TODO maybe do scr_w and scr_h adjustment in forth
-            const at_x = x + i + (screen_width - 400) / 2;
-            var col = character[i];
-
-            for (0..8) |j| {
-                const at_y = y + j + (screen_height - 300) / 2;
-                const value = col & 0x80;
-
-                if (value != 0) {
-                    const buffer_at = at_x + at_y * screen_width;
-                    const buffer_color = self.buffer[buffer_at][0..3];
-                    @memcpy(buffer_color, color);
-                }
-
-                col <<= 1;
-            }
-        }
+        _ = self;
+        _ = x;
+        _ = y;
+        _ = palette_idx;
+        // const color = &self.palette[palette_idx];
+        // const page_at = page % page_ct;
+        // const buffer_at = @as(usize, page_at) * page_size + addr;
+        // const buffer_color = self.buffer[buffer_at][0..3];
+        // @memcpy(buffer_color, color);
     }
 
-    pub fn setPalette(
-        self: *@This(),
-        at: u8,
-        r: u8,
-        g: u8,
-        b: u8,
-    ) void {
-        self.palette[at][0] = r;
-        self.palette[at][1] = g;
-        self.palette[at][2] = b;
-    }
-
-    pub fn setCharacter(
-        self: *@This(),
-        at: u8,
-        character: []const u8,
-    ) void {
-        @memcpy(&self.characters[at], character);
-    }
-
-    pub fn getCharacter(
-        self: *@This(),
-        at: u8,
-        character_buf: []u8,
-    ) void {
-        @memcpy(character_buf, &self.characters[at]);
-    }
+    //     pub fn putCharacter(
+    //         self: *@This(),
+    //         x: Cell,
+    //         y: Cell,
+    //         character_idx: u8,
+    //         palette_idx: u8,
+    //     ) void {
+    //         const character = self.characters[character_idx];
+    //         const color = self.palette[palette_idx];
+    //
+    //         for (0..6) |i| {
+    //             // TODO maybe do scr_w and scr_h adjustment in forth
+    //             const at_x = x + i + (screen_width - 400) / 2;
+    //             var col = character[i];
+    //
+    //             for (0..8) |j| {
+    //                 const at_y = y + j + (screen_height - 300) / 2;
+    //                 const value = col & 0x80;
+    //
+    //                 if (value != 0) {
+    //                     const buffer_at = at_x + at_y * screen_width;
+    //                     self.buffer[buffer_at] = color;
+    //                 }
+    //
+    //                 col <<= 1;
+    //             }
+    //         }
+    //     }
 
     pub fn updateTexture(self: *@This()) void {
         c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
@@ -253,14 +309,19 @@ pub const Video = struct {
             screen_height,
             c.GL_RGB,
             c.GL_UNSIGNED_BYTE,
-            &self.buffer,
+            &self.pixels.buffer,
         );
     }
 
     pub fn draw(self: *@This()) void {
         c.glUseProgram(self.program);
+
+        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
+        c.glActiveTexture(c.GL_TEXTURE0);
+
         c.glBindVertexArray(self.vao);
         c.glDrawArrays(c.GL_TRIANGLE_STRIP, 0, 4);
+
         c.glBindVertexArray(0);
     }
 };
