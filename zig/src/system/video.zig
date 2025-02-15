@@ -40,17 +40,11 @@ pub const Video = struct {
     characters: Characters,
 
     pub fn init(self: *@This()) void {
-        self.makeTexture();
-        self.makeQuad();
-        self.makeProgram();
+        // self.clearBuffer();
+        // self.updateTexture();
 
-        self.initLocations();
-
-        c.glUseProgram(self.program);
-        c.glUniform1i(self.locations.diffuse, 0);
-
-        self.clearBuffer();
-        self.updateTexture();
+        self.pixels.init();
+        self.characters.init();
     }
 
     pub fn deinit(_: *@This()) void {
@@ -58,54 +52,6 @@ pub const Video = struct {
     }
 
     // ===
-
-    fn makeQuad(self: *@This()) void {
-        var vbo: c.GLuint = undefined;
-        c.glGenBuffers(1, &vbo);
-        c.glBindBuffer(c.GL_ARRAY_BUFFER, vbo);
-        const data = [_]f32{
-            1.0,  1.0,  1.0, 1.0,
-            -1.0, 1.0,  0.0, 1.0,
-            1.0,  -1.0, 1.0, 0.0,
-            -1.0, -1.0, 0.0, 0.0,
-        };
-        c.glBufferData(
-            c.GL_ARRAY_BUFFER,
-            @sizeOf(@TypeOf(data)),
-            &data,
-            c.GL_STATIC_DRAW,
-        );
-
-        self.vbo = vbo;
-
-        var vao: c.GLuint = undefined;
-        c.glGenVertexArrays(1, &vao);
-        c.glBindVertexArray(vao);
-
-        c.glEnableVertexAttribArray(0);
-        c.glVertexAttribPointer(
-            0,
-            2,
-            c.GL_FLOAT,
-            c.GL_FALSE,
-            4 * @sizeOf(f32),
-            @ptrFromInt(0),
-        );
-
-        c.glEnableVertexAttribArray(1);
-        c.glVertexAttribPointer(
-            1,
-            2,
-            c.GL_FLOAT,
-            c.GL_FALSE,
-            4 * @sizeOf(f32),
-            @ptrFromInt(2 * @sizeOf(f32)),
-        );
-
-        c.glBindVertexArray(0);
-
-        self.vao = vao;
-    }
 
     fn makeProgram(self: *@This()) void {
         _ = self;
@@ -123,5 +69,10 @@ pub const Video = struct {
         //
         //         const program = gfx.program.create(vert_shader, frag_shader);
         //         self.program = program;
+    }
+
+    pub fn draw(self: *@This()) void {
+        self.pixels.draw();
+        self.characters.draw();
     }
 };

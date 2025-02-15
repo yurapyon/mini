@@ -407,7 +407,7 @@ pub const System = struct {
                 try self.rt.callXt(fxt);
             }
 
-            std.time.sleep(30000000);
+            std.time.sleep(30_000_000);
         }
 
         self.deinit();

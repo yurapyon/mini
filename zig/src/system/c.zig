@@ -33,7 +33,10 @@ pub const gfx = struct {
             var info_len: c_int = 0;
             c.glGetShaderiv(shd, c.GL_INFO_LOG_LENGTH, &info_len);
             if (info_len != 0) {
-                const buf = error_allocator.alloc(u8, @intCast(info_len)) catch unreachable;
+                const buf = error_allocator.alloc(
+                    u8,
+                    @intCast(info_len),
+                ) catch unreachable;
                 c.glGetShaderInfoLog(shd, info_len, null, buf.ptr);
                 std.debug.print("Shader info:\n{s}", .{buf});
                 error_allocator.free(buf);
@@ -77,7 +80,10 @@ pub const gfx = struct {
             var info_len: c_int = 0;
             c.glGetProgramiv(prog, c.GL_INFO_LOG_LENGTH, &info_len);
             if (info_len != 0) {
-                const buf = error_allocator.alloc(u8, @intCast(info_len)) catch unreachable;
+                const buf = error_allocator.alloc(
+                    u8,
+                    @intCast(info_len),
+                ) catch unreachable;
                 c.glGetProgramInfoLog(prog, info_len, null, buf.ptr);
                 std.debug.print("Program info:\n{s}", .{buf});
                 error_allocator.free(buf);
@@ -145,6 +151,22 @@ pub const gfx = struct {
             c.glBindTexture(c.GL_TEXTURE_2D, 0);
 
             return tex;
+        }
+    };
+
+    pub const buffer = struct {
+        fn create() c.GLuint {
+            var vbo: c.GLuint = undefined;
+            c.glGenBuffers(1, &vbo);
+            return vbo;
+        }
+    };
+
+    pub const vertex_array = struct {
+        fn create() c.GLuint {
+            var vao: c.GLuint = undefined;
+            c.glGenVertexArrays(1, &vao);
+            return vao;
         }
     };
 };
