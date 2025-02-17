@@ -120,6 +120,11 @@ pub fn Register(comptime offset_: Cell) type {
             try self.commaC(high);
         }
 
+        pub fn mask(self: @This(), value: Cell) void {
+            const cell_ptr = mem.cellPtr(self.memory, offset) catch unreachable;
+            cell_ptr.* &= value;
+        }
+
         // u8s ===
 
         pub fn storeC(self: @This(), value: u8) void {

@@ -1,13 +1,12 @@
 : mini ;
 
 goals:
-  classic
-    a 16 bit forth
-    prefer 'traditional' over 'modern'
-  nice
-    easy to write/read mini code
-    easy to implement/port
-    clean implementation
+  clear simple and obvious
+    both forth code and implementation
+  balanced
+    don't sacrifice readibility for performance
+  evolution of a classic
+    modern forth not 'forth-y [something else]'
 
 roadmap:
   planned:

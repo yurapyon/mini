@@ -32,14 +32,17 @@ pub const Error = error{
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
-pub const bytecodes_count = 64;
+pub const bytecodes_count = bytecodes.len;
 
-pub const enter_code = getBytecodeToken("enter") orelse unreachable;
+pub const cfa_codes = struct {
+    pub const docol = getBytecodeToken("docol") orelse unreachable;
+    pub const docon = getBytecodeToken("docon") orelse unreachable;
+    pub const docre = getBytecodeToken("docre") orelse unreachable;
+};
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     callback: BytecodeFn = panic,
-    // TODO tag_only: bool,  ?
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeDefinition {
@@ -76,11 +79,16 @@ pub fn initBuiltins(dict: *Dictionary) !void {
     }
 }
 
-const bytecodes = [bytecodes_count]BytecodeDefinition{
+const bytecodes = [_]BytecodeDefinition{
+    .{ .name = "docol", .callback = docol },
+    .{ .name = "docon", .callback = docon },
+    .{ .name = "docre", .callback = docre },
+
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
-    .{ .name = "enter", .callback = enter },
     .{ .name = "execute", .callback = execute },
+    // TODO
+    // .{ .name = "@execute", .callback = fetchExecute },
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
@@ -93,6 +101,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "0=", .callback = eq0 },
     .{ .name = "<", .callback = lt },
     .{ .name = "<=", .callback = lteq },
+
+    .{ .name = "u>", .callback = ugt },
+    .{ .name = "u>=", .callback = ugteq },
+    .{ .name = "u<", .callback = ult },
+    .{ .name = "u<=", .callback = ulteq },
 
     .{ .name = "and", .callback = and_ },
     .{ .name = "or", .callback = or_ },
@@ -147,21 +160,32 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
-    // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
-
-    .{},
-    .{},
-    .{},
+    .{ .name = "string~=", .callback = stringEqual },
 };
+
+pub fn docol(rt: *Runtime) Error!void {
+    rt.return_stack.push(rt.program_counter);
+    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
+}
+
+pub fn docon(rt: *Runtime) Error!void {
+    const addr = rt.current_token_addr + @sizeOf(Cell);
+    const value = mem.readCell(rt.memory, addr) catch unreachable;
+    rt.data_stack.push(value);
+}
+
+pub fn docre(rt: *Runtime) Error!void {
+    const does_addr = rt.current_token_addr + @sizeOf(Cell);
+    const body_addr = does_addr + @sizeOf(Cell);
+    const does = mem.readCell(rt.memory, does_addr) catch unreachable;
+    rt.data_stack.push(body_addr);
+    rt.return_stack.push(rt.program_counter);
+    rt.setCfaToExecute(does);
+}
 
 pub fn panic(_: *Runtime) Error!void {
     return error.Panic;
-}
-
-pub fn enter(rt: *Runtime) Error!void {
-    rt.return_stack.push(rt.program_counter);
-    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
 }
 
 pub fn exit(rt: *Runtime) Error!void {
@@ -219,6 +243,22 @@ pub fn lt(rt: *Runtime) Error!void {
 
 pub fn lteq(rt: *Runtime) Error!void {
     rt.data_stack.lteq();
+}
+
+pub fn ugt(rt: *Runtime) Error!void {
+    rt.data_stack.ugt();
+}
+
+pub fn ugteq(rt: *Runtime) Error!void {
+    rt.data_stack.ugteq();
+}
+
+pub fn ult(rt: *Runtime) Error!void {
+    rt.data_stack.ult();
+}
+
+pub fn ulteq(rt: *Runtime) Error!void {
+    rt.data_stack.ulteq();
 }
 
 pub fn and_(rt: *Runtime) Error!void {
@@ -569,5 +609,18 @@ pub fn memEqual(rt: *Runtime) Error!void {
     const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, count);
     const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, count);
     const areEqual = std.mem.eql(u8, a_slice, b_slice);
+    rt.data_stack.push(runtime.cellFromBoolean(areEqual));
+}
+
+pub fn stringEqual(rt: *Runtime) Error!void {
+    const a_len = rt.data_stack.pop();
+    const a_addr = rt.data_stack.pop();
+    const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, a_len);
+
+    const b_len = rt.data_stack.pop();
+    const b_addr = rt.data_stack.pop();
+    const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, b_len);
+
+    const areEqual = stringsEqual(a_slice, b_slice);
     rt.data_stack.push(runtime.cellFromBoolean(areEqual));
 }

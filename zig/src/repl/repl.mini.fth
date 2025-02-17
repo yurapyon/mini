@@ -1,4 +1,3 @@
-32 constant bl
 : space bl emit ;
 : spaces 0 |: 2dup > if space 1+ loop then 2drop ;
 : cr 10 emit ;
@@ -37,9 +36,9 @@ forth definitions
 : s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
 : ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
   else dup 127 < if emit else drop ." del" endcond ;
-: next dup dup dup 3 u.r space h8. space ascii 2 spaces 32 + ;
-: ashy 32 0 |: 2dup > if dup next next next next cr drop 1+ loop
-  then 2drop ;
+: column dup dup dup 3 u.r space h8. space ascii 2 spaces 32 + ;
+: ashy 32 0 |: 2dup > if dup column column column column cr drop
+  1+ loop then 2drop ;
 
 \ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
 \   <# # # # drop # # # drop # # # '.' hold #s #> type ;
@@ -122,11 +121,8 @@ create e.insert 0 , 64 allot
 forth definitions
 editor
 
-' l
-: l editor [ , ] ;
-
-' t
-: t editor [ , ] ;
+: l editor l ;
+: t editor t ;
 
 forth
 

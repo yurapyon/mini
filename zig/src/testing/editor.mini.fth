@@ -1,7 +1,19 @@
 : test-str s" asdf\nqwerty\nzxc\n\0" ;
 
 ( x y x y -- ordering )
-: direction 2compare dup 0= if drop else nip then ;
+: direction [by2] compare dup if swap then drop ;
+
+compiler definitions
+: literal lit, , ;
+forth definitions
+
+: this-line [ 63 invert ] literal and ;
+
+( addr -- len )
+: line-len this-line 64 -trailing nip ;
+
+( i -- len )
+: line#len line@# line-len ;
 
 \ 1024 constant max-len
 
@@ -59,7 +71,6 @@ s[ cell field >p.x cell field >p.y ]s point
 : p.compare >r p.>s r> p.>s 2compare ;
 
 \ ===
-
 
 0 [if]
 s[ ]s line-buffer

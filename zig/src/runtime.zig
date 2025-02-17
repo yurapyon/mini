@@ -25,6 +25,9 @@ const stack = @import("stack.zig");
 const DataStack = stack.DataStack;
 const ReturnStack = stack.ReturnStack;
 
+const stack2 = @import("stack2.zig");
+const Stack = stack2.Stack;
+
 const bytecodes = @import("bytecodes.zig");
 
 const externals = @import("externals.zig");
@@ -54,6 +57,7 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
+// TODO copy layout from Starting Forht
 pub const MainMemoryLayout = MemoryLayout(struct {
     here: Cell,
     forth_vocabulary: Cell,
@@ -62,15 +66,28 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     // pointers to pointers
     context: Cell,
     current: Cell,
+
     state: Cell,
     base: Cell,
+
     execute: [2]Cell,
+
     // zero for input buffer
     // anything else for string
     source_ptr: Cell,
     source_len: Cell,
     source_at: Cell,
+
     input_buffer: [128]u8,
+
+    data_stack_top_ptr: Cell,
+    data_stack: [32]Cell,
+    data_stack_top: u0,
+
+    return_stack_top_ptr: Cell,
+    return_stack: [32]Cell,
+    return_stack_top: u0,
+
     dictionary_start: u0,
 });
 
@@ -100,6 +117,7 @@ pub const Runtime = struct {
     allocator: Allocator,
     memory: MemoryPtr,
 
+    // TODO could put these in forth
     program_counter: Cell,
     current_token_addr: Cell,
     execute_register: Register(MainMemoryLayout.offsetOf("execute")),
@@ -108,10 +126,23 @@ pub const Runtime = struct {
     interpreter: Interpreter,
     input_buffer: InputBuffer,
 
+    data_stack2: Stack(
+        MainMemoryLayout.offsetOf("data_stack_top_ptr"),
+        MainMemoryLayout.offsetOf("data_stack"),
+        MainMemoryLayout.offsetOf("data_stack_top"),
+    ),
+    return_stack2: Stack(
+        MainMemoryLayout.offsetOf("return_stack_top_ptr"),
+        MainMemoryLayout.offsetOf("return_stack"),
+        MainMemoryLayout.offsetOf("return_stack_top"),
+    ),
+
+    // TODO could put this in forth
     should_quit: bool,
 
     externals: ArrayList(External),
 
+    // TODO could put this in forth
     last_evaluated_word: ?[]const u8,
 
     pub fn init(self: *@This(), allocator: Allocator, memory: MemoryPtr) void {
@@ -120,6 +151,8 @@ pub const Runtime = struct {
 
         self.interpreter.init(self.memory);
         self.input_buffer.init(self.memory);
+        self.data_stack2.init(self.memory);
+        self.return_stack2.init(self.memory);
 
         self.externals = ArrayList(External).init(allocator);
 
@@ -352,6 +385,28 @@ pub const Runtime = struct {
 
         std.debug.print("Unhandled external: {}\n", .{token});
         return error.UnhandledExternal;
+    }
+
+    // ===
+
+    // TODO search all vocabularies somehow
+    pub fn getXt(self: @This(), name: []const u8) !?Cell {
+        const definition_addr = try self.interpreter.dictionary.findWordInVocabulary(
+            Dictionary.forth_vocabulary_addr,
+            name,
+            false,
+        );
+
+        if (definition_addr) |daddr| {
+            return try self.interpreter.dictionary.toCfa(daddr);
+        } else {
+            return null;
+        }
+    }
+
+    pub fn callXt(self: *@This(), xt: Cell) !void {
+        try self.setupExecuteLoop(xt);
+        try self.executeLoop();
     }
 };
 

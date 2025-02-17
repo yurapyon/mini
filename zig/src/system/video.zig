@@ -1,70 +1,78 @@
 const c = @import("c.zig");
-const gfx = c.gfx;
 
 const runtime = @import("../runtime.zig");
 const Cell = runtime.Cell;
 
-// 5x7 characters, drawn with 1px right and bottom border
-const Character = [5]u8;
-// 256 color palette with 24bit color
-const RGB = [3]u8;
+const Pixels = @import("pixels.zig").Pixels;
+const Characters = @import("characters.zig").Characters;
+
+// ===
+
+// Inspired by pc-98
+// 640x400, 4bit color, 24bit palette
+// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
+//   7x11 characters, drawn in 8x16 boxes
+// 80x40 character mode
+//   7x9 characters, drawn in 8x10 boxes
+
+// Character buffer on top of pixel buffer
+
+// Note
+// Pixel buffer isn't exposed to forth
+//   pixel writes are done through pixelSet(x, y, color)-type
+//     interfaces only
+// Other buffers & palettes are directly accesible from forth
+
+pub const screen_width = 640;
+pub const screen_height = 400;
+
+const Attributes = packed struct {
+    _0: u1,
+    _1: u1,
+    _2: u1,
+    reverse: u1,
+    bold: u1,
+    color: u3,
+};
 
 pub const Video = struct {
-    // 64k * 3 can max 512 x 384 x 8bit
-    // This could fit a 400x300 drawing canvas
-    // For 6x8 characters, this can fit 85x48, or 4080 chars total
-    buffer: [64 * 1024 * 3]u8,
-    character_map: [256]Character,
-    palette: [256]RGB,
-
-    texture: c.GLuint,
-    quad: c.GLuint,
-    vao: c.GLuint,
-    prog: c.GLuint,
+    pixels: Pixels,
+    characters: Characters,
 
     pub fn init(self: *@This()) void {
-        self.texture = gfx.texture.createBlank(512, 384);
-        self.quad = gfx.buffer.createQuad();
-        self.prog = gfx.program.create();
-        // TODO set uniforms
+        // self.clearBuffer();
+        // self.updateTexture();
 
+        self.pixels.init();
+        self.characters.init();
     }
 
-    pub fn putCharacter(self: *@This(), x: Cell, y: Cell, char: u8) void {
-        _ = self;
-        _ = x;
-        _ = y;
-        _ = char;
+    pub fn deinit(_: *@This()) void {
+        // TODO
     }
 
-    pub fn putPixel(self: *@This(), x: Cell, y: Cell, color: u8) void {
+    // ===
+
+    fn makeProgram(self: *@This()) void {
         _ = self;
-        _ = x;
-        _ = y;
-        _ = color;
+        //         const vert_shader = gfx.shader.create(
+        //             gfx.vert_shader_string,
+        //             c.GL_VERTEX_SHADER,
+        //         );
+        //         defer gfx.shader.deinit(vert_shader);
+        //
+        //         const frag_shader = gfx.shader.create(
+        //             gfx.frag_shader_string,
+        //             c.GL_FRAGMENT_SHADER,
+        //         );
+        //         defer gfx.shader.deinit(frag_shader);
+        //
+        //         const program = gfx.program.create(vert_shader, frag_shader);
+        //         self.program = program;
     }
 
-    pub fn blit(
-        self: *@This(),
-        x: Cell,
-        y: Cell,
-        w: Cell,
-        h: Cell,
-        colors: []u8,
-        mask: []u8,
-    ) void {
-        _ = self;
-        _ = x;
-        _ = y;
-        _ = w;
-        _ = h;
-        _ = colors;
-        _ = mask;
-    }
-
-    pub fn swapBuffers(self: *@This()) void {
-        _ = self;
-        // copy buffer to texture
-        // show texture
+    pub fn draw(self: *@This()) void {
+        self.pixels.draw();
+        self.characters.draw();
     }
 };
