@@ -1,4 +1,9 @@
 vocabulary blocks
+
+forth definitions
+
+0 variable blk
+
 blocks definitions
 
 s[ cell field >id cell field >upd 1024 field >data
@@ -13,12 +18,6 @@ blkbuf double-buffer blkbufs
 : empty dup clrupd >id 0 swap ! ;
 : save dup clrupd dup >id @ swap >data bb.write ;
 : trysave dup >upd @ over >id @ and if save else drop then ;
-
-forth definitions
-
-0 variable blk
-
-blocks definitions
 
 create blkstack saved-max cells allot
 blkstack value blkstack-top
@@ -40,7 +39,7 @@ blocks
 : flush save-buffers empty-buffers ;
 
 : load pushblk dup blk ! block 1024 evaluate popblk ;
-: thru swap |: 2dup >= if dup load 1+ loop then 2drop ;
+: thru swap do.u>= dup load 1+ godo 2drop ;
 
 : bb.this-line 64 / 64 * ;
 : bb.next-line 64 + bb.this-line ;

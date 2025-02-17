@@ -9,6 +9,7 @@ in vec2 uv_coord;
 out vec4 out_color;
 
 void main() {
-    uint x = texture(tex, uv_coord).r;
-    out_color = vec4(float(x) / 255.0, 1, 1, 1);
+    uint color_idx = texture(tex, uv_coord).r;
+    vec3 color = palette[color_idx];
+    out_color = vec4(color, 1);
 }

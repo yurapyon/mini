@@ -16,8 +16,8 @@ pub usingnamespace c;
 pub const gfx = struct {
     const error_allocator = std.heap.c_allocator;
 
-    const shader = struct {
-        fn create(str: []const u8, shader_type: c.GLenum) c.GLuint {
+    pub const shader = struct {
+        pub fn create(str: []const u8, shader_type: c.GLenum) c.GLuint {
             const shd = c.glCreateShader(shader_type);
             if (shd == 0) {
                 // TODO error
@@ -51,14 +51,14 @@ pub const gfx = struct {
             return shd;
         }
 
-        fn deinit(shd: c.GLuint) void {
+        pub fn deinit(shd: c.GLuint) void {
             // TODO
             _ = shd;
         }
     };
 
-    const program = struct {
-        fn create(vert_shader: c.GLuint, frag_shader: c.GLuint) c.GLuint {
+    pub const program = struct {
+        pub fn create(vert_shader: c.GLuint, frag_shader: c.GLuint) c.GLuint {
             const shaders = [_]c.GLuint{
                 vert_shader,
                 frag_shader,
@@ -99,14 +99,14 @@ pub const gfx = struct {
             return prog;
         }
 
-        fn deinit(prog: c.GLuint) void {
+        pub fn deinit(prog: c.GLuint) void {
             // TODO
             _ = prog;
         }
     };
 
     pub const texture = struct {
-        fn createEmpty(
+        pub fn createEmpty(
             width: c_int,
             height: c_int,
         ) c.GLuint {
@@ -155,7 +155,7 @@ pub const gfx = struct {
     };
 
     pub const buffer = struct {
-        fn create() c.GLuint {
+        pub fn create() c.GLuint {
             var vbo: c.GLuint = undefined;
             c.glGenBuffers(1, &vbo);
             return vbo;
@@ -163,7 +163,7 @@ pub const gfx = struct {
     };
 
     pub const vertex_array = struct {
-        fn create() c.GLuint {
+        pub fn create() c.GLuint {
             var vao: c.GLuint = undefined;
             c.glGenVertexArrays(1, &vao);
             return vao;

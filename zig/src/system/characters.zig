@@ -8,6 +8,14 @@ pub const Characters = struct {
     sprites: [256 * 10]u8,
     buffer: [80 * 40 * 2]u8,
 
+    pub fn init(self: *@This()) void {
+        _ = self;
+    }
+
+    pub fn draw(self: *@This()) void {
+        _ = self;
+    }
+
     pub fn store(self: *@This(), addr: Cell, value: u8) void {
         const break0 = @sizeOf(self.palette);
         const break1 = break0 + @sizeOf(self.sprites);

@@ -1,10 +1,10 @@
 : space bl emit ;
-: spaces 0 |: 2dup > if space 1+ loop then 2drop ;
+: spaces 0 do.u> space 1+ godo 2drop ;
 : cr 10 emit ;
 : printable 32 126 in[,] ;
 : print dup printable 0= if drop '.' then emit ;
-: .print 2dup > if c@+ print loop then 2drop ;
-: .chars 2dup > if c@+ emit loop then 2drop ;
+: .print do.u> c@+ print godo 2drop ;
+: .chars do.u> c@+  emit godo 2drop ;
 : type range .chars ;
 : ." [compile] s" type ;
 compiler definitions
@@ -20,32 +20,30 @@ forth definitions
 : ? @ . ;
 
 : .2 swap . . ;
+: .3 flip . . . ;
 
 : h8.  <# h# h# #> type ;
 : h16. <# h# h# h# h# #> type ;
-: .bytes 2dup > if c@+ h8. space loop then 2drop ;
+: .bytes do.u> c@+ h8. space godo 2drop ;
 
-: dump range |: 2dup > if 16 split
-    dup h16. space 2dup .bytes .print cr
-  loop then 2drop ;
+: dump range do.u> 16 split dup h16. space 2dup .bytes .print cr
+  godo 2drop ;
 
 : .word name tuck type if space then ;
-: words context @ @ |: ?dup if dup .word @ loop then ;
+: words context @ @ do.?dup dup .word @ godo ;
 
 : s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
 : s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
 : ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
   else dup 127 < if emit else drop ." del" endcond ;
 : column dup dup dup 3 u.r space h8. space ascii 2 spaces 32 + ;
-: ashy 32 0 |: 2dup > if dup column column column column cr drop
-  1+ loop then 2drop ;
+: ashy 32 0 do.u> dup column column column column cr drop 1+
+  godo 2drop ;
 
 \ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
 \   <# # # # drop # # # drop # # # '.' hold #s #> type ;
 
 : ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
-
-: blank bl fill ;
 
 \ ===
 
@@ -68,8 +66,8 @@ forth definitions
 
 0 variable scr
 : .line swap 64 * + 64 range .print ;
-: .list >r 16 0 |: 2dup > if dup dup 2 u.r space r@ .line cr 1+
-  loop then r> drop 2drop ;
+: .list >r 16 0 do.u> dup dup 2 u.r space r@ .line cr 1+
+  godo r> drop 2drop ;
 : list dup scr ! dup . cr block .list ;
 
 : scrbuf scr @ block ;
@@ -127,6 +125,3 @@ editor
 forth
 
 [then]
-
-\ ===
-

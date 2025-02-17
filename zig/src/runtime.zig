@@ -59,6 +59,7 @@ pub fn isTruthy(value: Cell) bool {
 
 // TODO copy layout from Starting Forht
 pub const MainMemoryLayout = MemoryLayout(struct {
+    // TODO rename to 'h'
     here: Cell,
     forth_vocabulary: Cell,
     compiler_vocabulary: Cell,
@@ -89,6 +90,13 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     return_stack_top: u0,
 
     dictionary_start: u0,
+});
+
+pub const EndOfMemoryLayout = MemoryLayout(struct {
+    data_stack: Cell,
+    data_stack_ptr: Cell,
+    return_stack: [64]Cell,
+    return_stack_ptr: Cell,
 });
 
 comptime {
@@ -175,7 +183,10 @@ pub const Runtime = struct {
     }
 
     fn defineInternalConstants(self: *@This()) !void {
-        try self.defineMemoryLocationConstant("here");
+        try self.interpreter.dictionary.compileConstant(
+            "h",
+            MainMemoryLayout.offsetOf("here"),
+        );
         try self.interpreter.dictionary.compileConstant(
             "forth-latest",
             MainMemoryLayout.offsetOf("forth_vocabulary"),

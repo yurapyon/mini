@@ -33,7 +33,8 @@ const ExternalId = enum(Cell) {
     put_pixel,
     read_pixel,
     put_character,
-    set_palette,
+    pixels_store,
+    pixels_fetch,
     set_character,
     get_character,
     video_update,
@@ -72,15 +73,15 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             }
         },
         .put_pixel => {
-            // TODO order for this?
-            const page = rt.data_stack.pop();
-            const addr = rt.data_stack.pop();
-            const color = rt.data_stack.pop();
+            const idx = rt.data_stack.pop();
+            const y = rt.data_stack.pop();
+            const x = rt.data_stack.pop();
 
-            system.video.putPixel(
-                page,
-                addr,
-                @truncate(color),
+            // TODO fit in screen w/h
+            system.video.pixels.putPixel(
+                x,
+                y,
+                @truncate(idx),
             );
         },
         .read_pixel => {
@@ -100,18 +101,23 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             //                 @truncate(color),
             //             );
         },
-        .set_palette => {
-            //             const at = rt.data_stack.pop();
-            //             const b = rt.data_stack.pop();
-            //             const g = rt.data_stack.pop();
-            //             const r = rt.data_stack.pop();
-            //
-            //             system.video.setPalette(
-            //                 @truncate(at),
-            //                 @truncate(r),
-            //                 @truncate(g),
-            //                 @truncate(b),
-            //             );
+        .pixels_store => {
+            const addr = rt.data_stack.pop();
+            const value = rt.data_stack.pop();
+
+            system.video.pixels.store(
+                addr,
+                @truncate(value),
+            );
+        },
+        .pixels_fetch => {
+            const addr = rt.data_stack.pop();
+
+            const value = system.video.pixels.fetch(
+                addr,
+            );
+
+            rt.data_stack.push(value);
         },
         .set_character => {
             //             const at = rt.data_stack.pop();
@@ -140,7 +146,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             //             );
         },
         .video_update => {
-            system.video.updateTexture();
+            system.video.pixels.pushBufferToTexture();
         },
         else => return false,
     }
@@ -372,9 +378,14 @@ pub const System = struct {
             @intFromEnum(ExternalId.put_character),
         );
         try rt.defineExternal(
-            "setpal",
+            "pixels!",
             forth_vocabulary_addr,
-            @intFromEnum(ExternalId.set_palette),
+            @intFromEnum(ExternalId.pixels_store),
+        );
+        try rt.defineExternal(
+            "pixels@",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.pixels_fetch),
         );
         try rt.defineExternal(
             "setchar",

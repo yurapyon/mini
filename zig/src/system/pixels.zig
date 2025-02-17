@@ -46,8 +46,14 @@ pub const Pixels = struct {
         c.glUseProgram(self.program);
         c.glUniform1i(self.locations.texture, 0);
 
-        random.fillWithRandomBytes(self.buffer);
-        self.updateTexture();
+        random.fillWithRandomBytes(&self.buffer);
+        for (&self.buffer) |*color| {
+            color.* %= 16;
+        }
+        self.pushBufferToTexture();
+
+        random.fillWithRandomBytes(&self.palette);
+        self.setPaletteUniforms();
     }
 
     fn initProgram(self: *@This()) void {
@@ -116,41 +122,7 @@ pub const Pixels = struct {
         c.glBindVertexArray(0);
     }
 
-    // ===
-
-    pub fn store(self: *@This(), addr: Cell, value: u8) void {
-        if (addr < @sizeOf(self.palette)) {
-            self.palette[addr] = value;
-        }
-    }
-
-    pub fn fetch(self: *@This(), addr: Cell) u8 {
-        if (addr < @sizeOf(self.palette)) {
-            return self.palette[addr];
-        } else {
-            return 0;
-        }
-    }
-
-    // TODO
-    pub fn putPixel(
-        self: *@This(),
-        x: Cell,
-        y: Cell,
-        palette_idx: u4,
-    ) void {
-        _ = self;
-        _ = x;
-        _ = y;
-        _ = palette_idx;
-        // const color = &self.palette[palette_idx];
-        // const page_at = page % page_ct;
-        // const buffer_at = @as(usize, page_at) * page_size + addr;
-        // const buffer_color = self.buffer[buffer_at][0..3];
-        // @memcpy(buffer_color, color);
-    }
-
-    pub fn updateTexture(self: *@This()) void {
+    pub fn pushBufferToTexture(self: *@This()) void {
         c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
         c.glTexSubImage2D(
             c.GL_TEXTURE_2D,
@@ -161,7 +133,19 @@ pub const Pixels = struct {
             video.screen_height,
             c.GL_RED,
             c.GL_UNSIGNED_BYTE,
-            &self.pixels.buffer,
+            &self.buffer,
+        );
+    }
+
+    pub fn setPaletteUniforms(self: *@This()) void {
+        var float_palette = [_]f32{0} ** (16 * 3);
+        for (self.palette, 0..) |byte, i| {
+            float_palette[i] = @as(f32, @floatFromInt(byte)) / 255;
+        }
+        c.glUniform3fv(
+            self.locations.palette,
+            16,
+            &float_palette,
         );
     }
 
@@ -175,5 +159,32 @@ pub const Pixels = struct {
         c.glDrawArrays(c.GL_TRIANGLE_STRIP, 0, 4);
 
         c.glBindVertexArray(0);
+    }
+
+    // ===
+
+    pub fn store(self: *@This(), addr: Cell, value: u8) void {
+        if (addr < @sizeOf(@TypeOf(self.palette))) {
+            self.palette[addr] = value;
+            self.setPaletteUniforms();
+        }
+    }
+
+    pub fn fetch(self: *@This(), addr: Cell) u8 {
+        if (addr < @sizeOf(@TypeOf(self.palette))) {
+            return self.palette[addr];
+        } else {
+            return 0;
+        }
+    }
+
+    pub fn putPixel(
+        self: *@This(),
+        x: Cell,
+        y: Cell,
+        palette_idx: u4,
+    ) void {
+        const at = @as(usize, x) + @as(usize, y) * video.screen_width;
+        self.buffer[at] = palette_idx;
     }
 };

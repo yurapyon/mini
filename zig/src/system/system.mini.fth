@@ -22,7 +22,41 @@ forth definitions
 : . u. space ;
 : ? @ . ;
 
+: .2 swap . . ;
+: .3 flip . . . ;
+
 \ ===
+
+: pixels!+ tuck pixels! 1+ ;
+
+: setpal >r flip r> 3 * pixels!+ pixels!+ pixels!+ drop ;
+
+: debug-line >r
+  640 0 |: 2dup > if dup 30 r@ + r@ putp 1+ loop then 2drop
+  r> drop ;
+
+: gray dup dup 16 255 keepin ;
+
+: % 255 100 */ ;
+
+: default-palette 0 % gray 0 setpal
+  30 % gray 1 setpal 60 % gray 2 setpal 100 % gray 3 setpal
+  [ hex ]
+  00 00 f0 4 setpal 00 f0 00 5 setpal f0 00 00 6 setpal
+  00 f0 f0 7 setpal f0 f0 00 8 setpal f0 00 f0 9 setpal
+  00 60 c0 a setpal 60 c0 00 b setpal c0 00 60 c setpal
+  40 80 f0 d setpal 80 f0 40 e setpal f0 40 80 f setpal
+  [ decimal ] ;
+
+  80 % gray . . . cr
+
+: thing
+  16 0 |: 2dup > if dup debug-line 1+ loop then 2drop
+  v-up
+  ;
+
+  default-palette
+  thing
 
 0 [if]
 

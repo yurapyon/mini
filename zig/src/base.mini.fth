@@ -16,6 +16,17 @@ forth-latest context ! context @ current !
 
 : \ source-len @ >in ! ;
 
+: negate 0 swap - ;
+
+: 2dup  over over ;
+: 2drop drop drop ;
+: 2swap flip >r flip r> ;
+: 3drop drop 2drop ;
+: third flip dup >r flip r> ;
+: 3dup  third third third ;
+
+: fourth >r third r> swap ;
+
 : lit, lit lit , ;
 compiler definitions
 : literal lit, , ;
@@ -30,9 +41,10 @@ forth definitions
 2 constant cell
 : cells cell * ;
 
-: allot   here +! ;
+: here    h @ ;
+: allot   h +! ;
 : aligned dup cell mod + ;
-: align   here @ aligned here ! ;
+: align   here aligned h ! ;
 
 : create word define ['] docre @ , ['] exit , ;
 
@@ -40,17 +52,17 @@ forth definitions
 
 \ todo loop could be called recurse
 0 variable loop*
-: set-loop here @ loop* ! ;
+: set-loop here loop* ! ;
 compiler definitions
 : |:   set-loop ;
 : loop ['] jump , loop* @ , ;
 forth definitions
 : : : set-loop ;
 
-: (later), here @ 0 , ;
+: (later), here 0 , ;
 : (lit),   lit, (later), ;
 
-: this  here @ swap ;
+: this  here swap ;
 : this! this ! ;
 : dist  this - ;
 
@@ -59,8 +71,14 @@ compiler definitions
 : else ['] jump , (later), swap this! ;
 : then this! ;
 
+\ todo rename dorange / dolist
+: do.u>   [compile] |: ['] 2dup , ['] u> , [compile] if ;
+: do.u>=  [compile] |: ['] 2dup , ['] u>= , [compile] if ;
+: do.?dup [compile] |: ['] ?dup , [compile] if ;
+: godo    [compile] loop [compile] then ;
+
 0 constant cond
-: endcond ?dup if [compile] then loop then ;
+: endcond do.?dup [compile] then godo ;
 forth definitions
 
 : ( next-char ')' = 0= if loop then ;
@@ -74,23 +92,13 @@ forth definitions
 \ math ===
 
 compiler definitions
-: [by2] \ >r swap >r __ r> r> __
-  ' dup ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
+: [by2] ' dup \ >r swap >r __ r> r> __
+  ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
 forth definitions
 
 : binary 2 base ! ;
 : decimal 10 base ! ;
 : hex 16 base ! ;
-
-: negate 0 swap - ;
-
-: 2dup  over over ;
-: 2drop drop drop ;
-: 2swap flip >r flip r> ;
-: 3drop drop 2drop ;
-
-: third  flip dup >r flip r> ;
-: fourth >r third r> swap ;
 
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
@@ -152,10 +160,10 @@ forth definitions
   endcond c, loop then ;
 
 : count @+ ;
-: cstring (later), here @ string dist swap ! ;
+: cstring (later), here string dist swap ! ;
 
-: d" here @ dup string here ! ;
-: c" here @ dup cstring here ! ;
+: d" here dup string h ! ;
+: c" here dup cstring h ! ;
 : s" [compile] c" count ;
 compiler definitions
 : d" (data), string align this! ;
@@ -167,7 +175,7 @@ forth definitions
 
 \ number print ===
 
-: pad here @ 64 + ;
+: pad here 64 + ;
 
 0 variable #start
 : #len pad #start @ - ;
@@ -195,6 +203,12 @@ forth definitions
   s" [then]" string~= 0= if loop then then ;
 : [then] ;
 : [defined] word find nip ;
+
+compiler definitions
+: [if]      [if] ;
+: [then]    [then] ;
+: [defined] [defined] ;
+forth definitions
 
 \ ===
 
@@ -226,10 +240,10 @@ forth definitions
 
 \ xts ===
 
-: :noname 0 0 define here @ docol# , set-loop ] ;
+: :noname 0 0 define here docol# , set-loop ] ;
 
 compiler definitions
-: [: lit, here @ 6 + , ['] jump , (later), docol# , ;
+: [: lit, here 6 + , ['] jump , (later), docol# , ;
 : ;] ['] exit , this! ;
 forth definitions
 
@@ -239,8 +253,8 @@ forth definitions
 
 : mem d0 dist ;
 
-: fill   >r range |: 2dup > if r@ swap c!+ loop then r> 3drop ;
-: fill16 >r range |: 2dup > if r@ swap  !+ loop then r> 3drop ;
+: fill   >r range do.u> r@ swap c!+ godo r> 3drop ;
+: fill16 >r range do.u> r@ swap  !+ godo r> 3drop ;
 : erase 0 fill ;
 
 : swapmem over @ over @ 2swap >r ! r> ! ;
@@ -251,18 +265,24 @@ forth definitions
 
 \ evaluation ===
 
+vocabulary interpreter
+
 : source source-ptr @ ?dup 0= if input-buffer then
   source-len @ ;
 
-\ todo test with blocks on load
-\ maybe this should just return the rest of lie line? like '\'
+\ todo
+\ test on loading blocks
+\   just return the rest of the line? like '\'
 : source-rest >in @ dup source drop + swap
   source-len @ swap - ;
 
-vocabulary interpreter
-interpreter definitions
-
 ' 2drop variable onwnf
+
+\ note
+\ saved-max is also used for blkstack
+8 constant saved-max
+
+interpreter definitions
 
 : onlookup 0= state @ and if >cfa , else >cfa execute then ;
 : onnumber state @ if lit, , then ;
@@ -279,9 +299,6 @@ s[
   cell field >saved-at
 ]s saved-source
 
-\ note
-\ saved-max is also used for blkstack
-8 constant saved-max
 create saved-stack saved-max saved-source * allot
 saved-stack value saved-tos
 
@@ -302,8 +319,6 @@ saved-stack value saved-tos
 forth definitions
 interpreter
 
-: saved-max saved-max ;
-: onwnf onwnf ;
 : interpret get-word ?dup if resolve loop else drop then ;
 : evaluate save-source set-source interpret restore-source ;
 
@@ -312,26 +327,22 @@ forth
 \ ===
 
 32 constant bl
+: blank bl fill ;
 
-: in[]c >r |: 2dup > if dup c@ r@ <> if 1+ loop then then
-  r> drop <> ;
+: c1st >r do.u> dup c@ r@ <> if 1+ godo then swap r> 2drop ;
+: cin[] third >r c1st r> <> ;
+
 ( addr len 'c' -- t/f )
-: in-string -rot range rot in[]c ;
+: in-string -rot range rot cin[] ;
 : in-pad pad count rot in-string ;
 : s>pad dup pad !+ swap move ;
 : whitespace s"  \n\t" s>pad ;
 
 ( end start -- addr )
-: token 2dup > if c@+ in-pad 0= if loop then then nip ;
-: ltrim 2dup > if dup c@ in-pad if 1+ loop then then nip ;
-: rtrim swap 1- |: 2dup <= if dup 1- c@ in-pad if 1- loop then
-  then nip ;
-
-( addr len -- addr len )
-\ : -trailing 2dup range whitespace rtrim nip over - ;
-
-( addr len -- addr len )
-\ : -leading 2dup range whitespace ltrim -rot + over - ;
+\ : token 2dup > if c@+ in-pad 0= if loop then then nip ;
+\ : ltrim 2dup > if dup c@ in-pad if 1+ loop then then nip ;
+\ : rtrim swap 1- |: 2dup <= if dup 1- c@ in-pad if 1- loop then
+\  then nip ;
 
 : -trailing dup if 2dup + 1- c@ bl = if 1- loop then then ;
 
@@ -358,7 +369,8 @@ forth
 : wrap     ( val max -- )       tuck + swap mod ;
 : wrapxy   ( x y w h -- x y )   [by2] wrap ;
 
-: keepin   ( v dv max -- newv ) -rot + 0 rot clamp ;
+\ add two numbers but keep the value within 0-max
+: keepin   ( a b max -- newv ) -rot + 0 rot clamp ;
 
 0 [if]
 
@@ -366,7 +378,7 @@ compiler
 : assign (lit), ['] swap , ['] ! , ['] exit , this! docol# , ;
 forth
 
-: next, ['] jump , here @ cell + , ;
+: next, ['] jump , here cell + , ;
 : dyn, define docol# , next, ;
 : dyn! >cfa 2 cells + this! ;
 : :dyn word find if drop dyn! else dyn, then ] ;
