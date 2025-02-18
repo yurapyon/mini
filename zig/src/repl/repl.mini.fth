@@ -1,7 +1,6 @@
 : space bl emit ;
 : spaces 0 do.u> space 1+ godo 2drop ;
 : cr 10 emit ;
-: printable 32 126 in[,] ;
 : print dup printable 0= if drop '.' then emit ;
 : .print do.u> c@+ print godo 2drop ;
 : .chars do.u> c@+  emit godo 2drop ;
@@ -22,23 +21,20 @@ forth definitions
 : .2 swap . . ;
 : .3 flip . . . ;
 
-: h8.  <# h# h# #> type ;
-: h16. <# h# h# h# h# #> type ;
-: .bytes do.u> c@+ h8. space godo 2drop ;
+: .byte  <# h# h# #> type ;
+: .short <# h# h# h# h# #> type ;
+: .bytes do.u> c@+ .byte space godo 2drop ;
 
-: dump range do.u> 16 split dup h16. space 2dup .bytes .print cr
-  godo 2drop ;
+: dump range do.u> 16 split dup .short space 2dup .bytes .print
+  cr godo 2drop ;
 
 : .word name tuck type if space then ;
 : words context @ @ do.?dup dup .word @ godo ;
 
-: s0 3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si " [] ;
-: s1 3 d" dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] ;
-: ascii cond dup 16 < if s0 type else dup 32 < if 16 - s1 type
-  else dup 127 < if emit else drop ." del" endcond ;
-: column dup dup dup 3 u.r space h8. space ascii 2 spaces 32 + ;
-: ashy 32 0 do.u> dup column column column column cr drop 1+
-  godo 2drop ;
+: .ascii dup printable if emit else ctlcode type then ;
+: .col dup 3 u.r space dup .byte space .ascii 2 spaces ;
+: .row 128 range do.u> dup .col 32 + godo 2drop ;
+: ashy 32 0 do.u> dup .row cr 1+ godo 2drop ;
 
 \ : .k 1000 1024 */mod 1000 1024 */mod 1000 1024 */
 \   <# # # # drop # # # drop # # # '.' hold #s #> type ;
@@ -107,7 +103,8 @@ create e.insert 0 , 64 allot
   15 line# blank-line ;
 
 : .line# chr @ 64 / . ;
-: t 16 mod 64 * chr ! scrbuf chr @ + 64 range .print space .line# cr ;
+: t 16 mod 64 * chr ! scrbuf chr @ + 64 range .print space
+  .line# cr ;
 : p >insert> drop scrbuf chr @ bb.this-line + 64 move update ;
 : u >insert> drop scrbuf chr @ next-wrap + 64 move update ;
 : x scrbuf chr @ bb.this-line + 64 e.insert >line

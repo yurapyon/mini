@@ -143,21 +143,26 @@ forth definitions
 
 : (data), (lit), ['] jump , (later), swap this! ;
 
-: read-digit next-char char>digit ;
-: read-byte read-digit 16 * read-digit + ;
-: read-esc next-char cond
-    dup '0' = if drop 0 else
-    dup 'n' = if drop 10 else
-    dup 'x' = if drop read-byte else
+: next-digit next-char char>digit ;
+: next-byte next-digit 16 * next-digit + ;
+
+: escape, next-char cond
+    dup '0' = if drop 0 c, else
+    dup 'n' = if drop 10 c, else
+    dup 'N' = if drop 10 c, refill drop else
+    dup 'x' = if drop next-byte c, else
+    dup '&' = if drop refill drop else
     \ NOTE
     \ \\ and \" are handled by the 'cond' falling through
+    c,
   endcond ;
 
 : string next-char drop |:
   next-char cond
     dup '"' = if drop exit else
-    dup '\' = if drop read-esc else
-  endcond c, loop then ;
+    dup '\' = if drop escape, else
+    c,
+  endcond loop then ;
 
 : count @+ ;
 : cstring (later), here string dist swap ! ;
@@ -328,9 +333,14 @@ forth
 
 32 constant bl
 : blank bl fill ;
+: printable 32 126 in[,] ;
+: ctlcode cond dup 32 u< if 3
+d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc\&
+3dc4naksynetbcanem subescfs gs rs us " [] else
+  127 = if s" del" else 0 0 endcond ;
 
-: c1st >r do.u> dup c@ r@ <> if 1+ godo then swap r> 2drop ;
-: cin[] third >r c1st r> <> ;
+: findc >r do.u> dup c@ r@ <> if 1+ godo then swap r> 2drop ;
+: cin[] third >r findc r> <> ;
 
 ( addr len 'c' -- t/f )
 : in-string -rot range rot cin[] ;
