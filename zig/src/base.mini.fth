@@ -147,7 +147,8 @@ forth definitions
 : next-byte next-digit 16 * next-digit + ;
 
 : escape, next-char cond
-    dup '0' = if drop 0 c, else
+    dup '0' = if drop  0 c, else
+    dup 't' = if drop  9 c, else
     dup 'n' = if drop 10 c, else
     dup 'N' = if drop 10 c, refill drop else
     dup 'x' = if drop next-byte c, else
@@ -334,9 +335,9 @@ forth
 32 constant bl
 : blank bl fill ;
 : printable 32 126 in[,] ;
-: ctlcode cond dup 32 u< if 3
-d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc\&
-3dc4naksynetbcanem subescfs gs rs us " [] else
+: ctlcode cond dup 32 u< if 3 d" \&
+nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc\&
+4naksynetbcanem subescfs gs rs us " [] else
   127 = if s" del" else 0 0 endcond ;
 
 : findc >r do.u> dup c@ r@ <> if 1+ godo then swap r> 2drop ;
@@ -370,17 +371,17 @@ d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc\&
 : db.swap dup @ invert swap ! ;
 : db.get db.>s rot >r rot r> xor if nip else + then ;
 
-\ grid stuff ===
+\ grid ===
 
-: lastcol? ( i w -- t/f )       swap 1+ swap mod 0= ;
-: xy+      ( x y dx dy -- x y ) [by2] + ;
-: xy>i     ( x y w -- i )       * + ;
-: i>xy     ( i w -- x y )       /mod swap ;
-: wrap     ( val max -- )       tuck + swap mod ;
-: wrapxy   ( x y w h -- x y )   [by2] wrap ;
+: lastcol? ( i w -- t/f ) swap 1+ swap mod 0= ;
+: xy>i     ( x y w -- i ) * + ;
+: i>xy     ( i w -- x y ) /mod swap ;
+: wrap     ( val max -- ) tuck + swap mod ;
+: xy+    [by2] + ;
+: wrapxy [by2] wrap ;
 
 \ add two numbers but keep the value within 0-max
-: keepin   ( a b max -- newv ) -rot + 0 rot clamp ;
+: keepin ( a b max -- newv ) -rot + 0 rot clamp ;
 
 0 [if]
 

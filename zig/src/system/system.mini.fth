@@ -48,8 +48,6 @@ forth definitions
   40 80 f0 d setpal 80 f0 40 e setpal f0 40 80 f setpal
   [ decimal ] ;
 
-  80 % gray . . . cr
-
 : thing
   16 0 |: 2dup > if dup debug-line 1+ loop then 2drop
   v-up

@@ -7,6 +7,9 @@ const Cell = runtime.Cell;
 
 const video = @import("video.zig");
 
+const Palette = @import("palette.zig").Palette;
+const PixelBuffer = @import("pixel_buffer.zig").PixelBuffer;
+
 // ===
 
 pub const Pixels = struct {
@@ -22,12 +25,11 @@ pub const Pixels = struct {
         -1.0, -1.0, 0.0, 0.0,
     };
 
-    palette: [16 * 3]u8,
-    buffer: [256 * 1024]u8,
+    palette: Palette(16),
+    buffer: PixelBuffer(video.screen_width, video.screen_height),
 
-    texture: c.GLuint,
-    vbo: c.GLuint,
     vao: c.GLuint,
+    vbo: c.GLuint,
     program: c.GLuint,
 
     locations: struct {
@@ -36,24 +38,19 @@ pub const Pixels = struct {
     },
 
     pub fn init(self: *@This()) void {
-        self.texture = c.gfx.texture.createEmpty(
-            video.screen_width,
-            video.screen_height,
-        );
+        self.palette.init();
+        self.buffer.init();
+        self.buffer.randomize(16);
+
+        self.vao = c.gfx.vertex_array.create();
         self.initQuad();
         self.initProgram();
 
         c.glUseProgram(self.program);
         c.glUniform1i(self.locations.texture, 0);
 
-        random.fillWithRandomBytes(&self.buffer);
-        for (&self.buffer) |*color| {
-            color.* %= 16;
-        }
-        self.pushBufferToTexture();
-
-        random.fillWithRandomBytes(&self.palette);
-        self.setPaletteUniforms();
+        self.palette.updateProgramUniforms(self.locations.palette);
+        self.buffer.pushToTexture();
     }
 
     fn initProgram(self: *@This()) void {
@@ -95,8 +92,6 @@ pub const Pixels = struct {
             c.GL_STATIC_DRAW,
         );
 
-        self.vao = c.gfx.vertex_array.create();
-
         c.glBindVertexArray(self.vao);
 
         c.glEnableVertexAttribArray(0);
@@ -122,37 +117,10 @@ pub const Pixels = struct {
         c.glBindVertexArray(0);
     }
 
-    pub fn pushBufferToTexture(self: *@This()) void {
-        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
-        c.glTexSubImage2D(
-            c.GL_TEXTURE_2D,
-            0,
-            0,
-            0,
-            video.screen_width,
-            video.screen_height,
-            c.GL_RED,
-            c.GL_UNSIGNED_BYTE,
-            &self.buffer,
-        );
-    }
-
-    pub fn setPaletteUniforms(self: *@This()) void {
-        var float_palette = [_]f32{0} ** (16 * 3);
-        for (self.palette, 0..) |byte, i| {
-            float_palette[i] = @as(f32, @floatFromInt(byte)) / 255;
-        }
-        c.glUniform3fv(
-            self.locations.palette,
-            16,
-            &float_palette,
-        );
-    }
-
     pub fn draw(self: *@This()) void {
         c.glUseProgram(self.program);
 
-        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.buffer.texture);
         c.glActiveTexture(c.GL_TEXTURE0);
 
         c.glBindVertexArray(self.vao);
@@ -164,15 +132,15 @@ pub const Pixels = struct {
     // ===
 
     pub fn store(self: *@This(), addr: Cell, value: u8) void {
-        if (addr < @sizeOf(@TypeOf(self.palette))) {
-            self.palette[addr] = value;
-            self.setPaletteUniforms();
+        if (addr < @TypeOf(self.palette).item_ct) {
+            self.palette.colors[addr] = value;
+            self.palette.updateProgramUniforms(self.locations.palette);
         }
     }
 
-    pub fn fetch(self: *@This(), addr: Cell) u8 {
-        if (addr < @sizeOf(@TypeOf(self.palette))) {
-            return self.palette[addr];
+    pub fn fetch(self: @This(), addr: Cell) u8 {
+        if (addr < @TypeOf(self.palette).item_ct) {
+            return self.palette.colors[addr];
         } else {
             return 0;
         }
@@ -184,7 +152,10 @@ pub const Pixels = struct {
         y: Cell,
         palette_idx: u4,
     ) void {
-        const at = @as(usize, x) + @as(usize, y) * video.screen_width;
-        self.buffer[at] = palette_idx;
+        self.buffer.putXY(x, y, palette_idx);
+    }
+
+    pub fn update(self: *@This()) void {
+        self.buffer.pushToTexture();
     }
 };

@@ -35,8 +35,8 @@ const ExternalId = enum(Cell) {
     put_character,
     pixels_store,
     pixels_fetch,
-    set_character,
-    get_character,
+    characters_store,
+    characters_fetch,
     video_update,
     _max,
     _,
@@ -119,34 +119,27 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
             rt.data_stack.push(value);
         },
-        .set_character => {
-            //             const at = rt.data_stack.pop();
-            //             const buffer_addr = rt.data_stack.pop();
-            //             const slice = try mem.constSliceFromAddrAndLen(
-            //                 rt.memory,
-            //                 buffer_addr,
-            //                 6,
-            //             );
-            //             system.video.setCharacter(
-            //                 @truncate(at),
-            //                 slice,
-            //             );
+        .characters_store => {
+            const addr = rt.data_stack.pop();
+            const value = rt.data_stack.pop();
+
+            system.video.characters.store(
+                addr,
+                @truncate(value),
+            );
         },
-        .get_character => {
-            //             const at = rt.data_stack.pop();
-            //             const buffer_addr = rt.data_stack.pop();
-            //             const slice = try mem.sliceFromAddrAndLen(
-            //                 rt.memory,
-            //                 buffer_addr,
-            //                 6,
-            //             );
-            //             system.video.getCharacter(
-            //                 @truncate(at),
-            //                 slice,
-            //             );
+        .characters_fetch => {
+            const addr = rt.data_stack.pop();
+
+            const value = system.video.characters.fetch(
+                addr,
+            );
+
+            rt.data_stack.push(value);
         },
         .video_update => {
-            system.video.pixels.pushBufferToTexture();
+            system.video.pixels.update();
+            system.video.characters.update();
         },
         else => return false,
     }
@@ -388,14 +381,14 @@ pub const System = struct {
             @intFromEnum(ExternalId.pixels_fetch),
         );
         try rt.defineExternal(
-            "setchar",
+            "characters!",
             forth_vocabulary_addr,
-            @intFromEnum(ExternalId.set_character),
+            @intFromEnum(ExternalId.characters_store),
         );
         try rt.defineExternal(
-            "getchar",
+            "characters@",
             forth_vocabulary_addr,
-            @intFromEnum(ExternalId.get_character),
+            @intFromEnum(ExternalId.characters_fetch),
         );
         try rt.defineExternal(
             "v-up",

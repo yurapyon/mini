@@ -26,15 +26,6 @@ const Characters = @import("characters.zig").Characters;
 pub const screen_width = 640;
 pub const screen_height = 400;
 
-const Attributes = packed struct {
-    _0: u1,
-    _1: u1,
-    _2: u1,
-    reverse: u1,
-    bold: u1,
-    color: u3,
-};
-
 pub const Video = struct {
     pixels: Pixels,
     characters: Characters,
