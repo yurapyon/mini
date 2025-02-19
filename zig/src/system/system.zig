@@ -31,8 +31,6 @@ const ExternalId = enum(Cell) {
     debug_emit,
     set_xt,
     put_pixel,
-    read_pixel,
-    put_character,
     pixels_store,
     pixels_fetch,
     characters_store,
@@ -84,23 +82,6 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 @truncate(idx),
             );
         },
-        .read_pixel => {
-            // TODO
-        },
-        .put_character => {
-            // TODO order for this?
-            //             const color = rt.data_stack.pop();
-            //             const character = rt.data_stack.pop();
-            //             const y = rt.data_stack.pop();
-            //             const x = rt.data_stack.pop();
-            //
-            //             system.video.putCharacter(
-            //                 x,
-            //                 y,
-            //                 @truncate(character),
-            //                 @truncate(color),
-            //             );
-        },
         .pixels_store => {
             const addr = rt.data_stack.pop();
             const value = rt.data_stack.pop();
@@ -138,8 +119,7 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             rt.data_stack.push(value);
         },
         .video_update => {
-            system.video.pixels.update();
-            system.video.characters.update();
+            system.video.update();
         },
         else => return false,
     }
@@ -282,6 +262,10 @@ pub const System = struct {
         self.xts.keydown = null;
         self.xts.mousemove = null;
         self.xts.mousedown = null;
+
+        c.glEnable(c.GL_BLEND);
+        c.glBlendEquation(c.GL_FUNC_ADD);
+        c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     pub fn deinit(_: @This()) void {
@@ -361,16 +345,6 @@ pub const System = struct {
             @intFromEnum(ExternalId.put_pixel),
         );
         try rt.defineExternal(
-            "readp",
-            forth_vocabulary_addr,
-            @intFromEnum(ExternalId.read_pixel),
-        );
-        try rt.defineExternal(
-            "putc",
-            forth_vocabulary_addr,
-            @intFromEnum(ExternalId.put_character),
-        );
-        try rt.defineExternal(
             "pixels!",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.pixels_store),
@@ -391,6 +365,7 @@ pub const System = struct {
             @intFromEnum(ExternalId.characters_fetch),
         );
         try rt.defineExternal(
+            // TODO rename
             "v-up",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.video_update),
@@ -400,8 +375,8 @@ pub const System = struct {
 
     pub fn loop(self: *@This()) !void {
         while (c.glfwWindowShouldClose(self.window) == c.GL_FALSE) {
-            c.glClear(c.GL_COLOR_BUFFER_BIT);
             self.video.draw();
+
             c.glfwSwapBuffers(self.window);
 
             c.glfwPollEvents();

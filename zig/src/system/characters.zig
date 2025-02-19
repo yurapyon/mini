@@ -38,10 +38,10 @@ pub const Characters = struct {
     };
 
     const quad_data = [_]f32{
-        1.0,  1.0,  1.0, 1.0,
-        -1.0, 1.0,  0.0, 1.0,
-        1.0,  -1.0, 1.0, 0.0,
-        -1.0, -1.0, 0.0, 0.0,
+        1, 1, 1, 1,
+        0, 1, 0, 1,
+        1, 0, 1, 0,
+        0, 0, 0, 0,
     };
 
     palette: Palette(8),
@@ -60,6 +60,7 @@ pub const Characters = struct {
     locations: struct {
         spritesheet: c.GLint,
         palette: c.GLint,
+        screen: c.GLint,
     },
 
     pub fn init(self: *@This()) void {
@@ -68,6 +69,7 @@ pub const Characters = struct {
         self.initBuffers();
         self.spritesheet.init();
         self.spritesheet.randomize(2);
+        self.spritesheet.pushToTexture();
 
         math.m3.orthoScreen(
             &self.screen,
@@ -76,15 +78,18 @@ pub const Characters = struct {
         );
 
         // TODO make sure this has to be 2,2 and not 0.5,0.5
-        var temp: math.m3.Mat3 = undefined;
-        math.m3.scaling(&temp, 2, 2);
-        math.m3.mult(&self.screen, temp);
+        // var temp: math.m3.Mat3 = undefined;
+        // math.m3.scaling(&temp, 2, 2);
+        // math.m3.mult(&self.screen, temp);
 
         self.vao = c.gfx.vertex_array.create();
 
         self.initQuad();
         self.initInstanceBuffer();
         self.initProgram();
+
+        c.glUseProgram(self.program);
+        self.palette.updateProgramUniforms(self.locations.palette);
     }
 
     fn initBuffers(self: *@This()) void {
@@ -118,6 +123,10 @@ pub const Characters = struct {
         self.locations.palette = c.glGetUniformLocation(
             self.program,
             "palette",
+        );
+        self.locations.screen = c.glGetUniformLocation(
+            self.program,
+            "screen",
         );
     }
 
@@ -188,7 +197,7 @@ pub const Characters = struct {
             c.GL_UNSIGNED_INT,
             c.GL_FALSE,
             2 * @sizeOf(u32),
-            @ptrFromInt(2 * @sizeOf(u32)),
+            @ptrFromInt(1 * @sizeOf(u32)),
         );
         c.glVertexAttribDivisor(3, 1);
 
@@ -206,9 +215,13 @@ pub const Characters = struct {
     }
 
     pub fn draw(self: *@This()) void {
-        // TODO write screen matr to program
-
         c.glUseProgram(self.program);
+        c.glUniformMatrix3fv(
+            self.locations.screen,
+            1,
+            c.GL_FALSE,
+            &self.screen,
+        );
 
         c.glBindTexture(c.GL_TEXTURE_2D, self.spritesheet.texture);
         c.glActiveTexture(c.GL_TEXTURE0);
@@ -232,6 +245,7 @@ pub const Characters = struct {
         const break2 = break1 + buffer_width * buffer_height;
         if (addr < break0) {
             self.palette.colors[addr] = value;
+            c.glUseProgram(self.program);
             self.palette.updateProgramUniforms(self.locations.palette);
         } else if (addr < break1) {
             const start_addr = (addr - break0) * 8;

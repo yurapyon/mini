@@ -31,9 +31,6 @@ pub const Video = struct {
     characters: Characters,
 
     pub fn init(self: *@This()) void {
-        // self.clearBuffer();
-        // self.updateTexture();
-
         self.pixels.init();
         self.characters.init();
     }
@@ -42,27 +39,13 @@ pub const Video = struct {
         // TODO
     }
 
-    // ===
-
-    fn makeProgram(self: *@This()) void {
-        _ = self;
-        //         const vert_shader = gfx.shader.create(
-        //             gfx.vert_shader_string,
-        //             c.GL_VERTEX_SHADER,
-        //         );
-        //         defer gfx.shader.deinit(vert_shader);
-        //
-        //         const frag_shader = gfx.shader.create(
-        //             gfx.frag_shader_string,
-        //             c.GL_FRAGMENT_SHADER,
-        //         );
-        //         defer gfx.shader.deinit(frag_shader);
-        //
-        //         const program = gfx.program.create(vert_shader, frag_shader);
-        //         self.program = program;
+    pub fn update(self: *@This()) void {
+        self.pixels.update();
+        self.characters.update();
     }
 
     pub fn draw(self: *@This()) void {
+        c.glClear(c.GL_COLOR_BUFFER_BIT);
         self.pixels.draw();
         self.characters.draw();
     }

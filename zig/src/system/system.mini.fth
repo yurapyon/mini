@@ -40,7 +40,7 @@ forth definitions
 : % 255 100 */ ;
 
 : default-palette 0 % gray 0 setpal
-  30 % gray 1 setpal 60 % gray 2 setpal 100 % gray 3 setpal
+  20 % gray 1 setpal 60 % gray 2 setpal 100 % gray 3 setpal
   [ hex ]
   00 00 f0 4 setpal 00 f0 00 5 setpal f0 00 00 6 setpal
   00 f0 f0 7 setpal f0 f0 00 8 setpal f0 00 f0 9 setpal
@@ -48,13 +48,39 @@ forth definitions
   40 80 f0 d setpal 80 f0 40 e setpal f0 40 80 f setpal
   [ decimal ] ;
 
+: blline >r
+  640 0 |: 2dup > if dup r@ 1 putp 1+ loop then 2drop
+  r> drop ;
+
 : thing
-  16 0 |: 2dup > if dup debug-line 1+ loop then 2drop
+  \ 16 0 |: 2dup > if dup debug-line 1+ loop then 2drop
+  400 0 |: 2dup > if dup blline 1+ loop then 2drop
   v-up
   ;
 
   default-palette
   thing
+
+0b00000110 24 characters!
+0b00001010 24 16 1 * + characters!
+0b00010010 24 16 2 * + characters!
+0b00100010 24 16 3 * + characters!
+0b01000010 24 16 4 * + characters!
+0b11111110 24 16 5 * + characters!
+0b10000010 24 16 6 * + characters!
+0b10000010 24 16 7 * + characters!
+0b10000010 24 16 8 * + characters!
+0b00000000 24 16 9 * + characters!
+
+10 2600 characters!
+1 2601 characters!
+
+20 2602 characters!
+2 2603 characters!
+
+30 2604 characters!
+3 2605 characters!
+v-up
 
 0 [if]
 

@@ -20,6 +20,8 @@ flat out uint use_bold;
 flat out uint palette_idx;
 flat out vec2 uv_pixel_size;
 
+const vec2 char_quad = vec2(character_width, character_height);
+
 void main() {
     use_reverse = attributes & 0x10u;
     use_bold = attributes & 0x08u;
@@ -28,9 +30,9 @@ void main() {
     uv_pixel_size.x = 1.0 / float(spritesheet_width);
     uv_pixel_size.y = 1.0 / float(spritesheet_height);
 
-    // TODO move uv by characterw/h
-    vec2 flipped_uv = vec2(uv.x, 1 - uv.y);
-    uv_coord = flipped_uv;
+    vec2 uv_offset = vec2(character % 16u, character / 16u);
+
+    uv_coord = (uv + uv_offset) * uv_pixel_size * char_quad;
 
     uint id = uint(gl_InstanceID);
 
@@ -38,7 +40,7 @@ void main() {
     uint y = (id / buffer_width) * character_height;
     vec2 displace = vec2(x, y);
 
-    vec3 pos = screen * vec3(vertex + displace, 0.0);
+    vec3 pos = screen * vec3(vertex * char_quad + displace, 1.0);
 
     gl_Position = vec4(pos, 1.0);
 }
