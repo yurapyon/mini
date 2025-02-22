@@ -12,63 +12,51 @@ const Register = register.Register;
 
 pub fn Stack(
     comptime top_ptr_addr: Cell,
-    comptime stack_bottom: Cell,
-    comptime stack_top: Cell,
+    comptime top_addr: Cell,
 ) type {
     return struct {
         memory: MemoryPtr,
         // NOTE
-        // This is guaranteed to be Cell aligned as long as stack_bottom is
+        // This is guaranteed to be Cell aligned as long
+        //     as top_addr is
         //   This can get messed up from forth though
-        top: Register(top_ptr_addr),
-
-        // TODO comptime check that stack_size is 32
-        const stack_size = stack_top - stack_bottom;
-        const wrap_mask = 0x3f;
+        top_ptr: Register(top_ptr_addr),
 
         pub fn init(self: *@This(), memory: MemoryPtr) void {
             self.memory = memory;
-
-            self.top.init(self.memory);
-            self.top.store(stack_bottom);
+            self.top_ptr.init(self.memory);
+            self.top_ptr.store(top_addr);
         }
 
-        //         fn wrappedIndex(self: *@This(), offset: isize) Cell {
-        //             const top = self.top.fetch();
-        //             const idx = top - stack_bottom;
-        //             const new_idx = idx + offset * @sizeOf(Cell);
-        //             const wrapped_idx: Cell = @intCast(@mod(new_idx, stack_size));
-        //             return wrapped_idx + stack_bottom;
-        //         }
-
-        pub fn peek(self: *@This(), at: isize) *Cell {
-            // const idx = self.wrappedIndex(at);
-            const idx = self.top.fetch() + stack_bottom + at;
-            return mem.cellPtr(self.memory, idx & wrap_mask) catch unreachable;
+        pub fn depth(self: @This()) Cell {
+            const current_top = self.top_ptr.fetch();
+            return top_addr - current_top;
         }
 
-        pub fn peekSigned(self: *@This(), at: isize) *SignedCell {
-            const idx = self.wrappedIndex(at);
-            const cell_ptr = mem.cellPtr(self.memory, idx) catch unreachable;
+        fn peek(self: *@This(), at: Cell) *Cell {
+            const idx = self.top_ptr.fetch() + at;
+            return mem.cellPtr(self.memory, idx) catch unreachable;
+        }
+
+        fn peekSigned(self: *@This(), at: Cell) *SignedCell {
+            const cell_ptr = self.peek(at);
             return @ptrCast(cell_ptr);
         }
 
-        pub fn pop(self: *@This()) void {
-            self.top.storeSubtract(@sizeOf(Cell));
-            self.top.mask(wrap_mask);
+        fn pop(self: *@This(), count: Cell) void {
+            self.top_ptr.storeAdd(count * @sizeOf(Cell));
         }
 
-        pub fn push(self: *@This()) void {
-            self.top.storeAdd(@sizeOf(Cell));
-            self.top.mask(wrap_mask);
+        fn push(self: *@This(), count: Cell) void {
+            self.top_ptr.storeSubtract(count * @sizeOf(Cell));
         }
 
         // ===
 
         pub fn pushCell(self: *@This(), value: Cell) void {
-            const next_top = self.peek(1);
-            next_top.* = value;
-            self.push();
+            self.push(1);
+            const top = self.peek(0);
+            top.* = value;
         }
 
         pub fn pushBoolean(self: *@This(), value: bool) void {
@@ -77,48 +65,271 @@ pub fn Stack(
 
         pub fn popCell(self: *@This()) Cell {
             const top = self.peek(0);
-            self.pop();
+            self.pop(1);
             return top.*;
         }
 
-        pub fn debugPrint(self: *@This()) void {
+        pub fn peekCell(self: *@This()) Cell {
+            return self.peek(0).*;
+        }
+
+        pub fn debugPrint(self: @This()) void {
             const std = @import("std");
-            for (0..(stack_size / @sizeOf(Cell))) |i| {
+            for (0..(self.depth() / @sizeOf(Cell))) |i| {
                 const at = -@as(isize, @intCast(i));
                 std.debug.print("{x:2}: {}\n", .{ i, self.peek(at).* });
             }
         }
 
-        // ===
+        // stack manip ===
 
         pub fn dup(self: *@This()) void {
+            self.push(1);
             const top = self.peek(0);
-            const next_top = self.peek(1);
-            next_top.* = top.*;
-            self.push();
+            const second = self.peek(1);
+            top.* = second.*;
         }
 
         pub fn drop(self: *@This()) void {
-            self.pop();
+            self.pop(1);
         }
+
+        pub fn swap(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const temp = top.*;
+            top.* = second.*;
+            second.* = temp;
+        }
+
+        pub fn flip(self: *@This()) void {
+            const top = self.peek(0);
+            const third = self.peek(2);
+            const temp = top.*;
+            top.* = third.*;
+            third.* = temp;
+        }
+
+        pub fn over(self: *@This()) void {
+            self.push(1);
+            const top = self.peek(0);
+            const third = self.peek(2);
+            top.* = third.*;
+        }
+
+        pub fn nip(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            self.pop(1);
+            second.* = top.*;
+        }
+
+        pub fn tuck(self: *@This()) void {
+            self.push(1);
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
+
+            top.* = second.*;
+            second.* = third.*;
+            third.* = top.*;
+        }
+
+        pub fn rot(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
+
+            const temp = top.*;
+
+            top.* = third.*;
+            third.* = second.*;
+            second.* = temp;
+        }
+
+        pub fn nrot(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
+
+            const temp = top.*;
+
+            top.* = second.*;
+            second.* = third.*;
+            third.* = temp;
+        }
+
+        // logic ===
 
         pub fn eq(self: *@This()) void {
             const top = self.peek(0);
-            const second = self.peek(-1);
-            self.pushBoolean(top.* == second.*);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* == second.*);
+            self.pop(1);
         }
 
         pub fn eq0(self: *@This()) void {
             const top = self.peek(0);
-            self.pushBoolean(top.* == 0);
+            top.* = runtime.cellFromBoolean(top.* == 0);
         }
 
         pub fn gt(self: *@This()) void {
             const top = self.peekSigned(0);
-            const second = self.peekSigned(-1);
-            self.pop();
-            self.pop();
-            self.pushBoolean(second.* > top.*);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* > ssecond.*);
+            self.pop(1);
+        }
+
+        pub fn gteq(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* >= ssecond.*);
+            self.pop(1);
+        }
+
+        pub fn lt(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* < ssecond.*);
+            self.pop(1);
+        }
+
+        pub fn lteq(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* <= ssecond.*);
+            self.pop(1);
+        }
+
+        pub fn ugt(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* > second.*);
+            self.pop(1);
+        }
+
+        pub fn ugteq(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* >= second.*);
+            self.pop(1);
+        }
+
+        pub fn ult(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* < second.*);
+            self.pop(1);
+        }
+
+        pub fn ulteq(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* <= second.*);
+            self.pop(1);
+        }
+
+        // bits ===
+
+        pub fn and_(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = second.* & top.*;
+            self.pop(1);
+        }
+
+        pub fn ior(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = second.* | top.*;
+            self.pop(1);
+        }
+
+        pub fn xor(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = second.* ^ top.*;
+            self.pop(1);
+        }
+
+        pub fn invert(self: *@This()) void {
+            const top = self.peek(0);
+            top.* = ~top.*;
+        }
+
+        pub fn lshift(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = second.* << @truncate(top.*);
+            self.pop(1);
+        }
+
+        pub fn rshift(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = second.* >> @truncate(top.*);
+            self.pop(1);
+        }
+
+        // math ===
+
+        pub fn inc(self: *@This()) void {
+            const top = self.peek(0);
+            top.* +%= 1;
+        }
+
+        pub fn dec(self: *@This()) void {
+            const top = self.peek(0);
+            top.* -%= 1;
+        }
+
+        pub fn add(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* +%= top.*;
+            self.pop(1);
+        }
+
+        pub fn subtract(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* -%= top.*;
+            self.pop(1);
+        }
+
+        pub fn multiply(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* *%= top.*;
+            self.pop(1);
+        }
+
+        // TODO these should be signed
+        pub fn divide(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            if (top.* != 0) {
+                second.* /= top.*;
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
+        }
+
+        // TODO these should be signed
+        pub fn mod(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            if (top.* != 0) {
+                second.* %= top.*;
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
         }
     };
 }

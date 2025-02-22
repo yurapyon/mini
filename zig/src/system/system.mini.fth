@@ -59,27 +59,41 @@ forth definitions
   ;
 
   default-palette
-  thing
+  \ thing
 
-0b00000110 24 characters!
-0b00001010 24 16 1 * + characters!
-0b00010010 24 16 2 * + characters!
-0b00100010 24 16 3 * + characters!
-0b01000010 24 16 4 * + characters!
-0b11111110 24 16 5 * + characters!
-0b10000010 24 16 6 * + characters!
-0b10000010 24 16 7 * + characters!
-0b10000010 24 16 8 * + characters!
-0b00000000 24 16 9 * + characters!
+: putc 2 * 2584 + characters! ;
+: puta 2 * 2585 + characters! ;
+: puts 24 + characters! ;
+: putsprite 16 i>xy 160 * + >r
+160 0 do.u> rot over r@ + puts 16 + godo 2drop
+r> drop
+;
 
-10 2600 characters!
-1 2601 characters!
+hex
+00 00 00 00 00 00 00 00 00 00
+decimal
+0 putsprite
 
-20 2602 characters!
-2 2603 characters!
+hex
+00 82 82 82 fe 42 22 12 0a 06
+decimal
+255 putsprite
 
-30 2604 characters!
-3 2605 characters!
+
+0 0 putc
+0b00010111 0 puta
+
+20 1 putc
+2  1 puta
+
+0 2 putc
+0b00000011 2 puta
+
+1 80 putc
+0b00000011 80 puta
+
+2 160 putc
+0b00000011 160 puta
 v-up
 
 0 [if]

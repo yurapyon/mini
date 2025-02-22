@@ -19,7 +19,7 @@ void main() {
     vec3 color = palette[palette_idx];
     bool is_set = texture(tex, uv_coord).r != 0u;
 
-    /*
+    // TODO this bleeds between characters
     if (bool_bold) {
         vec2 previous_pixel_uv =
             vec2(uv_coord.x - uv_pixel_size.x, uv_coord.y);
@@ -30,8 +30,6 @@ void main() {
     if (bool_reverse) {
         is_set = !is_set;
     }
-    */
 
     out_color = vec4(color, is_set ? 1 : 0);
-    // out_color = vec4(uv_coord,1,1);
 }

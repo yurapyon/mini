@@ -44,11 +44,11 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
     switch (external_id) {
         .allocate => {
-            const size = rt.data_stack.pop();
+            const size = rt.data_stack.popCell();
             const handle_id = dyn.allocate(rt.allocator, size) catch {
                 return error.ExternalPanic;
             };
-            rt.data_stack.push(handle_id);
+            rt.data_stack.pushCell(handle_id);
         },
         // TODO
         //         .realloc => {
@@ -56,52 +56,58 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
         //             dyn.dynamic_memory.realloc(handle_id, size) catch unreachable;
         //         },
         .free => {
-            const handle_id = rt.data_stack.pop();
+            const handle_id = rt.data_stack.popCell();
             dyn.free(rt.allocator, handle_id);
             dyn.handles.freeHandle(handle_id);
         },
         .dynFetch => {
-            const handle_id, const addr = rt.data_stack.pop2();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
                 const value = cell_ptr[addr / 2];
-                rt.data_stack.push(value);
+                rt.data_stack.pushCell(value);
             }
         },
         .dynStore => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
                 cell_ptr[addr / 2] = value;
             }
         },
         .dynStoreAdd => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const cell_ptr = @as([*]Cell, @alignCast(@ptrCast(slice.ptr)));
                 cell_ptr[addr / 2] +%= value;
             }
         },
         .dynFetchC => {
-            const handle_id, const addr = rt.data_stack.pop2();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const value = slice[addr];
-                rt.data_stack.push(value);
+                rt.data_stack.pushCell(value);
             }
         },
         .dynStoreC => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const u8_value: u8 = @truncate(value);
                 slice[addr] = u8_value;
             }
         },
         .dynStoreAddC => {
-            const handle_id, const addr = rt.data_stack.pop2();
-            const value = rt.data_stack.pop();
+            const handle_id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
             if (dyn.getAllocatedSlice(handle_id)) |slice| {
                 const u8_value: u8 = @truncate(value);
                 slice[addr] +%= u8_value;

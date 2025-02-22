@@ -71,6 +71,9 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     state: Cell,
     base: Cell,
 
+    data_stack_ptr: Cell,
+    return_stack_ptr: Cell,
+
     execute: [2]Cell,
 
     // zero for input buffer
@@ -79,30 +82,22 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     source_len: Cell,
     source_at: Cell,
 
-    input_buffer: [128]u8,
-
-    data_stack_top_ptr: Cell,
-    data_stack: [32]Cell,
-    data_stack_top: u0,
-
-    return_stack_top_ptr: Cell,
-    return_stack: [32]Cell,
-    return_stack_top: u0,
-
     dictionary_start: u0,
-});
 
-pub const EndOfMemoryLayout = MemoryLayout(struct {
-    data_stack: Cell,
-    data_stack_ptr: Cell,
+    _: u0,
+
+    data_stack: u0,
+    input_buffer: [128]u8,
     return_stack: [64]Cell,
-    return_stack_ptr: Cell,
 });
 
 comptime {
-    if (MainMemoryLayout.offsetOf("dictionary_start") >= std.math.maxInt(Cell) + 1) {
-        @compileError("MainMemoryLayout doesn't fit within Memory");
-    }
+    // @compileError(std.fmt.comptimePrint("{} {} {} {}\n", .{
+    //     MainMemoryLayout.offsetOf("dictionary_start"),
+    //     MainMemoryLayout.offsetOf("data_stack"),
+    //     MainMemoryLayout.offsetOf("input_buffer"),
+    //     MainMemoryLayout.offsetOf("return_stack"),
+    // }));
 }
 
 // TODO state could just be a boolean
@@ -129,20 +124,18 @@ pub const Runtime = struct {
     program_counter: Cell,
     current_token_addr: Cell,
     execute_register: Register(MainMemoryLayout.offsetOf("execute")),
-    data_stack: DataStack,
-    return_stack: ReturnStack,
+    // data_stack: DataStack,
+    // return_stack: ReturnStack,
     interpreter: Interpreter,
     input_buffer: InputBuffer,
 
-    data_stack2: Stack(
-        MainMemoryLayout.offsetOf("data_stack_top_ptr"),
+    data_stack: Stack(
         MainMemoryLayout.offsetOf("data_stack"),
-        MainMemoryLayout.offsetOf("data_stack_top"),
+        MainMemoryLayout.offsetOf("data_stack_ptr"),
     ),
-    return_stack2: Stack(
-        MainMemoryLayout.offsetOf("return_stack_top_ptr"),
+    return_stack: Stack(
         MainMemoryLayout.offsetOf("return_stack"),
-        MainMemoryLayout.offsetOf("return_stack_top"),
+        MainMemoryLayout.offsetOf("return_stack_ptr"),
     ),
 
     // TODO could put this in forth
@@ -159,8 +152,8 @@ pub const Runtime = struct {
 
         self.interpreter.init(self.memory);
         self.input_buffer.init(self.memory);
-        self.data_stack2.init(self.memory);
-        self.return_stack2.init(self.memory);
+        self.data_stack.init(self.memory);
+        self.return_stack.init(self.memory);
 
         self.externals = ArrayList(External).init(allocator);
 
@@ -202,6 +195,10 @@ pub const Runtime = struct {
         try self.interpreter.dictionary.compileConstant(
             "d0",
             MainMemoryLayout.offsetOf("dictionary_start"),
+        );
+        try self.interpreter.dictionary.compileConstant(
+            "s0",
+            MainMemoryLayout.offsetOf("data_stack"),
         );
         try self.interpreter.dictionary.compileConstant(
             "input-buffer",
@@ -301,7 +298,7 @@ pub const Runtime = struct {
                 try self.executeLoop();
             },
             .number => |value| {
-                self.data_stack.push(value);
+                self.data_stack.pushCell(value);
             },
         }
     }
@@ -333,7 +330,7 @@ pub const Runtime = struct {
     fn setupExecuteLoop(self: *@This(), cfa_addr: Cell) !void {
         // NOTE
         // puts a zero on the return stack as a sentinel for the execute loop to exit
-        self.return_stack.push(0);
+        self.return_stack.pushCell(0);
         self.setCfaToExecute(cfa_addr);
     }
 

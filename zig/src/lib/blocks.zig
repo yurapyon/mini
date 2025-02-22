@@ -30,7 +30,8 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
 
     switch (external_id) {
         .bwrite => {
-            const addr, const block_id = rt.data_stack.pop2();
+            const addr = rt.data_stack.popCell();
+            const block_id = rt.data_stack.popCell();
             const buffer = try mem.constSliceFromAddrAndLen(
                 rt.memory,
                 addr,
@@ -40,7 +41,8 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             self.blockToStorage(block_id, buffer) catch unreachable;
         },
         .bread => {
-            const addr, const block_id = rt.data_stack.pop2();
+            const addr = rt.data_stack.popCell();
+            const block_id = rt.data_stack.popCell();
             const buffer = try mem.sliceFromAddrAndLen(
                 rt.memory,
                 addr,

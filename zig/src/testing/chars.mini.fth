@@ -40,7 +40,9 @@ true value first-frame
 
 : mousemove to my to mx ;
 
-: mousedown mx my in-chars? if
+: mousedown
+.2 cr
+mx my in-chars? if
 mx my clicked-ch to active-ch
 show-active
 then ;

@@ -20,12 +20,11 @@ const buffer_height = 40;
 const character_width = 8;
 const character_height = 10;
 
-// TODO blinking
+// TODO blinking, dropshadow, italic
 const Attributes = packed struct {
     _0: u1,
     _1: u1,
     _2: u1,
-    // TODO make sure reverse works even if no character is set
     reverse: u1,
     bold: u1,
     color: u3,
@@ -287,35 +286,4 @@ pub const Characters = struct {
     pub fn update(self: *@This()) void {
         self.updateInstanceBuffer();
     }
-
-    // TODO
-    //     pub fn putCharacter(
-    //         self: *@This(),
-    //         x: Cell,
-    //         y: Cell,
-    //         character_idx: u8,
-    //         palette_idx: u8,
-    //     ) void {
-    //         const character = self.characters[character_idx];
-    //         const color = self.palette[palette_idx];
-    //
-    //         for (0..6) |i| {
-    //             // TODO maybe do scr_w and scr_h adjustment in forth
-    //             const at_x = x + i + (screen_width - 400) / 2;
-    //             var col = character[i];
-    //
-    //             for (0..8) |j| {
-    //                 const at_y = y + j + (screen_height - 300) / 2;
-    //                 const value = col & 0x80;
-    //
-    //                 if (value != 0) {
-    //                     const buffer_at = at_x + at_y * screen_width;
-    //                     self.buffer[buffer_at] = color;
-    //                 }
-    //
-    //                 col <<= 1;
-    //             }
-    //         }
-    //     }
-
 };

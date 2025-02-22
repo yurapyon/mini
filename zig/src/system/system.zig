@@ -52,13 +52,13 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
         },
         .debug_emit => {
             // TODO dont use std.debug
-            const raw_char = rt.data_stack.pop();
+            const raw_char = rt.data_stack.popCell();
             const char = @as(u8, @truncate(raw_char & 0xff));
             std.debug.print("{c}", .{char});
         },
         .set_xt => {
-            const id = rt.data_stack.pop();
-            const addr = rt.data_stack.pop();
+            const id = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
 
             const xt = if (addr == 0) null else addr;
 
@@ -67,13 +67,14 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 1 => system.xts.keydown = xt,
                 2 => system.xts.mousemove = xt,
                 3 => system.xts.mousedown = xt,
+                4 => system.xts.char = xt,
                 else => {},
             }
         },
         .put_pixel => {
-            const idx = rt.data_stack.pop();
-            const y = rt.data_stack.pop();
-            const x = rt.data_stack.pop();
+            const idx = rt.data_stack.popCell();
+            const y = rt.data_stack.popCell();
+            const x = rt.data_stack.popCell();
 
             // TODO fit in screen w/h
             system.video.pixels.putPixel(
@@ -83,8 +84,8 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             );
         },
         .pixels_store => {
-            const addr = rt.data_stack.pop();
-            const value = rt.data_stack.pop();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
 
             system.video.pixels.store(
                 addr,
@@ -92,17 +93,17 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             );
         },
         .pixels_fetch => {
-            const addr = rt.data_stack.pop();
+            const addr = rt.data_stack.popCell();
 
             const value = system.video.pixels.fetch(
                 addr,
             );
 
-            rt.data_stack.push(value);
+            rt.data_stack.pushCell(value);
         },
         .characters_store => {
-            const addr = rt.data_stack.pop();
-            const value = rt.data_stack.pop();
+            const addr = rt.data_stack.popCell();
+            const value = rt.data_stack.popCell();
 
             system.video.characters.store(
                 addr,
@@ -110,13 +111,13 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             );
         },
         .characters_fetch => {
-            const addr = rt.data_stack.pop();
+            const addr = rt.data_stack.popCell();
 
             const value = system.video.characters.fetch(
                 addr,
             );
 
-            rt.data_stack.push(value);
+            rt.data_stack.pushCell(value);
         },
         .video_update => {
             system.video.update();
@@ -138,15 +139,12 @@ const glfw_callbacks = struct {
         const system: *System = @alignCast(@ptrCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        _ = keycode;
+        // TODO
         _ = scancode;
         _ = action;
         _ = mods;
-        // vm.push(cintToCell(mods)) catch unreachable;
-        // vm.push(cintToCell(action)) catch unreachable;
-        // vm.push(cintToCell(scancode)) catch unreachable;
-        // vm.push(cintToCell(key)) catch unreachable;
         if (system.xts.keydown) |ext| {
+            system.rt.data_stack.pushCell(@intCast(keycode));
             system.rt.callXt(ext) catch unreachable;
         }
     }
@@ -164,13 +162,13 @@ const glfw_callbacks = struct {
         //     probably not
         //   limit to intMax
         //   write a fn for the xy transform
-        const x_float = x / 2 - (video.screen_width - 400) / 2;
-        const y_float = y / 2 - (video.screen_height - 300) / 2;
-        const x_cell: Cell = if (x_float < 0) 0 else @intFromFloat(x_float);
-        const y_cell: Cell = if (y_float < 0) 0 else @intFromFloat(y_float);
-        system.rt.data_stack.push(x_cell);
-        system.rt.data_stack.push(y_cell);
         if (system.xts.mousemove) |ext| {
+            const x_float = x / 2 - (video.screen_width - 400) / 2;
+            const y_float = y / 2 - (video.screen_height - 300) / 2;
+            const x_cell: Cell = if (x_float < 0) 0 else @intFromFloat(x_float);
+            const y_cell: Cell = if (y_float < 0) 0 else @intFromFloat(y_float);
+            system.rt.data_stack.pushCell(x_cell);
+            system.rt.data_stack.pushCell(y_cell);
             system.rt.callXt(ext) catch unreachable;
         }
     }
@@ -184,15 +182,14 @@ const glfw_callbacks = struct {
         const system: *System = @alignCast(@ptrCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        // TODO
-        //   turn into forth specific structure
-        // system.rt.data_stack.push(@truncate(button));
-        // system.rt.data_stack.push(@truncate(action));
-        // system.rt.data_stack.push(@truncate(mods));
-        _ = button;
-        _ = action;
-        _ = mods;
         if (system.xts.mousedown) |ext| {
+            var value = @as(Cell, @intCast(button)) & 0x7;
+            if (action == c.GLFW_PRESS) {
+                value |= 0x10;
+            }
+
+            system.rt.data_stack.pushCell(value);
+            system.rt.data_stack.pushCell(@intCast(mods));
             system.rt.callXt(ext) catch unreachable;
         }
     }
@@ -202,10 +199,13 @@ const glfw_callbacks = struct {
         codepoint: c_uint,
     ) callconv(.C) void {
         const system: *System = @alignCast(@ptrCast(c.glfwGetWindowUserPointer(win)));
-        _ = system;
-        _ = codepoint;
-        // vm.push(codepoint) catch unreachable;
-        // vm.execute(xts.charInput) catch unreachable;
+        if (system.xts.char) |ext| {
+            const high: Cell = @intCast((codepoint & 0xff00) >> 16);
+            const low: Cell = @intCast(codepoint & 0xff);
+            system.rt.data_stack.pushCell(high);
+            system.rt.data_stack.pushCell(low);
+            system.rt.callXt(ext) catch unreachable;
+        }
     }
 
     fn windowSize(
@@ -231,6 +231,7 @@ pub const System = struct {
         keydown: ?Cell,
         mousemove: ?Cell,
         mousedown: ?Cell,
+        char: ?Cell,
     },
 
     window: *c.GLFWwindow,
@@ -262,6 +263,7 @@ pub const System = struct {
         self.xts.keydown = null;
         self.xts.mousemove = null;
         self.xts.mousedown = null;
+        self.xts.char = null;
 
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);
@@ -312,6 +314,7 @@ pub const System = struct {
         _ = c.glfwSetKeyCallback(window, glfw_callbacks.key);
         _ = c.glfwSetCursorPosCallback(window, glfw_callbacks.cursorPosition);
         _ = c.glfwSetMouseButtonCallback(window, glfw_callbacks.mouseButton);
+        _ = c.glfwSetCharCallback(window, glfw_callbacks.char);
 
         self.window = window;
     }

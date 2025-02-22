@@ -56,35 +56,36 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             repl.should_bye = true;
         },
         .emit => {
-            const raw_char = rt.data_stack.pop();
+            const raw_char = rt.data_stack.popCell();
             const char = @as(u8, @truncate(raw_char & 0xff));
             repl.emit(char) catch return error.ExternalPanic;
         },
         .showStack => {
             // TODO
             // something about this is broken
-            const count = rt.data_stack.pop();
+            const count = rt.data_stack.popCell();
             const u8_count: u8 = @truncate(count);
             std.debug.print("<{d}>", .{u8_count});
 
             var i: u8 = 0;
             while (i < u8_count) : (i += 1) {
-                std.debug.print(" {d}", .{rt.data_stack.index(i)});
+                // TODO
+                // std.debug.print(" {d}", .{rt.data_stack.index(i)});
             }
         },
         .key => {},
         .rawMode => {},
         .sqrt => {
-            const value = rt.data_stack.pop();
+            const value = rt.data_stack.popCell();
             const sqrt_value = std.math.sqrt(value);
-            rt.data_stack.push(sqrt_value);
+            rt.data_stack.pushCell(sqrt_value);
         },
         .sleep => {
-            const value: u64 = rt.data_stack.pop();
+            const value: u64 = rt.data_stack.popCell();
             std.time.sleep(value * 1000000);
         },
         .sleepS => {
-            const value: u64 = rt.data_stack.pop();
+            const value: u64 = rt.data_stack.popCell();
             std.time.sleep(value * 1000000000);
         },
         .time => {
@@ -92,12 +93,13 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             const seconds = @rem(timestamp, 60);
             const minutes = @rem(@divFloor(timestamp, 60), 60);
             const hours = @rem(@divFloor(timestamp, 3600), 24);
-            rt.data_stack.push(@intCast(hours));
-            rt.data_stack.push(@intCast(minutes));
-            rt.data_stack.push(@intCast(seconds));
+            rt.data_stack.pushCell(@intCast(hours));
+            rt.data_stack.pushCell(@intCast(minutes));
+            rt.data_stack.pushCell(@intCast(seconds));
         },
         .shell => {
-            const len, const addr = rt.data_stack.pop2();
+            const len = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
             const command = try mem.constSliceFromAddrAndLen(
                 rt.memory,
                 addr,

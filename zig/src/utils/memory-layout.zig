@@ -19,13 +19,42 @@ fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
             ));
         },
     }
+
+    const fields = std.meta.fields(Type);
+
     var ret = [_]FieldLayout{undefined} ** fieldCount(Type);
 
     var offset = 0;
-    for (std.meta.fields(Type), 0..) |field, i| {
-        ret[i].name = field.name;
-        ret[i].offset = offset;
-        offset += @sizeOf(field.type);
+
+    var breakpoint: struct {
+        found: bool,
+        index: usize,
+    } = undefined;
+    breakpoint.found = false;
+
+    for (fields, 0..) |field, i| {
+        if (std.mem.eql(u8, field.name, "_")) {
+            breakpoint.found = true;
+            breakpoint.index = i;
+            break;
+        } else {
+            ret[i].name = field.name;
+            ret[i].offset = offset;
+            offset += @sizeOf(field.type);
+        }
+    }
+
+    if (breakpoint.found) {
+        var i: usize = fields.len;
+        offset = 65536;
+
+        while (i > 0) : (i -= 1) {
+            const field = fields[i - 1];
+            offset -= @sizeOf(field.type);
+            ret[i - 1].name = field.name;
+            ret[i - 1].offset = offset;
+            if (i - 1 == breakpoint.index) break;
+        }
     }
 
     return ret;
