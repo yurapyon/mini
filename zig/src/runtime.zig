@@ -22,11 +22,7 @@ const Interpreter = interpreter.Interpreter;
 const LookupResult = interpreter.LookupResult;
 
 const stack = @import("stack.zig");
-const DataStack = stack.DataStack;
-const ReturnStack = stack.ReturnStack;
-
-const stack2 = @import("stack2.zig");
-const Stack = stack2.Stack;
+const Stack = stack.Stack;
 
 const bytecodes = @import("bytecodes.zig");
 
@@ -86,17 +82,18 @@ pub const MainMemoryLayout = MemoryLayout(struct {
 
     _: u0,
 
-    data_stack: u0,
+    data_stack: Cell,
     input_buffer: [128]u8,
-    return_stack: [64]Cell,
+    _return_stack: [64]Cell,
+    return_stack: Cell,
 });
 
 comptime {
     // @compileError(std.fmt.comptimePrint("{} {} {} {}\n", .{
-    //     MainMemoryLayout.offsetOf("dictionary_start"),
-    //     MainMemoryLayout.offsetOf("data_stack"),
-    //     MainMemoryLayout.offsetOf("input_buffer"),
-    //     MainMemoryLayout.offsetOf("return_stack"),
+    // MainMemoryLayout.offsetOf("dictionary_start"),
+    // MainMemoryLayout.offsetOf("data_stack"),
+    // MainMemoryLayout.offsetOf("input_buffer"),
+    // MainMemoryLayout.offsetOf("return_stack"),
     // }));
 }
 
@@ -130,12 +127,12 @@ pub const Runtime = struct {
     input_buffer: InputBuffer,
 
     data_stack: Stack(
-        MainMemoryLayout.offsetOf("data_stack"),
         MainMemoryLayout.offsetOf("data_stack_ptr"),
+        MainMemoryLayout.offsetOf("data_stack"),
     ),
     return_stack: Stack(
-        MainMemoryLayout.offsetOf("return_stack"),
         MainMemoryLayout.offsetOf("return_stack_ptr"),
+        MainMemoryLayout.offsetOf("return_stack"),
     ),
 
     // TODO could put this in forth

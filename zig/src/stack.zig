@@ -1,466 +1,338 @@
+const mem = @import("memory.zig");
+const MemoryPtr = mem.MemoryPtr;
+
 const runtime = @import("runtime.zig");
 const Cell = runtime.Cell;
 const SignedCell = runtime.SignedCell;
 
+const register = @import("register.zig");
+const Register = register.Register;
+
 // ===
 
-const stack_inner_depth = 64;
+pub fn Stack(
+    comptime top_ptr_addr: Cell,
+    comptime top_addr: Cell,
+) type {
+    return struct {
+        memory: MemoryPtr,
+        // NOTE
+        // This is guaranteed to be Cell aligned as long
+        //     as top_addr is
+        //   This can get messed up from forth though
+        top_ptr: Register(top_ptr_addr),
 
-const CircularStack = struct {
-    stack: [stack_inner_depth]Cell,
-    idx: u8,
-
-    fn peek(self: @This()) Cell {
-        return self.stack[self.idx];
-    }
-
-    pub fn index(self: *@This(), idx: u8) Cell {
-        return self.stack[self.idx +% idx];
-    }
-
-    fn setTop(self: *@This(), value: Cell) void {
-        self.stack[self.idx] = value;
-    }
-
-    fn push(self: *@This(), value: Cell) void {
-        const u8_len: u8 = @intCast(self.stack.len);
-        self.idx = (self.idx +% 1) % u8_len;
-        self.stack[self.idx] = value;
-    }
-
-    fn pop(self: *@This()) Cell {
-        const ret = self.peek();
-        const u8_len: u8 = @intCast(self.stack.len);
-        self.idx = (self.idx -% 1) % u8_len;
-        return ret;
-    }
-};
-
-pub const DataStack = struct {
-    // TODO what in here should use signed cells?
-    // everything maybe ?
-
-    top: Cell,
-    second: Cell,
-    inner: CircularStack,
-
-    pub fn peek(self: *@This()) Cell {
-        return self.top;
-    }
-
-    pub fn index(self: *@This(), idx: u8) Cell {
-        // TODO
-        // This has to wrap around 66
-        if (idx == 0) {
-            return self.top;
-        } else if (idx == 1) {
-            return self.second;
-        } else {
-            return self.inner.index(idx -% 2);
+        pub fn init(self: *@This(), memory: MemoryPtr) void {
+            self.memory = memory;
+            self.top_ptr.init(self.memory);
+            self.top_ptr.store(top_addr);
         }
-    }
 
-    pub fn push(self: *@This(), value: Cell) void {
-        self.inner.push(self.second);
-        self.second = self.top;
-        self.top = value;
-    }
-
-    pub fn pop(self: *@This()) Cell {
-        const ret = self.top;
-        self.top = self.second;
-        self.second = self.inner.pop();
-        return ret;
-    }
-
-    pub fn pop2(self: *@This()) [2]Cell {
-        const a = self.top;
-        const b = self.second;
-        self.top = self.inner.pop();
-        self.second = self.inner.pop();
-        return .{ a, b };
-    }
-
-    fn binop(self: *@This(), value: Cell) void {
-        self.top = value;
-        self.second = self.inner.pop();
-    }
-
-    pub fn eq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second == self.top);
-        self.binop(value);
-    }
-
-    pub fn eq0(self: *@This()) void {
-        self.top = runtime.cellFromBoolean(self.top == 0);
-    }
-
-    pub fn gt(self: *@This()) void {
-        const signed_top: SignedCell = @bitCast(self.top);
-        const signed_second: SignedCell = @bitCast(self.second);
-        const value = runtime.cellFromBoolean(signed_second > signed_top);
-        self.binop(value);
-    }
-
-    pub fn gteq(self: *@This()) void {
-        const signed_top: SignedCell = @bitCast(self.top);
-        const signed_second: SignedCell = @bitCast(self.second);
-        const value = runtime.cellFromBoolean(signed_second >= signed_top);
-        self.binop(value);
-    }
-
-    pub fn lt(self: *@This()) void {
-        const signed_top: SignedCell = @bitCast(self.top);
-        const signed_second: SignedCell = @bitCast(self.second);
-        const value = runtime.cellFromBoolean(signed_second < signed_top);
-        self.binop(value);
-    }
-
-    pub fn lteq(self: *@This()) void {
-        const signed_top: SignedCell = @bitCast(self.top);
-        const signed_second: SignedCell = @bitCast(self.second);
-        const value = runtime.cellFromBoolean(signed_second <= signed_top);
-        self.binop(value);
-    }
-
-    pub fn ugt(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second > self.top);
-        self.binop(value);
-    }
-
-    pub fn ugteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second >= self.top);
-        self.binop(value);
-    }
-
-    pub fn ult(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second < self.top);
-        self.binop(value);
-    }
-
-    pub fn ulteq(self: *@This()) void {
-        const value = runtime.cellFromBoolean(self.second <= self.top);
-        self.binop(value);
-    }
-
-    pub fn and_(self: *@This()) void {
-        const value = self.second & self.top;
-        self.binop(value);
-    }
-
-    pub fn ior(self: *@This()) void {
-        const value = self.second | self.top;
-        self.binop(value);
-    }
-
-    pub fn xor(self: *@This()) void {
-        const value = self.second ^ self.top;
-        self.binop(value);
-    }
-
-    pub fn invert(self: *@This()) void {
-        self.top = ~self.top;
-    }
-
-    pub fn lshift(self: *@This()) void {
-        const value = self.second << @truncate(self.top);
-        self.binop(value);
-    }
-
-    pub fn rshift(self: *@This()) void {
-        const value = self.second >> @truncate(self.top);
-        self.binop(value);
-    }
-
-    pub fn inc(self: *@This()) void {
-        self.top +%= 1;
-    }
-
-    pub fn dec(self: *@This()) void {
-        self.top -%= 1;
-    }
-
-    pub fn drop(self: *@This()) void {
-        _ = self.pop();
-    }
-
-    pub fn dup(self: *@This()) void {
-        self.inner.push(self.second);
-        self.second = self.top;
-    }
-
-    pub fn swap(self: *@This()) void {
-        const temp = self.top;
-        self.top = self.second;
-        self.second = temp;
-    }
-
-    pub fn flip(self: *@This()) void {
-        const temp = self.top;
-        self.top = self.inner.peek();
-        self.inner.setTop(temp);
-    }
-
-    pub fn over(self: *@This()) void {
-        self.push(self.second);
-    }
-
-    pub fn nip(self: *@This()) void {
-        self.second = self.inner.pop();
-    }
-
-    pub fn tuck(self: *@This()) void {
-        self.inner.push(self.top);
-    }
-
-    pub fn rot(self: *@This()) void {
-        self.push(self.inner.pop());
-    }
-
-    pub fn nrot(self: *@This()) void {
-        self.inner.push(self.pop());
-    }
-
-    pub fn add(self: *@This()) void {
-        const value = self.second +% self.top;
-        self.binop(value);
-    }
-
-    pub fn subtract(self: *@This()) void {
-        const value = self.second -% self.top;
-        self.binop(value);
-    }
-
-    pub fn multiply(self: *@This()) void {
-        const value = self.second *% self.top;
-        self.binop(value);
-    }
-
-    // TODO these should be signed
-    pub fn divide(self: *@This()) void {
-        var value: Cell = 0;
-        if (self.top != 0) {
-            value = self.second / self.top;
+        pub fn depth(self: @This()) Cell {
+            const current_top = self.top_ptr.fetch();
+            return top_addr - current_top;
         }
-        self.binop(value);
-    }
 
-    // TODO these should be signed
-    pub fn mod(self: *@This()) void {
-        var value: Cell = 0;
-        if (self.top != 0) {
-            value = self.second % self.top;
+        fn peek(self: *@This(), at: Cell) *Cell {
+            // TODO handle stack underflow
+            const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
+            if (addr > top_addr) unreachable;
+            return mem.cellPtr(self.memory, addr) catch unreachable;
         }
-        self.binop(value);
-    }
-};
 
-pub const ReturnStack = struct {
-    top: Cell,
-    inner: CircularStack,
+        fn peekSigned(self: *@This(), at: Cell) *SignedCell {
+            const cell_ptr = self.peek(at);
+            return @ptrCast(cell_ptr);
+        }
 
-    pub fn peek(self: *@This()) Cell {
-        return self.top;
-    }
+        fn pop(self: *@This(), count: Cell) void {
+            self.top_ptr.storeAdd(count * @sizeOf(Cell));
+        }
 
-    pub fn push(self: *@This(), value: Cell) void {
-        self.inner.push(self.top);
-        self.top = value;
-    }
+        fn push(self: *@This(), count: Cell) void {
+            self.top_ptr.storeSubtract(count * @sizeOf(Cell));
+        }
 
-    pub fn pop(self: *@This()) Cell {
-        const ret = self.top;
-        self.top = self.inner.pop();
-        return ret;
-    }
-};
+        // ===
 
-// tests ===
+        pub fn pushCell(self: *@This(), value: Cell) void {
+            // @import("std").debug.print("{}\n", .{self.top_ptr.fetch()});
+            self.push(1);
+            const top = self.peek(0);
+            top.* = value;
+        }
 
-fn testCommon(
-    stack: anytype,
-) !void {
-    const testing = @import("std").testing;
+        pub fn pushBoolean(self: *@This(), value: bool) void {
+            self.pushCell(runtime.cellFromBoolean(value));
+        }
 
-    const value = 0xbeef;
-    stack.push(value);
-    try testing.expectEqual(value, stack.pop());
+        pub fn popCell(self: *@This()) Cell {
+            const top = self.peek(0);
+            self.pop(1);
+            return top.*;
+        }
 
-    for (0..(stack_inner_depth * 2)) |_| {
-        _ = stack.pop();
-    }
+        pub fn peekCell(self: *@This()) Cell {
+            return self.peek(0).*;
+        }
 
-    for (0..(stack_inner_depth * 2)) |_| {
-        stack.push(0xabcd);
-    }
-}
+        pub fn debugPrint(self: @This()) void {
+            const std = @import("std");
+            for (0..(self.depth() / @sizeOf(Cell))) |i| {
+                const at = -@as(isize, @intCast(i));
+                std.debug.print("{x:2}: {}\n", .{ i, self.peek(at).* });
+            }
+        }
 
-fn testUnop(
-    stack: anytype,
-    value: Cell,
-    operator: fn (_: @TypeOf(stack)) void,
-    expected: Cell,
-) !void {
-    const testing = @import("std").testing;
-    stack.push(value);
-    operator(stack);
-    try testing.expectEqual(expected, stack.pop());
-}
+        // stack manip ===
 
-fn testBinop(
-    stack: anytype,
-    second: Cell,
-    top: Cell,
-    operator: fn (_: @TypeOf(stack)) void,
-    expected: Cell,
-) !void {
-    const testing = @import("std").testing;
-    stack.push(second);
-    stack.push(top);
-    operator(stack);
-    try testing.expectEqual(expected, stack.pop());
-}
+        pub fn dup(self: *@This()) void {
+            self.push(1);
+            const top = self.peek(0);
+            const second = self.peek(1);
+            top.* = second.*;
+        }
 
-fn testStackManipulator(
-    stack: anytype,
-    setup: []const Cell,
-    operator: fn (_: @TypeOf(stack)) void,
-    expected: []const Cell,
-) !void {
-    const testing = @import("std").testing;
-    for (setup) |value| {
-        stack.push(value);
-    }
-    operator(stack);
-    for (0..(expected.len)) |i| {
-        const idx = expected.len - i - 1;
-        try testing.expectEqual(expected[idx], stack.pop());
-    }
-}
+        pub fn drop(self: *@This()) void {
+            self.pop(1);
+        }
 
-test "stack: circular" {
-    const testing = @import("std").testing;
-    var cs: CircularStack = undefined;
+        pub fn swap(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const temp = top.*;
+            top.* = second.*;
+            second.* = temp;
+        }
 
-    try testCommon(&cs);
+        pub fn flip(self: *@This()) void {
+            const top = self.peek(0);
+            const third = self.peek(2);
+            const temp = top.*;
+            top.* = third.*;
+            third.* = temp;
+        }
 
-    cs.push(0xbeef);
-    try testing.expectEqual(0xbeef, cs.peek());
-    cs.setTop(0x1234);
-    try testing.expectEqual(0x1234, cs.peek());
-}
+        pub fn over(self: *@This()) void {
+            self.push(1);
+            const top = self.peek(0);
+            const third = self.peek(2);
+            top.* = third.*;
+        }
 
-test "stack: data" {
-    var ds: DataStack = undefined;
+        pub fn nip(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            self.pop(1);
+            second.* = top.*;
+        }
 
-    try testCommon(&ds);
+        pub fn tuck(self: *@This()) void {
+            self.push(1);
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
 
-    const forth_true = runtime.cellFromBoolean(true);
-    const forth_false = runtime.cellFromBoolean(false);
+            top.* = second.*;
+            second.* = third.*;
+            third.* = top.*;
+        }
 
-    try testBinop(&ds, 0xbeef, 0xbeef, DataStack.eq, forth_true);
-    try testBinop(&ds, 0x1234, 0xbeef, DataStack.eq, forth_false);
+        pub fn rot(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
 
-    try testBinop(&ds, 0x0, 0x1, DataStack.gt, forth_false);
-    try testBinop(&ds, 0x0, 0x0, DataStack.gt, forth_false);
-    try testBinop(&ds, 0x1, 0x0, DataStack.gt, forth_true);
+            const temp = top.*;
 
-    try testBinop(&ds, 0x0, 0x1, DataStack.gteq, forth_false);
-    try testBinop(&ds, 0x0, 0x0, DataStack.gteq, forth_true);
-    try testBinop(&ds, 0x1, 0x0, DataStack.gteq, forth_true);
+            top.* = third.*;
+            third.* = second.*;
+            second.* = temp;
+        }
 
-    try testBinop(&ds, 0xbe00, 0x00ef, DataStack.and_, 0x0000);
-    try testBinop(&ds, 0xbe00, 0x00ef, DataStack.ior, 0xbeef);
-    try testBinop(&ds, 0xbe00, 0x00ef, DataStack.xor, 0xbeef);
-    try testBinop(&ds, 0x0000, 0x1111, DataStack.xor, 0x1111);
+        pub fn nrot(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
 
-    try testUnop(&ds, forth_true, DataStack.invert, forth_false);
+            const temp = top.*;
 
-    try testBinop(&ds, 0xbeef, 8, DataStack.lshift, 0xef00);
-    try testBinop(&ds, 0xbeef, 8, DataStack.rshift, 0x00be);
+            top.* = second.*;
+            second.* = third.*;
+            third.* = temp;
+        }
 
-    try testUnop(&ds, 1, DataStack.inc, 2);
-    try testUnop(&ds, 0xffff, DataStack.inc, 0x0000);
-    try testUnop(&ds, 2, DataStack.dec, 1);
-    try testUnop(&ds, 0x0000, DataStack.dec, 0xffff);
+        // logic ===
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.drop,
-        &[_]Cell{ 1, 2 },
-    );
+        pub fn eq(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(top.* == second.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.dup,
-        &[_]Cell{ 1, 2, 3, 3 },
-    );
+        pub fn eq0(self: *@This()) void {
+            const top = self.peek(0);
+            top.* = runtime.cellFromBoolean(top.* == 0);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.swap,
-        &[_]Cell{ 1, 3, 2 },
-    );
+        pub fn gt(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(ssecond.* > top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.flip,
-        &[_]Cell{ 3, 2, 1 },
-    );
+        pub fn gteq(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(ssecond.* >= top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.over,
-        &[_]Cell{ 1, 2, 3, 2 },
-    );
+        pub fn lt(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(ssecond.* < top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.nip,
-        &[_]Cell{ 1, 3 },
-    );
+        pub fn lteq(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const ssecond = self.peekSigned(1);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(ssecond.* <= top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.tuck,
-        &[_]Cell{ 1, 3, 2, 3 },
-    );
+        pub fn ugt(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(second.* > top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.rot,
-        &[_]Cell{ 2, 3, 1 },
-    );
+        pub fn ugteq(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(second.* >= top.*);
+            self.pop(1);
+        }
 
-    try testStackManipulator(
-        &ds,
-        &[_]Cell{ 1, 2, 3 },
-        DataStack.nrot,
-        &[_]Cell{ 3, 1, 2 },
-    );
+        pub fn ult(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(second.* < top.*);
+            self.pop(1);
+        }
 
-    try testBinop(&ds, 1234, 2, DataStack.add, 1236);
-    try testBinop(&ds, 0xffff, 2, DataStack.add, 0x0001);
-    try testBinop(&ds, 1234, 2, DataStack.subtract, 1232);
-    try testBinop(&ds, 0x0000, 2, DataStack.subtract, 0xfffe);
-    try testBinop(&ds, 5, 5, DataStack.multiply, 25);
-    try testBinop(&ds, 5, 5, DataStack.divide, 1);
-    try testBinop(&ds, 5, 0, DataStack.divide, 0);
-    try testBinop(&ds, 5, 5, DataStack.mod, 0);
-    try testBinop(&ds, 7, 5, DataStack.mod, 2);
-    try testBinop(&ds, 5, 0, DataStack.mod, 0);
-}
+        pub fn ulteq(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* = runtime.cellFromBoolean(second.* <= top.*);
+            self.pop(1);
+        }
 
-test "stack: return" {
-    var rs: ReturnStack = undefined;
+        // bits ===
 
-    try testCommon(&rs);
+        pub fn and_(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* &= top.*;
+            self.pop(1);
+        }
+
+        pub fn ior(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* |= top.*;
+            self.pop(1);
+        }
+
+        pub fn xor(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* ^= top.*;
+            self.pop(1);
+        }
+
+        pub fn invert(self: *@This()) void {
+            const top = self.peek(0);
+            top.* = ~top.*;
+        }
+
+        pub fn lshift(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* <<= @truncate(top.*);
+            self.pop(1);
+        }
+
+        pub fn rshift(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* >>= @truncate(top.*);
+            self.pop(1);
+        }
+
+        // math ===
+
+        pub fn inc(self: *@This()) void {
+            const top = self.peek(0);
+            top.* +%= 1;
+        }
+
+        pub fn dec(self: *@This()) void {
+            const top = self.peek(0);
+            top.* -%= 1;
+        }
+
+        pub fn add(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* +%= top.*;
+            self.pop(1);
+        }
+
+        pub fn subtract(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* -%= top.*;
+            self.pop(1);
+        }
+
+        pub fn multiply(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            second.* *%= top.*;
+            self.pop(1);
+        }
+
+        // TODO these should be signed
+        pub fn divide(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            if (top.* != 0) {
+                second.* /= top.*;
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
+        }
+
+        // TODO these should be signed
+        pub fn mod(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            if (top.* != 0) {
+                second.* %= top.*;
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
+        }
+    };
 }
