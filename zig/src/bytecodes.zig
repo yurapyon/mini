@@ -217,6 +217,7 @@ pub fn jump0(rt: *Runtime) Error!void {
 }
 
 pub fn quit(rt: *Runtime) Error!void {
+    // TODO this needs to clear the return stack, now that its not circular
     rt.program_counter = 0;
     rt.should_quit = true;
 }

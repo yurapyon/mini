@@ -56,7 +56,6 @@ pub fn Stack(
         // ===
 
         pub fn pushCell(self: *@This(), value: Cell) void {
-            // @import("std").debug.print("{}\n", .{self.top_ptr.fetch()});
             self.push(1);
             const top = self.peek(0);
             top.* = value;
@@ -123,8 +122,8 @@ pub fn Stack(
         pub fn nip(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            self.pop(1);
             second.* = top.*;
+            self.pop(1);
         }
 
         pub fn tuck(self: *@This()) void {

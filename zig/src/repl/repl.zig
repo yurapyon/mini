@@ -209,16 +209,19 @@ pub const Repl = struct {
 
         self.should_bye = false;
 
-        while (!self.should_bye) {
-            rt.interpretUntilQuit() catch |err| switch (err) {
-                error.WordNotFound => {
-                    std.debug.print(">> {s}?\n", .{
-                        rt.last_evaluated_word orelse unreachable,
-                    });
-                },
-                else => return err,
-            };
-        }
+        //         while (!self.should_bye) {
+        //             rt.interpretUntilQuit() catch |err| switch (err) {
+        //                 error.WordNotFound => {
+        //                     std.debug.print(">> {s}?\n", .{
+        //                         rt.last_evaluated_word orelse unreachable,
+        //                     });
+        //                 },
+        //                 else => return err,
+        //             };
+        //         }
+
+        const interpret_xt = (try rt.getXt("interpret") orelse unreachable);
+        try rt.callXt(interpret_xt);
     }
 
     fn emit(self: *@This(), char: u8) !void {

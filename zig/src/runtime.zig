@@ -88,15 +88,6 @@ pub const MainMemoryLayout = MemoryLayout(struct {
     return_stack: Cell,
 });
 
-comptime {
-    // @compileError(std.fmt.comptimePrint("{} {} {} {}\n", .{
-    // MainMemoryLayout.offsetOf("dictionary_start"),
-    // MainMemoryLayout.offsetOf("data_stack"),
-    // MainMemoryLayout.offsetOf("input_buffer"),
-    // MainMemoryLayout.offsetOf("return_stack"),
-    // }));
-}
-
 // TODO state could just be a boolean
 pub const CompileState = enum(Cell) {
     interpret = 0,
@@ -121,11 +112,6 @@ pub const Runtime = struct {
     program_counter: Cell,
     current_token_addr: Cell,
     execute_register: Register(MainMemoryLayout.offsetOf("execute")),
-    // data_stack: DataStack,
-    // return_stack: ReturnStack,
-    interpreter: Interpreter,
-    input_buffer: InputBuffer,
-
     data_stack: Stack(
         MainMemoryLayout.offsetOf("data_stack_ptr"),
         MainMemoryLayout.offsetOf("data_stack"),
@@ -134,6 +120,8 @@ pub const Runtime = struct {
         MainMemoryLayout.offsetOf("return_stack_ptr"),
         MainMemoryLayout.offsetOf("return_stack"),
     ),
+    interpreter: Interpreter,
+    input_buffer: InputBuffer,
 
     // TODO could put this in forth
     should_quit: bool,

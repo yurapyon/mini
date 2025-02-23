@@ -14,10 +14,6 @@ probably
         just truncate/wrap the value in zig ie state, base
         do it on read ie >> const state = state_from_forth & 1;
     maybe have a debug mode cli option
-  rework stacks to be in forth memory
-    still circular ?
-      probably not
-    data stack shouldnt have fixed size and should grow limitlessly
   refiller idea probably isnt necessary
     unsure if 'refilling' itself is necessary
       difference between sending strings to forth and having it execute them or
