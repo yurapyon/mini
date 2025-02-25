@@ -22,7 +22,7 @@ forth-latest context ! context @ current !
 : 2drop drop drop ;
 : 2swap flip >r flip r> ;
 : 3drop drop 2drop ;
-: third flip dup >r flip r> ;
+: third >r over r> swap ;
 : 3dup  third third third ;
 
 : fourth >r third r> swap ;
@@ -74,7 +74,9 @@ compiler definitions
 \ todo rename dorange / dolist
 : do.u>   [compile] |: ['] 2dup , ['] u> , [compile] if ;
 : do.u>=  [compile] |: ['] 2dup , ['] u>= , [compile] if ;
+\ TODO replace this with do.dup
 : do.?dup [compile] |: ['] ?dup , [compile] if ;
+\ todo putting this inside an if/else/then breaks it
 : godo    [compile] loop [compile] then ;
 
 0 constant cond
