@@ -18,8 +18,8 @@ forth definitions
 : . u. space ;
 : ? @ . ;
 
-: .2 swap . . ;
-: .3 flip . . . ;
+\ : .2 swap . . ;
+\ : .3 flip . . . ;
 
 : .byte  <# h# h# #> type ;
 : .short <# h# h# h# h# #> type ;
@@ -40,6 +40,11 @@ forth definitions
 \   <# # # # drop # # # drop # # # '.' hold #s #> type ;
 
 : ./k 1000 1024 */ <# # # # '.' hold #s #> type ;
+
+: .cells swap cell - |: 2dup <= if dup @ . cell - loop then
+  2drop ;
+: <.> <# '>' hold #s '<' hold #> type ;
+: .s depth <.> space sdata range .cells ;
 
 \ ===
 

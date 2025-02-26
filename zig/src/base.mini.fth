@@ -20,7 +20,7 @@ forth-latest context ! context @ current !
 
 : 2dup  over over ;
 : 2drop drop drop ;
-: 2swap flip >r flip r> ;
+: 2swap >r flip r> flip ;
 : 3drop drop 2drop ;
 : third >r over r> swap ;
 : 3dup  third third third ;
@@ -332,6 +332,12 @@ interpreter
 : evaluate save-source set-source interpret restore-source ;
 
 forth
+
+\ ===
+
+: sdata s* @ s0 over - cell + ;
+: depth sdata nip cell / ;
+: dropa s0 cell + s* ! ;
 
 \ ===
 
