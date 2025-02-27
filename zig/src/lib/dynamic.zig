@@ -28,8 +28,8 @@ const ExternalId = enum(Cell) {
     dynFetchC,
     dynStoreC,
     dynStoreAddC,
+    dynMoveTo,
     // TODO
-    // dynMove
     // copy allocated memory to/from dictionary
     // read file into dynamic memory
 
@@ -113,6 +113,26 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 slice[addr] +%= u8_value;
             }
         },
+        .dynMoveTo => {
+            const handle_id = rt.data_stack.popCell();
+            const count = rt.data_stack.popCell();
+            const destination = rt.data_stack.popCell();
+            const source = rt.data_stack.popCell();
+            const source_slice = try mem.constSliceFromAddrAndLen(
+                rt.memory,
+                source,
+                count,
+            );
+            if (dyn.getAllocatedSlice(handle_id)) |slice| {
+                const destination_slice =
+                    try mem.sliceFromAddrAndLen(
+                    slice,
+                    destination,
+                    count,
+                );
+                @memcpy(destination_slice, source_slice);
+            }
+        },
         else => return false,
     }
     return true;
@@ -179,6 +199,16 @@ pub const Dynamic = struct {
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.dynStoreAddC) + start_token,
         );
+        try self.rt.defineExternal(
+            ">dyn",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.dynMoveTo) + start_token,
+        );
+        // try self.rt.defineExternal(
+        //     "dyn>",
+        //     forth_vocabulary_addr,
+        //     @intFromEnum(ExternalId.dynMoveFrom) + start_token,
+        // );
         try self.rt.addExternal(external);
 
         self.start_token = start_token;

@@ -36,6 +36,7 @@ const ExternalId = enum(Cell) {
     sleepS,
     time,
     shell,
+    accept,
     _max,
     _,
 };
@@ -111,6 +112,27 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
             temp[len] = 0;
             _ = c.system(temp.ptr);
         },
+        .accept => {
+            const len = rt.data_stack.popCell();
+            const addr = rt.data_stack.popCell();
+            const out = try mem.sliceFromAddrAndLen(
+                rt.memory,
+                addr,
+                len,
+            );
+
+            const reader = repl.input_file.reader();
+            const slice =
+                reader.readUntilDelimiterOrEof(
+                out[0..out.len],
+                '\n',
+            ) catch return error.CannotRefill;
+            if (slice) |slc| {
+                rt.data_stack.pushCell(@truncate(slc.len));
+            } else {
+                rt.data_stack.pushCell(0);
+            }
+        },
         else => return false,
     }
     return true;
@@ -180,6 +202,11 @@ pub const Repl = struct {
             "shell",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.shell),
+        );
+        try rt.defineExternal(
+            "accept",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.accept),
         );
         try rt.addExternal(external);
 

@@ -53,7 +53,7 @@ pub fn isTruthy(value: Cell) bool {
     return value != 0;
 }
 
-// TODO copy layout from Starting Forht
+// TODO copy layout from Starting Forth
 pub const MainMemoryLayout = MemoryLayout(struct {
     // TODO rename to 'h'
     here: Cell,
