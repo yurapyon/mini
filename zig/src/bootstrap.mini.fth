@@ -1,141 +1,267 @@
 here constant bootstrap0
 
-vocabulary tcmp
-tcmp definitions
+vocabulary target
+target definitions
 
 8 1024 * allocate constant mem
 
-s[
-cell field >_pc
-cell field >_cta
-cell field >_dsp
-cell field >_rsp
-cell field >h
-cell field >fvocab
-cell field >cvocab
-cell field >current
-cell field >context
-]s fk0
+: t@   mem dyn@ ;
+: t!   mem dyn! ;
+: t+!  mem dyn+! ;
+: tc@  mem dync@ ;
+: tc!  mem dync! ;
+: tc+! mem dync+! ;
+: >t   mem >dyn ;
 
-: @ mem dyn@ ;
-: ! mem dyn! ;
-: +! mem dyn+! ;
-: c@ mem dync@ ;
-: c! mem dync! ;
-: c+! mem dync+! ;
-: host>target mem >dyn ;
-
-: .print do.u> dup c@ print 1+ godo 2drop ;
-: .bytes do.u> dup c@ .byte space 1+ godo 2drop ;
+: .print do.u> dup tc@ print 1+ godo 2drop ;
+: .bytes do.u> dup tc@ .byte space 1+ godo 2drop ;
 : .mem range do.u> 16 split dup .short space 2dup .bytes .print
   cr godo 2drop ;
 
-fk0 0 >h !
-0 0 >fvocab !
-0 0 >cvocab !
-0 >fvocab 0 >current !
+: l[ 0 ;
+: ]l constant ;
+: layout  over constant + ;
+: layout- - dup constant ;
 
-: here 0 >h @ ;
-: allot 0 >h +! ;
-: , here ! cell allot ;
-: c, here c! 1 allot ;
-: aligned dup cell mod + ;
-: align here aligned 0 >h ! ;
+\ NOTE
+\ cell size of target == cell size of host
 
-: str, dup c, tuck here swap host>target allot ;
-: define align here >r 0 >current @ @ , str, align r> 0 >current @ ! ;
+l[
+   cell layout _pc  \ program counter
+   cell layout _cta \ current token addr
+   cell layout s*
+   cell layout r*
+   cell layout h
+   cell layout fvocab
+   cell layout cvocab
+   cell layout current
+   cell layout context
+   cell layout state
+   cell layout base
+   cell layout source-ptr
+   cell layout source-len
+   cell layout >in
+   cell layout loop*
+2 cells layout execreg
+]l internal0
 
-: exit  0 , ;
-: docol 1 , ;
+l[
+  1024 layout-  b1
+  1024 layout-  b0
+  dup  constant r0
+  64 cells -    \ spacing for rstack
+  128  layout-  input-buffer
+]l s0
 
-: t; exit ;
+: there  h t@ ;
+: tallot h t+! ;
+: t,     there t! cell tallot ;
+: tc,    there tc! 1 tallot ;
+: talign there aligned h t! ;
 
-forth
-: deft define ['] docre @ , ['] exit , , does> @ [ tcmp ] , ;
+: tname,  dup tc, tuck there swap >t tallot ;
+: tdefine talign there >r current t@ t@ t, tname, talign
+  r> current t@ t! ;
 
-: buit word deft ;
+: tclone define ['] docre @ , ['] exit , , does> @ t, ;
+: tclone,here there -rot tclone ;
 
-forth
-: t: word 2dup
-  [ tcmp ] here [ forth ] -rot [ tcmp ] deft
-  define docol ;
+0 value docol#
+0 value docon#
 
-2 buit @
-3 buit !
+0 value exit-addr
+0 value jump-addr
+0 value jump0-addr
+0 value lit-addr
 
-: .mem .mem ;
+: t: word 2dup tclone,here tdefine docol# t, there loop* t! ;
+: t; exit-addr t, ;
+
+: tconstant word 2dup tclone,here tdefine docon# t, t, ;
+
+: builtins[ 0 ;
+: ]builtins ." builtins ct: " . cr ;
+: b:        dup word 2dup tclone,here third , tdefine t, 1+ ;
+: 'baddr '  2 cells + @ ;
+: 'bcode '  3 cells + @ ;
+
+: t(later), there 0 t, ;
+: tthis!    there swap t! ;
+
+: tif   jump0-addr t, t(later), ;
+: telse jump-addr t, t(later), swap tthis! ;
+: tthen tthis! ;
+
+: tliteral lit-addr t, t, ;
+
+: t|:   there loop* t! ;
+: tloop jump-addr t, loop* t@ t, ;
+
+: initexecreg exit-addr execreg cell + t! ;
+
+\ : 0     0 _literal ;
+\ : 128   128 _literal ;
+\ : false 0 ;
+\ : true  0xffff _literal ;
+
+internal0 h t!
+0 fvocab t!
+0 cvocab t!
+fvocab current t!
+fvocab context t!
+
+\ todo
+\ probably don't need:
+\   quit , c,
+\ need:
+\   u/ u/mod
+\   negate
+
+builtins[
+  b: exit
+  b: docol
+  b: docon
+  b: docre
+  b: jump
+  b: jump0
+  b: lit
+  b: panic
+  \ b: abort"
+  b: quit
+  b: accept
+  b: emit
+  b: =
+  b: >
+  b: >=
+  b: 0=
+  b: <
+  b: <=
+  b: u>
+  b: u>=
+  b: u<
+  b: u<=
+  b: and
+  b: or
+  b: xor
+  b: invert
+  b: lshift
+  b: rshift
+  b: !
+  b: +!
+  b: @
+  b: ,
+  b: c!
+  b: +c!
+  b: c@
+  b: c,
+  b: >r
+  b: r>
+  b: r@
+  b: +
+  b: -
+  b: *
+  b: /
+  b: mod
+  b: /mod
+  b: */
+  b: */mod
+  b: 1+
+  b: 1-
+  b: drop
+  b: dup
+  b: ?dup
+  b: swap
+  b: flip
+  b: over
+  b: nip
+  b: tuck
+  b: rot
+  b: -rot
+]builtins
+
+'bcode docol to docol#
+'bcode docon to docon#
+'baddr exit  to exit-addr
+'baddr jump  to jump-addr
+'baddr jump0 to jump0-addr
+'baddr lit   to lit-addr
+initexecreg
+
+bl tconstant bl
+source-ptr   tconstant source-ptr
+source-len   tconstant source-len
+>in          tconstant >in
+input-buffer tconstant input-buffer
+
+t: 2dup  over over t;
+t: 2drop drop drop t;
+t: 2swap >r flip r> flip t;
+\ t: 3drop drop 2drop t;
+\ t: third >r over r> swap t;
+\ t: 3dup  third third third t;
+
+t: <> = 0= t;
+
+t: /string tuck - -rot + swap t;
+t: -leading dup tif over c@ bl = tif 1 tliteral /string tloop tthen
+   tthen t;
+t: range over + swap t;
+
+t: source source-ptr @ ?dup 0= tif input-buffer tthen
+  source-len @ t;
+
+t: source@ source drop >in @ + t;
+t: next-char source@ c@ 1 tliteral >in +! t;
+t: source-rest source@ source + over - t;
+
+t: nextbl t|: 2dup u> tif dup c@ bl <> tif 1+ tloop tthen
+   tthen nip t;
+t: token -leading 2dup range nextbl nip over - t;
+t: word source-rest token 2dup + source drop - >in ! t;
+
+t: execute execreg tliteral ! jump execreg t, t;
+
+0 there .mem
+." after compile: " .s cr
+." mem size: " there . cr
+
+0 [if]
+
+\ >number
+\ lookup
+\ on word not found
+
+\ : lit, lit lit , ;
+\ : name cell + c@+ ;
+\ : >cfa name + aligned ;
+
+t: execute execreg _literal ! jump execreg , t;
+
+t: onlookup 0= state _literal @ and _if >cfa , else >cfa execute _then t;
+t: onnumber state _literal @ _if lit, , _then t;
+
+t: resolve
+    2dup lookup ?dup _if 2swap 2drop swap onlookup _else
+    2dup >number     _if -rot 2drop       onnumber _else
+    \ todo
+    \ on word not found
+  _then _then t;
+
+t: refill,user input-buffer _literal 128 accept source-len _literal ! 0 >in _literal ! t;
+t: refill source-ptr _literal @ _if false _else refill,user true _then t;
+
+t: word! word ?dup 0= _if drop refill _if _loop _else
+   0 0 _then _then t;
+
+t: interpret word! ?dup _if resolve _loop _else drop _then t;
+
+[then]
 
 forth definitions
 
 0 [if]
 
 \ ===
-
-: b: dup word define , 1+ ;
-: b: dup word 2drop drop ;
-: bs[ 0 ;
-: ]bs ." bytecode ct:" . ;
-
-bs[
-b: exit
-b: panic
-b: abort"
-b: quit
-b: accept
-b: docol
-b: docon
-b: docre
-b: jump
-b: jump0
-b: lit
-b: =
-b: >
-b: >=
-b: 0=
-b: <
-b: <=
-b: u>
-b: u>=
-b: u<
-b: u<=
-b: and
-b: or
-b: xor
-b: invert
-b: lshift
-b: rshift
-b: !
-b: +!
-b: @
-b: ,
-b: c!
-b: +c!
-b: c@
-b: c,
-b: >r
-b: r>
-b: r@
-b: +
-b: -
-b: *
-b: /
-b: mod
-b: /mod
-b: */
-b: */mod
-b: 1+
-b: 1-
-b: drop
-b: dup
-b: ?dup
-b: swap
-b: flip
-b: over
-b: nip
-b: tuck
-b: rot
-b: -rot
-]bs
 
 0 variable state
 10 variable base

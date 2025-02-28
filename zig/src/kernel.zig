@@ -1,9 +1,16 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+const ArrayList = std.ArrayList;
+
 const mem = @import("memory.zig");
 const bytecodes = @import("bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
-pub const External = struct {};
+const externals = @import("externals.zig");
+const External = externals.External;
+
+// ===
 
 pub const Cell = u16;
 pub const DoubleCell = u32;
@@ -28,8 +35,8 @@ pub const RAMLayout = MemoryLayout(struct {
 });
 
 pub const Kernel = struct {
-    memory: [64 * 1024]u8,
-    externals: []External,
+    memory: mem.MemoryPtr,
+    externals: ArrayList(External),
 
     program_counter: *Cell,
     current_token_addr: *Cell,
@@ -37,6 +44,7 @@ pub const Kernel = struct {
     return_stack_ptr: *Cell,
 
     pub fn init(self: *@This()) void {
+        // TODO allocate memory
         self.program_counter = &self.memory[RAMLayout.offsetOf("program_counter")];
         self.current_token_addr = &self.memory[RAMLayout.offsetOf("current_token_addr")];
         self.data_stack_ptr = &self.memory[RAMLayout.offsetOf("data_stack_ptr")];
@@ -84,5 +92,32 @@ pub const Kernel = struct {
     pub fn advancePC(self: *@This(), offset: Cell) !void {
         try mem.assertOffsetInBounds(self.program_counter, offset);
         self.program_counter += offset;
+    }
+
+    // ===
+
+    // TODO
+    // this could take an offset?
+    pub fn addExternal(self: *@This(), external: External) !void {
+        try self.externals.append(external);
+    }
+
+    fn processExternals(self: *@This(), token: Cell) !void {
+        if (self.externals.items.len > 0) {
+            // NOTE
+            // Starts at the end of the list so
+            //   later externals can override earlier ones
+            var i: usize = 1;
+            while (i <= self.externals.items.len) : (i += 1) {
+                const at = self.externals.items.len - i;
+                var external = self.externals.items[at];
+                if (try external.call(self, token)) {
+                    return;
+                }
+            }
+        }
+
+        std.debug.print("Unhandled external: {}\n", .{token});
+        return error.UnhandledExternal;
     }
 };
