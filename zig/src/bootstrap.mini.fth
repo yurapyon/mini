@@ -1,5 +1,3 @@
-here constant bootstrap0
-
 vocabulary target
 target definitions
 
@@ -31,6 +29,7 @@ l[
    cell layout _cta \ current token addr
    cell layout s*
    cell layout r*
+2 cells layout execreg
    cell layout h
    cell layout fvocab
    cell layout cvocab
@@ -42,7 +41,6 @@ l[
    cell layout source-len
    cell layout >in
    cell layout loop*
-2 cells layout execreg
 ]l internal0
 
 l[
@@ -65,6 +63,7 @@ l[
 
 : tclone define ['] docre @ , ['] exit , , does> @ t, ;
 : tclone,here there -rot tclone ;
+: 'taddr '  2 cells + @ ;
 
 0 value docol#
 0 value docon#
@@ -82,7 +81,6 @@ l[
 : builtins[ 0 ;
 : ]builtins ." builtins ct: " . cr ;
 : b:        dup word 2dup tclone,here third , tdefine t, 1+ ;
-: 'baddr '  2 cells + @ ;
 : 'bcode '  3 cells + @ ;
 
 : t(later), there 0 t, ;
@@ -98,11 +96,6 @@ l[
 : tloop jump-addr t, loop* t@ t, ;
 
 : initexecreg exit-addr execreg cell + t! ;
-
-\ : 0     0 _literal ;
-\ : 128   128 _literal ;
-\ : false 0 ;
-\ : true  0xffff _literal ;
 
 internal0 h t!
 0 fvocab t!
@@ -167,6 +160,7 @@ builtins[
   b: */mod
   b: 1+
   b: 1-
+  b: negate
   b: drop
   b: dup
   b: ?dup
@@ -181,10 +175,10 @@ builtins[
 
 'bcode docol to docol#
 'bcode docon to docon#
-'baddr exit  to exit-addr
-'baddr jump  to jump-addr
-'baddr jump0 to jump0-addr
-'baddr lit   to lit-addr
+'taddr exit  to exit-addr
+'taddr jump  to jump-addr
+'taddr jump0 to jump0-addr
+'taddr lit   to lit-addr
 initexecreg
 
 bl tconstant bl
@@ -192,15 +186,28 @@ source-ptr   tconstant source-ptr
 source-len   tconstant source-len
 >in          tconstant >in
 input-buffer tconstant input-buffer
+h tconstant h
+current tconstant current
+context tconstant context
+fvocab tconstant fvocab
+cvocab tconstant cvocab
+state tconstant state
+base  tconstant base
+0      tconstant false
+0xFFFF tconstant true
+cell   tconstant cell
 
 t: 2dup  over over t;
 t: 2drop drop drop t;
 t: 2swap >r flip r> flip t;
-\ t: 3drop drop 2drop t;
-\ t: third >r over r> swap t;
-\ t: 3dup  third third third t;
+t: 3drop drop 2drop t;
+t: third >r over r> swap t;
+t: 3dup  third third third t;
 
-t: <> = 0= t;
+t: here h @ t;
+t: aligned dup cell mod + t;
+
+\ ===
 
 t: /string tuck - -rot + swap t;
 t: -leading dup tif over c@ bl = tif 1 tliteral /string tloop tthen
@@ -214,216 +221,109 @@ t: source@ source drop >in @ + t;
 t: next-char source@ c@ 1 tliteral >in +! t;
 t: source-rest source@ source + over - t;
 
-t: nextbl t|: 2dup u> tif dup c@ bl <> tif 1+ tloop tthen
+t: nextbl t|: 2dup u> tif dup c@ bl = 0= tif 1+ tloop tthen
    tthen nip t;
 t: token -leading 2dup range nextbl nip over - t;
 t: word source-rest token 2dup + source drop - >in ! t;
 
+\ ===
+
+t: c@+ dup 1+ swap c@ t;
+
+\ todo
+t: string~= t;
+
+t: name cell + c@+ t;
+
+( name len start -- addr )
+\ todo note, could use a pure string=, could convert names to lowercase on define
+t: locate t|: dup tif 3dup name string~= 0= tif @ tloop tthen tthen nip nip t;
+
+\ todo need to check it isn't 0 before dereferencing it
+\ another thing could be that '0 @' is 0
+t: locskip 3dup locate dup current @ @ = tif drop @ locate telse
+   >r 3drop r> tthen t;
+
+t: locprev state @ tif locskip telse locate tthen t;
+
+t: find 2dup context @ @ locprev ?dup tif nip nip telse
+  fvocab @ locprev tthen t;
+
+( name len -- compiler-word? addr/0 )
+t: lookup
+   2dup cvocab @ locprev ?dup tif nip nip true swap telse
+   2dup find ?dup tif nip nip false swap telse 2drop 0 tliteral
+   tthen tthen t;
+
+\ ===
+
+t: negative? drop c@ '-' tliteral = t;
+t: char? 3 tliteral = swap dup c@ ''' tliteral = swap
+   2 tliteral + c@ ''' tliteral = and and t;
+
+( str len -- # )
+t: >base drop c@
+   dup '%' tliteral = tif drop  2 tliteral telse
+   dup '#' tliteral = tif drop 10 tliteral telse
+       '$' tliteral = tif      16 tliteral telse
+       base @
+   tthen tthen tthen t;
+t: >char drop 1+ c@ t;
+
+t: pad here 64 tliteral + t;
+
+( digit base -- )
+t: accumulate pad @ * + pad ! t;
+
+t: in[,] rot tuck >= -rot <= and t;
+
+t: char>digit
+    dup '0' tliteral '9' tliteral in[,] tif '0' tliteral - telse
+    dup 'A' tliteral 'Z' tliteral in[,] tif '7' tliteral - telse
+    dup 'a' tliteral 'z' tliteral in[,] tif 'W' tliteral - telse
+  tthen tthen tthen t;
+
+( str len base -- number t/f )
+t: >number,base
+   >r range 0 tliteral pad !
+   t|: 2dup u> tif dup c@ char>digit dup r@ < tif r@ accumulate 1+ tloop tthen tthen
+   r> drop = tif pad @ true telse drop false tthen t;
+
+\ ( str len -- number t/f )
+t: >number 2dup char? tif >char true exit tthen 2dup negative? -rot
+   third tif 1 tliteral /string tthen 2dup >base >number,base
+   tif swap tif negate tthen true telse drop false tthen t;
+
+\ ===
+
 t: execute execreg tliteral ! jump execreg t, t;
+
+t: >cfa name + aligned t;
+t: lit, lit lit , t;
+
+t: onlookup 0= state @ and tif >cfa , telse >cfa execute tthen t;
+t: onnumber state @ tif lit, , tthen t;
+
+t: resolve
+    2dup lookup ?dup tif 2swap 2drop swap onlookup telse
+    2dup >number     tif -rot 2drop       onnumber telse
+    \ todo
+    \ on word not found
+  tthen tthen t;
+
+t: refill,user input-buffer 128 tliteral accept source-len ! 0 tliteral >in ! t;
+t: refill source-ptr @ tif false telse refill,user true tthen t;
+
+t: word! word ?dup 0= tif drop refill tif tloop telse 0 tliteral tthen tthen t;
+
+t: interpret word! ?dup tif resolve tloop telse drop tthen t;
+
+'taddr interpret execreg t!
+
+\ ===
 
 0 there .mem
 ." after compile: " .s cr
 ." mem size: " there . cr
 
-0 [if]
-
-\ >number
-\ lookup
-\ on word not found
-
-\ : lit, lit lit , ;
-\ : name cell + c@+ ;
-\ : >cfa name + aligned ;
-
-t: execute execreg _literal ! jump execreg , t;
-
-t: onlookup 0= state _literal @ and _if >cfa , else >cfa execute _then t;
-t: onnumber state _literal @ _if lit, , _then t;
-
-t: resolve
-    2dup lookup ?dup _if 2swap 2drop swap onlookup _else
-    2dup >number     _if -rot 2drop       onnumber _else
-    \ todo
-    \ on word not found
-  _then _then t;
-
-t: refill,user input-buffer _literal 128 accept source-len _literal ! 0 >in _literal ! t;
-t: refill source-ptr _literal @ _if false _else refill,user true _then t;
-
-t: word! word ?dup 0= _if drop refill _if _loop _else
-   0 0 _then _then t;
-
-t: interpret word! ?dup _if resolve _loop _else drop _then t;
-
-[then]
-
 forth definitions
-
-0 [if]
-
-\ ===
-
-0 variable state
-10 variable base
-\ here variable h
-\ : here h @ ;
-\ : allot h +! ;
-\ : , here ! cell allot ;
-\ : c, here c! 1 allot ;
-\ : aligned dup cell mod + ;
-\ : align here aligned h ! ;
-
-compiler definitions
-: do.dup [compile] |: ['] dup , [compile] if ;
-forth definitions
-
-0 variable source-ptr
-0 variable source-len
-0 variable >in
-
-create input-buffer 128 allot
-
-: source source-ptr @ ?dup 0= if input-buffer then
-  source-len @ ;
-
-\ todo use addr from zig
-\ 0 constant input-buffer
-: refill,user input-buffer 128 accept source-len ! 0 >in ! ;
-: refill source-ptr @ if false else refill,user true then ;
-
-: source@ source drop >in @ + ;
-: next-char source@ c@ 1 >in +! ;
-
-: source-rest source@ source + over - ;
-
-: nextbl do.u> dup c@ bl <> if 1+ godo then nip ;
-: token -leading 2dup range nextbl nip over - ;
-: word source-rest token 2dup + source drop - >in ! ;
-
-( name len start -- addr )
-: locate do.dup 3dup name string~= 0= if @ godo then nip nip ;
-
-\ todo need to check it isn't 0 before dereferencing it
-\ another thing could be that '0 @' is 0
-: locskip 3dup locate dup current @ @ = if drop @ locate else
-  >r 3drop r> then ;
-
-: locprev state @ if locskip else locate then ;
-
-: find 2dup context @ @ locprev ?dup if nip nip else
-  forth-latest @ locprev then ;
-
-( name len -- compiler-word? addr/0 )
-: lookup cond
-  2dup compiler-latest @ locprev ?dup if nip nip true swap else
-  2dup find ?dup if nip nip false swap else 2drop 0 endcond ;
-
-\ note
-\ doesnt work with temporary strings
-: str, dup c, tuck here swap move allot ;
-
-: define align here >r current @ @ , str, align r> current @ ! ;
-
-: ' word find dup if >cfa then ;
-
-\ numbers ===
-
-( str len -- t/f )
-: negative? drop c@ '-' = ;
-: char? 3 = swap dup c@ ''' = swap 2 + c@ ''' = and and ;
-
-( str len -- # )
-: >base drop c@ cond dup '%' = if drop 2 else
-  dup '#' = if drop 10 else '$' = if 16 else base @ endcond ;
-: >char drop 1+ c@ ;
-
-( digit base -- )
-: accumulate pad @ * + pad ! ;
-
-( str len base -- number t/f )
-: >number,base >r range 0 pad !
-  do.u> dup c@ char>digit dup r@ < if r@ accumulate 1+ godo then
-  r> drop = if pad @ true else drop false then ;
-
-( str len -- number t/f )
-: >number 2dup char? if >char true exit then 2dup negative? -rot
-  third if 1 /string then 2dup >base >number,base
-  if swap if negate then true else drop false then ;
-
-\ ===
-
-: word! word ?dup 0= if drop refill if loop else 0 0 then then ;
-
-: onlookup 0= state @ and if >cfa , else >cfa execute then ;
-: onnumber state @ if lit, , then ;
-
-: resolve cond
-    2dup lookup ?dup if 2swap 2drop swap onlookup else
-    2dup >number     if -rot 2drop       onnumber else
-    type ." ?_" cr
-  endcond ;
-
-: interpret word! ?dup if resolve loop else drop then ;
-
-create execreg 0 , ' exit ,
-
-: execute execreg ! jump [ execreg , ] ;
-
-\ ' interpret ,
-
-\ version major , minor ,
-\ 0 , 1 ,
-
-bootstrap0 @ dist ./k cr
-
-[then]
-
-
-\ bootstrapper ===
-
-\ tokenizing
-\ states
-
-\ kernel ===
-
-\ @ ! +
-
-\ precompiled ===
-
-\ state
-\ h
-
-\ 2dup
-\ [ ]
-\ : ; define
-
-\ ,
-\ if/cond
-
-\ align aligned
-
-\ >cfa
-\ execute
-
-\ lookup word
-\ >number
-
-\ refill
-\ word/tokenizing input
-
-\ variables
-\ source management
-
-\ interpret
-\ evaluate
-
-\ would be nice to have ===
-\ constants
-\ field s[ ]s
-
-\ dont think you need ===
-\ pad
-\ blocks
-\ strings
-\ extra math stuff
-\ comments

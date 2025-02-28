@@ -22,6 +22,7 @@ pub const RAMLayout = MemoryLayout(struct {
     current_token_addr: Cell,
     data_stack_ptr: Cell,
     return_stack_ptr: Cell,
+    execute_register: [2]Cell,
     dictionary_start: u0,
 
     _: u0,
@@ -35,6 +36,8 @@ pub const RAMLayout = MemoryLayout(struct {
 });
 
 pub const Kernel = struct {
+    allocator: Allocator,
+
     memory: mem.MemoryPtr,
     externals: ArrayList(External),
 
@@ -42,13 +45,22 @@ pub const Kernel = struct {
     current_token_addr: *Cell,
     data_stack_ptr: *Cell,
     return_stack_ptr: *Cell,
+    execute_register: *Cell,
 
-    pub fn init(self: *@This()) void {
-        // TODO allocate memory
-        self.program_counter = &self.memory[RAMLayout.offsetOf("program_counter")];
-        self.current_token_addr = &self.memory[RAMLayout.offsetOf("current_token_addr")];
-        self.data_stack_ptr = &self.memory[RAMLayout.offsetOf("data_stack_ptr")];
-        self.return_stack_ptr = &self.memory[RAMLayout.offsetOf("return_stack_ptr")];
+    pub fn init(self: *@This(), allocator: Allocator) !void {
+        self.memory = try mem.allocateMemory(allocator);
+        self.externals = ArrayList(External).init(allocator);
+
+        self.program_counter = try mem.cellPtr(RAMLayout.offsetOf("program_counter"));
+        self.current_token_addr = try mem.cellPtr(RAMLayout.offsetOf("current_token_addr"));
+        self.data_stack_ptr = try mem.cellPtr(RAMLayout.offsetOf("data_stack_ptr"));
+        self.return_stack_ptr = try mem.cellPtr(RAMLayout.offsetOf("return_stack_ptr"));
+        self.execute_register = try mem.cellPtr(RAMLayout.offsetOf("execute_register"));
+    }
+
+    pub fn deinit(self: *@This()) void {
+        // TODO free memory
+        _ = self;
     }
 
     pub fn load(self: *@This(), data: []u8) void {
@@ -57,10 +69,14 @@ pub const Kernel = struct {
         // @memcpy(self.memory, self.data)
     }
 
-    // Assumes self.program_counter is on the cell to execute
-    fn execute(self: *@This(), cfa_addr: Cell) !void {
+    pub fn setCfaToExecute(self: *@This(), cfa_addr: Cell) void {
+        self.execute_register.* = cfa_addr;
+    }
+
+    // Assumes the execute register is set
+    pub fn execute(self: *@This()) !void {
         self.return_stack.pushCell(0);
-        self.program_counter = cfa_addr;
+        self.program_counter = RAMLayout.offsetOf("execute_register");
 
         // Execution strategy:
         //   1. increment PC, then
@@ -76,6 +92,7 @@ pub const Kernel = struct {
 
             const token = try mem.readCell(self.memory, token_addr);
             if (bytecodes.getBytecode(token)) |callback| {
+                // TODO handle errors here
                 try callback(self);
             } else {
                 try self.processExternals(token);
