@@ -3,12 +3,18 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const mem = @import("memory.zig");
-const bytecodes = @import("bytecodes.zig");
+const bytecodes = @import("kernel_bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const externals = @import("externals.zig");
 const External = externals.External;
+
+const stack = @import("kernel_stack.zig");
+const Stack = stack.Stack;
+
+const register = @import("register.zig");
+const Register = register.Register;
 
 // ===
 
@@ -41,21 +47,40 @@ pub const Kernel = struct {
     memory: mem.MemoryPtr,
     externals: ArrayList(External),
 
-    program_counter: *Cell,
-    current_token_addr: *Cell,
-    data_stack_ptr: *Cell,
-    return_stack_ptr: *Cell,
-    execute_register: *Cell,
+    input_file: std.fs.File,
+    output_file: std.fs.File,
+
+    program_counter: Register(
+        RAMLayout.offsetOf("program_counter"),
+    ),
+    current_token_addr: Register(
+        RAMLayout.offsetOf("current_token_addr"),
+    ),
+    execute_register: Register(
+        RAMLayout.offsetOf("execute_register"),
+    ),
+    data_stack: Stack(
+        RAMLayout.offsetOf("data_stack_ptr"),
+        RAMLayout.offsetOf("data_stack"),
+    ),
+    return_stack: Stack(
+        RAMLayout.offsetOf("return_stack_ptr"),
+        RAMLayout.offsetOf("return_stack"),
+    ),
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
+        self.input_file = std.io.getStdIn();
+        self.output_file = std.io.getStdOut();
+
         self.memory = try mem.allocateMemory(allocator);
         self.externals = ArrayList(External).init(allocator);
 
-        self.program_counter = try mem.cellPtr(RAMLayout.offsetOf("program_counter"));
-        self.current_token_addr = try mem.cellPtr(RAMLayout.offsetOf("current_token_addr"));
-        self.data_stack_ptr = try mem.cellPtr(RAMLayout.offsetOf("data_stack_ptr"));
-        self.return_stack_ptr = try mem.cellPtr(RAMLayout.offsetOf("return_stack_ptr"));
-        self.execute_register = try mem.cellPtr(RAMLayout.offsetOf("execute_register"));
+        self.program_counter.init(self.memory);
+        self.current_token_addr.init(self.memory);
+        self.execute_register.init(self.memory);
+
+        self.data_stack.init(self.memory);
+        self.return_stack.init(self.memory);
     }
 
     pub fn deinit(self: *@This()) void {
@@ -63,20 +88,29 @@ pub const Kernel = struct {
         _ = self;
     }
 
+    pub fn clear(self: *@This()) void {
+        for (self.memory) |*byte| {
+            byte.* = 0xaa;
+        }
+    }
+
     pub fn load(self: *@This(), data: []u8) void {
-        _ = self;
-        _ = data;
-        // @memcpy(self.memory, self.data)
+        self.clear();
+        @memcpy(self.memory[0..data.len], data);
+        self.data_stack.initTopPtr();
+        self.return_stack.initTopPtr();
     }
 
     pub fn setCfaToExecute(self: *@This(), cfa_addr: Cell) void {
-        self.execute_register.* = cfa_addr;
+        self.execute_register.store(cfa_addr);
+        self.program_counter.store(@TypeOf(self.execute_register).offset);
     }
 
-    // Assumes the execute register is set
     pub fn execute(self: *@This()) !void {
         self.return_stack.pushCell(0);
-        self.program_counter = RAMLayout.offsetOf("execute_register");
+        self.program_counter.store(@TypeOf(self.execute_register).offset);
+
+        // std.debug.print("here {}\n", .{self.program_counter.fetch()});
 
         // Execution strategy:
         //   1. increment PC, then
@@ -85,30 +119,44 @@ pub const Kernel = struct {
         //   because bytecodes can just set the jump location
         //     directly without having to do any math
 
-        while (self.program_counter != 0) {
-            const token_addr = try mem.readCell(self.memory, self.program_counter);
-            self.current_token_addr = token_addr;
+        while (self.program_counter.fetch() != 0) {
+            const token_addr = try mem.readCell(
+                self.memory,
+                self.program_counter.fetch(),
+            );
+            self.current_token_addr.store(token_addr);
             try self.advancePC(@sizeOf(Cell));
 
+            // std.debug.print("loop {} {}\n", .{
+            // token_addr,
+            // self.program_counter.fetch(),
+            // });
+
             const token = try mem.readCell(self.memory, token_addr);
+
+            // std.debug.print("loop {}\n", .{ token });
+
             if (bytecodes.getBytecode(token)) |callback| {
-                // TODO handle errors here
+                // std.debug.print("x {}\n", .{callback});
+                // TODO handle abort" errors here
                 try callback(self);
             } else {
-                try self.processExternals(token);
+                // TODO
+                // try self.processExternals(token);
             }
         }
     }
 
     pub fn assertValidProgramCounter(self: @This()) !void {
-        if (self.program_counter == 0) {
+        if (self.program_counter.fetch() == 0) {
             return error.InvalidProgramCounter;
         }
     }
 
     pub fn advancePC(self: *@This(), offset: Cell) !void {
-        try mem.assertOffsetInBounds(self.program_counter, offset);
-        self.program_counter += offset;
+        // std.debug.print("{}\n", .{self.program_counter.fetch()});
+        try mem.assertOffsetInBounds(self.program_counter.fetch(), offset);
+        self.program_counter.storeAdd(offset);
     }
 
     // ===

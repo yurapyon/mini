@@ -8,6 +8,7 @@ pub const CliOptions = struct {
     run_system: bool,
     filepaths: ArrayList([]u8),
     image_filepath: ?[]u8,
+    kernel_filepath: ?[]u8,
 
     pub fn initFromProcessArgs(self: *@This(), allocator: Allocator) !void {
         self.allocator = allocator;
@@ -24,6 +25,9 @@ pub const CliOptions = struct {
         var expect_image_filepath = false;
         self.image_filepath = null;
 
+        var expect_kernel_filepath = false;
+        self.kernel_filepath = null;
+
         _ = iter.skip();
         while (iter.next()) |arg| {
             // just ignore it
@@ -38,11 +42,21 @@ pub const CliOptions = struct {
                 continue;
             }
 
+            if (expect_kernel_filepath and self.kernel_filepath == null) {
+                expect_kernel_filepath = false;
+                // TODO errdefer
+                const filepath = try self.allocator.alloc(u8, arg.len);
+                @memcpy(filepath, arg);
+                self.kernel_filepath = filepath;
+                continue;
+            }
+
             if (arg[0] == '-') {
                 switch (arg[1]) {
                     'i' => self.interactive = !self.interactive,
                     's' => self.run_system = !self.run_system,
                     'I' => expect_image_filepath = true,
+                    'k' => expect_kernel_filepath = true,
                     else => {},
                 }
             } else {

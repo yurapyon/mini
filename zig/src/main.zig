@@ -22,6 +22,8 @@ const System = @import("system/system.zig").System;
 
 const readFile = @import("utils/read-file.zig").readFile;
 
+const Kernel = @import("kernel.zig").Kernel;
+
 // ===
 
 const base_file = @embedFile("base.mini.fth");
@@ -67,6 +69,15 @@ pub fn main() !void {
             },
             else => return err,
         };
+    }
+
+    if (cli_options.kernel_filepath) |filepath| {
+        var kernel: Kernel = undefined;
+        try kernel.init(allocator);
+        const precompiled = try readFile(allocator, filepath);
+        kernel.load(precompiled);
+        try kernel.execute();
+        return;
     }
 
     if (cli_options.run_system) {

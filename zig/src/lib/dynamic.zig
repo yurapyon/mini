@@ -16,6 +16,8 @@ const Dictionary = dictionary.Dictionary;
 
 const Handles = @import("../utils/handles.zig").Handles;
 
+const writeFile = @import("../utils/read-file.zig").writeFile;
+
 // ===
 
 const ExternalId = enum(Cell) {
@@ -33,6 +35,7 @@ const ExternalId = enum(Cell) {
     // copy allocated memory to/from dictionary
     // read file into dynamic memory
 
+    dynToFile,
     _max,
     _,
 };
@@ -133,6 +136,26 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 @memcpy(destination_slice, source_slice);
             }
         },
+        .dynToFile => {
+            const handle_id = rt.data_stack.popCell();
+            const filename_len = rt.data_stack.popCell();
+            const filename_addr = rt.data_stack.popCell();
+            const mem_len = rt.data_stack.popCell();
+            const mem_addr = rt.data_stack.popCell();
+            if (dyn.getAllocatedSlice(handle_id)) |slice| {
+                const filename = try mem.constSliceFromAddrAndLen(
+                    rt.memory,
+                    filename_addr,
+                    filename_len,
+                );
+                const bytes = try mem.sliceFromAddrAndLen(
+                    slice,
+                    mem_addr,
+                    mem_len,
+                );
+                writeFile(filename, bytes) catch unreachable;
+            }
+        },
         else => return false,
     }
     return true;
@@ -209,6 +232,11 @@ pub const Dynamic = struct {
         //     forth_vocabulary_addr,
         //     @intFromEnum(ExternalId.dynMoveFrom) + start_token,
         // );
+        try self.rt.defineExternal(
+            "dyn>file",
+            forth_vocabulary_addr,
+            @intFromEnum(ExternalId.dynToFile) + start_token,
+        );
         try self.rt.addExternal(external);
 
         self.start_token = start_token;

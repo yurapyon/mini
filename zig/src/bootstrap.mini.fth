@@ -61,9 +61,18 @@ l[
 : tdefine talign there >r current t@ t@ t, tname, talign
   r> current t@ t! ;
 
-: tclone define ['] docre @ , ['] exit , , does> @ t, ;
+: 'taddr ' 2 cells + @ ;
+
+: tc@+ dup 1+ swap tc@ ;
+: tname cell + tc@+ ;
+: t>cfa tname + aligned ;
+: 'tcfa 'taddr t>cfa ;
+
+: tclone define ['] docre @ , ['] exit , , does> @ t>cfa t, ;
 : tclone,here there -rot tclone ;
-: 'taddr '  2 cells + @ ;
+
+: savemem 0 there s" mini-out/precompiled.mini.bin" mem
+  dyn>file ;
 
 0 value docol#
 0 value docon#
@@ -95,7 +104,7 @@ l[
 : t|:   there loop* t! ;
 : tloop jump-addr t, loop* t@ t, ;
 
-: initexecreg exit-addr execreg cell + t! ;
+: setexecreg execreg t! exit-addr execreg cell + t! ;
 
 internal0 h t!
 0 fvocab t!
@@ -142,11 +151,9 @@ builtins[
   b: !
   b: +!
   b: @
-  b: ,
   b: c!
   b: +c!
   b: c@
-  b: c,
   b: >r
   b: r>
   b: r@
@@ -171,15 +178,15 @@ builtins[
   b: tuck
   b: rot
   b: -rot
+  b: mem=
 ]builtins
 
 'bcode docol to docol#
 'bcode docon to docon#
-'taddr exit  to exit-addr
-'taddr jump  to jump-addr
-'taddr jump0 to jump0-addr
-'taddr lit   to lit-addr
-initexecreg
+'tcfa exit  to exit-addr
+'tcfa jump  to jump-addr
+'tcfa jump0 to jump0-addr
+'tcfa lit   to lit-addr
 
 bl tconstant bl
 source-ptr   tconstant source-ptr
@@ -205,39 +212,43 @@ t: third >r over r> swap t;
 t: 3dup  third third third t;
 
 t: here h @ t;
+t: allot h +! t;
 t: aligned dup cell mod + t;
+
+t: ,  here ! cell allot t;
+t: c, here c! 1 tliteral allot t;
+
+t: c@+ dup 1+ swap c@ t;
+t: name cell + c@+ t;
+
+t: >cfa name + aligned t;
+t: lit, lit lit , t;
+
+t: /string tuck - -rot + swap t;
+t: -leading dup tif over c@ bl = tif 1 tliteral /string tloop tthen tthen t;
+t: range over + swap t;
+
+t: .chars 2dup u> tif c@+ emit tloop tthen 2drop t;
+t: type range .chars t;
+
+t: string= rot over = tif mem= telse 3drop false tthen t;
 
 \ ===
 
-t: /string tuck - -rot + swap t;
-t: -leading dup tif over c@ bl = tif 1 tliteral /string tloop tthen
-   tthen t;
-t: range over + swap t;
-
-t: source source-ptr @ ?dup 0= tif input-buffer tthen
-  source-len @ t;
+t: source source-ptr @ ?dup 0= tif input-buffer tthen source-len @ t;
 
 t: source@ source drop >in @ + t;
 t: next-char source@ c@ 1 tliteral >in +! t;
 t: source-rest source@ source + over - t;
 
-t: nextbl t|: 2dup u> tif dup c@ bl = 0= tif 1+ tloop tthen
-   tthen nip t;
-t: token -leading 2dup range nextbl nip over - t;
-t: word source-rest token 2dup + source drop - >in ! t;
+t: nextbl t|: 2dup u> tif dup c@ bl = 0= tif 1+ tloop tthen tthen nip t;
+t: token  -leading 2dup range nextbl nip over - t;
+t: word   source-rest token 2dup + source drop - >in ! t;
 
 \ ===
 
-t: c@+ dup 1+ swap c@ t;
-
-\ todo
-t: string~= t;
-
-t: name cell + c@+ t;
-
 ( name len start -- addr )
-\ todo note, could use a pure string=, could convert names to lowercase on define
-t: locate t|: dup tif 3dup name string~= 0= tif @ tloop tthen tthen nip nip t;
+t: locate t|: dup tif 3dup name string= 0= tif @ tloop tthen tthen nip nip t;
 
 \ todo need to check it isn't 0 before dereferencing it
 \ another thing could be that '0 @' is 0
@@ -298,17 +309,13 @@ t: >number 2dup char? tif >char true exit tthen 2dup negative? -rot
 
 t: execute execreg tliteral ! jump execreg t, t;
 
-t: >cfa name + aligned t;
-t: lit, lit lit , t;
-
 t: onlookup 0= state @ and tif >cfa , telse >cfa execute tthen t;
 t: onnumber state @ tif lit, , tthen t;
 
 t: resolve
     2dup lookup ?dup tif 2swap 2drop swap onlookup telse
     2dup >number     tif -rot 2drop       onnumber telse
-    \ todo
-    \ on word not found
+    type '?' tliteral emit
   tthen tthen t;
 
 t: refill,user input-buffer 128 tliteral accept source-len ! 0 tliteral >in ! t;
@@ -318,12 +325,16 @@ t: word! word ?dup 0= tif drop refill tif tloop telse 0 tliteral tthen tthen t;
 
 t: interpret word! ?dup tif resolve tloop telse drop tthen t;
 
-'taddr interpret execreg t!
+t: test 'taddr interpret tliteral name type t;
+
+'tcfa test setexecreg
 
 \ ===
 
 0 there .mem
 ." after compile: " .s cr
 ." mem size: " there . cr
+savemem
+." saved" cr
 
 forth definitions

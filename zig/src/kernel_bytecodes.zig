@@ -5,10 +5,12 @@ const mem = @import("memory.zig");
 const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
 
 const runtime = @import("runtime.zig");
-const Runtime = runtime.Runtime;
-const Cell = runtime.Cell;
-const DoubleCell = runtime.DoubleCell;
-const SignedCell = runtime.SignedCell;
+
+const kernel = @import("kernel.zig");
+const Kernel = kernel.Kernel;
+const Cell = kernel.Cell;
+const DoubleCell = kernel.DoubleCell;
+const SignedCell = kernel.SignedCell;
 
 // ===
 
@@ -26,17 +28,68 @@ pub const Error = error{
     InvalidCompileState,
 };
 
-pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
+pub const BytecodeFn = *const fn (runtime: *Kernel) Error!void;
 
 pub const callbacks = [_]BytecodeFn{
     &exit,
-    &panic,
-    // &abort,
-    &quit,
-    &execute,
-    &refill,
     &docol,
-    // ...
+    &docon,
+    &docre,
+    &jump,
+    &jump0,
+    &lit,
+    &panic,
+    &quit,
+    // abort
+    &accept,
+    &emit,
+    &eq,
+    &gt,
+    &gteq,
+    &eq0,
+    &lt,
+    &lteq,
+    &ugt,
+    &ugteq,
+    &ult,
+    &ulteq,
+    &and_,
+    &or_,
+    &xor,
+    &invert,
+    &lshift,
+    &rshift,
+    &store,
+    &storeAdd,
+    &fetch,
+    &storeC,
+    &storeAddC,
+    &fetchC,
+    &toR,
+    &fromR,
+    &fetchR,
+    &plus,
+    &minus,
+    &multiply,
+    &divide,
+    &mod,
+    &divmod,
+    &muldiv,
+    &muldivmod,
+    &inc,
+    &dec,
+    &negate,
+    &drop,
+    &dup,
+    &maybeDup,
+    &swap,
+    &flip,
+    &over,
+    &nip,
+    &tuck,
+    &rot,
+    &nrot,
+    &memEqual,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeFn {
@@ -47,286 +100,317 @@ pub fn getBytecode(token: Cell) ?BytecodeFn {
     }
 }
 
-pub fn docol(rt: *Runtime) Error!void {
-    rt.return_stack.pushCell(rt.program_counter);
-    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
+pub fn docol(k: *Kernel) Error!void {
+    k.return_stack.pushCell(k.program_counter.fetch());
+    k.program_counter.store(k.current_token_addr.fetch() + @sizeOf(Cell));
+    // @import("std").debug.print("docol {}\n", .{k.program_counter.fetch()});
 }
 
-pub fn docon(rt: *Runtime) Error!void {
-    const addr = rt.current_token_addr + @sizeOf(Cell);
-    const value = mem.readCell(rt.memory, addr) catch unreachable;
-    rt.data_stack.pushCell(value);
+pub fn docon(k: *Kernel) Error!void {
+    const addr = k.current_token_addr.fetch() + @sizeOf(Cell);
+    const value = mem.readCell(k.memory, addr) catch unreachable;
+    k.data_stack.pushCell(value);
+    // @import("std").debug.print("docon {} {}\n", .{ k.current_token_addr.fetch(), k.program_counter.fetch() });
 }
 
-pub fn docre(rt: *Runtime) Error!void {
-    const does_addr = rt.current_token_addr + @sizeOf(Cell);
+pub fn docre(k: *Kernel) Error!void {
+    const does_addr = k.current_token_addr.fetch() + @sizeOf(Cell);
     const body_addr = does_addr + @sizeOf(Cell);
-    const does = mem.readCell(rt.memory, does_addr) catch unreachable;
-    rt.data_stack.pushCell(body_addr);
-    rt.return_stack.pushCell(rt.program_counter);
-    rt.setCfaToExecute(does);
+    const does = mem.readCell(k.memory, does_addr) catch unreachable;
+    k.data_stack.pushCell(body_addr);
+    k.return_stack.pushCell(k.program_counter.fetch());
+    k.setCfaToExecute(does);
 }
 
-pub fn panic(_: *Runtime) Error!void {
+pub fn panic(_: *Kernel) Error!void {
     return error.Panic;
 }
 
-pub fn exit(rt: *Runtime) Error!void {
-    rt.program_counter = rt.return_stack.popCell();
+pub fn exit(k: *Kernel) Error!void {
+    k.program_counter.store(k.return_stack.popCell());
+    // @import("std").debug.print("exit {}\n", .{k.program_counter.fetch()});
 }
 
-pub fn execute(rt: *Runtime) Error!void {
-    const cfa_addr = rt.data_stack.popCell();
-    rt.return_stack.pushCell(rt.program_counter);
-    rt.setCfaToExecute(cfa_addr);
+pub fn execute(k: *Kernel) Error!void {
+    const cfa_addr = k.data_stack.popCell();
+    k.return_stack.pushCell(k.program_counter.fetch());
+    k.setCfaToExecute(cfa_addr);
 }
 
-pub fn jump(rt: *Runtime) Error!void {
-    try rt.assertValidProgramCounter();
-    const addr = try mem.readCell(rt.memory, rt.program_counter);
+pub fn jump(k: *Kernel) Error!void {
+    try k.assertValidProgramCounter();
+    const addr = try mem.readCell(k.memory, k.program_counter.fetch());
     try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
-    rt.program_counter = addr;
+    k.program_counter.store(addr);
 }
 
-pub fn jump0(rt: *Runtime) Error!void {
-    try rt.assertValidProgramCounter();
+pub fn jump0(k: *Kernel) Error!void {
+    try k.assertValidProgramCounter();
 
-    const conditional = rt.data_stack.popCell();
+    const conditional = k.data_stack.popCell();
     if (!runtime.isTruthy(conditional)) {
-        try jump(rt);
+        try jump(k);
     } else {
-        try rt.advancePC(@sizeOf(Cell));
+        try k.advancePC(@sizeOf(Cell));
     }
 }
 
-pub fn quit(rt: *Runtime) Error!void {
+pub fn quit(k: *Kernel) Error!void {
     // TODO this needs to clear the return stack, now that its not circular
-    rt.program_counter = 0;
-    rt.should_quit = true;
+    k.program_counter.store(0);
+    // TODO
+    // k.should_quit = true;
 }
 
-pub fn eq(rt: *Runtime) Error!void {
-    rt.data_stack.eq();
-}
+pub fn accept(k: *Kernel) Error!void {
+    const len = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+    const out = try mem.sliceFromAddrAndLen(
+        k.memory,
+        addr,
+        len,
+    );
 
-pub fn eq0(rt: *Runtime) Error!void {
-    rt.data_stack.eq0();
-}
-
-pub fn gt(rt: *Runtime) Error!void {
-    rt.data_stack.gt();
-}
-
-pub fn gteq(rt: *Runtime) Error!void {
-    rt.data_stack.gteq();
-}
-
-pub fn lt(rt: *Runtime) Error!void {
-    rt.data_stack.lt();
-}
-
-pub fn lteq(rt: *Runtime) Error!void {
-    rt.data_stack.lteq();
-}
-
-pub fn ugt(rt: *Runtime) Error!void {
-    rt.data_stack.ugt();
-}
-
-pub fn ugteq(rt: *Runtime) Error!void {
-    rt.data_stack.ugteq();
-}
-
-pub fn ult(rt: *Runtime) Error!void {
-    rt.data_stack.ult();
-}
-
-pub fn ulteq(rt: *Runtime) Error!void {
-    rt.data_stack.ulteq();
-}
-
-pub fn and_(rt: *Runtime) Error!void {
-    rt.data_stack.and_();
-}
-
-pub fn or_(rt: *Runtime) Error!void {
-    rt.data_stack.ior();
-}
-
-pub fn xor(rt: *Runtime) Error!void {
-    rt.data_stack.xor();
-}
-
-pub fn invert(rt: *Runtime) Error!void {
-    rt.data_stack.invert();
-}
-
-pub fn lshift(rt: *Runtime) Error!void {
-    rt.data_stack.lshift();
-}
-
-pub fn rshift(rt: *Runtime) Error!void {
-    rt.data_stack.rshift();
-}
-
-pub fn inc(rt: *Runtime) Error!void {
-    rt.data_stack.inc();
-}
-
-pub fn dec(rt: *Runtime) Error!void {
-    rt.data_stack.dec();
-}
-
-pub fn drop(rt: *Runtime) Error!void {
-    rt.data_stack.drop();
-}
-
-pub fn dup(rt: *Runtime) Error!void {
-    rt.data_stack.dup();
-}
-
-pub fn maybeDup(rt: *Runtime) Error!void {
-    const top = rt.data_stack.peekCell();
-    if (runtime.isTruthy(top)) {
-        rt.data_stack.dup();
+    const reader = k.input_file.reader();
+    const slice =
+        reader.readUntilDelimiterOrEof(
+        out[0..out.len],
+        '\n',
+    ) catch return error.CannotRefill;
+    if (slice) |slc| {
+        k.data_stack.pushCell(@truncate(slc.len));
+    } else {
+        k.data_stack.pushCell(0);
     }
 }
 
-pub fn swap(rt: *Runtime) Error!void {
-    rt.data_stack.swap();
+pub fn emit(k: *Kernel) Error!void {
+    const std = @import("std");
+
+    const raw_char = k.data_stack.popCell();
+    const char = @as(u8, @truncate(raw_char & 0xff));
+    var bw = std.io.bufferedWriter(k.output_file.writer());
+    bw.writer().print("{c}", .{char}) catch unreachable;
+    bw.flush() catch unreachable;
 }
 
-pub fn flip(rt: *Runtime) Error!void {
-    rt.data_stack.flip();
+pub fn eq(k: *Kernel) Error!void {
+    k.data_stack.eq();
 }
 
-pub fn over(rt: *Runtime) Error!void {
-    rt.data_stack.over();
+pub fn eq0(k: *Kernel) Error!void {
+    k.data_stack.eq0();
 }
 
-pub fn nip(rt: *Runtime) Error!void {
-    rt.data_stack.nip();
+pub fn gt(k: *Kernel) Error!void {
+    k.data_stack.gt();
 }
 
-pub fn tuck(rt: *Runtime) Error!void {
-    rt.data_stack.tuck();
+pub fn gteq(k: *Kernel) Error!void {
+    k.data_stack.gteq();
 }
 
-pub fn rot(rt: *Runtime) Error!void {
-    rt.data_stack.rot();
+pub fn lt(k: *Kernel) Error!void {
+    k.data_stack.lt();
 }
 
-pub fn nrot(rt: *Runtime) Error!void {
-    rt.data_stack.nrot();
+pub fn lteq(k: *Kernel) Error!void {
+    k.data_stack.lteq();
 }
 
-pub fn store(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
-    try mem.writeCell(rt.memory, addr, value);
+pub fn ugt(k: *Kernel) Error!void {
+    k.data_stack.ugt();
 }
 
-pub fn fetchAdd(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
-    (try mem.cellPtr(rt.memory, addr)).* +%= value;
+pub fn ugteq(k: *Kernel) Error!void {
+    k.data_stack.ugteq();
 }
 
-pub fn fetch(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    rt.data_stack.pushCell(try mem.readCell(rt.memory, addr));
+pub fn ult(k: *Kernel) Error!void {
+    k.data_stack.ult();
 }
 
-pub fn comma(rt: *Runtime) Error!void {
-    const value = rt.data_stack.popCell();
-    try rt.interpreter.dictionary.here.comma(value);
+pub fn ulteq(k: *Kernel) Error!void {
+    k.data_stack.ulteq();
 }
 
-pub fn storeC(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
+pub fn and_(k: *Kernel) Error!void {
+    k.data_stack.and_();
+}
+
+pub fn or_(k: *Kernel) Error!void {
+    k.data_stack.ior();
+}
+
+pub fn xor(k: *Kernel) Error!void {
+    k.data_stack.xor();
+}
+
+pub fn invert(k: *Kernel) Error!void {
+    k.data_stack.invert();
+}
+
+pub fn lshift(k: *Kernel) Error!void {
+    k.data_stack.lshift();
+}
+
+pub fn rshift(k: *Kernel) Error!void {
+    k.data_stack.rshift();
+}
+
+pub fn inc(k: *Kernel) Error!void {
+    k.data_stack.inc();
+}
+
+pub fn dec(k: *Kernel) Error!void {
+    k.data_stack.dec();
+}
+
+pub fn negate(k: *Kernel) Error!void {
+    const value = k.data_stack.popSignedCell();
+    k.data_stack.pushSignedCell(-value);
+}
+
+pub fn drop(k: *Kernel) Error!void {
+    k.data_stack.drop();
+}
+
+pub fn dup(k: *Kernel) Error!void {
+    k.data_stack.dup();
+}
+
+pub fn maybeDup(k: *Kernel) Error!void {
+    const top = k.data_stack.peekCell();
+    if (runtime.isTruthy(top)) {
+        k.data_stack.dup();
+    }
+}
+
+pub fn swap(k: *Kernel) Error!void {
+    k.data_stack.swap();
+}
+
+pub fn flip(k: *Kernel) Error!void {
+    k.data_stack.flip();
+}
+
+pub fn over(k: *Kernel) Error!void {
+    k.data_stack.over();
+}
+
+pub fn nip(k: *Kernel) Error!void {
+    k.data_stack.nip();
+}
+
+pub fn tuck(k: *Kernel) Error!void {
+    k.data_stack.tuck();
+}
+
+pub fn rot(k: *Kernel) Error!void {
+    k.data_stack.rot();
+}
+
+pub fn nrot(k: *Kernel) Error!void {
+    k.data_stack.nrot();
+}
+
+pub fn store(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
+    try mem.writeCell(k.memory, addr, value);
+}
+
+pub fn storeAdd(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
+    (try mem.cellPtr(k.memory, addr)).* +%= value;
+}
+
+pub fn fetch(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    k.data_stack.pushCell(try mem.readCell(k.memory, addr));
+}
+
+pub fn storeC(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
-    rt.memory[addr] = value_u8;
+    k.memory[addr] = value_u8;
 }
 
-pub fn fetchAddC(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
+pub fn storeAddC(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
-    rt.memory[addr] +%= value_u8;
+    k.memory[addr] +%= value_u8;
 }
 
-pub fn fetchC(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.popCell();
-    rt.data_stack.pushCell(rt.memory[addr]);
+pub fn fetchC(k: *Kernel) Error!void {
+    const addr = k.data_stack.popCell();
+    k.data_stack.pushCell(k.memory[addr]);
 }
 
-pub fn commaC(rt: *Runtime) Error!void {
-    const value = rt.data_stack.popCell();
-    try rt.interpreter.dictionary.here.commaC(@truncate(value));
+pub fn toR(k: *Kernel) Error!void {
+    k.return_stack.pushCell(k.data_stack.popCell());
 }
 
-pub fn toR(rt: *Runtime) Error!void {
-    rt.return_stack.pushCell(rt.data_stack.popCell());
+pub fn fromR(k: *Kernel) Error!void {
+    k.data_stack.pushCell(k.return_stack.popCell());
 }
 
-pub fn fromR(rt: *Runtime) Error!void {
-    rt.data_stack.pushCell(rt.return_stack.popCell());
+pub fn fetchR(k: *Kernel) Error!void {
+    k.data_stack.pushCell(k.return_stack.peekCell());
 }
 
-pub fn fetchR(rt: *Runtime) Error!void {
-    rt.data_stack.pushCell(rt.return_stack.peekCell());
+pub fn plus(k: *Kernel) Error!void {
+    k.data_stack.add();
 }
 
-pub fn plus(rt: *Runtime) Error!void {
-    rt.data_stack.add();
+pub fn minus(k: *Kernel) Error!void {
+    k.data_stack.subtract();
 }
 
-pub fn minus(rt: *Runtime) Error!void {
-    rt.data_stack.subtract();
+pub fn multiply(k: *Kernel) Error!void {
+    k.data_stack.multiply();
 }
 
-pub fn multiply(rt: *Runtime) Error!void {
-    rt.data_stack.multiply();
+pub fn divide(k: *Kernel) Error!void {
+    k.data_stack.divide();
 }
 
-pub fn divide(rt: *Runtime) Error!void {
-    rt.data_stack.divide();
-}
-
-pub fn mod(rt: *Runtime) Error!void {
-    rt.data_stack.mod();
+pub fn mod(k: *Kernel) Error!void {
+    k.data_stack.mod();
 }
 
 // TODO move this into DataStack definiton
-pub fn divmod(rt: *Runtime) Error!void {
-    const div = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
+pub fn divmod(k: *Kernel) Error!void {
+    const div = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
     const q = value / div;
     const r = value % div;
-    rt.data_stack.pushCell(@truncate(q));
-    rt.data_stack.pushCell(@truncate(r));
+    k.data_stack.pushCell(@truncate(q));
+    k.data_stack.pushCell(@truncate(r));
 }
 
 // TODO move this into DataStack definiton
-pub fn muldiv(rt: *Runtime) Error!void {
-    const div = rt.data_stack.popCell();
-    const mul = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
+pub fn muldiv(k: *Kernel) Error!void {
+    const div = k.data_stack.popCell();
+    const mul = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
     const double_value: DoubleCell = @intCast(value);
     const double_mul: DoubleCell = @intCast(mul);
     const calc = double_value * double_mul / div;
     // NOTE
     // truncating
     // this can happen when mul is big and div is small
-    rt.data_stack.pushCell(@truncate(calc));
+    k.data_stack.pushCell(@truncate(calc));
 }
 
 // TODO move this into DataStack definiton
-pub fn muldivmod(rt: *Runtime) Error!void {
-    const div = rt.data_stack.popCell();
-    const mul = rt.data_stack.popCell();
-    const value = rt.data_stack.popCell();
+pub fn muldivmod(k: *Kernel) Error!void {
+    const div = k.data_stack.popCell();
+    const mul = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
     const double_value: DoubleCell = @intCast(value);
     const double_mul: DoubleCell = @intCast(mul);
     const q = double_value * double_mul / div;
@@ -334,19 +418,25 @@ pub fn muldivmod(rt: *Runtime) Error!void {
     // NOTE
     // truncating
     // this can happen when mul is big and div is small
-    rt.data_stack.pushCell(@truncate(q));
-    rt.data_stack.pushCell(@truncate(r));
+    k.data_stack.pushCell(@truncate(q));
+    k.data_stack.pushCell(@truncate(r));
 }
 
-pub fn refill(rt: *Runtime) Error!void {
-    const did_refill = try rt.input_buffer.refill();
-    // TODO use pushBoolean
-    rt.data_stack.pushCell(runtime.cellFromBoolean(did_refill));
+pub fn lit(k: *Kernel) Error!void {
+    try k.assertValidProgramCounter();
+    const value = try mem.readCell(k.memory, k.program_counter.fetch());
+    k.data_stack.pushCell(value);
+    try k.advancePC(@sizeOf(Cell));
 }
 
-pub fn lit(rt: *Runtime) Error!void {
-    try rt.assertValidProgramCounter();
-    const value = try mem.readCell(rt.memory, rt.program_counter);
-    rt.data_stack.pushCell(value);
-    try rt.advancePC(@sizeOf(Cell));
+pub fn memEqual(k: *Kernel) Error!void {
+    const std = @import("std");
+
+    const count = k.data_stack.popCell();
+    const b_addr = k.data_stack.popCell();
+    const a_addr = k.data_stack.popCell();
+    const a_slice = try mem.constSliceFromAddrAndLen(k.memory, a_addr, count);
+    const b_slice = try mem.constSliceFromAddrAndLen(k.memory, b_addr, count);
+    const areEqual = std.mem.eql(u8, a_slice, b_slice);
+    k.data_stack.pushCell(runtime.cellFromBoolean(areEqual));
 }

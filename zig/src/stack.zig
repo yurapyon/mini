@@ -83,6 +83,18 @@ pub fn Stack(
             }
         }
 
+        pub fn popSignedCell(self: *@This()) SignedCell {
+            const top = self.peekSigned(0);
+            self.pop(1);
+            return top.*;
+        }
+
+        pub fn pushSignedCell(self: *@This(), value: SignedCell) void {
+            self.push(1);
+            const top = self.peekSigned(0);
+            top.* = value;
+        }
+
         // stack manip ===
 
         pub fn dup(self: *@This()) void {
