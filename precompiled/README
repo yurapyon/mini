@@ -1,0 +1,35 @@
+zig implementation ==
+
+files:
+  // core
+  runtime.zig      - brings all the vm's components together and defines some types
+  register.zig     - 'pointer' that stores an offset into vm memory
+  stack.zig        - circular stacks modelled after the F18 architecture
+
+  dictionary.zig   - compilation and word lookup
+  interpreter.zig  - thin wrapper over the dictionary and the 'state' and 'base' registers
+  input_buffer.zig - manages the input buffer and general line-by-line input
+
+  bytecodes.zig    - bytecode behaviors and the code-field lookup table
+  base.mini.fth    - a forth file that defines the 'std library' and most of the language features
+
+  // utils
+  memory.zig               - memory-related type definitions and error-returning memory access utils
+  linked_list_iterator.zig - helper for dictionary lookups
+  reader_refiller.zig      - use Zig readers to fill an input-buffer
+  utils.zig                - general utils: number parser, comptime utils, lowercase string compare
+
+  // app
+  main.zig         - processes commandline options and starts a repl
+  cli_options.zig  - basic commandline option interpreter
+  repl.zig         - the repl
+  system/
+    c.zig          - c interface
+    system.zig     - GUI and virtual computer
+
+
+undefined behavior:
+  compared to untyped, mini should never have a chance to segfault
+  alignment needs to be checked and turned into a MemoryError
+  out of bounds access of the vm memory block needs to be checked too
+

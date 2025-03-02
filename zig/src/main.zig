@@ -71,13 +71,15 @@ pub fn main() !void {
         };
     }
 
-    if (cli_options.kernel_filepath) |filepath| {
-        var kernel: Kernel = undefined;
-        try kernel.init(allocator);
-        const precompiled = try readFile(allocator, filepath);
-        kernel.load(precompiled);
-        try kernel.execute();
-        return;
+    if (cli_options.kernel_filepath) |precompiled_filepath| {
+        if (cli_options.image_filepath) |image_filepath| {
+            var kernel: Kernel = undefined;
+            try kernel.init(allocator, image_filepath);
+            const precompiled = try readFile(allocator, precompiled_filepath);
+            kernel.load(precompiled);
+            try kernel.execute();
+            return;
+        }
     }
 
     if (cli_options.run_system) {
