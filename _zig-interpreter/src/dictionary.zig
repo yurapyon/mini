@@ -184,6 +184,7 @@ pub const Dictionary = struct {
         return mem.constSliceFromAddrAndLen(self.memory, name_info.addr, name_info.len);
     }
 
+    // TODO this can be a util function
     fn getNameInfo(
         self: @This(),
         definition_addr: Cell,
@@ -196,6 +197,7 @@ pub const Dictionary = struct {
         };
     }
 
+    // TODO this can be a util function
     pub fn toCfa(self: @This(), definition_addr: Cell) !Cell {
         const name_info = try self.getNameInfo(definition_addr);
         const name_end = name_info.addr + name_info.len;
@@ -227,9 +229,8 @@ pub const Dictionary = struct {
     ) !void {
         const vocabulary_addr = self.current.fetch();
         try self.defineWord(vocabulary_addr, name);
-        try self.here.comma(bytecodes.enter_code);
-        try self.compileLit(value);
-        try self.compileXt(self.tag_addresses.exit);
+        try self.here.comma(bytecodes.cfa_codes.docon);
+        try self.here.comma(value);
     }
 };
 

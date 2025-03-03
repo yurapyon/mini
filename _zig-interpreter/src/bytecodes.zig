@@ -32,14 +32,17 @@ pub const Error = error{
 
 pub const BytecodeFn = *const fn (runtime: *Runtime) Error!void;
 
-pub const bytecodes_count = 64;
+pub const bytecodes_count = bytecodes.len;
 
-pub const enter_code = getBytecodeToken("enter") orelse unreachable;
+pub const cfa_codes = struct {
+    pub const docol = getBytecodeToken("docol") orelse unreachable;
+    pub const docon = getBytecodeToken("docon") orelse unreachable;
+    pub const docre = getBytecodeToken("docre") orelse unreachable;
+};
 
 const BytecodeDefinition = struct {
     name: []const u8 = "",
     callback: BytecodeFn = panic,
-    // TODO tag_only: bool,  ?
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeDefinition {
@@ -76,11 +79,16 @@ pub fn initBuiltins(dict: *Dictionary) !void {
     }
 }
 
-const bytecodes = [bytecodes_count]BytecodeDefinition{
+const bytecodes = [_]BytecodeDefinition{
+    .{ .name = "docol", .callback = docol },
+    .{ .name = "docon", .callback = docon },
+    .{ .name = "docre", .callback = docre },
+
     .{ .name = "panic", .callback = panic },
     .{ .name = "exit", .callback = exit },
-    .{ .name = "enter", .callback = enter },
     .{ .name = "execute", .callback = execute },
+    // TODO
+    // .{ .name = "@execute", .callback = fetchExecute },
     .{ .name = "jump", .callback = jump },
     .{ .name = "jump0", .callback = jump0 },
     .{ .name = "quit", .callback = quit },
@@ -93,6 +101,11 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = "0=", .callback = eq0 },
     .{ .name = "<", .callback = lt },
     .{ .name = "<=", .callback = lteq },
+
+    .{ .name = "u>", .callback = ugt },
+    .{ .name = "u>=", .callback = ugteq },
+    .{ .name = "u<", .callback = ult },
+    .{ .name = "u<=", .callback = ulteq },
 
     .{ .name = "and", .callback = and_ },
     .{ .name = "or", .callback = or_ },
@@ -147,30 +160,41 @@ const bytecodes = [bytecodes_count]BytecodeDefinition{
     .{ .name = ">number", .callback = toNumber },
 
     .{ .name = "move", .callback = move },
-    // TODO write in forth?
     .{ .name = "mem=", .callback = memEqual },
-
-    .{},
-    .{},
-    .{},
+    .{ .name = "string~=", .callback = stringEqual },
 };
+
+pub fn docol(rt: *Runtime) Error!void {
+    rt.return_stack.pushCell(rt.program_counter);
+    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
+}
+
+pub fn docon(rt: *Runtime) Error!void {
+    const addr = rt.current_token_addr + @sizeOf(Cell);
+    const value = mem.readCell(rt.memory, addr) catch unreachable;
+    rt.data_stack.pushCell(value);
+}
+
+pub fn docre(rt: *Runtime) Error!void {
+    const does_addr = rt.current_token_addr + @sizeOf(Cell);
+    const body_addr = does_addr + @sizeOf(Cell);
+    const does = mem.readCell(rt.memory, does_addr) catch unreachable;
+    rt.data_stack.pushCell(body_addr);
+    rt.return_stack.pushCell(rt.program_counter);
+    rt.setCfaToExecute(does);
+}
 
 pub fn panic(_: *Runtime) Error!void {
     return error.Panic;
 }
 
-pub fn enter(rt: *Runtime) Error!void {
-    rt.return_stack.push(rt.program_counter);
-    rt.program_counter = rt.current_token_addr + @sizeOf(Cell);
-}
-
 pub fn exit(rt: *Runtime) Error!void {
-    rt.program_counter = rt.return_stack.pop();
+    rt.program_counter = rt.return_stack.popCell();
 }
 
 pub fn execute(rt: *Runtime) Error!void {
-    const cfa_addr = rt.data_stack.pop();
-    rt.return_stack.push(rt.program_counter);
+    const cfa_addr = rt.data_stack.popCell();
+    rt.return_stack.pushCell(rt.program_counter);
     rt.setCfaToExecute(cfa_addr);
 }
 
@@ -184,7 +208,7 @@ pub fn jump(rt: *Runtime) Error!void {
 pub fn jump0(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
 
-    const conditional = rt.data_stack.pop();
+    const conditional = rt.data_stack.popCell();
     if (!runtime.isTruthy(conditional)) {
         try jump(rt);
     } else {
@@ -193,6 +217,7 @@ pub fn jump0(rt: *Runtime) Error!void {
 }
 
 pub fn quit(rt: *Runtime) Error!void {
+    // TODO this needs to clear the return stack, now that its not circular
     rt.program_counter = 0;
     rt.should_quit = true;
 }
@@ -219,6 +244,22 @@ pub fn lt(rt: *Runtime) Error!void {
 
 pub fn lteq(rt: *Runtime) Error!void {
     rt.data_stack.lteq();
+}
+
+pub fn ugt(rt: *Runtime) Error!void {
+    rt.data_stack.ugt();
+}
+
+pub fn ugteq(rt: *Runtime) Error!void {
+    rt.data_stack.ugteq();
+}
+
+pub fn ult(rt: *Runtime) Error!void {
+    rt.data_stack.ult();
+}
+
+pub fn ulteq(rt: *Runtime) Error!void {
+    rt.data_stack.ulteq();
 }
 
 pub fn and_(rt: *Runtime) Error!void {
@@ -262,7 +303,7 @@ pub fn dup(rt: *Runtime) Error!void {
 }
 
 pub fn maybeDup(rt: *Runtime) Error!void {
-    const top = rt.data_stack.peek();
+    const top = rt.data_stack.peekCell();
     if (runtime.isTruthy(top)) {
         rt.data_stack.dup();
     }
@@ -297,57 +338,61 @@ pub fn nrot(rt: *Runtime) Error!void {
 }
 
 pub fn store(rt: *Runtime) Error!void {
-    const addr, const value = rt.data_stack.pop2();
+    const addr = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     try mem.writeCell(rt.memory, addr, value);
 }
 
 pub fn fetchAdd(rt: *Runtime) Error!void {
-    const addr, const value = rt.data_stack.pop2();
+    const addr = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     (try mem.cellPtr(rt.memory, addr)).* +%= value;
 }
 
 pub fn fetch(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.pop();
-    rt.data_stack.push(try mem.readCell(rt.memory, addr));
+    const addr = rt.data_stack.popCell();
+    rt.data_stack.pushCell(try mem.readCell(rt.memory, addr));
 }
 
 pub fn comma(rt: *Runtime) Error!void {
-    const value = rt.data_stack.pop();
+    const value = rt.data_stack.popCell();
     try rt.interpreter.dictionary.here.comma(value);
 }
 
 pub fn storeC(rt: *Runtime) Error!void {
-    const addr, const value = rt.data_stack.pop2();
+    const addr = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] = value_u8;
 }
 
 pub fn fetchAddC(rt: *Runtime) Error!void {
-    const addr, const value = rt.data_stack.pop2();
+    const addr = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
     rt.memory[addr] +%= value_u8;
 }
 
 pub fn fetchC(rt: *Runtime) Error!void {
-    const addr = rt.data_stack.pop();
-    rt.data_stack.push(rt.memory[addr]);
+    const addr = rt.data_stack.popCell();
+    rt.data_stack.pushCell(rt.memory[addr]);
 }
 
 pub fn commaC(rt: *Runtime) Error!void {
-    const value = rt.data_stack.pop();
+    const value = rt.data_stack.popCell();
     try rt.interpreter.dictionary.here.commaC(@truncate(value));
 }
 
 pub fn toR(rt: *Runtime) Error!void {
-    rt.return_stack.push(rt.data_stack.pop());
+    rt.return_stack.pushCell(rt.data_stack.popCell());
 }
 
 pub fn fromR(rt: *Runtime) Error!void {
-    rt.data_stack.push(rt.return_stack.pop());
+    rt.data_stack.pushCell(rt.return_stack.popCell());
 }
 
 pub fn fetchR(rt: *Runtime) Error!void {
-    rt.data_stack.push(rt.return_stack.peek());
+    rt.data_stack.pushCell(rt.return_stack.peekCell());
 }
 
 pub fn plus(rt: *Runtime) Error!void {
@@ -372,33 +417,33 @@ pub fn mod(rt: *Runtime) Error!void {
 
 // TODO move this into DataStack definiton
 pub fn divmod(rt: *Runtime) Error!void {
-    const div = rt.data_stack.pop();
-    const value = rt.data_stack.pop();
+    const div = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     const q = value / div;
     const r = value % div;
-    rt.data_stack.push(@truncate(q));
-    rt.data_stack.push(@truncate(r));
+    rt.data_stack.pushCell(@truncate(q));
+    rt.data_stack.pushCell(@truncate(r));
 }
 
 // TODO move this into DataStack definiton
 pub fn muldiv(rt: *Runtime) Error!void {
-    const div = rt.data_stack.pop();
-    const mul = rt.data_stack.pop();
-    const value = rt.data_stack.pop();
+    const div = rt.data_stack.popCell();
+    const mul = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     const double_value: DoubleCell = @intCast(value);
     const double_mul: DoubleCell = @intCast(mul);
     const calc = double_value * double_mul / div;
     // NOTE
     // truncating
     // this can happen when mul is big and div is small
-    rt.data_stack.push(@truncate(calc));
+    rt.data_stack.pushCell(@truncate(calc));
 }
 
 // TODO move this into DataStack definiton
 pub fn muldivmod(rt: *Runtime) Error!void {
-    const div = rt.data_stack.pop();
-    const mul = rt.data_stack.pop();
-    const value = rt.data_stack.pop();
+    const div = rt.data_stack.popCell();
+    const mul = rt.data_stack.popCell();
+    const value = rt.data_stack.popCell();
     const double_value: DoubleCell = @intCast(value);
     const double_mul: DoubleCell = @intCast(mul);
     const q = double_value * double_mul / div;
@@ -406,12 +451,13 @@ pub fn muldivmod(rt: *Runtime) Error!void {
     // NOTE
     // truncating
     // this can happen when mul is big and div is small
-    rt.data_stack.push(@truncate(q));
-    rt.data_stack.push(@truncate(r));
+    rt.data_stack.pushCell(@truncate(q));
+    rt.data_stack.pushCell(@truncate(r));
 }
 
 pub fn find(rt: *Runtime) Error!void {
-    const len, const addr = rt.data_stack.pop2();
+    const len = rt.data_stack.popCell();
+    const addr = rt.data_stack.popCell();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
     const context_vocabulary_addr = rt.interpreter.dictionary.context.fetch();
@@ -421,16 +467,21 @@ pub fn find(rt: *Runtime) Error!void {
         word,
         false,
     )) |word_info| {
-        rt.data_stack.push(word_info.definition_addr);
-        rt.data_stack.push(runtime.cellFromBoolean(true));
+        rt.data_stack.pushCell(word_info.definition_addr);
+        // TODO use pushBoolean
+        rt.data_stack.pushCell(runtime.cellFromBoolean(true));
     } else {
-        rt.data_stack.push(0);
-        rt.data_stack.push(runtime.cellFromBoolean(false));
+        // TODO only push 1 thing
+        rt.data_stack.pushCell(0);
+
+        // TODO use pushBoolean
+        rt.data_stack.pushCell(runtime.cellFromBoolean(false));
     }
 }
 
 pub fn lookup(rt: *Runtime) Error!void {
-    const len, const addr = rt.data_stack.pop2();
+    const len = rt.data_stack.popCell();
+    const addr = rt.data_stack.popCell();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
 
     const maybe_lookup_result = rt.interpreter.lookupString(word) catch |err| switch (err) {
@@ -442,18 +493,21 @@ pub fn lookup(rt: *Runtime) Error!void {
         switch (lookup_result) {
             .word => |word_info| {
                 const is_compile_word = word_info.context_addr == Dictionary.compiler_vocabulary_addr;
-                rt.data_stack.push(word_info.definition_addr);
-                rt.data_stack.push(runtime.cellFromBoolean(is_compile_word));
-                rt.data_stack.push(runtime.cellFromBoolean(true));
+                rt.data_stack.pushCell(word_info.definition_addr);
+                // TODO use pushBoolean
+                rt.data_stack.pushCell(runtime.cellFromBoolean(is_compile_word));
+                rt.data_stack.pushCell(runtime.cellFromBoolean(true));
                 return;
             },
             else => {},
         }
     }
 
-    rt.data_stack.push(0);
-    rt.data_stack.push(0);
-    rt.data_stack.push(runtime.cellFromBoolean(false));
+    // TODO only push 1 thing
+    rt.data_stack.pushCell(0);
+    rt.data_stack.pushCell(0);
+    // TODO use pushBoolean
+    rt.data_stack.pushCell(runtime.cellFromBoolean(false));
 }
 
 pub fn nextWord(rt: *Runtime) Error!void {
@@ -461,16 +515,18 @@ pub fn nextWord(rt: *Runtime) Error!void {
     // This doesnt try to refill,
     //   because refilling invalidates what was stored in the input buffer
     const range = rt.input_buffer.readNextWordRange() orelse {
-        rt.data_stack.push(0);
-        rt.data_stack.push(0);
+        // TODO only push 1 thing
+        rt.data_stack.pushCell(0);
+        rt.data_stack.pushCell(0);
         return;
     };
-    rt.data_stack.push(range.address);
-    rt.data_stack.push(range.len);
+    rt.data_stack.pushCell(range.address);
+    rt.data_stack.pushCell(range.len);
 }
 
 pub fn define(rt: *Runtime) Error!void {
-    const len, const addr = rt.data_stack.pop2();
+    const len = rt.data_stack.popCell();
+    const addr = rt.data_stack.popCell();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const vocabulary_addr = rt.interpreter.dictionary.current.fetch();
     try rt.interpreter.dictionary.defineWord(vocabulary_addr, word);
@@ -483,12 +539,13 @@ pub fn nextChar(rt: *Runtime) Error!void {
     const char = rt.input_buffer.readNextChar() orelse {
         return error.UnexpectedEndOfInput;
     };
-    rt.data_stack.push(char);
+    rt.data_stack.pushCell(char);
 }
 
 pub fn refill(rt: *Runtime) Error!void {
     const did_refill = try rt.input_buffer.refill();
-    rt.data_stack.push(runtime.cellFromBoolean(did_refill));
+    // TODO use pushBoolean
+    rt.data_stack.pushCell(runtime.cellFromBoolean(did_refill));
 }
 
 pub fn tick(rt: *Runtime) Error!void {
@@ -508,7 +565,7 @@ pub fn tick(rt: *Runtime) Error!void {
         state == .compile,
     )) |word_info| {
         const cfa_addr = try rt.interpreter.dictionary.toCfa(word_info.definition_addr);
-        rt.data_stack.push(cfa_addr);
+        rt.data_stack.pushCell(cfa_addr);
     } else {
         rt.last_evaluated_word = word;
         return error.WordNotFound;
@@ -518,31 +575,35 @@ pub fn tick(rt: *Runtime) Error!void {
 pub fn lit(rt: *Runtime) Error!void {
     try rt.assertValidProgramCounter();
     const value = try mem.readCell(rt.memory, rt.program_counter);
-    rt.data_stack.push(value);
+    rt.data_stack.pushCell(value);
     try rt.advancePC(@sizeOf(Cell));
 }
 
 pub fn toNumber(rt: *Runtime) Error!void {
-    const len, const addr = rt.data_stack.pop2();
+    const len = rt.data_stack.popCell();
+    const addr = rt.data_stack.popCell();
     const word = try mem.constSliceFromAddrAndLen(rt.memory, addr, len);
     const base_addr = runtime.MainMemoryLayout.offsetOf("base");
     const base = mem.readCell(rt.memory, base_addr) catch unreachable;
     const number_usize = rt.interpreter.parseNumberCallback(word, base) catch {
-        rt.data_stack.push(0);
-        rt.data_stack.push(0);
+        // TODO only push 1 thing
+        rt.data_stack.pushCell(0);
+        rt.data_stack.pushCell(0);
         return;
     };
 
     const cell = @as(Cell, @truncate(number_usize & 0xffff));
-    rt.data_stack.push(cell);
-    rt.data_stack.push(0xffff);
+    rt.data_stack.pushCell(cell);
+    // TODO use pushBoolean
+    rt.data_stack.pushCell(0xffff);
 }
 
 pub fn move(rt: *Runtime) Error!void {
     const std = @import("std");
 
-    const count = rt.data_stack.pop();
-    const destination, const source = rt.data_stack.pop2();
+    const count = rt.data_stack.popCell();
+    const destination = rt.data_stack.popCell();
+    const source = rt.data_stack.popCell();
     const source_slice = try mem.constSliceFromAddrAndLen(
         rt.memory,
         source,
@@ -564,10 +625,24 @@ pub fn move(rt: *Runtime) Error!void {
 pub fn memEqual(rt: *Runtime) Error!void {
     const std = @import("std");
 
-    const count = rt.data_stack.pop();
-    const b_addr, const a_addr = rt.data_stack.pop2();
+    const count = rt.data_stack.popCell();
+    const b_addr = rt.data_stack.popCell();
+    const a_addr = rt.data_stack.popCell();
     const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, count);
     const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, count);
     const areEqual = std.mem.eql(u8, a_slice, b_slice);
-    rt.data_stack.push(runtime.cellFromBoolean(areEqual));
+    rt.data_stack.pushCell(runtime.cellFromBoolean(areEqual));
+}
+
+pub fn stringEqual(rt: *Runtime) Error!void {
+    const a_len = rt.data_stack.popCell();
+    const a_addr = rt.data_stack.popCell();
+    const a_slice = try mem.constSliceFromAddrAndLen(rt.memory, a_addr, a_len);
+
+    const b_len = rt.data_stack.popCell();
+    const b_addr = rt.data_stack.popCell();
+    const b_slice = try mem.constSliceFromAddrAndLen(rt.memory, b_addr, b_len);
+
+    const areEqual = stringsEqual(a_slice, b_slice);
+    rt.data_stack.pushCell(runtime.cellFromBoolean(areEqual));
 }
