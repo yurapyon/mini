@@ -1,18 +1,19 @@
 vocabulary target
 target definitions
 
-create mem 6 1024 * allot
+8 1024 * allocate constant mem
 
-: t@   mem + @ ;
-: t!   mem + ! ;
-: t+!  mem + +! ;
-: tc@  mem + c@ ;
-: tc!  mem + c! ;
-: t+c! mem + +c! ;
-: >t   swap mem + swap move ;
+: t@   mem dyn@ ;
+: t!   mem dyn! ;
+: t+!  mem dyn+! ;
+: tc@  mem dync@ ;
+: tc!  mem dync! ;
+: tc+! mem dync+! ;
+: >t   mem >dyn ;
 
-: .mem swap mem + swap range do.u>
-    16 split dup mem - .short space 2dup .bytes .print
+: .print do.u> dup tc@ print 1+ godo 2drop ;
+: .bytes do.u> dup tc@ .byte space 1+ godo 2drop ;
+: .mem range do.u> 16 split dup .short space 2dup .bytes .print
   cr godo 2drop ;
 
 : l[ 0 ;
@@ -54,9 +55,6 @@ l[
 ]l internal0
 
 l[
-  \ NOTE
-  \ b1 can't end at mem = 65536 or address ranges don't work
-  cell layout-  _space
   1024 layout-  b1
   cell layout-  b1.upd
   cell layout-  b1.id
@@ -75,13 +73,9 @@ l[
 : tc,    there tc! 1 tallot ;
 : talign there aligned h t! ;
 
-: tname,  dup tc, tuck there swap >t tallot ;
-: tdefine talign there >r current t@ t@ t, tname, talign
+: tstr,   dup tc, tuck there swap >t tallot ;
+: tdefine talign there >r current t@ t@ t, tstr, talign
   r> current t@ t! ;
-
-: tforth       fvocab context t! ;
-: tcompiler    cvocab context t! ;
-: tdefinitions context t@ current t! ;
 
 : 'taddr ' 2 cells + @ ;
 
@@ -90,10 +84,11 @@ l[
 : t>cfa tname + aligned ;
 : 'tcfa 'taddr t>cfa ;
 
-: tclone define ['] docre @ , ['] exit , there , does> @ t>cfa t, ;
+: tclone define ['] docre @ , ['] exit , , does> @ t>cfa t, ;
+: tclone,here there -rot tclone ;
 
-: savemem mem there
-  s" ../precompiled/mini-out/precompiled.mini.bin" >file ;
+: savemem 0 there s" mini-out/precompiled.mini.bin" mem
+  dyn>file ;
 
 0 value docol#
 0 value docon#
@@ -105,14 +100,14 @@ l[
 
 0 variable loop*
 
-: t: word 2dup tclone tdefine docol# t, there loop* ! ;
+: t: word 2dup tclone,here tdefine docol# t, there loop* ! ;
 : t; exit-addr t, ;
 
-: tconstant word 2dup tclone tdefine docon# t, t, ;
+: tconstant word 2dup tclone,here tdefine docon# t, t, ;
 
 : builtins[ 0 ;
 : ]builtins ." builtins ct: " . cr ;
-: b:        dup word 2dup tclone third , tdefine t, 1+ ;
+: b:        dup word 2dup tclone,here third , tdefine t, 1+ ;
 : 'bcode '  3 cells + @ ;
 
 : (later), there 0 t, ;
@@ -140,8 +135,6 @@ fvocab context t!
 false bswapped t!
 true  stay t!
 0     blk t!
-saved-stack saved* t!
-saved-blk-stack saved-blk* t!
 
 \ todo
 \ need:
@@ -164,7 +157,6 @@ builtins[
   b: ?dup   b: swap   b: flip  b: over
   b: nip    b: tuck   b: rot   b: -rot
   b: move   b: mem=   b: bread b: bwrite
-  b: >file
 ]builtins
 
 'bcode docol to docol#
@@ -333,14 +325,11 @@ t: banner \ literal count type cr t;
   'm' literal emit 'i' literal emit 'n' literal emit 'i' literal emit space
   ')' literal emit cr t;
 
-\ todo word not found should abort
 t: interpret word! ?dup if resolve stay @ if loop then else drop then t;
 t: bye false stay ! t;
 
 t: str, dup c, tuck here swap move allot t;
 t: define align here >r current @ @ , str, align r> current @ ! t;
-
-\ todo def external
 
 t: ss>ptr t;
 t: ss>len cell + t;
@@ -377,20 +366,11 @@ t: bsave    dup bclrupd dup b>id @ swap bwrite t;
 t: btrysave dup b>upd @ over b>id @ and if bsave else drop then t;
 
 t: update bfront b>upd true swap ! t;
-\ todo these are wrong ?
-0 [if]
 t: buffer bback dup btrysave tuck b>id ! t;
 t: block
     dup bfront b>id @ = if drop else
     dup bback  b>id @ = if drop bswap else
     dup buffer bread bswap
-  then then bfront t;
-[then]
-t: buffer bback tuck b>id ! t;
-t: block
-    dup bfront b>id @ = if drop else
-    dup bback  b>id @ = if drop bswap else
-    bback btrysave dup buffer bread bswap
   then then bfront t;
 t: save-buffers bfront btrysave bback btrysave t;
 t: empty-buffers bfront bempty bback bempty t;
@@ -399,29 +379,12 @@ t: flush save-buffers empty-buffers t;
 t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
 t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
 
-\ todo
-\  if youre evaluating a block and it calls load
-\  it shouldnt call block, it should only read into the back buffer
-\ t: load bpushblk dup blk ! block 1024 literal evaluate bpopblk t;
+t: load pushblk dup blk ! block 1024 literal evaluate popblk t;
 \ t: thru swap do.u>= dup load 1+ godo 2drop t;
 
-t: load bpushblk blk @ over blk !
-  if bback btrysave dup buffer tuck bread else block then
-  1024 literal evaluate bpopblk t;
-
 \ ===
 
-t: ] 1 literal state ! t;
-tcompiler tdefinitions
-t: [ 0 literal state ! t;
-tforth tdefinitions
-
-t: : word define docol# literal , ] t;
-tcompiler tdefinitions
-t: ; 'tcfa exit literal , [ t;
-tforth tdefinitions
-
-\ ===
+\ TODO bye
 
 t: init empty-buffers banner interpret t;
 
@@ -429,12 +392,11 @@ t: init empty-buffers banner interpret t;
 
 \ ===
 
-forth
-: cr cr ;
+: cr [ forth ] cr ;
 
 target
 
-\ 0 there .mem
+0 there .mem
 ." after compile: " .s cr
 ." mem size: " there . cr
 savemem

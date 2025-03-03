@@ -46,8 +46,6 @@ pub const RAMLayout = MemoryLayout(struct {
     b1_id: Cell,
     b1_upd: Cell,
     b1: [block_size]u8,
-    // NOTE
-    // b1 can't end at mem = 65536 or address ranges don't work
     bswapped: Cell,
 });
 
@@ -61,11 +59,6 @@ pub const Kernel = struct {
     output_file: std.fs.File,
 
     block_image_filepath: []const u8,
-
-    accept_buffer: ?struct {
-        mem: []const u8,
-        at: usize,
-    },
 
     program_counter: Register(
         RAMLayout.offsetOf("program_counter"),
@@ -104,7 +97,6 @@ pub const Kernel = struct {
         self.return_stack.init(self.memory);
 
         self.block_image_filepath = block_image_filepath;
-        self.accept_buffer = null;
     }
 
     pub fn deinit(self: *@This()) void {

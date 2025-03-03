@@ -1,8 +1,8 @@
-const runtime = @import("runtime.zig");
-const Runtime = runtime.Runtime;
-const Cell = runtime.Cell;
+const kernel = @import("kernel.zig");
+const Kernel = kernel.Kernel;
+const Cell = kernel.Cell;
 
-const bytecodes = @import("bytecodes.zig");
+const bytecodes = @import("kernel_bytecodes.zig");
 
 pub const External = struct {
     pub const Error = error{
@@ -10,7 +10,7 @@ pub const External = struct {
     } || bytecodes.Error;
 
     pub const Callback = *const fn (
-        rt: *Runtime,
+        k: *Kernel,
         id: Cell,
         userdata: ?*anyopaque,
     ) Error!bool;
@@ -18,7 +18,7 @@ pub const External = struct {
     callback: Callback,
     userdata: ?*anyopaque,
 
-    pub fn call(self: *@This(), rt: *Runtime, id: Cell) !bool {
-        return self.callback(rt, id, self.userdata);
+    pub fn call(self: *@This(), k: *Kernel, id: Cell) !bool {
+        return self.callback(k, id, self.userdata);
     }
 };

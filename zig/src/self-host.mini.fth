@@ -1,3 +1,89 @@
+: \ source-len @ >in ! ;
+
+: forth fvocab context ! ;
+: compiler cvocab context ! ;
+: definitions context @ current ! ;
+compiler definitions
+\ : literal lit, , ;
+: [compile] ' , ;
+: ['] ' lit, , ;
+forth definitions
+: constant word define ['] docon @ , , ;
+: enum dup constant 1+ ;
+: create word define ['] docre @ , ['] exit , ;
+: variable create , ;
+0 variable loop*
+: set-loop here loop* ! ;
+compiler definitions
+: |: set-loop ;
+: loop ['] jump , loop* @ , ;
+forth definitions
+: : : set-loop ;
+: (later), here 0 , ;
+: (lit), lit, (later), ;
+: this here swap ;
+: this! this ! ;
+: dist this - ;
+compiler definitions
+: if ['] jump0 , (later), ;
+: else ['] jump , (later), swap this! ;
+: then this! ;
+forth definitions
+: ( next-char ')' = 0= if loop then ;
+: last current @ @ >cfa ;
+: >does cell + ;
+compiler definitions
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
+forth definitions
+\ : value create , does> @ ;
+: value constant ;
+: vname ' cell + ;
+: to  vname ! ;
+: +to vname +! ;
+\ compiler definitions
+\ : to  lit, vname , ['] ! , ;
+\ : +to lit, vname , ['] +! , ;
+\ forth definitions
+: vocabulary create 0 , does> context ! ;
+
+: digit>char dup 10 < if '0' else 'W' then + ;
+0 variable #start
+: #len pad #start @ - ;
+: <# pad #start ! ;
+: #> drop #start @ #len ;
+: hold -1 #start +! #start @ c! ;
+: # base @ /mod digit>char hold ;
+: #s dup 0= if # else |: # dup if loop then then ;
+: #pad dup #len > if over hold loop then 2drop ;
+: h# 16 /mod digit>char hold ;
+: u.pad rot <# #s flip #pad #> type ;
+: u.r bl u.pad ;
+: u.0 '0' u.pad ;
+: u. <# #s #> type ;
+: . u. space ;
+: printable 32 126 in[,] ;
+: print dup printable 0= if drop '.' then emit ;
+: byte. <# h# h# #> type ;
+: short. <# h# h# h# h# #> type ;
+
+: print. 2dup u> if c@+ print loop then 2drop ;
+: bytes. 2dup u> if c@+ byte. space loop then 2drop ;
+
+: split over + tuck swap ;
+
+: sdata s* @ s0 over - ;
+: depth sdata nip cell / ;
+
+: .cells swap cell - |: 2dup <= if dup @ . cell - loop then
+  2drop ;
+: <.> <# '>' hold #s '<' hold #> type ;
+: .s depth <.> space sdata range .cells ;
+
+: println next-char drop source-rest type source-len @ >in ! ;
+
+: hex 16 base ! ;
+: decimal 10 base ! ;
+
 vocabulary target
 target definitions
 
@@ -11,9 +97,9 @@ create mem 6 1024 * allot
 : t+c! mem + +c! ;
 : >t   swap mem + swap move ;
 
-: .mem swap mem + swap range do.u>
-    16 split dup mem - .short space 2dup .bytes .print
-  cr godo 2drop ;
+: mem. swap mem + swap range |: 2dup u> if
+    16 split dup mem - short. space 2dup bytes. print.
+  cr loop then 2drop ;
 
 : l[ 0 ;
 : ]l constant ;
@@ -75,8 +161,8 @@ l[
 : tc,    there tc! 1 tallot ;
 : talign there aligned h t! ;
 
-: tstr,   dup tc, tuck there swap >t tallot ;
-: tdefine talign there >r current t@ t@ t, tstr, talign
+: tname,  dup tc, tuck there swap >t tallot ;
+: tdefine talign there >r current t@ t@ t, tname, talign
   r> current t@ t! ;
 
 : tforth       fvocab context t! ;
@@ -92,8 +178,7 @@ l[
 
 : tclone define ['] docre @ , ['] exit , there , does> @ t>cfa t, ;
 
-: savemem mem there
-  s" ../precompiled/mini-out/precompiled.mini.bin" >file ;
+: savemem word >r >r mem there r> r> >file ;
 
 0 value docol#
 0 value docon#
@@ -111,7 +196,7 @@ l[
 : tconstant word 2dup tclone tdefine docon# t, t, ;
 
 : builtins[ 0 ;
-: ]builtins ." builtins ct: " . cr ;
+: ]builtins . cr ;
 : b:        dup word 2dup tclone third , tdefine t, 1+ ;
 : 'bcode '  3 cells + @ ;
 
@@ -165,6 +250,7 @@ builtins[
   b: nip    b: tuck   b: rot   b: -rot
   b: move   b: mem=   b: bread b: bwrite
   b: >file
+println builtins ct: 
 ]builtins
 
 'bcode docol to docol#
@@ -188,7 +274,8 @@ cvocab       tconstant cvocab
 state        tconstant state
 base         tconstant base
 0            tconstant false
-0xFFFF       tconstant true
+hex FFFF decimal
+             tconstant true
 cell         tconstant cell
 b0           tconstant b0
 b1           tconstant b1
@@ -196,6 +283,8 @@ bswapped     tconstant bswapped
 saved*       tconstant saved*
 blk          tconstant blk
 saved-blk*   tconstant saved-blk*
+s*           tconstant s*
+s0           tconstant s0
 
 t: cells cell * t;
 
@@ -241,6 +330,8 @@ t: nextbl |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip t;
 t: token  -leading 2dup range nextbl nip over - t;
 t: word   source-rest token 2dup + source drop - >in ! t;
 
+\ t: println next-char drop source-rest type source-len @ >in ! t;
+
 \ ===
 
 ( name len start -- addr )
@@ -255,6 +346,10 @@ t: locprev state @ if locskip else locate then t;
 
 t: find 2dup context @ @ locprev ?dup if nip nip else
   fvocab @ locprev then t;
+
+\ NOTE todo
+\ there is a bug where compiler words are being found and executed
+\   while in interpreter mode
 
 ( name len -- compiler-word? addr/0 )
 t: lookup
@@ -307,14 +402,29 @@ t: >number 2dup char? if >char true exit then 2dup negative? -rot
 
 t: execute execreg literal ! jump execreg t, t;
 
+\ note todo
+\ there is an edge case here
+\ if compiler word and not compiling, just compiles the cfa
 t: onlookup 0= state @ and if >cfa , else >cfa execute then t;
 t: onnumber state @ if lit, , then t;
 
+\ t: resolve
+\     2dup state @ if lookup else find false swap then
+\       ?dup if 2swap 2drop swap onlookup else
+\     2dup >number     if -rot 2drop       onnumber else
+\     type '?' literal emit
+\   then then t;
+
 t: resolve
-    2dup lookup ?dup if 2swap 2drop swap onlookup else
+    2dup
+      state @ if
+        lookup ?dup if 2swap 2drop swap onlookup exit then
+      else
+        find ?dup if nip nip >cfa execute exit then
+      then
     2dup >number     if -rot 2drop       onnumber else
     type '?' literal emit
-  then then t;
+  then t;
 
 t: refill,user input-buffer 128 literal accept source-len ! 0 literal >in ! t;
 t: refill source-ptr @ if false else refill,user true then t;
@@ -377,15 +487,6 @@ t: bsave    dup bclrupd dup b>id @ swap bwrite t;
 t: btrysave dup b>upd @ over b>id @ and if bsave else drop then t;
 
 t: update bfront b>upd true swap ! t;
-\ todo these are wrong ?
-0 [if]
-t: buffer bback dup btrysave tuck b>id ! t;
-t: block
-    dup bfront b>id @ = if drop else
-    dup bback  b>id @ = if drop bswap else
-    dup buffer bread bswap
-  then then bfront t;
-[then]
 t: buffer bback tuck b>id ! t;
 t: block
     dup bfront b>id @ = if drop else
@@ -434,10 +535,14 @@ forth
 
 target
 
-0 there .mem
-." after compile: " .s cr
-." mem size: " there . cr
-savemem
-." saved" cr
+\ 0 there mem.
+println after compile: 
+.s cr
+println mem size: 
+there . cr
+println saving
+savemem mini-out/precompiled.mini.bin cr
+
+bye
 
 forth definitions

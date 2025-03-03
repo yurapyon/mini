@@ -392,6 +392,9 @@ nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc\&
 \ add two numbers but keep the value within 0-max
 : keepin ( a b max -- newv ) -rot + 0 rot clamp ;
 
+: fvocab forth-latest ;
+: cvocab compiler-latest ;
+
 0 [if]
 
 compiler

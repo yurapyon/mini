@@ -12,7 +12,7 @@ const Cell = kernel.Cell;
 const DoubleCell = kernel.DoubleCell;
 const SignedCell = kernel.SignedCell;
 
-const writeFile = @import("../utils/read-file.zig").writeFile;
+const writeFile = @import("utils/read-file.zig").writeFile;
 
 // ===
 
@@ -112,6 +112,13 @@ pub fn jump0(k: *Kernel) Error!void {
     } else {
         try k.advancePC(@sizeOf(Cell));
     }
+}
+
+pub fn quit(k: *Kernel) Error!void {
+    // TODO this needs to clear the return stack, now that its not circular
+    k.program_counter.store(0);
+    // TODO
+    // k.should_quit = true;
 }
 
 pub fn accept(k: *Kernel) Error!void {
@@ -444,23 +451,20 @@ pub fn bwrite(k: *Kernel) Error!void {
 }
 
 pub fn toFile(k: *Kernel) Error!void {
-    _ = k;
-    //     const filename_len = k.data_stack.popCell();
-    //     const filename_addr = k.data_stack.popCell();
-    //     const mem_len = k.data_stack.popCell();
-    //     const mem_addr = k.data_stack.popCell();
-    //     // TODO
-    //     if (k.getAllocatedSlice(mem_addr)) |slice| {
-    //         const filename = try mem.constSliceFromAddrAndLen(
-    //             k.memory,
-    //             filename_addr,
-    //             filename_len,
-    //         );
-    //         const bytes = try mem.sliceFromAddrAndLen(
-    //             slice,
-    //             mem_addr,
-    //             mem_len,
-    //         );
-    //         writeFile(filename, bytes) catch unreachable;
-    //     }
+    const filename_len = k.data_stack.popCell();
+    const filename_addr = k.data_stack.popCell();
+    const mem_len = k.data_stack.popCell();
+    const mem_addr = k.data_stack.popCell();
+
+    const filename = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        filename_addr,
+        filename_len,
+    );
+    const bytes = try mem.sliceFromAddrAndLen(
+        k.memory,
+        mem_addr,
+        mem_len,
+    );
+    writeFile(filename, bytes) catch unreachable;
 }

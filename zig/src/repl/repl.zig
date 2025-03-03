@@ -23,8 +23,6 @@ const c = @cImport({
     @cInclude("stdlib.h");
 });
 
-const writeFile = @import("../utils/read-file.zig").writeFile;
-
 // ===
 
 const ExternalId = enum(Cell) {
@@ -39,7 +37,6 @@ const ExternalId = enum(Cell) {
     time,
     shell,
     accept,
-    toFile,
     _max,
     _,
 };
@@ -136,24 +133,6 @@ fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.
                 rt.data_stack.pushCell(0);
             }
         },
-        .toFile => {
-            const filename_len = rt.data_stack.popCell();
-            const filename_addr = rt.data_stack.popCell();
-            const mem_len = rt.data_stack.popCell();
-            const mem_addr = rt.data_stack.popCell();
-
-            const filename = try mem.constSliceFromAddrAndLen(
-                rt.memory,
-                filename_addr,
-                filename_len,
-            );
-            const bytes = try mem.sliceFromAddrAndLen(
-                rt.memory,
-                mem_addr,
-                mem_len,
-            );
-            writeFile(filename, bytes) catch unreachable;
-        },
         else => return false,
     }
     return true;
@@ -228,11 +207,6 @@ pub const Repl = struct {
             "accept",
             forth_vocabulary_addr,
             @intFromEnum(ExternalId.accept),
-        );
-        try rt.defineExternal(
-            ">file",
-            forth_vocabulary_addr,
-            @intFromEnum(ExternalId.toFile),
         );
         try rt.addExternal(external);
 
