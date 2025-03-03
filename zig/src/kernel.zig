@@ -3,14 +3,14 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 const mem = @import("memory.zig");
-const bytecodes = @import("kernel_bytecodes.zig");
+const bytecodes = @import("bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const stack = @import("kernel_stack.zig");
+const stack = @import("stack.zig");
 const Stack = stack.Stack;
 
 const register = @import("register.zig");
@@ -166,7 +166,7 @@ pub const Kernel = struct {
                 try callback(self);
             } else {
                 // TODO
-                // try self.processExternals(token);
+                try self.processExternals(token);
             }
         }
     }

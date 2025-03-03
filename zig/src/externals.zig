@@ -2,7 +2,7 @@ const kernel = @import("kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const bytecodes = @import("kernel_bytecodes.zig");
+const bytecodes = @import("bytecodes.zig");
 
 pub const External = struct {
     pub const Error = error{

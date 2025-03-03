@@ -1,10 +1,12 @@
+fvocab context ! context @ current !
+
 : \ source-len @ >in ! ;
 
 : forth fvocab context ! ;
 : compiler cvocab context ! ;
 : definitions context @ current ! ;
 compiler definitions
-\ : literal lit, , ;
+: literal lit, , ;
 : [compile] ' , ;
 : ['] ' lit, , ;
 forth definitions
@@ -365,12 +367,14 @@ t: negative? drop c@ '-' literal = t;
 t: char? 3 literal = swap dup c@ ''' literal = swap
    2 literal + c@ ''' literal = and and t;
 
-( str len -- # )
+\ todo seems like for some reason this isnt working
+\ todo you have to skip the firt char of the string
+( str len -- # t/f )
 t: >base drop c@
-   dup '%' literal = if drop  2 literal else
-   dup '#' literal = if drop 10 literal else
-       '$' literal = if      16 literal else
-       base @
+   dup '%' literal = if drop  2 literal true else
+   dup '#' literal = if drop 10 literal true else
+       '$' literal = if      16 literal true else
+       base @ false
    then then then t;
 t: >char drop 1+ c@ t;
 
@@ -395,8 +399,8 @@ t: >number,base
 
 \ ( str len -- number t/f )
 t: >number 2dup char? if >char true exit then 2dup negative? -rot
-   third if 1 literal /string then 2dup >base >number,base
-   if swap if negate then true else drop false then t;
+   third if 1 literal /string then 2dup >base if >r 1 literal /string r> then
+   >number,base if swap if negate then true else drop false then t;
 
 \ ===
 
@@ -450,7 +454,7 @@ t: bye false stay ! t;
 t: str, dup c, tuck here swap move allot t;
 t: define align here >r current @ @ , str, align r> current @ ! t;
 
-\ todo def external
+t: external word define , t;
 
 t: ss>ptr t;
 t: ss>len cell + t;
@@ -497,6 +501,9 @@ t: save-buffers bfront btrysave bback btrysave t;
 t: empty-buffers bfront bempty bback bempty t;
 t: flush save-buffers empty-buffers t;
 
+\ todo
+\   blk stack is not really needed if
+\   if the max depth of loading a block is 2
 t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
 t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
 
@@ -544,5 +551,3 @@ println saving
 savemem mini-out/precompiled.mini.bin cr
 
 bye
-
-forth definitions
