@@ -11,7 +11,8 @@ const Kernel = @import("kernel.zig").Kernel;
 
 // ===
 
-const base_file = @embedFile("base.mini.fth");
+// const base_file = @embedFile("base.mini.fth");
+const self_host_file = @embedFile("self-host.mini.fth");
 
 pub fn main() !void {
     const allocator = std.heap.c_allocator;
@@ -23,15 +24,19 @@ pub fn main() !void {
     const memory = try mem.allocateMemory(allocator);
     defer allocator.free(memory);
 
-    // var start_token = repl.max_external_id;
-
     if (cli_options.kernel_filepath) |precompiled_filepath| {
         if (cli_options.image_filepath) |image_filepath| {
-            var kernel: Kernel = undefined;
-            try kernel.init(allocator, image_filepath);
+            var k: Kernel = undefined;
+            try k.init(allocator, image_filepath);
+
             const precompiled = try readFile(allocator, precompiled_filepath);
-            kernel.load(precompiled);
-            try kernel.execute();
+            k.load(precompiled);
+
+            if (cli_options.precompile) {
+                k.setAcceptBuffer(self_host_file);
+            }
+
+            try k.execute();
             return;
         }
     }

@@ -1,6 +1,7 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
 const bytecodes = @import("bytecodes.zig");
@@ -18,12 +19,27 @@ const Register = register.Register;
 
 // ===
 
+comptime {
+    const native_endianness = builtin.target.cpu.arch.endian();
+    if (native_endianness != .little) {
+        @compileError("native endianness must be .little");
+    }
+}
+
 pub const Cell = u16;
 pub const DoubleCell = u32;
 pub const SignedCell = i16;
 
-const block_size = 1024;
-const block_count = 256;
+pub fn cellFromBoolean(value: bool) Cell {
+    return if (value) 0xffff else 0;
+}
+
+pub fn isTruthy(value: Cell) bool {
+    return value != 0;
+}
+
+pub const block_size = 1024;
+pub const block_count = 256;
 
 // TODO copy layout from Starting Forth
 pub const RAMLayout = MemoryLayout(struct {
@@ -48,7 +64,7 @@ pub const RAMLayout = MemoryLayout(struct {
     b1: [block_size]u8,
     // NOTE
     // b1 can't end at mem = 65536 or address ranges don't work
-    bswapped: Cell,
+    _b1_space: Cell,
 });
 
 pub const Kernel = struct {
@@ -63,8 +79,8 @@ pub const Kernel = struct {
     block_image_filepath: []const u8,
 
     accept_buffer: ?struct {
+        stream: std.io.FixedBufferStream([]const u8),
         mem: []const u8,
-        at: usize,
     },
 
     program_counter: Register(
@@ -134,8 +150,6 @@ pub const Kernel = struct {
         self.return_stack.pushCell(0);
         self.program_counter.store(@TypeOf(self.execute_register).offset);
 
-        // std.debug.print("here {}\n", .{self.program_counter.fetch()});
-
         // Execution strategy:
         //   1. increment PC, then
         //   2. evaluate byte at PC-1
@@ -151,21 +165,11 @@ pub const Kernel = struct {
             self.current_token_addr.store(token_addr);
             try self.advancePC(@sizeOf(Cell));
 
-            // std.debug.print("loop {} {}\n", .{
-            // token_addr,
-            // self.program_counter.fetch(),
-            // });
-
             const token = try mem.readCell(self.memory, token_addr);
 
-            // std.debug.print("loop {}\n", .{ token });
-
             if (bytecodes.getBytecode(token)) |callback| {
-                // std.debug.print("x {}\n", .{callback});
-                // TODO handle abort" errors here
                 try callback(self);
             } else {
-                // TODO
                 try self.processExternals(token);
             }
         }
@@ -178,7 +182,6 @@ pub const Kernel = struct {
     }
 
     pub fn advancePC(self: *@This(), offset: Cell) !void {
-        // std.debug.print("{}\n", .{self.program_counter.fetch()});
         try mem.assertOffsetInBounds(self.program_counter.fetch(), offset);
         self.program_counter.storeAdd(offset);
     }
@@ -231,7 +234,7 @@ pub const Kernel = struct {
 
         // TODO
         // check file size ?
-        const seek_pt: usize = (block_id - 1) * block_size;
+        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
         try file.seekTo(seek_pt);
         _ = try file.read(buffer);
     }
@@ -255,8 +258,25 @@ pub const Kernel = struct {
 
         // TODO
         // check file size ?
-        const seek_pt: usize = (block_id - 1) * block_size;
+        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
         try file.seekTo(seek_pt);
         _ = try file.write(buffer);
+    }
+
+    // ===
+
+    // TODO note should copy the buffer
+    pub fn setAcceptBuffer(
+        self: *@This(),
+        buffer: []const u8,
+    ) void {
+        self.accept_buffer = .{
+            .stream = std.io.fixedBufferStream(buffer),
+            .mem = buffer,
+        };
+    }
+
+    pub fn clearAcceptBuffer(self: *@This()) void {
+        self.accept_buffer = null;
     }
 };

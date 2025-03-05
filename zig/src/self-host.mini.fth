@@ -35,17 +35,13 @@ forth definitions
 : last current @ @ >cfa ;
 : >does cell + ;
 compiler definitions
-: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
+  ['] docol @ , ;
 forth definitions
-\ : value create , does> @ ;
-: value constant ;
-: vname ' cell + ;
+: value create , does> @ ;
+: vname ' 2 cells + ;
 : to  vname ! ;
 : +to vname +! ;
-\ compiler definitions
-\ : to  lit, vname , ['] ! , ;
-\ : +to lit, vname , ['] +! , ;
-\ forth definitions
 : vocabulary create 0 , does> context ! ;
 
 : digit>char dup 10 < if '0' else 'W' then + ;
@@ -367,8 +363,6 @@ t: negative? drop c@ '-' literal = t;
 t: char? 3 literal = swap dup c@ ''' literal = swap
    2 literal + c@ ''' literal = and and t;
 
-\ todo seems like for some reason this isnt working
-\ todo you have to skip the firt char of the string
 ( str len -- # t/f )
 t: >base drop c@
    dup '%' literal = if drop  2 literal true else
@@ -412,15 +406,9 @@ t: execute execreg literal ! jump execreg t, t;
 t: onlookup 0= state @ and if >cfa , else >cfa execute then t;
 t: onnumber state @ if lit, , then t;
 
-\ t: resolve
-\     2dup state @ if lookup else find false swap then
-\       ?dup if 2swap 2drop swap onlookup else
-\     2dup >number     if -rot 2drop       onnumber else
-\     type '?' literal emit
-\   then then t;
-
 t: resolve
     2dup
+      \ todo kinda messy
       state @ if
         lookup ?dup if 2swap 2drop swap onlookup exit then
       else
@@ -507,12 +495,6 @@ t: flush save-buffers empty-buffers t;
 t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
 t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
 
-\ todo
-\  if youre evaluating a block and it calls load
-\  it shouldnt call block, it should only read into the back buffer
-\ t: load bpushblk dup blk ! block 1024 literal evaluate bpopblk t;
-\ t: thru swap do.u>= dup load 1+ godo 2drop t;
-
 t: load bpushblk blk @ over blk !
   if bback btrysave dup buffer tuck bread else block then
   1024 literal evaluate bpopblk t;
@@ -542,7 +524,7 @@ forth
 
 target
 
-\ 0 there mem.
+0 there mem.
 println after compile: 
 .s cr
 println mem size: 
@@ -550,4 +532,4 @@ there . cr
 println saving
 savemem mini-out/precompiled.mini.bin cr
 
-bye
+forth bye
