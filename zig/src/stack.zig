@@ -1,9 +1,9 @@
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
-const runtime = @import("runtime.zig");
-const Cell = runtime.Cell;
-const SignedCell = runtime.SignedCell;
+const kernel = @import("kernel.zig");
+const Cell = kernel.Cell;
+const SignedCell = kernel.SignedCell;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -67,7 +67,7 @@ pub fn Stack(
         }
 
         pub fn pushBoolean(self: *@This(), value: bool) void {
-            self.pushCell(runtime.cellFromBoolean(value));
+            self.pushCell(kernel.cellFromBoolean(value));
         }
 
         pub fn popCell(self: *@This()) Cell {
@@ -183,20 +183,20 @@ pub fn Stack(
         pub fn eq(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(top.* == second.*);
+            second.* = kernel.cellFromBoolean(top.* == second.*);
             self.pop(1);
         }
 
         pub fn eq0(self: *@This()) void {
             const top = self.peek(0);
-            top.* = runtime.cellFromBoolean(top.* == 0);
+            top.* = kernel.cellFromBoolean(top.* == 0);
         }
 
         pub fn gt(self: *@This()) void {
             const top = self.peekSigned(0);
             const ssecond = self.peekSigned(1);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(ssecond.* > top.*);
+            second.* = kernel.cellFromBoolean(ssecond.* > top.*);
             self.pop(1);
         }
 
@@ -204,7 +204,7 @@ pub fn Stack(
             const top = self.peekSigned(0);
             const ssecond = self.peekSigned(1);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(ssecond.* >= top.*);
+            second.* = kernel.cellFromBoolean(ssecond.* >= top.*);
             self.pop(1);
         }
 
@@ -212,7 +212,7 @@ pub fn Stack(
             const top = self.peekSigned(0);
             const ssecond = self.peekSigned(1);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(ssecond.* < top.*);
+            second.* = kernel.cellFromBoolean(ssecond.* < top.*);
             self.pop(1);
         }
 
@@ -220,35 +220,35 @@ pub fn Stack(
             const top = self.peekSigned(0);
             const ssecond = self.peekSigned(1);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(ssecond.* <= top.*);
+            second.* = kernel.cellFromBoolean(ssecond.* <= top.*);
             self.pop(1);
         }
 
         pub fn ugt(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(second.* > top.*);
+            second.* = kernel.cellFromBoolean(second.* > top.*);
             self.pop(1);
         }
 
         pub fn ugteq(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(second.* >= top.*);
+            second.* = kernel.cellFromBoolean(second.* >= top.*);
             self.pop(1);
         }
 
         pub fn ult(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(second.* < top.*);
+            second.* = kernel.cellFromBoolean(second.* < top.*);
             self.pop(1);
         }
 
         pub fn ulteq(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
-            second.* = runtime.cellFromBoolean(second.* <= top.*);
+            second.* = kernel.cellFromBoolean(second.* <= top.*);
             self.pop(1);
         }
 

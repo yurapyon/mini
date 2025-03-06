@@ -3,8 +3,8 @@ const std = @import("std");
 const mem = @import("memory.zig");
 const MemoryPtr = mem.MemoryPtr;
 
-const runtime = @import("runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("kernel.zig");
+const Cell = kernel.Cell;
 
 // ===
 

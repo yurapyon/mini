@@ -6,6 +6,7 @@ pub const CliOptions = struct {
     allocator: Allocator,
     interactive: bool,
     run_system: bool,
+    precompile: bool,
     filepaths: ArrayList([]u8),
     image_filepath: ?[]u8,
     kernel_filepath: ?[]u8,
@@ -18,6 +19,7 @@ pub const CliOptions = struct {
 
         self.interactive = true;
         self.run_system = false;
+        self.precompile = false;
 
         self.filepaths = ArrayList([]u8).init(self.allocator);
         errdefer self.filepaths.deinit();
@@ -57,6 +59,7 @@ pub const CliOptions = struct {
                     's' => self.run_system = !self.run_system,
                     'I' => expect_image_filepath = true,
                     'k' => expect_kernel_filepath = true,
+                    'p' => self.precompile = !self.precompile,
                     else => {},
                 }
             } else {

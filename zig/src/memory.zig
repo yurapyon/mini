@@ -1,8 +1,8 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const runtime = @import("runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("kernel.zig");
+const Cell = kernel.Cell;
 
 // ===
 
