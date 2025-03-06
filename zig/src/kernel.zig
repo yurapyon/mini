@@ -41,6 +41,11 @@ pub fn isTruthy(value: Cell) bool {
 pub const block_size = 1024;
 pub const block_count = 256;
 
+const NamedExternal = struct {
+    name: []const u8,
+    external: External,
+};
+
 // TODO copy layout from Starting Forth
 pub const RAMLayout = MemoryLayout(struct {
     program_counter: Cell,
@@ -71,7 +76,7 @@ pub const Kernel = struct {
     allocator: Allocator,
 
     memory: mem.MemoryPtr,
-    externals: ArrayList(External),
+    externals: ArrayList(NamedExternal),
 
     input_file: std.fs.File,
     output_file: std.fs.File,
@@ -106,11 +111,13 @@ pub const Kernel = struct {
         allocator: Allocator,
         block_image_filepath: []const u8,
     ) !void {
+        self.allocator = allocator;
+
         self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
 
         self.memory = try mem.allocateMemory(allocator);
-        self.externals = ArrayList(External).init(allocator);
+        self.externals = ArrayList(NamedExternal).init(allocator);
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -170,7 +177,8 @@ pub const Kernel = struct {
             if (bytecodes.getBytecode(token)) |callback| {
                 try callback(self);
             } else {
-                try self.processExternals(token);
+                const ext_token = token - @as(Cell, @intCast(bytecodes.callbacks.len));
+                try self.processExternals(ext_token);
             }
         }
     }
@@ -188,29 +196,33 @@ pub const Kernel = struct {
 
     // ===
 
-    // TODO
-    // this could take an offset?
-    pub fn addExternal(self: *@This(), external: External) !void {
-        try self.externals.append(external);
+    pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
+        // TODO check that this id isn't > maxInt(cell)
+        try self.externals.append(.{
+            .name = name,
+            .external = external,
+        });
     }
 
-    fn processExternals(self: *@This(), token: Cell) !void {
-        if (self.externals.items.len > 0) {
-            // NOTE
-            // Starts at the end of the list so
-            //   later externals can override earlier ones
-            var i: usize = 1;
-            while (i <= self.externals.items.len) : (i += 1) {
-                const at = self.externals.items.len - i;
-                var external = self.externals.items[at];
-                if (try external.call(self, token)) {
-                    return;
-                }
+    fn processExternals(self: *@This(), ext_token: Cell) !void {
+        if (ext_token < self.externals.items.len) {
+            try self.externals.items[ext_token].external.call(self);
+        } else {
+            std.debug.print("Unhandled external: {}\n", .{
+                ext_token,
+            });
+            return error.UnhandledExternal;
+        }
+    }
+
+    pub fn lookupExternal(self: *@This(), name: []const u8) ?Cell {
+        for (self.externals.items, 0..) |namedExternal, i| {
+            if (std.mem.eql(u8, namedExternal.name, name)) {
+                return @intCast(i);
             }
         }
 
-        std.debug.print("Unhandled external: {}\n", .{token});
-        return error.UnhandledExternal;
+        return null;
     }
 
     // blocks ===

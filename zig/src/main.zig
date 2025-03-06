@@ -29,6 +29,8 @@ pub fn main() !void {
             var k: Kernel = undefined;
             try k.init(allocator, image_filepath);
 
+            try @import("lib/os.zig").registerExternals(&k);
+
             const precompiled = try readFile(allocator, precompiled_filepath);
             k.load(precompiled);
 

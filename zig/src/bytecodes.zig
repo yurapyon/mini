@@ -46,7 +46,7 @@ pub const callbacks = [_]BytecodeFn{
     &maybeDup, &swap,     &flip,      &over,
     &nip,      &tuck,     &rot,       &nrot,
     &move,     &memEqual, &bread,     &bwrite,
-    &toFile,
+    &toFile,   &extId,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeFn {
@@ -476,4 +476,19 @@ pub fn toFile(k: *Kernel) Error!void {
         mem_len,
     );
     writeFile(filename, bytes) catch unreachable;
+}
+
+pub fn extId(k: *Kernel) Error!void {
+    const len = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+
+    const name = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        addr,
+        len,
+    );
+
+    const ext_token = k.lookupExternal(name) orelse 0xffff;
+    const token = ext_token + @as(Cell, @intCast(callbacks.len));
+    k.data_stack.pushCell(token);
 }

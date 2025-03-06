@@ -11,14 +11,13 @@ pub const External = struct {
 
     pub const Callback = *const fn (
         k: *Kernel,
-        id: Cell,
         userdata: ?*anyopaque,
-    ) Error!bool;
+    ) Error!void;
 
     callback: Callback,
     userdata: ?*anyopaque,
 
-    pub fn call(self: *@This(), k: *Kernel, id: Cell) !bool {
-        return self.callback(k, id, self.userdata);
+    pub fn call(self: *@This(), k: *Kernel) !void {
+        try self.callback(k, self.userdata);
     }
 };

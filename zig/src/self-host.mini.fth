@@ -247,7 +247,7 @@ builtins[
   b: ?dup   b: swap   b: flip  b: over
   b: nip    b: tuck   b: rot   b: -rot
   b: move   b: mem=   b: bread b: bwrite
-  b: >file
+  b: >file  b: extid
 println builtins ct: 
 ]builtins
 
@@ -442,7 +442,7 @@ t: bye false stay ! t;
 t: str, dup c, tuck here swap move allot t;
 t: define align here >r current @ @ , str, align r> current @ ! t;
 
-t: external word define , t;
+t: external word 2dup extid -rot define , t;
 
 t: ss>ptr t;
 t: ss>len cell + t;
