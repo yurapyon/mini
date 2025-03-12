@@ -2,8 +2,6 @@ const std_ = @import("std");
 
 const mem = @import("memory.zig");
 
-const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
-
 const kernel = @import("kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
@@ -17,15 +15,9 @@ const writeFile = @import("utils/read-file.zig").writeFile;
 pub const Error = error{
     Panic,
     InvalidProgramCounter,
-    WordNameTooLong,
-    InvalidWordlist,
     OutOfBounds,
     MisalignedAddress,
-    UnexpectedEndOfInput,
-    CannotRefill,
-    OversizeInputBuffer,
-    WordNotFound,
-    InvalidCompileState,
+    CannotAccept,
 };
 
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
@@ -131,7 +123,7 @@ pub fn accept(k: *Kernel) Error!void {
             reader.readUntilDelimiterOrEof(
             out[0..out.len],
             '\n',
-        ) catch return error.CannotRefill;
+        ) catch return error.CannotAccept;
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
@@ -144,7 +136,7 @@ pub fn accept(k: *Kernel) Error!void {
             reader.readUntilDelimiterOrEof(
             out[0..out.len],
             '\n',
-        ) catch return error.CannotRefill;
+        ) catch return error.CannotAccept;
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
