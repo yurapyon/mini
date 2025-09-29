@@ -61,15 +61,15 @@ pub const RAMLayout = MemoryLayout(struct {
     input_buffer: [128]u8,
     _rs_space: [64]Cell,
     return_stack: u0,
-    b0_id: Cell,
-    b0_upd: Cell,
-    b0: [block_size]u8,
-    b1_id: Cell,
-    b1_upd: Cell,
-    b1: [block_size]u8,
+    // b0_id: Cell,
+    // b0_upd: Cell,
+    // b0: [block_size]u8,
+    // b1_id: Cell,
+    // b1_upd: Cell,
+    // b1: [block_size]u8,
     // NOTE
     // b1 can't end at mem = 65536 or address ranges don't work
-    _b1_space: Cell,
+    _rs_top_space: Cell,
 });
 
 pub const Kernel = struct {

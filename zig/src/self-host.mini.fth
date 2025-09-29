@@ -125,28 +125,28 @@ l[
    cell layout context
    cell layout state
    cell layout base
-   cell layout bswapped
+\   cell layout bswapped
    cell layout source-ptr
    cell layout source-len
    cell layout >in
    cell layout saved*
 8 saved-source *
         layout saved-stack
-   cell layout blk
-   cell layout saved-blk*
-8 cells layout saved-blk-stack
+\    cell layout blk
+\    cell layout saved-blk*
+\ 8 cells layout saved-blk-stack
 ]l internal0
 
 l[
   \ NOTE
-  \ b1 can't end at mem = 65536 or address ranges don't work
+  \ r0 can't end at mem = 65536 or address ranges don't work
   cell layout-  _space
-  1024 layout-  b1
-  cell layout-  b1.upd
-  cell layout-  b1.id
-  1024 layout-  b0
-  cell layout-  b0.upd
-  cell layout-  b0.id
+  \ 1024 layout-  b1
+  \ cell layout-  b1.upd
+  \ cell layout-  b1.id
+  \ 1024 layout-  b0
+  \ cell layout-  b0.upd
+  \ cell layout-  b0.id
   dup  constant r0
   64 cells -    \ spacing for rstack
   \ todo just use s0 for input buffer
@@ -176,7 +176,7 @@ l[
 
 : tclone define ['] docre @ , ['] exit , there , does> @ t>cfa t, ;
 
-: savemem word >r >r mem there r> r> >file ;
+: savemem word >r >r mem there r> r> >disk ;
 
 0 value docol#
 0 value docon#
@@ -220,11 +220,11 @@ fvocab context t!
 0     state t!
 10    base t!
 0     source-ptr t!
-false bswapped t!
+\ false bswapped t!
 true  stay t!
-0     blk t!
+\ 0     blk t!
 saved-stack saved* t!
-saved-blk-stack saved-blk* t!
+\ saved-blk-stack saved-blk* t!
 
 \ todo
 \ need:
@@ -246,8 +246,8 @@ builtins[
   b: 1-     b: negate b: drop  b: dup
   b: ?dup   b: swap   b: flip  b: over
   b: nip    b: tuck   b: rot   b: -rot
-  b: move   b: mem=   b: bread b: bwrite
-  b: >file  b: extid
+  b: move   b: mem=   \ b: bread b: bwrite
+  b: >disk  b: disk>  b: extid
 println builtins ct: 
 ]builtins
 
@@ -275,12 +275,12 @@ base         tconstant base
 hex FFFF decimal
              tconstant true
 cell         tconstant cell
-b0           tconstant b0
-b1           tconstant b1
-bswapped     tconstant bswapped
+\ b0           tconstant b0
+\ b1           tconstant b1
+\ bswapped     tconstant bswapped
 saved*       tconstant saved*
-blk          tconstant blk
-saved-blk*   tconstant saved-blk*
+\ blk          tconstant blk
+\ saved-blk*   tconstant saved-blk*
 s*           tconstant s*
 s0           tconstant s0
 
@@ -414,7 +414,7 @@ t: resolve
       else
         find ?dup if nip nip >cfa execute exit then
       then
-    2dup >number     if -rot 2drop       onnumber else
+    2dup >number if -rot 2drop onnumber else
     type '?' literal emit
   then t;
 
@@ -466,38 +466,38 @@ t: evaluate save-source set-source interpret restore-source t;
 
 \ blocks ===
 
-t: bswap  bswapped @ invert bswapped ! t;
-t: bfront bswapped @ if b0 else b1 then t;
-t: bback  bswapped @ if b1 else b0 then t;
+\ t: bswap  bswapped @ invert bswapped ! t;
+\ t: bfront bswapped @ if b0 else b1 then t;
+\ t: bback  bswapped @ if b1 else b0 then t;
 
-t: b>id  2 literal cells - t;
-t: b>upd cell - t;
+\ t: b>id  2 literal cells - t;
+\ t: b>upd cell - t;
 
-t: bclrupd  b>upd false swap ! t;
-t: bempty   dup bclrupd b>id 0 literal swap ! t;
-t: bsave    dup bclrupd dup b>id @ swap bwrite t;
-t: btrysave dup b>upd @ over b>id @ and if bsave else drop then t;
+\ t: bclrupd  b>upd false swap ! t;
+\ t: bempty   dup bclrupd b>id 0 literal swap ! t;
+\ t: bsave    dup bclrupd dup b>id @ swap bwrite t;
+\ t: btrysave dup b>upd @ over b>id @ and if bsave else drop then t;
 
-t: update bfront b>upd true swap ! t;
-t: buffer bback tuck b>id ! t;
-t: block
-    dup bfront b>id @ = if drop else
-    dup bback  b>id @ = if drop bswap else
-    bback btrysave dup buffer bread bswap
-  then then bfront t;
-t: save-buffers bfront btrysave bback btrysave t;
-t: empty-buffers bfront bempty bback bempty t;
-t: flush save-buffers empty-buffers t;
+\ t: update bfront b>upd true swap ! t;
+\ t: buffer bback tuck b>id ! t;
+\ t: block
+\    dup bfront b>id @ = if drop else
+\    dup bback  b>id @ = if drop bswap else
+\    bback btrysave dup buffer bread bswap
+\  then then bfront t;
+\ t: save-buffers bfront btrysave bback btrysave t;
+\ t: empty-buffers bfront bempty bback bempty t;
+\ t: flush save-buffers empty-buffers t;
 
 \ todo
 \   blk stack is not really needed if
 \   if the max depth of loading a block is 2
-t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
-t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
+\ t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
+\ t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
 
-t: load bpushblk blk @ over blk !
-  if bback btrysave dup buffer tuck bread else block then
-  1024 literal evaluate bpopblk t;
+\ t: load bpushblk blk @ over blk !
+\   if bback btrysave dup buffer tuck bread else block then
+\   1024 literal evaluate bpopblk t;
 
 \ ===
 
@@ -513,7 +513,7 @@ tforth tdefinitions
 
 \ ===
 
-t: init empty-buffers banner interpret t;
+t: init banner interpret t;
 
 'tcfa init setexecreg
 

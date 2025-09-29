@@ -37,8 +37,9 @@ pub const callbacks = [_]BytecodeFn{
     &dec,      &negate,   &drop,      &dup,
     &maybeDup, &swap,     &flip,      &over,
     &nip,      &tuck,     &rot,       &nrot,
-    &move,     &memEqual, &bread,     &bwrite,
-    &toFile,   &extId,
+    &move,   &memEqual, // &bread,     &bwrite,
+    &toDisk, &fromDisk,
+    &extId,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeFn {
@@ -121,9 +122,9 @@ pub fn accept(k: *Kernel) Error!void {
         const reader = accept_buffer.stream.reader();
         const slice =
             reader.readUntilDelimiterOrEof(
-            out[0..out.len],
-            '\n',
-        ) catch return error.CannotAccept;
+                out[0..out.len],
+                '\n',
+            ) catch return error.CannotAccept;
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
@@ -134,9 +135,9 @@ pub fn accept(k: *Kernel) Error!void {
         const reader = k.input_file.reader();
         const slice =
             reader.readUntilDelimiterOrEof(
-            out[0..out.len],
-            '\n',
-        ) catch return error.CannotAccept;
+                out[0..out.len],
+                '\n',
+            ) catch return error.CannotAccept;
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
@@ -427,31 +428,31 @@ pub fn memEqual(k: *Kernel) Error!void {
     k.data_stack.pushCell(kernel.cellFromBoolean(areEqual));
 }
 
-pub fn bread(k: *Kernel) Error!void {
-    const addr = k.data_stack.popCell();
-    const block_id = k.data_stack.popCell();
-    const buffer = try mem.sliceFromAddrAndLen(
-        k.memory,
-        addr,
-        kernel.block_size,
-    );
-    // TODO don't catch unreachable
-    k.storageToBlock(block_id, buffer) catch unreachable;
-}
+// pub fn bread(k: *Kernel) Error!void {
+// const addr = k.data_stack.popCell();
+// const block_id = k.data_stack.popCell();
+// const buffer = try mem.sliceFromAddrAndLen(
+// k.memory,
+// addr,
+// kernel.block_size,
+// );
+// // TODO don't catch unreachable
+// k.storageToBlock(block_id, buffer) catch unreachable;
+// }
 
-pub fn bwrite(k: *Kernel) Error!void {
-    const addr = k.data_stack.popCell();
-    const block_id = k.data_stack.popCell();
-    const buffer = try mem.constSliceFromAddrAndLen(
-        k.memory,
-        addr,
-        kernel.block_size,
-    );
-    // TODO don't catch unreachable
-    k.blockToStorage(block_id, buffer) catch unreachable;
-}
+// pub fn bwrite(k: *Kernel) Error!void {
+// const addr = k.data_stack.popCell();
+// const block_id = k.data_stack.popCell();
+// const buffer = try mem.constSliceFromAddrAndLen(
+// k.memory,
+// addr,
+// kernel.block_size,
+// );
+// // TODO don't catch unreachable
+// k.blockToStorage(block_id, buffer) catch unreachable;
+// }
 
-pub fn toFile(k: *Kernel) Error!void {
+pub fn toDisk(k: *Kernel) Error!void {
     const filename_len = k.data_stack.popCell();
     const filename_addr = k.data_stack.popCell();
     const mem_len = k.data_stack.popCell();
@@ -468,6 +469,33 @@ pub fn toFile(k: *Kernel) Error!void {
         mem_len,
     );
     writeFile(filename, bytes) catch unreachable;
+}
+
+pub fn fromDisk(k: *Kernel) Error!void {
+    const filename_len = k.data_stack.popCell();
+    const filename_addr = k.data_stack.popCell();
+    const mem_len = k.data_stack.popCell();
+    const mem_addr = k.data_stack.popCell();
+
+    _ = filename_len;
+    _ = filename_addr;
+    _ = mem_len;
+    _ = mem_addr;
+
+    // TODO
+    // fromDisk
+
+    // const filename = try mem.constSliceFromAddrAndLen(
+    // k.memory,
+    // filename_addr,
+    // filename_len,
+    // );
+    // const bytes = try mem.sliceFromAddrAndLen(
+    // k.memory,
+    // mem_addr,
+    // mem_len,
+    // );
+    // writeFile(filename, bytes) catch unreachable;
 }
 
 pub fn extId(k: *Kernel) Error!void {

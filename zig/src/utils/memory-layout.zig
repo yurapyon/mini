@@ -11,7 +11,7 @@ fn fieldCount(comptime Type: type) usize {
 
 fn structToMemoryLayout(comptime Type: type) [fieldCount(Type)]FieldLayout {
     switch (@typeInfo(Type)) {
-        .Union, .Struct => {},
+        .@"union", .@"struct" => {},
         else => {
             @compileError(std.fmt.comptimePrint(
                 "Layout type '{}' must be a union or struct\n",
