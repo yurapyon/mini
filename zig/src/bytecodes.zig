@@ -2,10 +2,6 @@ const std_ = @import("std");
 
 const mem = @import("memory.zig");
 
-const stringsEqual = @import("utils/strings-equal.zig").stringsEqual;
-
-const runtime = @import("runtime.zig");
-
 const kernel = @import("kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
@@ -19,18 +15,13 @@ const writeFile = @import("utils/read-file.zig").writeFile;
 pub const Error = error{
     Panic,
     InvalidProgramCounter,
-    WordNameTooLong,
-    InvalidWordlist,
     OutOfBounds,
     MisalignedAddress,
-    UnexpectedEndOfInput,
-    CannotRefill,
-    OversizeInputBuffer,
-    WordNotFound,
-    InvalidCompileState,
+    CannotAccept,
+    CannotEmit,
 };
 
-pub const BytecodeFn = *const fn (runtime: *Kernel) Error!void;
+pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
 
 pub const callbacks = [_]BytecodeFn{
     &exit,     &docol,    &docon,     &docre,
@@ -47,8 +38,7 @@ pub const callbacks = [_]BytecodeFn{
     &dec,      &negate,   &drop,      &dup,
     &maybeDup, &swap,     &flip,      &over,
     &nip,      &tuck,     &rot,       &nrot,
-    &move,     &memEqual, &bread,     &bwrite,
-    &toFile,
+    &move,     &memEqual, &extId,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeFn {
@@ -62,14 +52,12 @@ pub fn getBytecode(token: Cell) ?BytecodeFn {
 pub fn docol(k: *Kernel) Error!void {
     k.return_stack.pushCell(k.program_counter.fetch());
     k.program_counter.store(k.current_token_addr.fetch() + @sizeOf(Cell));
-    // @import("std").debug.print("docol {}\n", .{k.program_counter.fetch()});
 }
 
 pub fn docon(k: *Kernel) Error!void {
     const addr = k.current_token_addr.fetch() + @sizeOf(Cell);
     const value = mem.readCell(k.memory, addr) catch unreachable;
     k.data_stack.pushCell(value);
-    // @import("std").debug.print("docon {} {}\n", .{ k.current_token_addr.fetch(), k.program_counter.fetch() });
 }
 
 pub fn docre(k: *Kernel) Error!void {
@@ -81,13 +69,8 @@ pub fn docre(k: *Kernel) Error!void {
     k.setCfaToExecute(does);
 }
 
-pub fn panic(_: *Kernel) Error!void {
-    return error.Panic;
-}
-
 pub fn exit(k: *Kernel) Error!void {
     k.program_counter.store(k.return_stack.popCell());
-    // @import("std").debug.print("exit {}\n", .{k.program_counter.fetch()});
 }
 
 pub fn execute(k: *Kernel) Error!void {
@@ -107,11 +90,22 @@ pub fn jump0(k: *Kernel) Error!void {
     try k.assertValidProgramCounter();
 
     const conditional = k.data_stack.popCell();
-    if (!runtime.isTruthy(conditional)) {
+    if (!kernel.isTruthy(conditional)) {
         try jump(k);
     } else {
         try k.advancePC(@sizeOf(Cell));
     }
+}
+
+pub fn lit(k: *Kernel) Error!void {
+    try k.assertValidProgramCounter();
+    const value = try mem.readCell(k.memory, k.program_counter.fetch());
+    k.data_stack.pushCell(value);
+    try k.advancePC(@sizeOf(Cell));
+}
+
+pub fn panic(_: *Kernel) Error!void {
+    return error.Panic;
 }
 
 pub fn accept(k: *Kernel) Error!void {
@@ -123,27 +117,36 @@ pub fn accept(k: *Kernel) Error!void {
         len,
     );
 
-    const reader = k.input_file.reader();
-    const slice =
-        reader.readUntilDelimiterOrEof(
-        out[0..out.len],
-        '\n',
-    ) catch return error.CannotRefill;
-    if (slice) |slc| {
-        k.data_stack.pushCell(@truncate(slc.len));
+    if (k.accept_buffer) |*accept_buffer| {
+        const reader = accept_buffer.stream.reader();
+        const slice =
+            reader.readUntilDelimiterOrEof(
+                out[0..out.len],
+                '\n',
+            ) catch return error.CannotAccept;
+        if (slice) |slc| {
+            k.data_stack.pushCell(@truncate(slc.len));
+        } else {
+            k.clearAcceptBuffer();
+            k.data_stack.pushCell(0);
+        }
+    } else if (k.accept_closure) |closure| {
+        const size = try closure.callback(out, closure.userdata);
+        k.data_stack.pushCell(size);
     } else {
-        k.data_stack.pushCell(0);
+        return error.CannotAccept;
     }
 }
 
 pub fn emit(k: *Kernel) Error!void {
-    const std = @import("std");
-
     const raw_char = k.data_stack.popCell();
     const char = @as(u8, @truncate(raw_char & 0xff));
-    var bw = std.io.bufferedWriter(k.output_file.writer());
-    bw.writer().print("{c}", .{char}) catch unreachable;
-    bw.flush() catch unreachable;
+
+    if (k.emit_closure) |closure| {
+        closure.callback(char, closure.userdata);
+    } else {
+        return error.CannotEmit;
+    }
 }
 
 pub fn eq(k: *Kernel) Error!void {
@@ -233,7 +236,7 @@ pub fn dup(k: *Kernel) Error!void {
 
 pub fn maybeDup(k: *Kernel) Error!void {
     const top = k.data_stack.peekCell();
-    if (runtime.isTruthy(top)) {
+    if (kernel.isTruthy(top)) {
         k.data_stack.dup();
     }
 }
@@ -374,13 +377,6 @@ pub fn muldivmod(k: *Kernel) Error!void {
     k.data_stack.pushCell(@truncate(r));
 }
 
-pub fn lit(k: *Kernel) Error!void {
-    try k.assertValidProgramCounter();
-    const value = try mem.readCell(k.memory, k.program_counter.fetch());
-    k.data_stack.pushCell(value);
-    try k.advancePC(@sizeOf(Cell));
-}
-
 pub fn move(k: *Kernel) Error!void {
     const std = @import("std");
 
@@ -411,53 +407,31 @@ pub fn memEqual(k: *Kernel) Error!void {
     const count = k.data_stack.popCell();
     const b_addr = k.data_stack.popCell();
     const a_addr = k.data_stack.popCell();
-    const a_slice = try mem.constSliceFromAddrAndLen(k.memory, a_addr, count);
-    const b_slice = try mem.constSliceFromAddrAndLen(k.memory, b_addr, count);
+    const a_slice = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        a_addr,
+        count,
+    );
+    const b_slice = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        b_addr,
+        count,
+    );
     const areEqual = std.mem.eql(u8, a_slice, b_slice);
-    k.data_stack.pushCell(runtime.cellFromBoolean(areEqual));
+    k.data_stack.pushCell(kernel.cellFromBoolean(areEqual));
 }
 
-pub fn bread(k: *Kernel) Error!void {
+pub fn extId(k: *Kernel) Error!void {
+    const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
-    const block_id = k.data_stack.popCell();
-    const buffer = try mem.sliceFromAddrAndLen(
+
+    const name = try mem.constSliceFromAddrAndLen(
         k.memory,
         addr,
-        // TODO don't hardcode this
-        1024,
+        len,
     );
-    // TODO don't catch unreachable
-    k.storageToBlock(block_id, buffer) catch unreachable;
-}
 
-pub fn bwrite(k: *Kernel) Error!void {
-    const addr = k.data_stack.popCell();
-    const block_id = k.data_stack.popCell();
-    const buffer = try mem.constSliceFromAddrAndLen(
-        k.memory,
-        addr,
-        // TODO don't hardcode this
-        1024,
-    );
-    // TODO don't catch unreachable
-    k.blockToStorage(block_id, buffer) catch unreachable;
-}
-
-pub fn toFile(k: *Kernel) Error!void {
-    const filename_len = k.data_stack.popCell();
-    const filename_addr = k.data_stack.popCell();
-    const mem_len = k.data_stack.popCell();
-    const mem_addr = k.data_stack.popCell();
-
-    const filename = try mem.constSliceFromAddrAndLen(
-        k.memory,
-        filename_addr,
-        filename_len,
-    );
-    const bytes = try mem.sliceFromAddrAndLen(
-        k.memory,
-        mem_addr,
-        mem_len,
-    );
-    writeFile(filename, bytes) catch unreachable;
+    const ext_token = k.lookupExternal(name) orelse 0xffff;
+    const token = ext_token + @as(Cell, @intCast(callbacks.len));
+    k.data_stack.pushCell(token);
 }

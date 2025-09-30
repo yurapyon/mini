@@ -1,16 +1,17 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
+const builtin = @import("builtin");
 
 const mem = @import("memory.zig");
-const bytecodes = @import("kernel_bytecodes.zig");
+const bytecodes = @import("bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
 const externals = @import("externals.zig");
 const External = externals.External;
 
-const stack = @import("kernel_stack.zig");
+const stack = @import("stack.zig");
 const Stack = stack.Stack;
 
 const register = @import("register.zig");
@@ -18,12 +19,32 @@ const Register = register.Register;
 
 // ===
 
+comptime {
+    const native_endianness = builtin.target.cpu.arch.endian();
+    if (native_endianness != .little) {
+        @compileError("native endianness must be .little");
+    }
+}
+
 pub const Cell = u16;
 pub const DoubleCell = u32;
 pub const SignedCell = i16;
 
-const block_size = 1024;
-const block_count = 256;
+pub fn cellFromBoolean(value: bool) Cell {
+    return if (value) 0xffff else 0;
+}
+
+pub fn isTruthy(value: Cell) bool {
+    return value != 0;
+}
+
+pub const block_size = 1024;
+pub const block_count = 256;
+
+const NamedExternal = struct {
+    name: []const u8,
+    external: External,
+};
 
 // TODO copy layout from Starting Forth
 pub const RAMLayout = MemoryLayout(struct {
@@ -40,31 +61,39 @@ pub const RAMLayout = MemoryLayout(struct {
     input_buffer: [128]u8,
     _rs_space: [64]Cell,
     return_stack: u0,
-    b0_id: Cell,
-    b0_upd: Cell,
-    b0: [block_size]u8,
-    b1_id: Cell,
-    b1_upd: Cell,
-    b1: [block_size]u8,
     // NOTE
-    // b1 can't end at mem = 65536 or address ranges don't work
-    bswapped: Cell,
+    // rs can't end at mem = 65536 or address ranges don't work
+    _rs_top_space: Cell,
 });
+
+pub const AcceptCallback =
+    *const fn (out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell;
+
+pub const EmitCallback =
+    *const fn (char: u8, userdata: ?*anyopaque) void;
 
 pub const Kernel = struct {
     allocator: Allocator,
 
     memory: mem.MemoryPtr,
-    externals: ArrayList(External),
+    externals: ArrayList(NamedExternal),
 
     input_file: std.fs.File,
     output_file: std.fs.File,
 
-    block_image_filepath: []const u8,
-
     accept_buffer: ?struct {
+        stream: std.io.FixedBufferStream([]const u8),
         mem: []const u8,
-        at: usize,
+    },
+
+    accept_closure: ?struct {
+        callback: AcceptCallback,
+        userdata: ?*anyopaque,
+    },
+
+    emit_closure: ?struct {
+        callback: EmitCallback,
+        userdata: ?*anyopaque,
     },
 
     program_counter: Register(
@@ -88,13 +117,14 @@ pub const Kernel = struct {
     pub fn init(
         self: *@This(),
         allocator: Allocator,
-        block_image_filepath: []const u8,
     ) !void {
+        self.allocator = allocator;
+
         self.input_file = std.io.getStdIn();
         self.output_file = std.io.getStdOut();
 
         self.memory = try mem.allocateMemory(allocator);
-        self.externals = ArrayList(External).init(allocator);
+        self.externals = ArrayList(NamedExternal).init(allocator);
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -103,7 +133,6 @@ pub const Kernel = struct {
         self.data_stack.init(self.memory);
         self.return_stack.init(self.memory);
 
-        self.block_image_filepath = block_image_filepath;
         self.accept_buffer = null;
     }
 
@@ -134,8 +163,6 @@ pub const Kernel = struct {
         self.return_stack.pushCell(0);
         self.program_counter.store(@TypeOf(self.execute_register).offset);
 
-        // std.debug.print("here {}\n", .{self.program_counter.fetch()});
-
         // Execution strategy:
         //   1. increment PC, then
         //   2. evaluate byte at PC-1
@@ -151,22 +178,13 @@ pub const Kernel = struct {
             self.current_token_addr.store(token_addr);
             try self.advancePC(@sizeOf(Cell));
 
-            // std.debug.print("loop {} {}\n", .{
-            // token_addr,
-            // self.program_counter.fetch(),
-            // });
-
             const token = try mem.readCell(self.memory, token_addr);
 
-            // std.debug.print("loop {}\n", .{ token });
-
             if (bytecodes.getBytecode(token)) |callback| {
-                // std.debug.print("x {}\n", .{callback});
-                // TODO handle abort" errors here
                 try callback(self);
             } else {
-                // TODO
-                // try self.processExternals(token);
+                const ext_token = token - @as(Cell, @intCast(bytecodes.callbacks.len));
+                try self.processExternals(ext_token);
             }
         }
     }
@@ -178,36 +196,39 @@ pub const Kernel = struct {
     }
 
     pub fn advancePC(self: *@This(), offset: Cell) !void {
-        // std.debug.print("{}\n", .{self.program_counter.fetch()});
         try mem.assertOffsetInBounds(self.program_counter.fetch(), offset);
         self.program_counter.storeAdd(offset);
     }
 
     // ===
 
-    // TODO
-    // this could take an offset?
-    pub fn addExternal(self: *@This(), external: External) !void {
-        try self.externals.append(external);
+    pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
+        // TODO check that this id isn't > maxInt(cell)
+        try self.externals.append(.{
+            .name = name,
+            .external = external,
+        });
     }
 
-    fn processExternals(self: *@This(), token: Cell) !void {
-        if (self.externals.items.len > 0) {
-            // NOTE
-            // Starts at the end of the list so
-            //   later externals can override earlier ones
-            var i: usize = 1;
-            while (i <= self.externals.items.len) : (i += 1) {
-                const at = self.externals.items.len - i;
-                var external = self.externals.items[at];
-                if (try external.call(self, token)) {
-                    return;
-                }
+    fn processExternals(self: *@This(), ext_token: Cell) !void {
+        if (ext_token < self.externals.items.len) {
+            try self.externals.items[ext_token].external.call(self);
+        } else {
+            std.debug.print("Unhandled external: {}\n", .{
+                ext_token,
+            });
+            return error.UnhandledExternal;
+        }
+    }
+
+    pub fn lookupExternal(self: *@This(), name: []const u8) ?Cell {
+        for (self.externals.items, 0..) |namedExternal, i| {
+            if (std.mem.eql(u8, namedExternal.name, name)) {
+                return @intCast(i);
             }
         }
 
-        std.debug.print("Unhandled external: {}\n", .{token});
-        return error.UnhandledExternal;
+        return null;
     }
 
     // blocks ===
@@ -231,7 +252,7 @@ pub const Kernel = struct {
 
         // TODO
         // check file size ?
-        const seek_pt: usize = (block_id - 1) * block_size;
+        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
         try file.seekTo(seek_pt);
         _ = try file.read(buffer);
     }
@@ -255,8 +276,62 @@ pub const Kernel = struct {
 
         // TODO
         // check file size ?
-        const seek_pt: usize = (block_id - 1) * block_size;
+        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
         try file.seekTo(seek_pt);
         _ = try file.write(buffer);
+    }
+
+    // ===
+
+    pub fn setAcceptBuffer(
+        self: *@This(),
+        buffer: []const u8,
+    ) !void {
+        std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
+        const copied = try self.allocator.alloc(u8, buffer.len);
+        @memcpy(copied, buffer);
+        const const_copied: []const u8 = copied;
+        self.accept_buffer = .{
+            .stream = std.io.fixedBufferStream(const_copied),
+            .mem = const_copied,
+        };
+    }
+
+    pub fn clearAcceptBuffer(self: *@This()) void {
+        std.debug.print(">> Accept buffer cleared\n", .{});
+        if (self.accept_buffer) |buf| {
+            self.allocator.free(buf.mem);
+        }
+        self.accept_buffer = null;
+    }
+
+    pub fn setAcceptClosure(
+        self: *@This(),
+        callback: AcceptCallback,
+        userdata: ?*anyopaque,
+    ) void {
+        self.accept_closure = .{
+            .callback = callback,
+            .userdata = userdata,
+        };
+    }
+
+    pub fn clearAcceptClosure(self: *@This()) void {
+        self.accept_closure = null;
+    }
+
+    pub fn setEmitClosure(
+        self: *@This(),
+        callback: EmitCallback,
+        userdata: ?*anyopaque,
+    ) void {
+        self.emit_closure = .{
+            .callback = callback,
+            .userdata = userdata,
+        };
+    }
+
+    pub fn clearEmitClosure(self: *@This()) void {
+        self.emit_closure = null;
     }
 };

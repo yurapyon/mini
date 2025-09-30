@@ -1,10 +1,12 @@
+fvocab context ! context @ current !
+
 : \ source-len @ >in ! ;
 
 : forth fvocab context ! ;
 : compiler cvocab context ! ;
 : definitions context @ current ! ;
 compiler definitions
-\ : literal lit, , ;
+: literal lit, , ;
 : [compile] ' , ;
 : ['] ' lit, , ;
 forth definitions
@@ -33,17 +35,13 @@ forth definitions
 : last current @ @ >cfa ;
 : >does cell + ;
 compiler definitions
-: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
+  ['] docol @ , ;
 forth definitions
-\ : value create , does> @ ;
-: value constant ;
-: vname ' cell + ;
+: value create , does> @ ;
+: vname ' 2 cells + ;
 : to  vname ! ;
 : +to vname +! ;
-\ compiler definitions
-\ : to  lit, vname , ['] ! , ;
-\ : +to lit, vname , ['] +! , ;
-\ forth definitions
 : vocabulary create 0 , does> context ! ;
 
 : digit>char dup 10 < if '0' else 'W' then + ;
@@ -127,28 +125,18 @@ l[
    cell layout context
    cell layout state
    cell layout base
-   cell layout bswapped
    cell layout source-ptr
    cell layout source-len
    cell layout >in
    cell layout saved*
 8 saved-source *
         layout saved-stack
-   cell layout blk
-   cell layout saved-blk*
-8 cells layout saved-blk-stack
 ]l internal0
 
 l[
   \ NOTE
-  \ b1 can't end at mem = 65536 or address ranges don't work
+  \ r0 can't end at mem = 65536 or address ranges don't work
   cell layout-  _space
-  1024 layout-  b1
-  cell layout-  b1.upd
-  cell layout-  b1.id
-  1024 layout-  b0
-  cell layout-  b0.upd
-  cell layout-  b0.id
   dup  constant r0
   64 cells -    \ spacing for rstack
   \ todo just use s0 for input buffer
@@ -177,8 +165,6 @@ l[
 : 'tcfa 'taddr t>cfa ;
 
 : tclone define ['] docre @ , ['] exit , there , does> @ t>cfa t, ;
-
-: savemem word >r >r mem there r> r> >file ;
 
 0 value docol#
 0 value docon#
@@ -222,11 +208,8 @@ fvocab context t!
 0     state t!
 10    base t!
 0     source-ptr t!
-false bswapped t!
 true  stay t!
-0     blk t!
 saved-stack saved* t!
-saved-blk-stack saved-blk* t!
 
 \ todo
 \ need:
@@ -248,8 +231,7 @@ builtins[
   b: 1-     b: negate b: drop  b: dup
   b: ?dup   b: swap   b: flip  b: over
   b: nip    b: tuck   b: rot   b: -rot
-  b: move   b: mem=   b: bread b: bwrite
-  b: >file
+  b: move   b: mem=   b: extid
 println builtins ct: 
 ]builtins
 
@@ -277,12 +259,7 @@ base         tconstant base
 hex FFFF decimal
              tconstant true
 cell         tconstant cell
-b0           tconstant b0
-b1           tconstant b1
-bswapped     tconstant bswapped
 saved*       tconstant saved*
-blk          tconstant blk
-saved-blk*   tconstant saved-blk*
 s*           tconstant s*
 s0           tconstant s0
 
@@ -365,12 +342,12 @@ t: negative? drop c@ '-' literal = t;
 t: char? 3 literal = swap dup c@ ''' literal = swap
    2 literal + c@ ''' literal = and and t;
 
-( str len -- # )
+( str len -- # t/f )
 t: >base drop c@
-   dup '%' literal = if drop  2 literal else
-   dup '#' literal = if drop 10 literal else
-       '$' literal = if      16 literal else
-       base @
+   dup '%' literal = if drop  2 literal true else
+   dup '#' literal = if drop 10 literal true else
+       '$' literal = if      16 literal true else
+       base @ false
    then then then t;
 t: >char drop 1+ c@ t;
 
@@ -395,8 +372,8 @@ t: >number,base
 
 \ ( str len -- number t/f )
 t: >number 2dup char? if >char true exit then 2dup negative? -rot
-   third if 1 literal /string then 2dup >base >number,base
-   if swap if negate then true else drop false then t;
+   third if 1 literal /string then 2dup >base if >r 1 literal /string r> then
+   >number,base if swap if negate then true else drop false then t;
 
 \ ===
 
@@ -408,21 +385,15 @@ t: execute execreg literal ! jump execreg t, t;
 t: onlookup 0= state @ and if >cfa , else >cfa execute then t;
 t: onnumber state @ if lit, , then t;
 
-\ t: resolve
-\     2dup state @ if lookup else find false swap then
-\       ?dup if 2swap 2drop swap onlookup else
-\     2dup >number     if -rot 2drop       onnumber else
-\     type '?' literal emit
-\   then then t;
-
 t: resolve
     2dup
+      \ todo kinda messy
       state @ if
         lookup ?dup if 2swap 2drop swap onlookup exit then
       else
         find ?dup if nip nip >cfa execute exit then
       then
-    2dup >number     if -rot 2drop       onnumber else
+    2dup >number if -rot 2drop onnumber else
     type '?' literal emit
   then t;
 
@@ -450,7 +421,7 @@ t: bye false stay ! t;
 t: str, dup c, tuck here swap move allot t;
 t: define align here >r current @ @ , str, align r> current @ ! t;
 
-\ todo def external
+t: external word 2dup extid -rot define , t;
 
 t: ss>ptr t;
 t: ss>len cell + t;
@@ -472,44 +443,6 @@ t: set-source source-len ! source-ptr ! 0 literal >in ! t;
 
 t: evaluate save-source set-source interpret restore-source t;
 
-\ blocks ===
-
-t: bswap  bswapped @ invert bswapped ! t;
-t: bfront bswapped @ if b0 else b1 then t;
-t: bback  bswapped @ if b1 else b0 then t;
-
-t: b>id  2 literal cells - t;
-t: b>upd cell - t;
-
-t: bclrupd  b>upd false swap ! t;
-t: bempty   dup bclrupd b>id 0 literal swap ! t;
-t: bsave    dup bclrupd dup b>id @ swap bwrite t;
-t: btrysave dup b>upd @ over b>id @ and if bsave else drop then t;
-
-t: update bfront b>upd true swap ! t;
-t: buffer bback tuck b>id ! t;
-t: block
-    dup bfront b>id @ = if drop else
-    dup bback  b>id @ = if drop bswap else
-    bback btrysave dup buffer bread bswap
-  then then bfront t;
-t: save-buffers bfront btrysave bback btrysave t;
-t: empty-buffers bfront bempty bback bempty t;
-t: flush save-buffers empty-buffers t;
-
-t: bpushblk blk @ saved-blk* @ ! cell saved-blk* +! t;
-t: bpopblk  cell negate saved-blk* +! saved-blk* @ @ blk ! t;
-
-\ todo
-\  if youre evaluating a block and it calls load
-\  it shouldnt call block, it should only read into the back buffer
-\ t: load bpushblk dup blk ! block 1024 literal evaluate bpopblk t;
-\ t: thru swap do.u>= dup load 1+ godo 2drop t;
-
-t: load bpushblk blk @ over blk !
-  if bback btrysave dup buffer tuck bread else block then
-  1024 literal evaluate bpopblk t;
-
 \ ===
 
 t: ] 1 literal state ! t;
@@ -524,7 +457,7 @@ tforth tdefinitions
 
 \ ===
 
-t: init empty-buffers banner interpret t;
+t: init banner interpret t;
 
 'tcfa init setexecreg
 
@@ -535,14 +468,11 @@ forth
 
 target
 
-\ 0 there mem.
+0 there mem.
 println after compile: 
 .s cr
 println mem size: 
 there . cr
-println saving
-savemem mini-out/precompiled.mini.bin cr
 
-bye
-
-forth definitions
+mem there
+forth bye
