@@ -8,6 +8,8 @@ const External = externals.External;
 
 const mem = @import("../memory.zig");
 
+const readFile = @import("../utils/read-file.zig").readFile;
+
 const c = @cImport({
     @cInclude("stdio.h");
     @cInclude("stdlib.h");
@@ -50,6 +52,18 @@ fn shell(k: *Kernel, _: ?*anyopaque) External.Error!void {
     _ = c.system(temp.ptr);
 }
 
+fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const len = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+    const filepath = try mem.constSliceFromAddrAndLen(k.memory, addr, len);
+    const file = readFile(
+        k.allocator,
+        filepath,
+    ) catch return error.ExternalPanic;
+    defer k.allocator.free(file);
+    k.setAcceptBuffer(file) catch return error.ExternalPanic;
+}
+
 pub fn registerExternals(k: *Kernel) !void {
     try k.addExternal("sleep", .{
         .callback = sleep,
@@ -65,6 +79,10 @@ pub fn registerExternals(k: *Kernel) !void {
     });
     try k.addExternal("shell", .{
         .callback = shell,
+        .userdata = null,
+    });
+    try k.addExternal("accept-file", .{
+        .callback = setAcceptFile,
         .userdata = null,
     });
 }

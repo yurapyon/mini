@@ -18,6 +18,7 @@ pub const Error = error{
     OutOfBounds,
     MisalignedAddress,
     CannotAccept,
+    CannotEmit,
 };
 
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
@@ -129,29 +130,23 @@ pub fn accept(k: *Kernel) Error!void {
             k.clearAcceptBuffer();
             k.data_stack.pushCell(0);
         }
+    } else if (k.accept_closure) |closure| {
+        const size = try closure.callback(out, closure.userdata);
+        k.data_stack.pushCell(size);
     } else {
-        const reader = k.input_file.reader();
-        const slice =
-            reader.readUntilDelimiterOrEof(
-                out[0..out.len],
-                '\n',
-            ) catch return error.CannotAccept;
-        if (slice) |slc| {
-            k.data_stack.pushCell(@truncate(slc.len));
-        } else {
-            k.data_stack.pushCell(0);
-        }
+        return error.CannotAccept;
     }
 }
 
 pub fn emit(k: *Kernel) Error!void {
-    const std = @import("std");
-
     const raw_char = k.data_stack.popCell();
     const char = @as(u8, @truncate(raw_char & 0xff));
-    var bw = std.io.bufferedWriter(k.output_file.writer());
-    bw.writer().writeByte(char) catch unreachable;
-    bw.flush() catch unreachable;
+
+    if (k.emit_closure) |closure| {
+        closure.callback(char, closure.userdata);
+    } else {
+        return error.CannotEmit;
+    }
 }
 
 pub fn eq(k: *Kernel) Error!void {

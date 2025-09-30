@@ -66,6 +66,12 @@ pub const RAMLayout = MemoryLayout(struct {
     _rs_top_space: Cell,
 });
 
+pub const AcceptCallback =
+    *const fn (out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell;
+
+pub const EmitCallback =
+    *const fn (char: u8, userdata: ?*anyopaque) void;
+
 pub const Kernel = struct {
     allocator: Allocator,
 
@@ -78,6 +84,16 @@ pub const Kernel = struct {
     accept_buffer: ?struct {
         stream: std.io.FixedBufferStream([]const u8),
         mem: []const u8,
+    },
+
+    accept_closure: ?struct {
+        callback: AcceptCallback,
+        userdata: ?*anyopaque,
+    },
+
+    emit_closure: ?struct {
+        callback: EmitCallback,
+        userdata: ?*anyopaque,
     },
 
     program_counter: Register(
@@ -267,18 +283,55 @@ pub const Kernel = struct {
 
     // ===
 
-    // TODO note should copy the buffer
     pub fn setAcceptBuffer(
         self: *@This(),
         buffer: []const u8,
-    ) void {
+    ) !void {
+        std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
+        const copied = try self.allocator.alloc(u8, buffer.len);
+        @memcpy(copied, buffer);
+        const const_copied: []const u8 = copied;
         self.accept_buffer = .{
-            .stream = std.io.fixedBufferStream(buffer),
-            .mem = buffer,
+            .stream = std.io.fixedBufferStream(const_copied),
+            .mem = const_copied,
         };
     }
 
     pub fn clearAcceptBuffer(self: *@This()) void {
+        std.debug.print(">> Accept buffer cleared\n", .{});
+        if (self.accept_buffer) |buf| {
+            self.allocator.free(buf.mem);
+        }
         self.accept_buffer = null;
+    }
+
+    pub fn setAcceptClosure(
+        self: *@This(),
+        callback: AcceptCallback,
+        userdata: ?*anyopaque,
+    ) void {
+        self.accept_closure = .{
+            .callback = callback,
+            .userdata = userdata,
+        };
+    }
+
+    pub fn clearAcceptClosure(self: *@This()) void {
+        self.accept_closure = null;
+    }
+
+    pub fn setEmitClosure(
+        self: *@This(),
+        callback: EmitCallback,
+        userdata: ?*anyopaque,
+    ) void {
+        self.emit_closure = .{
+            .callback = callback,
+            .userdata = userdata,
+        };
+    }
+
+    pub fn clearEmitClosure(self: *@This()) void {
+        self.emit_closure = null;
     }
 };
