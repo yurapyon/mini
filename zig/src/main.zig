@@ -36,7 +36,7 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
     }
 }
 
-// const base_file = @embedFile("base.mini.fth");
+const startup_file = @embedFile("startup.mini.fth");
 const self_host_file = @embedFile("self-host.mini.fth");
 
 pub fn main() !void {
@@ -82,9 +82,7 @@ pub fn main() !void {
             });
             writeFile(filename, bytes) catch unreachable;
         } else {
-            // TODO
-            // Load std lib
-
+            try k.setAcceptBuffer(startup_file);
             try k.execute();
         }
 

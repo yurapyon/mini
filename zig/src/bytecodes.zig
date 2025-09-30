@@ -123,7 +123,11 @@ pub fn accept(k: *Kernel) Error!void {
             reader.readUntilDelimiterOrEof(
                 out[0..out.len],
                 '\n',
-            ) catch return error.CannotAccept;
+            ) catch |err| {
+                // TODO errors
+                @import("std").debug.print("{}\n", .{err});
+                return error.CannotAccept;
+            };
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
