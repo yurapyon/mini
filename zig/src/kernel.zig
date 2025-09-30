@@ -61,14 +61,8 @@ pub const RAMLayout = MemoryLayout(struct {
     input_buffer: [128]u8,
     _rs_space: [64]Cell,
     return_stack: u0,
-    // b0_id: Cell,
-    // b0_upd: Cell,
-    // b0: [block_size]u8,
-    // b1_id: Cell,
-    // b1_upd: Cell,
-    // b1: [block_size]u8,
     // NOTE
-    // b1 can't end at mem = 65536 or address ranges don't work
+    // rs can't end at mem = 65536 or address ranges don't work
     _rs_top_space: Cell,
 });
 
@@ -80,8 +74,6 @@ pub const Kernel = struct {
 
     input_file: std.fs.File,
     output_file: std.fs.File,
-
-    block_image_filepath: []const u8,
 
     accept_buffer: ?struct {
         stream: std.io.FixedBufferStream([]const u8),
@@ -109,7 +101,6 @@ pub const Kernel = struct {
     pub fn init(
         self: *@This(),
         allocator: Allocator,
-        block_image_filepath: []const u8,
     ) !void {
         self.allocator = allocator;
 
@@ -126,7 +117,6 @@ pub const Kernel = struct {
         self.data_stack.init(self.memory);
         self.return_stack.init(self.memory);
 
-        self.block_image_filepath = block_image_filepath;
         self.accept_buffer = null;
     }
 
