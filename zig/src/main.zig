@@ -82,6 +82,9 @@ pub fn main() !void {
             });
             writeFile(filename, bytes) catch unreachable;
         } else {
+            // TODO
+            // Load std lib
+
             try k.execute();
         }
 
