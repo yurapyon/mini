@@ -46,13 +46,13 @@ const NamedExternal = struct {
     external: External,
 };
 
-// TODO copy layout from Starting Forth
 pub const RAMLayout = MemoryLayout(struct {
     program_counter: Cell,
     current_token_addr: Cell,
     data_stack_ptr: Cell,
     return_stack_ptr: Cell,
     execute_register: [2]Cell,
+    init_xt: Cell,
     dictionary_start: u0,
 
     _: u0,
@@ -103,6 +103,9 @@ pub const Kernel = struct {
     execute_register: Register(
         RAMLayout.offsetOf("execute_register"),
     ),
+    init_xt: Register(
+        RAMLayout.offsetOf("init_xt"),
+    ),
     data_stack: Stack(
         RAMLayout.offsetOf("data_stack_ptr"),
         RAMLayout.offsetOf("data_stack"),
@@ -124,6 +127,7 @@ pub const Kernel = struct {
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
         self.execute_register.init(self.memory);
+        self.init_xt.init(self.memory);
 
         self.data_stack.init(self.memory);
         self.return_stack.init(self.memory);
@@ -148,6 +152,11 @@ pub const Kernel = struct {
         @memcpy(self.memory[0..data.len], data);
         self.data_stack.initTopPtr();
         self.return_stack.initTopPtr();
+    }
+
+    pub fn initForth(self: *@This()) void {
+        const init_xt = self.init_xt.fetch();
+        self.execute_register.store(init_xt);
     }
 
     pub fn setCfaToExecute(self: *@This(), cfa_addr: Cell) void {
@@ -225,57 +234,6 @@ pub const Kernel = struct {
         }
 
         return null;
-    }
-
-    // blocks ===
-
-    // TODO remove these
-    pub fn storageToBlock(
-        self: *@This(),
-        block_id: Cell,
-        buffer: []u8,
-    ) !void {
-        if (block_id > block_count) {
-            return error.InvalidBlockId;
-        }
-
-        // TODO check block size
-
-        var file = try std.fs.cwd().openFile(
-            self.block_image_filepath,
-            .{ .mode = .read_only },
-        );
-        defer file.close();
-
-        // TODO
-        // check file size ?
-        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
-        try file.seekTo(seek_pt);
-        _ = try file.read(buffer);
-    }
-
-    pub fn blockToStorage(
-        self: *@This(),
-        block_id: Cell,
-        buffer: []const u8,
-    ) !void {
-        if (block_id > block_count) {
-            return error.InvalidBlockId;
-        }
-
-        // TODO check block size
-
-        var file = try std.fs.cwd().openFile(
-            self.block_image_filepath,
-            .{ .mode = .write_only },
-        );
-        defer file.close();
-
-        // TODO
-        // check file size ?
-        const seek_pt: usize = (@as(usize, block_id) - 1) * block_size;
-        try file.seekTo(seek_pt);
-        _ = try file.write(buffer);
     }
 
     // ===

@@ -69,6 +69,7 @@ pub fn main() !void {
 
         if (cli_options.precompile) {
             try k.setAcceptBuffer(self_host_file);
+            k.initForth();
             try k.execute();
             const len = k.data_stack.popCell();
             const addr = k.data_stack.popCell();
@@ -87,6 +88,7 @@ pub fn main() !void {
         } else {
             k.debug_accept_buffer = false;
             try k.setAcceptBuffer(startup_file);
+            k.initForth();
             try k.execute();
         }
 

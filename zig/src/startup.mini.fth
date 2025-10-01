@@ -58,7 +58,7 @@ forth definitions
 : >does cell + ;
 compiler definitions
 : does> (lit), ['] last , ['] >does , ['] ! , ['] exit ,
-  this! ['] docol @ , ;
+  this! ['] docol @ , set-loop ;
 forth definitions
 : does> last :noname swap >does ! ;
 
@@ -105,20 +105,29 @@ forth definitions
 : (data), (lit), ['] jump , (later), swap this! ;
 : next-digit next-char char>digit ;
 : next-byte next-digit 16 * next-digit + ;
-: escape, next-char cond dup '0' = if drop 0 c, else
-dup 't' = if drop 9 c, else dup 'n' = if drop 10 c, else
-dup 'N' = if drop 10 c, refill drop else dup 'x' = if drop
-next-byte c, else dup '&' = if drop refill drop else c, endcond ;
-: string next-char drop |: next-char cond dup '"' =
-if drop exit else dup '\' = if drop escape, else c, endcond loop ;
+: escape, next-char cond
+  dup '0' = if drop 0 c, else
+  dup 't' = if drop 9 c, else
+  dup 'n' = if drop 10 c, else
+  dup 'N' = if drop 10 c, refill drop else
+  dup 'x' = if drop next-byte c, else
+  dup '&' = if drop refill drop else
+    c,
+  endcond ;
+
+: string next-char drop |: next-char cond dup '"' = if drop exit else
+  dup '\' = if drop escape, else c, endcond loop ;
+
 : cstring (later), here string dist swap ! ;
 : d" here dup string h ! ;
 : c" here dup cstring h ! ;
 : count @+ ;
-: s" [compile] c" count ;       compiler definitions
+: s" [compile] c" count ;
+compiler definitions
 : d" (data), string align this! ;
 : c" (data), cstring align this! ;
-: s" [compile] c" ['] count , ; forth definitions
+: s" [compile] c" ['] count , ;
+forth definitions
 
 : digit>char dup 10 < if '0' else 'W' then + ;
 0 variable #start
@@ -148,9 +157,7 @@ if drop exit else dup '\' = if drop escape, else c, endcond loop ;
 : cells. swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
 : <.> <# '>' hold #s '<' hold #> type ;
 : .s depth <.> space sdata range cells. ;
-: bthis-line 64 / 64 * ;
-: bnext-line 64 + bthis-line ;
-\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
+\ todo rename []
 : [] flip over * rot + swap ;
 : spaces 0 u>?|: space 1+ loop then 2drop ;
 : ctlcode cond dup 32 u< if 3
@@ -173,6 +180,9 @@ compiler definitions
 : ." [compile] s" ['] type , ;
 forth definitions
 
+\ : bthis-line 64 / 64 * ;
+\ : bnext-line 64 + bthis-line ;
+\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
 
 ( os externals )
 external time-utc
@@ -186,3 +196,5 @@ external shell
 : $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
 external accept-file
 : include source-rest 1 /string source-len @ >in ! accept-file ;
+
+." (mini)" cr

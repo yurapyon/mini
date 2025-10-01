@@ -116,6 +116,7 @@ l[
    cell layout s*
    cell layout r*
 2 cells layout execreg
+   cell layout initxt
 \ controlled by forth
    cell layout stay
    cell layout h
@@ -198,7 +199,8 @@ l[
 : |:   there loop* ! ;
 : loop jump-addr t, loop* @ t, ;
 
-: setexecreg execreg t! exit-addr execreg cell + t! ;
+: >init/exec initxt t! execreg cell + t! ;
+
 
 internal0 h t!
 0 fvocab t!
@@ -307,8 +309,6 @@ t: nextbl |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip t;
 t: token  -leading 2dup range nextbl nip over - t;
 t: word   source-rest token 2dup + source drop - >in ! t;
 
-\ t: println next-char drop source-rest type source-len @ >in ! t;
-
 \ ===
 
 ( name len start -- addr )
@@ -406,14 +406,6 @@ t: word! word ?dup 0= if drop refill if loop else
 t: space bl emit t;
 t: cr    10 literal emit t;
 
-\ t: count c@+ t;
-
-\ there s" ( mini )" tstr, talign
-t: banner \ literal count type cr t;
-  '(' literal emit space
-  'm' literal emit 'i' literal emit 'n' literal emit 'i' literal emit space
-  ')' literal emit cr t;
-
 \ todo word not found should abort
 t: interpret word! ?dup if resolve stay @ if loop then else drop then t;
 t: bye false stay ! t;
@@ -423,6 +415,8 @@ t: define align here >r current @ @ , str, align r> current @ ! t;
 
 t: external word 2dup extid -rot define , t;
 
+\ todo
+\ maybe don't need evaluate defined as part of this
 t: ss>ptr t;
 t: ss>len cell + t;
 t: ss>>in 2 literal cells + t;
@@ -457,9 +451,7 @@ tforth tdefinitions
 
 \ ===
 
-t: init banner interpret t;
-
-'tcfa init setexecreg
+exit-addr 'tcfa interpret >init/exec
 
 \ ===
 
