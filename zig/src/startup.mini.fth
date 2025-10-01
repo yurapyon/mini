@@ -15,6 +15,7 @@ forth definitions
 : flag dup constant 1 lshift ;
 : create word define ['] docre @ , ['] exit , ;
 : variable create , ;
+
 0 variable loop*
 : set-loop here loop* ! ;
 compiler definitions
@@ -22,6 +23,7 @@ compiler definitions
 : loop ['] jump , loop* @ , ;
 forth definitions
 : : : set-loop ;
+
 : (later), here 0 , ;
 : (lit), lit, (later), ;
 : this here swap ;
@@ -31,25 +33,75 @@ compiler definitions
 : if ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
-forth definitions
-: ( next-char ')' = 0= if loop then ;
-: last current @ @ >cfa ;
-: >does cell + ;
-compiler definitions
-: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
+
 : u>?|: [compile] |: ['] 2dup , ['] u> , [compile] if ;
 : dup?|: [compile] |: ['] dup , [compile] if ;
 0 constant cond
 : endcond dup?|: [compile] then loop then drop ;
 forth definitions
+
+: ( next-char ')' = 0= if loop then ;
+compiler definitions
+: ( ( ; \ )
+: \ \ ;
+forth definitions
+
+\ noname/does ===
+
+: :noname 0 0 define here ['] docol @ , set-loop ] ;
+compiler definitions
+: [: lit, here 6 + , ['] jump , (later), ['] docol @ , ;
+: ;] ['] exit , this! ;
+forth definitions
+
+: last current @ @ >cfa ;
+: >does cell + ;
+compiler definitions
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit ,
+  this! ['] docol @ , ;
+forth definitions
+: does> last :noname swap >does ! ;
+
+: value create , does> @ ;
+: vname ' 2 cells + ;
+: to vname ! ;
+: +to vname +! ;
+compiler definitions
+: to lit, vname , ['] ! , ;
+: +to lit, vname , ['] +! , ;
+forth definitions
+
 : vocabulary create 0 , does> context ! ;
 
+0 constant s[
+: ]s constant ;
+: +field over create , + does> @ + ;
+: field swap aligned swap +field ;
+
+\ ===
+
+
+: binary 2 base ! ;
 : hex 16 base ! ;
 : decimal 10 base ! ;
+
+: <> = 0= ;
+: min 2dup > if swap then drop ;
+: max 2dup < if swap then drop ;
+
+-1 enum %lt enum %eq constant %gt
+: compare 2dup = if 2drop %eq else > if %gt else %lt then then ;
+
+\ ( value min max -- value )
+: clamp rot min max ;
+: in[,] rot tuck >= -rot <= and ;
+: in[,) 1- in[,] ;
+
 : @+ dup cell + swap @ ;
 : !+ tuck ! cell + ;
 : c@+ dup 1+ swap c@ ;
 : c!+ tuck c! 1+ ;
+
 : split over + tuck swap ;
 : (data), (lit), ['] jump , (later), swap this! ;
 : next-digit next-char char>digit ;
@@ -117,32 +169,15 @@ d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem
 : erase 0 fill ;
 : blank bl fill ;
 
-: value create , does> @ ;
-: vname ' 2 cells + ;
-: to vname ! ;
-: +to vname +! ;
-compiler definitions
-: to lit, vname , ['] ! , ;
-: +to lit, vname , ['] +! , ;
-forth definitions
-
 : ." [compile] s" type ;
 compiler definitions
 : ." [compile] s" ['] type , ;
 forth definitions
-0 constant s[
-: ]s constant ;
-: +field over create , + does> @ + ;
-: field swap aligned swap +field ;
-: :noname 0 0 define here ['] docol @ , set-loop ] ;
-compiler definitions
-: [: lit, here 6 + , ['] jump , (later), ['] docol @ , ;
-: ;] ['] exit , this! ;
-forth definitions
-: does> last :noname swap >does ! ;
+
 
 ( os externals )
-external time-utc                  -6 value hour-adj
+external time-utc
+-6 value hour-adj
 : 24>12 12 mod dup 0= if drop 12 then ;
 : time time-utc flip hour-adj + 24 mod flip ;
 : 00:# # # drop ':' hold ;
@@ -150,3 +185,5 @@ external time-utc                  -6 value hour-adj
 : time12hm. drop <# 00:# 24>12 # # #> type ;
 external shell
 : $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
+external accept-file
+: include source-rest 1 /string source-len @ >in ! accept-file ;

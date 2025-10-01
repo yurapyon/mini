@@ -19,12 +19,12 @@ const c = @cImport({
 
 fn sleep(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const value: u64 = k.data_stack.popCell();
-    std.time.sleep(value * 1000000);
+    std.Thread.sleep(value * 1000000);
 }
 
 fn sleepS(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const value: u64 = k.data_stack.popCell();
-    std.time.sleep(value * 1000000000);
+    std.Thread.sleep(value * 1000000000);
 }
 
 fn time(k: *Kernel, _: ?*anyopaque) External.Error!void {
@@ -53,6 +53,8 @@ fn shell(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    k.debug_accept_buffer = true;
+
     const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const filepath = try mem.constSliceFromAddrAndLen(k.memory, addr, len);

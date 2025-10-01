@@ -78,9 +78,7 @@ pub const Kernel = struct {
     memory: mem.MemoryPtr,
     externals: ArrayList(NamedExternal),
 
-    input_file: std.fs.File,
-    output_file: std.fs.File,
-
+    debug_accept_buffer: bool,
     accept_buffer: ?struct {
         stream: std.io.FixedBufferStream([]const u8),
         mem: []const u8,
@@ -120,11 +118,8 @@ pub const Kernel = struct {
     ) !void {
         self.allocator = allocator;
 
-        self.input_file = std.io.getStdIn();
-        self.output_file = std.io.getStdOut();
-
         self.memory = try mem.allocateMemory(allocator);
-        self.externals = ArrayList(NamedExternal).init(allocator);
+        self.externals = .empty;
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -133,6 +128,7 @@ pub const Kernel = struct {
         self.data_stack.init(self.memory);
         self.return_stack.init(self.memory);
 
+        self.debug_accept_buffer = true;
         self.accept_buffer = null;
     }
 
@@ -204,7 +200,7 @@ pub const Kernel = struct {
 
     pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
         // TODO check that this id isn't > maxInt(cell)
-        try self.externals.append(.{
+        try self.externals.append(self.allocator, .{
             .name = name,
             .external = external,
         });
@@ -233,6 +229,7 @@ pub const Kernel = struct {
 
     // blocks ===
 
+    // TODO remove these
     pub fn storageToBlock(
         self: *@This(),
         block_id: Cell,
@@ -287,7 +284,9 @@ pub const Kernel = struct {
         self: *@This(),
         buffer: []const u8,
     ) !void {
-        std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
+        if (self.debug_accept_buffer) {
+            std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
+        }
         const copied = try self.allocator.alloc(u8, buffer.len);
         @memcpy(copied, buffer);
         const const_copied: []const u8 = copied;
@@ -298,7 +297,9 @@ pub const Kernel = struct {
     }
 
     pub fn clearAcceptBuffer(self: *@This()) void {
-        std.debug.print(">> Accept buffer cleared\n", .{});
+        if (self.debug_accept_buffer) {
+            std.debug.print(">> Accept buffer cleared\n", .{});
+        }
         if (self.accept_buffer) |buf| {
             self.allocator.free(buf.mem);
         }

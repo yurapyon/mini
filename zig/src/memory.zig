@@ -18,7 +18,7 @@ pub fn allocateMemory(allocator: Allocator) Allocator.Error!MemoryPtr {
     const slice = try allocator.allocWithOptions(
         u8,
         memory_size,
-        @alignOf(Cell),
+        std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
         null,
     );
     return @ptrCast(slice.ptr);

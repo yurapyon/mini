@@ -28,12 +28,15 @@ pub fn build(b: *std.Build) void {
     // location when the user invokes the "install" step (the default step when
     // running `zig build`).
     // b.installArtifact(lib);
-
-    const exe = b.addExecutable(.{
-        .name = "zig",
+    const mod = b.addModule("main", .{
         .root_source_file = b.path("src/main.zig"),
         .target = target,
         .optimize = optimize,
+    });
+
+    const exe = b.addExecutable(.{
+        .name = "zig",
+        .root_module = mod,
     });
 
     exe.linkSystemLibrary("c");
@@ -79,9 +82,7 @@ pub fn build(b: *std.Build) void {
     // const run_lib_unit_tests = b.addRunArtifact(lib_unit_tests);
 
     const exe_unit_tests = b.addTest(.{
-        .root_source_file = b.path("src/main.zig"),
-        .target = target,
-        .optimize = optimize,
+        .root_module = mod,
     });
 
     const run_exe_unit_tests = b.addRunArtifact(exe_unit_tests);

@@ -21,8 +21,8 @@ pub const CliOptions = struct {
         self.run_system = false;
         self.precompile = false;
 
-        self.filepaths = ArrayList([]u8).init(self.allocator);
-        errdefer self.filepaths.deinit();
+        self.filepaths = .empty;
+        errdefer self.filepaths.deinit(self.allocator);
 
         // var expect_image_filepath = false;
         // self.image_filepath = null;
@@ -67,12 +67,12 @@ pub const CliOptions = struct {
                 // TODO errdefer
                 const filepath = try self.allocator.alloc(u8, arg.len);
                 @memcpy(filepath, arg);
-                try self.filepaths.append(filepath);
+                try self.filepaths.append(allocator, filepath);
             }
         }
     }
 
-    pub fn deinit(self: @This()) void {
+    pub fn deinit(self: *@This()) void {
         // if (self.image_filepath) |image_filepath| {
         // self.allocator.free(image_filepath);
         // }
@@ -80,6 +80,6 @@ pub const CliOptions = struct {
         while (i < self.filepaths.items.len) : (i += 1) {
             self.allocator.free(self.filepaths.items[i]);
         }
-        self.filepaths.deinit();
+        self.filepaths.deinit(self.allocator);
     }
 };

@@ -15,25 +15,28 @@ const Cell = kernel.Cell;
 // ===
 
 fn emitStdOut(char: u8, userdata: ?*anyopaque) void {
+    var buf = [_]u8{0} ** 256;
+
     const output_file = @as(*std.fs.File, @ptrCast(@alignCast(userdata)));
-    var bw = std.io.bufferedWriter(output_file.writer());
-    bw.writer().writeByte(char) catch unreachable;
-    bw.flush() catch unreachable;
+    // var bw = std.io.Writer.buffered(output_file.writer());
+    var fw = std.fs.File.Writer.init(output_file.*, &buf);
+    fw.interface.writeByte(char) catch unreachable;
+    fw.interface.flush() catch unreachable;
 }
 
 fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
+    var buf = [_]u8{0} ** 256;
+
+    var bw = std.Io.Writer.fixed(out);
+
     const input_file = @as(*std.fs.File, @ptrCast(@alignCast(userdata)));
-    const reader = input_file.reader();
-    const slice =
-        reader.readUntilDelimiterOrEof(
-            out[0..out.len],
-            '\n',
-        ) catch return error.CannotAccept;
-    if (slice) |slc| {
-        return @truncate(slc.len);
-    } else {
-        return 0;
-    }
+    var fr = input_file.reader(&buf);
+    const len = fr.interface.streamDelimiterEnding(
+        &bw,
+        '\n',
+    ) catch return error.CannotAccept;
+
+    return @truncate(len);
 }
 
 const startup_file = @embedFile("startup.mini.fth");
@@ -49,8 +52,8 @@ pub fn main() !void {
     const memory = try mem.allocateMemory(allocator);
     defer allocator.free(memory);
 
-    var input_file = std.io.getStdIn();
-    var output_file = std.io.getStdOut();
+    var input_file = std.fs.File.stdin();
+    var output_file = std.fs.File.stdout();
 
     if (cli_options.kernel_filepath) |precompiled_filepath| {
         var k: Kernel = undefined;
@@ -82,6 +85,7 @@ pub fn main() !void {
             });
             writeFile(filename, bytes) catch unreachable;
         } else {
+            k.debug_accept_buffer = false;
             try k.setAcceptBuffer(startup_file);
             try k.execute();
         }
