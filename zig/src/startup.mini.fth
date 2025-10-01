@@ -80,7 +80,6 @@ forth definitions
 
 \ ===
 
-
 : binary 2 base ! ;
 : hex 16 base ! ;
 : decimal 10 base ! ;
