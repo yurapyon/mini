@@ -199,16 +199,17 @@ l[
 
 : >init/exec initxt t! execreg cell + t! ;
 
+\ ===
 
 internal0 h t!
 0 fvocab t!
 0 cvocab t!
 fvocab current t!
 fvocab context t!
-0     state t!
-10    base t!
-0     source-ptr t!
-true  stay t!
+0    state t!
+10   base t!
+0    source-ptr t!
+true stay t!
 
 \ todo
 \ need:
@@ -241,11 +242,15 @@ println builtins ct:
 'tcfa jump0 to jump0-addr
 'tcfa lit   to lit-addr
 
-32           tconstant bl
+32    tconstant bl
+2     tconstant cell
+0     tconstant false
+$FFFF tconstant true
 stay         tconstant stay
 source-ptr   tconstant source-ptr
 source-len   tconstant source-len
 >in          tconstant >in
+\ todo just use s0 for input buffer
 input-buffer tconstant input-buffer
 h            tconstant h
 current      tconstant current
@@ -254,10 +259,6 @@ fvocab       tconstant fvocab
 cvocab       tconstant cvocab
 state        tconstant state
 base         tconstant base
-0            tconstant false
-hex FFFF decimal
-             tconstant true
-cell         tconstant cell
 s*           tconstant s*
 s0           tconstant s0
 
@@ -307,28 +308,21 @@ t: word   source-rest token 2dup + source drop - >in ! t;
 
 \ ===
 
-( name len start -- addr )
+( name len start -- addr/0 )
+\ returns 0 on not found
 t: locate |: dup if 3dup name string= 0= if @ loop then then nip nip t;
 
-\ todo need to check it isn't 0 before dereferencing it
-\ another thing could be that '0 @' is 0
-t: locskip 3dup locate dup current @ @ = if drop @ locate else
-   >r 3drop r> then t;
+( name len start -- addr/0 )
+t: locprev dup if dup current @ @ = context @ current @ = state @ and and
+  if @ then then locate t;
 
-t: locprev state @ if locskip else locate then t;
-
+( name len -- addr/0 )
 t: find 2dup context @ @ locprev ?dup if nip nip else
   fvocab @ locprev then t;
 
-\ NOTE todo
-\ there is a bug where compiler words are being found and executed
-\   while in interpreter mode
-
-( name len -- compiler-word? addr/0 )
-t: lookup
-   2dup cvocab @ locprev ?dup if nip nip true swap else
-   2dup find ?dup if nip nip false swap else 2drop 0 literal
-   then then t;
+( name len -- addr/0 compiler-word? )
+t: lookup 2dup cvocab @ locprev ?dup if nip nip true else
+   find false then t;
 
 t: ' word find dup if >cfa then t;
 
@@ -362,16 +356,15 @@ t: str>number 0 literal pad ! >r range |: 2dup u> if
   then r> drop = pad @ swap t;
 
 t: >number 2dup str>char if -rot 2drop true exit else drop then
-  str>neg >r str>base str>number if
-    r> if negate then true
-  else
-    r> drop false
-  then t;
-
+  str>neg >r str>base str>number tuck r> and if negate then swap t;
 
 \ ===
 
 t: execute execreg literal ! jump execreg t, t;
+
+\ NOTE todo
+\ there is a bug where compiler words are being found and executed
+\   while in interpreter mode
 
 \ note todo
 \ there is an edge case here
@@ -383,7 +376,7 @@ t: resolve
     2dup
       \ todo kinda messy
       state @ if
-        lookup ?dup if 2swap 2drop swap onlookup exit then
+        lookup swap ?dup if 2swap 2drop swap onlookup exit else drop then
       else
         find ?dup if nip nip >cfa execute exit then
       then

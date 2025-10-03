@@ -233,5 +233,5 @@ external accept-file
 
 ." (mini)" cr
 
-\ include src/testing/tn.mini.fth
+include src/testing/sh.mini.fth
 \ include src/testing/cal.mini.fth

@@ -62,8 +62,6 @@ pub fn main() !void {
         k.setAcceptClosure(acceptStdIn, &input_file);
         k.setEmitClosure(emitStdOut, &output_file);
 
-        try @import("lib/os.zig").registerExternals(&k);
-
         const precompiled = try readFile(allocator, precompiled_filepath);
         k.load(precompiled);
 
@@ -85,7 +83,11 @@ pub fn main() !void {
                 filename,
             });
             writeFile(filename, bytes) catch unreachable;
+        } else if (cli_options.run_system) {
+            // todo
         } else {
+            try @import("lib/os.zig").registerExternals(&k);
+
             k.debug_accept_buffer = false;
             try k.setAcceptBuffer(startup_file);
             k.initForth();
