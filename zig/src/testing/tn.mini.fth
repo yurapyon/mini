@@ -1,22 +1,34 @@
-\ str len -- char t/f
-: check-char 3 = swap dup c@ ''' = swap 2 + c@ ''' = and and
-  if drop 1+ c@ true else 0 false then ;
+: str>char 3 = >r c@+ ''' = >r c@+ swap c@ ''' = r> r> and and ;
 
 \ str len -- str len t/f
-: check-negative 2dup drop c@ '-' = >r r@ if 1 /string then r> ;
+: str>neg over c@ '-' = if 1 /string true else false then ;
 
 \ str len -- str len base
-: check-base over c@
+: str>base over c@
    dup '%' = if drop 1 /string  2 else
    dup '#' = if drop 1 /string 10 else
        '$' = if      1 /string 16 else
      base @
    then then then ;
 
-: >number 2dup check-char if true exit else drop then
-  check-negative >r
-  check-base >number,base if
+: pad here 64 + ;
+
+: in[,] rot tuck >= -rot <= and ;
+
+: char>digit
+    dup '0' '9' in[,] if '0' - else
+    dup 'A' 'Z' in[,] if '7' - else
+    dup 'a' 'z' in[,] if 'W' - else
+  then then then ;
+
+( str len base -- number t/f )
+: str>number 0 pad ! >r range |: 2dup u> if
+    dup c@ char>digit dup r@ < if r@ pad @ * + pad ! 1+ loop else 2drop then
+  then r> drop = pad @ swap ;
+
+: >number 2dup str>char if -rot 2drop true exit else drop then
+  str>neg >r str>base str>number if
     r> if negate then true
   else
-    r> 2drop false
+    r> drop false
   then ;

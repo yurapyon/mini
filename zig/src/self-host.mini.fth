@@ -44,6 +44,9 @@ forth definitions
 : +to vname +! ;
 : vocabulary create 0 , does> context ! ;
 
+: space bl emit ;
+: cr    10 emit ;
+
 : digit>char dup 10 < if '0' else 'W' then + ;
 0 variable #start
 : #len pad #start @ - ;
@@ -107,8 +110,6 @@ create mem 6 1024 * allot
 \ NOTE
 \ cell size of target == cell size of host
 
-3 cells constant saved-source
-
 l[
 \ kernel internal
    cell layout _pc  \ program counter
@@ -129,9 +130,6 @@ l[
    cell layout source-ptr
    cell layout source-len
    cell layout >in
-   cell layout saved*
-8 saved-source *
-        layout saved-stack
 ]l internal0
 
 l[
@@ -211,7 +209,6 @@ fvocab context t!
 10    base t!
 0     source-ptr t!
 true  stay t!
-saved-stack saved* t!
 
 \ todo
 \ need:
@@ -244,7 +241,7 @@ println builtins ct:
 'tcfa jump0 to jump0-addr
 'tcfa lit   to lit-addr
 
-bl           tconstant bl
+32           tconstant bl
 stay         tconstant stay
 source-ptr   tconstant source-ptr
 source-len   tconstant source-len
@@ -261,7 +258,6 @@ base         tconstant base
 hex FFFF decimal
              tconstant true
 cell         tconstant cell
-saved*       tconstant saved*
 s*           tconstant s*
 s0           tconstant s0
 
@@ -338,23 +334,19 @@ t: ' word find dup if >cfa then t;
 
 \ ===
 
-t: negative? drop c@ '-' literal = t;
-t: char? 3 literal = swap dup c@ ''' literal = swap
-   2 literal + c@ ''' literal = and and t;
+t: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
+  r> r> and and t;
 
-( str len -- # t/f )
-t: >base drop c@
-   dup '%' literal = if drop  2 literal true else
-   dup '#' literal = if drop 10 literal true else
-       '$' literal = if      16 literal true else
-       base @ false
+t: str>neg over c@ '-' literal = if 1 literal /string true else false then t;
+
+t: str>base over c@
+   dup '%' literal = if drop 1 literal /string  2 literal else
+   dup '#' literal = if drop 1 literal /string 10 literal else
+       '$' literal = if      1 literal /string 16 literal else
+     base @
    then then then t;
-t: >char drop 1+ c@ t;
 
 t: pad here 64 literal + t;
-
-( digit base -- )
-t: accumulate pad @ * + pad ! t;
 
 t: in[,] rot tuck >= -rot <= and t;
 
@@ -362,18 +354,20 @@ t: char>digit
     dup '0' literal '9' literal in[,] if '0' literal - else
     dup 'A' literal 'Z' literal in[,] if '7' literal - else
     dup 'a' literal 'z' literal in[,] if 'W' literal - else
+    drop -1 literal
   then then then t;
 
-( str len base -- number t/f )
-t: >number,base
-   >r range 0 literal pad !
-   |: 2dup u> if dup c@ char>digit dup r@ < if r@ accumulate 1+ loop then then
-   r> drop = if pad @ true else drop false then t;
+t: str>number 0 literal pad ! >r range |: 2dup u> if
+    dup c@ char>digit dup r@ < if r@ pad @ * + pad ! 1+ loop else 2drop then
+  then r> drop = pad @ swap t;
 
-\ ( str len -- number t/f )
-t: >number 2dup char? if >char true exit then 2dup negative? -rot
-   third if 1 literal /string then 2dup >base if >r 1 literal /string r> then
-   >number,base if swap if negate then true else drop false then t;
+t: >number 2dup str>char if -rot 2drop true exit else drop then
+  str>neg >r str>base str>number if
+    r> if negate then true
+  else
+    r> drop false
+  then t;
+
 
 \ ===
 
@@ -403,9 +397,6 @@ t: refill source-ptr @ if false else refill,user true then t;
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;
 
-t: space bl emit t;
-t: cr    10 literal emit t;
-
 \ todo word not found should abort
 t: interpret word! ?dup if resolve stay @ if loop then else drop then t;
 t: bye false stay ! t;
@@ -414,28 +405,6 @@ t: str, dup c, tuck here swap move allot t;
 t: define align here >r current @ @ , str, align r> current @ ! t;
 
 t: external word 2dup extid -rot define , t;
-
-\ todo
-\ maybe don't need evaluate defined as part of this
-t: ss>ptr t;
-t: ss>len cell + t;
-t: ss>>in 2 literal cells + t;
-
-t: save-source
-  source-ptr @ saved* @ ss>ptr !
-  source-len @ saved* @ ss>len !
-  >in @        saved* @ ss>>in !
-  saved-source literal saved* +! t;
-
-t: restore-source
-  saved-source literal negate saved* +!
-  saved* @ ss>ptr @ source-ptr !
-  saved* @ ss>len @ source-len !
-  saved* @ ss>>in @ >in ! t;
-
-t: set-source source-len ! source-ptr ! 0 literal >in ! t;
-
-t: evaluate save-source set-source interpret restore-source t;
 
 \ ===
 
@@ -454,11 +423,6 @@ tforth tdefinitions
 exit-addr 'tcfa interpret >init/exec
 
 \ ===
-
-forth
-: cr cr ;
-
-target
 
 0 there mem.
 println after compile: 

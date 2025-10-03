@@ -129,6 +129,9 @@ compiler definitions
 : s" [compile] c" ['] count , ;
 forth definitions
 
+: space bl emit ;
+: cr    10 emit ;
+
 : digit>char dup 10 < if '0' else 'W' then + ;
 0 variable #start
 : #len pad #start @ - ;
@@ -197,4 +200,38 @@ external shell
 external accept-file
 : include source-rest 1 /string source-len @ >in ! accept-file ;
 
+\ 3 cells constant saved-source
+
+
+\    cell layout saved*
+\ 8 saved-source *
+        \ layout saved-stack
+
+\ saved-stack saved* t!
+
+\ saved*       tconstant saved*
+
+\ t: ss>ptr t;
+\ t: ss>len cell + t;
+\ t: ss>>in 2 literal cells + t;
+
+\ t: save-source
+  \ source-ptr @ saved* @ ss>ptr !
+  \ source-len @ saved* @ ss>len !
+  \ >in @        saved* @ ss>>in !
+  \ saved-source literal saved* +! t;
+
+\ t: restore-source
+  \ saved-source literal negate saved* +!
+  \ saved* @ ss>ptr @ source-ptr !
+  \ saved* @ ss>len @ source-len !
+  \ saved* @ ss>>in @ >in ! t;
+
+\ t: set-source source-len ! source-ptr ! 0 literal >in ! t;
+
+\ t: evaluate save-source set-source interpret restore-source t;
+
 ." (mini)" cr
+
+\ include src/testing/tn.mini.fth
+\ include src/testing/cal.mini.fth
