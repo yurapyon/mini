@@ -317,12 +317,7 @@ t: locprev dup if dup current @ @ = context @ current @ = state @ and and
   if @ then then locate t;
 
 ( name len -- addr/0 )
-t: find 2dup context @ @ locprev ?dup if nip nip else
-  fvocab @ locprev then t;
-
-( name len -- addr/0 compiler-word? )
-t: lookup 2dup cvocab @ locprev ?dup if nip nip true else
-   find false then t;
+t: find 2dup context @ @ locprev ?dup if nip nip else fvocab @ locprev then t;
 
 t: ' word find dup if >cfa then t;
 
@@ -362,36 +357,33 @@ t: >number 2dup str>char if -rot 2drop true exit else drop then
 
 t: execute execreg literal ! jump execreg t, t;
 
-\ NOTE todo
-\ there is a bug where compiler words are being found and executed
-\   while in interpreter mode
-
-\ note todo
-\ there is an edge case here
-\ if compiler word and not compiling, just compiles the cfa
-t: onlookup 0= state @ and if >cfa , else >cfa execute then t;
-t: onnumber state @ if lit, , then t;
-
-t: resolve
-    2dup
-      \ todo kinda messy
-      state @ if
-        lookup swap ?dup if 2swap 2drop swap onlookup exit else drop then
-      else
-        find ?dup if nip nip >cfa execute exit then
-      then
-    2dup >number if -rot 2drop onnumber else
-    type '?' literal emit
-  then t;
-
 t: refill,user input-buffer 128 literal accept source-len ! 0 literal >in ! t;
 t: refill source-ptr @ if false else refill,user true then t;
 
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;
 
-\ todo word not found should abort
-t: interpret word! ?dup if resolve stay @ if loop then else drop then t;
+t: interpret word! ?dup if
+    state @ if
+      2dup cvocab @ locprev ?dup if -rot 2drop >cfa execute else
+      2dup find             ?dup if -rot 2drop >cfa ,       else
+      2dup >number               if -rot 2drop lit, ,       else
+        \ todo word not found should abort
+        type '?' literal emit
+      then then then
+    else
+      2dup find             ?dup if -rot 2drop >cfa execute else
+      2dup >number               if -rot 2drop              else
+        \ todo word not found should abort
+        type '?' literal emit
+      then then
+    then
+    stay @ if loop then
+  else
+    drop
+  then
+  t;
+
 t: bye false stay ! t;
 
 t: str, dup c, tuck here swap move allot t;
