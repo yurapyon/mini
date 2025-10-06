@@ -1,4 +1,4 @@
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 
 const random = @import("../utils/random.zig");
 

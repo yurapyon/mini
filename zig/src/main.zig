@@ -12,6 +12,8 @@ const kernel = @import("kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
+const System = @import("system/system_k.zig").System;
+
 // ===
 
 fn emitStdOut(char: u8, userdata: ?*anyopaque) void {
@@ -84,7 +86,10 @@ pub fn main() !void {
             });
             writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            // todo
+            var sys: System = undefined;
+
+            try sys.init(&k);
+            defer sys.deinit();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
 

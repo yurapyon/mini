@@ -1,7 +1,7 @@
 const c = @import("c.zig");
 
-const runtime = @import("../runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("../kernel.zig");
+const Cell = kernel.Cell;
 
 const Pixels = @import("pixels.zig").Pixels;
 const Characters = @import("characters.zig").Characters;

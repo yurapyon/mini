@@ -1,4 +1,5 @@
-const c = @import("c.zig");
+const c = @import("c.zig").c;
+const cgfx = @import("c.zig").gfx;
 
 const random = @import("../utils/random.zig");
 
@@ -11,7 +12,7 @@ pub fn PixelBuffer(
         texture: c.GLuint,
 
         pub fn init(self: *@This()) void {
-            self.texture = c.gfx.texture.createEmpty(
+            self.texture = cgfx.texture.createEmpty(
                 width,
                 height,
             );

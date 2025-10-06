@@ -1,9 +1,10 @@
-const c = @import("c.zig");
+const c = @import("c.zig").c;
+const cgfx = @import("c.zig").gfx;
 
 const random = @import("../utils/random.zig");
 
-const runtime = @import("../runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("../kernel.zig");
+const Cell = kernel.Cell;
 
 const video = @import("video.zig");
 
@@ -42,7 +43,7 @@ pub const Pixels = struct {
         self.buffer.init();
         self.buffer.randomize(16);
 
-        self.vao = c.gfx.vertex_array.create();
+        self.vao = cgfx.vertex_array.create();
         self.initQuad();
         self.initProgram();
 
@@ -54,19 +55,19 @@ pub const Pixels = struct {
     }
 
     fn initProgram(self: *@This()) void {
-        const vert_shader = c.gfx.shader.create(
+        const vert_shader = cgfx.shader.create(
             shader_strings.vert,
             c.GL_VERTEX_SHADER,
         );
-        defer c.gfx.shader.deinit(vert_shader);
+        defer cgfx.shader.deinit(vert_shader);
 
-        const frag_shader = c.gfx.shader.create(
+        const frag_shader = cgfx.shader.create(
             shader_strings.frag,
             c.GL_FRAGMENT_SHADER,
         );
-        defer c.gfx.shader.deinit(frag_shader);
+        defer cgfx.shader.deinit(frag_shader);
 
-        self.program = c.gfx.program.create(
+        self.program = cgfx.program.create(
             vert_shader,
             frag_shader,
         );
@@ -82,7 +83,7 @@ pub const Pixels = struct {
     }
 
     fn initQuad(self: *@This()) void {
-        self.vbo = c.gfx.buffer.create();
+        self.vbo = cgfx.buffer.create();
 
         c.glBindBuffer(c.GL_ARRAY_BUFFER, self.vbo);
         c.glBufferData(

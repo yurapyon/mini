@@ -62,6 +62,8 @@ compiler definitions
 forth definitions
 : does> last :noname swap >does ! ;
 
+: cells cell * ;
+
 : value create , does> @ ;
 : vname ' 2 cells + ;
 : to vname ! ;
@@ -79,6 +81,8 @@ forth definitions
 : field swap aligned swap +field ;
 
 \ ===
+
+: 2swap >r flip r> flip ;
 
 : binary 2 base ! ;
 : hex 16 base ! ;
@@ -233,5 +237,5 @@ external accept-file
 
 ." (mini)" cr
 
-include src/testing/sh.mini.fth
+\ include src/testing/sh.mini.fth
 \ include src/testing/cal.mini.fth

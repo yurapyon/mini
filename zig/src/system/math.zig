@@ -1,5 +1,5 @@
-const runtime = @import("../runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("../kernel.zig");
+const Cell = kernel.Cell;
 
 pub const m3 = struct {
     pub const Mat3 = [9]f32;

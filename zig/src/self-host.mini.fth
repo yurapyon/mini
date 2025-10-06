@@ -2,6 +2,8 @@ fvocab context ! context @ current !
 
 : \ source-len @ >in ! ;
 
+: cells cell * ;
+
 : forth fvocab context ! ;
 : compiler cvocab context ! ;
 : definitions context @ current ! ;
@@ -262,39 +264,13 @@ base         tconstant base
 s*           tconstant s*
 s0           tconstant s0
 
-t: cells cell * t;
-
 t: 2dup  over over t;
 t: 2drop drop drop t;
-t: 2swap >r flip r> flip t;
 t: 3drop drop 2drop t;
 t: third >r over r> swap t;
 t: 3dup  third third third t;
 
-t: here    h @ t;
-t: allot   h +! t;
-t: aligned dup cell mod + t;
-t: align   here aligned h ! t;
-
-t: ,  here ! cell allot t;
-t: c, here c! 1 literal allot t;
-
-t: c@+ dup 1+ swap c@ t;
-t: name cell + c@+ t;
-
-t: >cfa name + aligned t;
-t: lit, lit lit , t;
-
-t: /string tuck - -rot + swap t;
-t: -leading dup if over c@ bl = if 1 literal /string loop then then t;
-t: range over + swap t;
-
-t: .chars 2dup u> if c@+ emit loop then 2drop t;
-t: type range .chars t;
-
-t: string= rot over = if mem= else 3drop false then t;
-
-\ ===
+\ input ===
 
 t: source source-ptr @ ?dup 0= if input-buffer then source-len @ t;
 
@@ -302,26 +278,39 @@ t: source@ source drop >in @ + t;
 t: next-char source@ c@ 1 literal >in +! t;
 t: source-rest source@ source + over - t;
 
-t: nextbl |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip t;
-t: token  -leading 2dup range nextbl nip over - t;
-t: word   source-rest token 2dup + source drop - >in ! t;
+t: /string tuck - -rot + swap t;
+t: -leading dup if over c@ bl = if 1 literal /string loop then then t;
+t: range over + swap t;
 
-\ ===
+t: token -leading 2dup range
+  |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip
+  nip over - t;
 
-( name len start -- addr/0 )
+t: word source-rest token 2dup + source drop - >in ! t;
+
+\ lookups ===
+
+t: c@+ dup 1+ swap c@ t;
+
+t: name cell + c@+ t;
+
+t: string= rot over = if mem= else 3drop false then t;
+
+\ skips most recent definition if compiling
 \ returns 0 on not found
-t: locate |: dup if 3dup name string= 0= if @ loop then then nip nip t;
-
 ( name len start -- addr/0 )
-t: locprev dup if dup current @ @ = context @ current @ = state @ and and
-  if @ then then locate t;
+t: locate dup if dup current @ @ = context @ current @ = state @ and and
+  if @ then then
+  |: dup if 3dup name string= 0= if @ loop then then nip nip
+  t;
 
 ( name len -- addr/0 )
-t: find 2dup context @ @ locprev ?dup if nip nip else fvocab @ locprev then t;
+t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
 
-t: ' word find dup if >cfa then t;
+\ number conversion ===
 
-\ ===
+t: here h @ t;
+t: pad here 64 literal + t;
 
 t: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
   r> r> and and t;
@@ -335,8 +324,6 @@ t: str>base over c@
      base @
    then then then t;
 
-t: pad here 64 literal + t;
-
 t: in[,] rot tuck >= -rot <= and t;
 
 t: char>digit
@@ -347,35 +334,50 @@ t: char>digit
   then then then t;
 
 t: str>number 0 literal pad ! >r range |: 2dup u> if
-    dup c@ char>digit dup r@ < if r@ pad @ * + pad ! 1+ loop else 2drop then
+    dup c@ char>digit r@ 2dup < if pad @ * + pad ! 1+ loop else 2drop then
   then r> drop = pad @ swap t;
 
 t: >number 2dup str>char if -rot 2drop true exit else drop then
   str>neg >r str>base str>number tuck r> and if negate then swap t;
 
-\ ===
+\ interpret/compile ===
+
+t: allot h +! t;
+t: ,  here ! cell allot t;
+t: c, here c! 1 literal allot t;
+t: lit, lit lit , t;
+
+t: .chars 2dup u> if c@+ emit loop then 2drop t;
+t: type range .chars t;
 
 t: execute execreg literal ! jump execreg t, t;
 
-t: refill,user input-buffer 128 literal accept source-len ! 0 literal >in ! t;
-t: refill source-ptr @ if false else refill,user true then t;
+t: aligned dup cell mod + t;
+t: align here aligned h ! t;
+t: >cfa name + aligned t;
+
+t: refill source-ptr @ if false else
+  input-buffer 128 literal accept source-len ! 0 literal >in !
+  true then t;
 
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;
 
 t: interpret word! ?dup if
     state @ if
-      2dup cvocab @ locprev ?dup if -rot 2drop >cfa execute else
-      2dup find             ?dup if -rot 2drop >cfa ,       else
-      2dup >number               if -rot 2drop lit, ,       else
+      \ skip recent
+      2dup cvocab @ locate ?dup if -rot 2drop >cfa execute else
+      2dup find            ?dup if -rot 2drop >cfa ,       else
+      2dup >number              if -rot 2drop lit, ,       else
         \ todo word not found should abort
-        type '?' literal emit
+        drop type '?' literal emit
       then then then
     else
-      2dup find             ?dup if -rot 2drop >cfa execute else
-      2dup >number               if -rot 2drop              else
+      \ no skip recent
+      2dup find ?dup if -rot 2drop >cfa execute else
+      2dup >number   if -rot 2drop              else
         \ todo word not found should abort
-        type '?' literal emit
+        drop type '?' literal emit
       then then
     then
     stay @ if loop then
@@ -386,12 +388,15 @@ t: interpret word! ?dup if
 
 t: bye false stay ! t;
 
-t: str, dup c, tuck here swap move allot t;
-t: define align here >r current @ @ , str, align r> current @ ! t;
+t: define align here >r current @ @ ,
+  dup c, tuck here swap move allot
+  align r> current @ ! t;
 
 t: external word 2dup extid -rot define , t;
 
-\ ===
+\ extras ===
+
+t: ' word find dup if >cfa then t;
 
 t: ] 1 literal state ! t;
 tcompiler tdefinitions
