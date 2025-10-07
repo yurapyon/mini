@@ -1,4 +1,4 @@
-const c = @import("c.zig");
+const c = @import("c.zig").c;
 
 const kernel = @import("../kernel.zig");
 const Cell = kernel.Cell;

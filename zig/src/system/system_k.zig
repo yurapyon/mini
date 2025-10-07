@@ -3,7 +3,9 @@ const std = @import("std");
 const kernel = @import("../kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
-const ExternalError = kernel.ExternalError;
+
+const externals = @import("../externals.zig");
+const External = externals.External;
 
 const c = @import("c.zig").c;
 
@@ -31,11 +33,12 @@ const glfw_callbacks = struct {
         _ = scancode;
         _ = action;
         _ = mods;
-        if (system.xts.keydown) |ext| {
+        if (system.xts.key) |xt| {
             _ = keycode;
-            _ = ext;
             // system.rt.data_stack.pushCell(@intCast(keycode));
-            // system.rt.callXt(ext) catch unreachable;
+
+            // TODO error
+            system.k.callXt(xt) catch unreachable;
         }
     }
 
@@ -121,12 +124,49 @@ const glfw_callbacks = struct {
     }
 };
 
+const exts = struct {
+    fn setXt(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const xt = k.data_stack.popCell();
+        switch (idx) {
+            1 => {
+                s.xts.key = xt;
+            },
+            else => {},
+        }
+    }
+
+    fn shouldClose(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const should_close = c.glfwWindowShouldClose(s.window) == c.GL_TRUE;
+        k.data_stack.pushBoolean(should_close);
+    }
+
+    fn drawPoll(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        s.video.draw();
+        c.glfwSwapBuffers(s.window);
+        c.glfwPollEvents();
+
+        std.Thread.sleep(30_000_000);
+    }
+
+    fn deinit(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+        s.deinit();
+    }
+};
+
 pub const System = struct {
     k: *Kernel,
 
     xts: struct {
         frame: ?Cell,
-        keydown: ?Cell,
+        key: ?Cell,
         mousemove: ?Cell,
         mousedown: ?Cell,
         char: ?Cell,
@@ -146,7 +186,7 @@ pub const System = struct {
         self.video.init();
 
         self.xts.frame = null;
-        self.xts.keydown = null;
+        self.xts.key = null;
         self.xts.mousemove = null;
         self.xts.mousedown = null;
         self.xts.char = null;
@@ -154,6 +194,12 @@ pub const System = struct {
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);
         c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
+
+        try self.registerExternals(k);
+
+        try k.setAcceptBuffer(system_file);
+        k.initForth();
+        try k.execute();
     }
 
     pub fn deinit(_: @This()) void {
@@ -205,25 +251,44 @@ pub const System = struct {
         self.window = window;
     }
 
+    fn registerExternals(self: *@This(), k: *Kernel) !void {
+        try k.addExternal("setxt", .{
+            .callback = exts.setXt,
+            .userdata = self,
+        });
+        try k.addExternal("close?", .{
+            .callback = exts.shouldClose,
+            .userdata = self,
+        });
+        try k.addExternal("draw/poll", .{
+            .callback = exts.drawPoll,
+            .userdata = self,
+        });
+        try k.addExternal("deinit", .{
+            .callback = exts.deinit,
+            .userdata = self,
+        });
+    }
+
     // ===
 
-    pub fn loop(self: *@This()) !void {
-        while (c.glfwWindowShouldClose(self.window) == c.GL_FALSE) {
-            self.video.draw();
+    // pub fn loop(self: *@This()) !void {
+    // while (c.glfwWindowShouldClose(self.window) == c.GL_FALSE) {
+    // self.video.draw();
 
-            c.glfwSwapBuffers(self.window);
+    // c.glfwSwapBuffers(self.window);
 
-            c.glfwPollEvents();
+    // c.glfwPollEvents();
 
-            if (self.xts.frame) |fxt| {
-                // TODO handle errors
-                // try self.rt.callXt(fxt);
-                _ = fxt;
-            }
+    // if (self.xts.frame) |fxt| {
+    // TODO handle errors
+    // try self.rt.callXt(fxt);
+    // _ = fxt;
+    // }
 
-            std.time.sleep(30_000_000);
-        }
+    // std.time.sleep(30_000_000);
+    // }
 
-        self.deinit();
-    }
+    // self.deinit();
+    // }
 };

@@ -205,6 +205,18 @@ pub const Kernel = struct {
         self.program_counter.storeAdd(offset);
     }
 
+    pub fn callXt(self: *@This(), xt: Cell) !void {
+        self.current_token_addr.store(xt);
+        const token = try mem.readCell(self.memory, xt);
+
+        if (bytecodes.getBytecode(token)) |callback| {
+            try callback(self);
+        } else {
+            const ext_token = token - @as(Cell, @intCast(bytecodes.callbacks.len));
+            try self.processExternals(ext_token);
+        }
+    }
+
     // ===
 
     pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {

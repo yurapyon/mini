@@ -1,3 +1,54 @@
+: \ source-len @ >in ! ;
+
+: forth fvocab context ! ;
+: compiler cvocab context ! ;
+: definitions context @ current ! ;
+
+compiler definitions
+: literal lit, , ;
+: [compile] ' , ;
+: ['] ' [compile] literal ;
+forth definitions
+
+: constant word define ['] docon @ , , ;
+: enum dup constant 1+ ;
+: flag dup constant 1 lshift ;
+: create word define ['] docre @ , ['] exit , ;
+: variable create , ;
+
+0 variable loop*
+: set-loop here loop* ! ;
+compiler definitions
+: |: set-loop ;
+: loop ['] jump , loop* @ , ;
+forth definitions
+: : : set-loop ;
+
+: (later), here 0 , ;
+: (lit), lit, (later), ;
+: this here swap ;
+: this! this ! ;
+: dist this - ;
+compiler definitions
+: if ['] jump0 , (later), ;
+: else ['] jump , (later), swap this! ;
+: then this! ;
+forth definitions
+
+external setxt
+external close?
+external draw/poll
+external deinit
+
+: on-key 35 emit ;
+' on-key 1 setxt
+
+: main close? 0= if draw/poll loop then deinit ;
+
+main
+
+bye
+
 \ todo this is just debug stuff
 
 : emit __emit ;
