@@ -58,6 +58,14 @@ pub fn Stack(
             self.top_ptr.storeSubtract(count * @sizeOf(Cell));
         }
 
+        fn constPeek(self: @This(), at: Cell) Cell {
+            // TODO handle stack underflow
+            const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
+            // @import("std").debug.print("addr {} {}\n", .{ addr, top_addr });
+            if (addr >= top_addr) unreachable;
+            return mem.readCell(self.memory, addr) catch unreachable;
+        }
+
         // ===
 
         pub fn pushCell(self: *@This(), value: Cell) void {
@@ -83,8 +91,8 @@ pub fn Stack(
         pub fn debugPrint(self: @This()) void {
             const std = @import("std");
             for (0..(self.depth() / @sizeOf(Cell))) |i| {
-                const at = -@as(isize, @intCast(i));
-                std.debug.print("{x:2}: {}\n", .{ i, self.peek(at).* });
+                const at = @as(Cell, @intCast(i));
+                std.debug.print("{x:2}: {}\n", .{ i, self.constPeek(at) });
             }
         }
 

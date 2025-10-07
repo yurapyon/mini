@@ -86,6 +86,8 @@ pub fn main() !void {
             });
             writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
+            try @import("lib/os.zig").registerExternals(&k);
+
             var sys: System = undefined;
 
             try sys.init(&k);

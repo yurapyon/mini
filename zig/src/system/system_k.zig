@@ -31,12 +31,10 @@ const glfw_callbacks = struct {
         ));
         // TODO
         _ = scancode;
-        _ = action;
         _ = mods;
         if (system.xts.key) |xt| {
-            _ = keycode;
-            // system.rt.data_stack.pushCell(@intCast(keycode));
-
+            system.k.data_stack.pushCell(@intCast(keycode));
+            system.k.data_stack.pushCell(@intCast(action));
             // TODO error
             system.k.callXt(xt) catch unreachable;
         }
@@ -55,17 +53,16 @@ const glfw_callbacks = struct {
         //     probably not
         //   limit to intMax
         //   write a fn for the xy transform
-        if (system.xts.mousemove) |ext| {
-            const x_float = x / 2 - (video.screen_width - 400) / 2;
-            const y_float = y / 2 - (video.screen_height - 300) / 2;
+        if (system.xts.mousemove) |xt| {
+            // const x_float = x / 2 - (video.screen_width - 400) / 2;
+            // const y_float = y / 2 - (video.screen_height - 300) / 2;
+            const x_float = x / 2;
+            const y_float = y / 2;
             const x_cell: Cell = if (x_float < 0) 0 else @intFromFloat(x_float);
             const y_cell: Cell = if (y_float < 0) 0 else @intFromFloat(y_float);
-            _ = x_cell;
-            _ = y_cell;
-            _ = ext;
-            // system.k.data_stack.pushCell(x_cell);
-            // system.k.data_stack.pushCell(y_cell);
-            // system.k.callXt(ext) catch unreachable;
+            system.k.data_stack.pushCell(x_cell);
+            system.k.data_stack.pushCell(y_cell);
+            system.k.callXt(xt) catch unreachable;
         }
     }
 
@@ -78,17 +75,14 @@ const glfw_callbacks = struct {
         const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        if (system.xts.mousedown) |ext| {
+        if (system.xts.mousedown) |xt| {
             var value = @as(Cell, @intCast(button)) & 0x7;
             if (action == c.GLFW_PRESS) {
                 value |= 0x10;
             }
-            _ = ext;
-            _ = mods;
-
-            // system.k.data_stack.pushCell(value);
-            // system.k.data_stack.pushCell(@intCast(mods));
-            // system.k.callXt(ext) catch unreachable;
+            system.k.data_stack.pushCell(value);
+            system.k.data_stack.pushCell(@intCast(mods));
+            system.k.callXt(xt) catch unreachable;
         }
     }
 
@@ -97,15 +91,12 @@ const glfw_callbacks = struct {
         codepoint: c_uint,
     ) callconv(.c) void {
         const system: *System = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(win)));
-        if (system.xts.char) |ext| {
+        if (system.xts.char) |xt| {
             const high: Cell = @intCast((codepoint & 0xff00) >> 16);
             const low: Cell = @intCast(codepoint & 0xff);
-            _ = high;
-            _ = low;
-            _ = ext;
-            // system.k.data_stack.pushCell(high);
-            // system.k.data_stack.pushCell(low);
-            // system.k.callXt(ext) catch unreachable;
+            system.k.data_stack.pushCell(high);
+            system.k.data_stack.pushCell(low);
+            system.k.callXt(xt) catch unreachable;
         }
     }
 
@@ -129,11 +120,15 @@ const exts = struct {
         const s: *System = @ptrCast(@alignCast(userdata));
 
         const idx = k.data_stack.popCell();
-        const xt = k.data_stack.popCell();
+        const addr = k.data_stack.popCell();
+
+        const xt = if (addr == 0) null else addr;
+
         switch (idx) {
-            1 => {
-                s.xts.key = xt;
-            },
+            0 => s.xts.key = xt,
+            1 => s.xts.mousemove = xt,
+            2 => s.xts.mousedown = xt,
+            3 => s.xts.char = xt,
             else => {},
         }
     }
@@ -148,6 +143,7 @@ const exts = struct {
     fn drawPoll(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
+        s.video.update();
         s.video.draw();
         c.glfwSwapBuffers(s.window);
         c.glfwPollEvents();
@@ -159,13 +155,42 @@ const exts = struct {
         const s: *System = @ptrCast(@alignCast(userdata));
         s.deinit();
     }
+
+    fn pixelPaletteStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+        const value = k.data_stack.popCell();
+
+        s.video.pixels.store(addr, @truncate(value));
+    }
+
+    fn pixelPaletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+
+        const value = s.video.pixels.fetch(addr);
+
+        k.data_stack.pushCell(value);
+    }
+
+    fn pixelSet(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const y = k.data_stack.popCell();
+        const x = k.data_stack.popCell();
+
+        // TODO fit in screen w/h
+        s.video.pixels.putPixel(x, y, @truncate(idx));
+    }
 };
 
 pub const System = struct {
     k: *Kernel,
 
     xts: struct {
-        frame: ?Cell,
         key: ?Cell,
         mousemove: ?Cell,
         mousedown: ?Cell,
@@ -185,7 +210,6 @@ pub const System = struct {
 
         self.video.init();
 
-        self.xts.frame = null;
         self.xts.key = null;
         self.xts.mousemove = null;
         self.xts.mousedown = null;
@@ -268,27 +292,17 @@ pub const System = struct {
             .callback = exts.deinit,
             .userdata = self,
         });
+        try k.addExternal("pcolors!", .{
+            .callback = exts.pixelPaletteStore,
+            .userdata = self,
+        });
+        try k.addExternal("pcolors@", .{
+            .callback = exts.pixelPaletteFetch,
+            .userdata = self,
+        });
+        try k.addExternal("pset", .{
+            .callback = exts.pixelSet,
+            .userdata = self,
+        });
     }
-
-    // ===
-
-    // pub fn loop(self: *@This()) !void {
-    // while (c.glfwWindowShouldClose(self.window) == c.GL_FALSE) {
-    // self.video.draw();
-
-    // c.glfwSwapBuffers(self.window);
-
-    // c.glfwPollEvents();
-
-    // if (self.xts.frame) |fxt| {
-    // TODO handle errors
-    // try self.rt.callXt(fxt);
-    // _ = fxt;
-    // }
-
-    // std.time.sleep(30_000_000);
-    // }
-
-    // self.deinit();
-    // }
 };

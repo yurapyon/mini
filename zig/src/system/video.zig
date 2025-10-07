@@ -47,6 +47,6 @@ pub const Video = struct {
     pub fn draw(self: *@This()) void {
         c.glClear(c.GL_COLOR_BUFFER_BIT);
         self.pixels.draw();
-        self.characters.draw();
+        // self.characters.draw();
     }
 };
