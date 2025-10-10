@@ -149,6 +149,7 @@ const exts = struct {
         c.glfwPollEvents();
 
         std.Thread.sleep(30_000_000);
+        // std.Thread.sleep(100_000_000);
     }
 
     fn deinit(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -162,7 +163,7 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
-        s.video.pixels.store(addr, @truncate(value));
+        s.video.pixels.storePalette(addr, @truncate(value));
     }
 
     fn pixelPaletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -170,7 +171,7 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
-        const value = s.video.pixels.fetch(addr);
+        const value = s.video.pixels.fetchPalette(addr);
 
         k.data_stack.pushCell(value);
     }
@@ -184,6 +185,75 @@ const exts = struct {
 
         // TODO fit in screen w/h
         s.video.pixels.putPixel(x, y, @truncate(idx));
+    }
+
+    fn pixelLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const y1 = k.data_stack.popCell();
+        const x1 = k.data_stack.popCell();
+        const y0 = k.data_stack.popCell();
+        const x0 = k.data_stack.popCell();
+
+        // TODO fit in screen w/h
+        s.video.pixels.putLine(x0, y0, x1, y1, @truncate(idx));
+    }
+
+    fn pixelRect(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const y1 = k.data_stack.popCell();
+        const x1 = k.data_stack.popCell();
+        const y0 = k.data_stack.popCell();
+        const x0 = k.data_stack.popCell();
+
+        // TODO fit in screen w/h
+        s.video.pixels.putRect(x0, y0, x1, y1, @truncate(idx));
+    }
+
+    fn brushSet(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const y = k.data_stack.popCell();
+        const x = k.data_stack.popCell();
+
+        // TODO fit in screen w/h
+        s.video.pixels.putBrush(x, y, @truncate(idx));
+    }
+
+    fn brushStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+        const value = k.data_stack.popCell();
+
+        s.video.pixels.storeBrush(addr, @truncate(value));
+    }
+
+    fn brushFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+
+        const value = s.video.pixels.fetchBrush(addr);
+
+        k.data_stack.pushCell(value);
+    }
+
+    fn brushLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const idx = k.data_stack.popCell();
+        const y1 = k.data_stack.popCell();
+        const x1 = k.data_stack.popCell();
+        const y0 = k.data_stack.popCell();
+        const x0 = k.data_stack.popCell();
+
+        // TODO fit in screen w/h
+        s.video.pixels.putBrushLine(x0, y0, x1, y1, @truncate(idx));
     }
 };
 
@@ -302,6 +372,30 @@ pub const System = struct {
         });
         try k.addExternal("pset", .{
             .callback = exts.pixelSet,
+            .userdata = self,
+        });
+        try k.addExternal("pline", .{
+            .callback = exts.pixelLine,
+            .userdata = self,
+        });
+        try k.addExternal("prect", .{
+            .callback = exts.pixelRect,
+            .userdata = self,
+        });
+        try k.addExternal("pbrush!", .{
+            .callback = exts.brushStore,
+            .userdata = self,
+        });
+        try k.addExternal("pbrush@", .{
+            .callback = exts.brushFetch,
+            .userdata = self,
+        });
+        try k.addExternal("pbrush", .{
+            .callback = exts.brushSet,
+            .userdata = self,
+        });
+        try k.addExternal("pbrushline", .{
+            .callback = exts.brushLine,
             .userdata = self,
         });
     }

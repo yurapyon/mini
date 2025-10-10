@@ -213,214 +213,97 @@ external deinit
 external pcolors!
 external pcolors@
 external pset
+external pline
+external prect
+external pbrush!
+external pbrush@
+external pbrush
+external pbrushline
+
+: region create >r >r >r , r> , r> , r> , ;
+: region>stack @+ swap @+ swap @+ swap @ ;
+
+( x y x0 y0 x1 y1 -- t/f )
+: inside? >r swap >r rot >r in[,) r> r> r> in[,) and ;
+
+0 variable c.0
+1 variable c.1
+0 variable c.sel
+
+: c.adv dup @ 1+ 16 mod swap ! ;
+
+: c.toggle c.sel @ 0= c.sel ! ;
+
+: c.current c.sel @ 0= if c.0 else c.1 then ;
+
+ 0 0 25 25 region c.0.view
+25 0 50 25 region c.1.view
+
+: c.draw
+  c.0.view region>stack c.0 @ prect
+  c.1.view region>stack c.1 @ prect ;
+
+: c.click
+  2dup c.0.view region>stack inside? if 2drop c.0 c.adv else
+       c.1.view region>stack inside? if       c.1 c.adv else
+  then then ;
 
 ( r g b idx -- )
 : ppalette! 3 * tuck 2 + pcolors! tuck 1 + pcolors! pcolors! ;
 
 hex
-00 00 00 0 ppalette!
-00 00 ff 1 ppalette!
-00 ff 00 2 ppalette!
-ff 00 00 3 ppalette!
-00 ff ff 4 ppalette!
-ff ff 00 5 ppalette!
-ff 00 ff 6 ppalette!
-ff ff ff 7 ppalette!
-40 40 40 8 ppalette!
-40 40 a0 9 ppalette!
-40 a0 40 a ppalette!
-a0 40 40 b ppalette!
-40 a0 a0 c ppalette!
-a0 a0 40 d ppalette!
-a0 40 a0 e ppalette!
-a0 a0 a0 f ppalette!
+00 00 00 $0 ppalette!
+ff ff ff $1 ppalette!
+00 00 ff $2 ppalette!
+00 ff 00 $3 ppalette!
+ff 00 00 $4 ppalette!
+00 ff ff $5 ppalette!
+ff ff 00 $6 ppalette!
+ff 00 ff $7 ppalette!
+40 40 40 $8 ppalette!
+40 40 a0 $9 ppalette!
+40 a0 40 $a ppalette!
+a0 40 40 $b ppalette!
+40 a0 a0 $c ppalette!
+a0 a0 40 $d ppalette!
+a0 40 a0 $e ppalette!
+a0 a0 a0 $f ppalette!
 decimal
 
-0 variable cursor
+0 0 640 400 1 prect
 
-: blline >r
-  640 0 |: 2dup u> if dup r@ cursor @ pset 1+ loop then 2drop
-  r> drop ;
+: setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then ;
 
-: row
-  dup cursor !
-  8 *
-     dup blline
-  1+ dup blline
-  1+ dup blline
-  1+ dup blline
-  1+ dup blline
-  1+ dup blline
-  1+ dup blline
-  1+     blline ;
-
-hex
-0 row
-1 row
-2 row
-3 row
-4 row
-5 row
-6 row
-7 row
-8 row
-9 row
-a row
-b row
-c row
-d row
-e row
-f row
-decimal
-
-: on-key 1 = if emit then ;
-' on-key 0 setxt
+setupbrush
 
 0 variable mx
 0 variable my
+0 variable mx-last
+0 variable my-last
 false variable m0-held
 
-: on-mouse-move my ! mx !
-m0-held @ if mx @ . my @ . cr then
-;
-' on-mouse-move 1 setxt
+\ : hovered? mx @ my @ rot region>stack inside? ;
+
+: drawline mx @ my @ mx-last @ my-last @ c.current @ pbrushline ;
+
+: on-key 1 = if 'X' = if c.toggle then then ;
+
+: on-mouse-move mx @ mx-last ! my @ my-last ! my ! mx !
+  m0-held @ if drawline
+  then ;
 
 ( value mods -- )
-: on-mouse-down
-drop dup $7 and 0= if $10 and m0-held ! else drop then ;
+: on-mouse-down drop dup $7 and 0= if $10 and dup m0-held !
+  if mx @ my @ c.click then
+  drawline
+  else drop then ;
+
+' on-key 0 setxt
+' on-mouse-move 1 setxt
 ' on-mouse-down 2 setxt
 
-: frame
-  ;
+: frame c.draw ;
 
 : main frame draw/poll close? 0= if loop then deinit ;
 
 main
-
-bye
-
-\ todo this is just debug stuff
-
-: emit __emit ;
-: space bl emit ;
-: spaces 0 |: 2dup > if space 1+ loop then 2drop ;
-: cr 10 emit ;
-: printable 32 126 in[,] ;
-: print dup printable 0= if drop '.' then emit ;
-: .print 2dup > if c@+ print loop then 2drop ;
-: .chars 2dup > if c@+ emit loop then 2drop ;
-: type range .chars ;
-: ." [compile] s" type ;
-compiler definitions
-: ." [compile] s" ['] type , ;
-forth definitions
-:noname type '?' emit cr ; onwnf !
-
-: u. <# #s #> type ;
-: u.pad rot <# #s flip #pad #> type ;
-: u.r bl u.pad ;
-: u.0 '0' u.pad ;
-: . u. space ;
-: ? @ . ;
-
-: .2 swap . . ;
-: .3 flip . . . ;
-
-\ ===
-
-: pixels!+ tuck pixels! 1+ ;
-
-: setpal >r flip r> 3 * pixels!+ pixels!+ pixels!+ drop ;
-
-: debug-line >r
-  640 0 |: 2dup > if dup 30 r@ + r@ putp 1+ loop then 2drop
-  r> drop ;
-
-: gray dup dup 16 255 keepin ;
-
-: % 255 100 */ ;
-
-: default-palette 0 % gray 0 setpal
-  20 % gray 1 setpal 60 % gray 2 setpal 100 % gray 3 setpal
-  [ hex ]
-  00 00 f0 4 setpal 00 f0 00 5 setpal f0 00 00 6 setpal
-  00 f0 f0 7 setpal f0 f0 00 8 setpal f0 00 f0 9 setpal
-  00 60 c0 a setpal 60 c0 00 b setpal c0 00 60 c setpal
-  40 80 f0 d setpal 80 f0 40 e setpal f0 40 80 f setpal
-  [ decimal ] ;
-
-: blline >r
-  640 0 |: 2dup > if dup r@ 1 putp 1+ loop then 2drop
-  r> drop ;
-
-: thing
-  \ 16 0 |: 2dup > if dup debug-line 1+ loop then 2drop
-  400 0 |: 2dup > if dup blline 1+ loop then 2drop
-  v-up
-  ;
-
-  default-palette
-  \ thing
-
-: putc 2 * 2584 + characters! ;
-: puta 2 * 2585 + characters! ;
-: puts 24 + characters! ;
-: putsprite 16 i>xy 160 * + >r
-160 0 do.u> rot over r@ + puts 16 + godo 2drop
-r> drop
-;
-
-hex
-00 00 00 00 00 00 00 00 00 00
-decimal
-0 putsprite
-
-hex
-00 82 82 82 fe 42 22 12 0a 06
-decimal
-255 putsprite
-
-
-0 0 putc
-0b00010111 0 puta
-
-20 1 putc
-2  1 puta
-
-0 2 putc
-0b00000011 2 puta
-
-1 80 putc
-0b00000011 80 puta
-
-2 160 putc
-0b00000011 160 puta
-v-up
-
-0 [if]
-
-: fillpage >r
-  0xffff 0 |: 2dup u> if third over r@ putp 1+ loop then 2drop
-  r> 2drop ;
-: fillscr dup 0 fillpage 1 fillpage ;
-: blankscr 0 fillscr ;
-
-: fillline
-  ;
-
-: defchars
-  d" \x0f\x3f\xff\xff\x3f\x0f" 0 setchar
-  d" \x08\x48\x88\x88\x48\x08" 1 setchar
-  ;
-
-: defpal [ hex ]
-  00 00 00 0 setpal ff ff ff 1 setpal 80 80 80 2 setpal
-  00 00 ff 2 setpal 00 ff 00 3 setpal ff 00 00 4 setpal
-  00 ff ff 5 setpal ff ff 00 6 setpal ff 00 ff 7 setpal
-  [ decimal ] ;
-
-: init-video defchars defpal blankscr v-up ;
-
-\ todo show boot image
-
-[then]

@@ -298,11 +298,11 @@ t: string= rot over = if mem= else 3drop false then t;
 
 \ skips most recent definition if compiling
 \ returns 0 on not found
+\ assumes current @ @ doesnt == 0,
+\   the logic is convoluted but this is generally true
 ( name len start -- addr/0 )
-t: locate dup if dup current @ @ = context @ current @ = state @ and and
-  if @ then then
-  |: dup if 3dup name string= 0= if @ loop then then nip nip
-  t;
+t: locate dup current @ @ = context @ current @ = state @ and and if @ then
+  |: dup if 3dup name string= 0= if @ loop then then nip nip t;
 
 ( name len -- addr/0 )
 t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;

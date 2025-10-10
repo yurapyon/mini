@@ -1,3 +1,17 @@
+vocabulary asdf
+asdf definitions
+current @ @ . cr
+s" here" find .s cr
+: wow wow ;
+current @ @ . cr
+' wow .s cr
+
+
+
+
+
+bye
+
 ( name len start -- addr )
 : locate dup if context @ current @ = state @ and if @ then then
   |: dup if 3dup name string= 0= if @ loop then then nip nip ;

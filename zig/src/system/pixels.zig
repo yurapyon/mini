@@ -5,6 +5,7 @@ const random = @import("../utils/random.zig");
 
 const kernel = @import("../kernel.zig");
 const Cell = kernel.Cell;
+const SignedCell = kernel.SignedCell;
 
 const video = @import("video.zig");
 
@@ -12,6 +13,8 @@ const Palette = @import("palette.zig").Palette;
 const PixelBuffer = @import("pixel_buffer.zig").PixelBuffer;
 
 // ===
+
+const brush_width = 7;
 
 pub const Pixels = struct {
     const shader_strings = struct {
@@ -28,6 +31,7 @@ pub const Pixels = struct {
 
     palette: Palette(16),
     buffer: PixelBuffer(video.screen_width, video.screen_height),
+    brush: [brush_width * brush_width]u8,
 
     vao: c.GLuint,
     vbo: c.GLuint,
@@ -132,7 +136,7 @@ pub const Pixels = struct {
 
     // ===
 
-    pub fn store(self: *@This(), addr: Cell, value: u8) void {
+    pub fn storePalette(self: *@This(), addr: Cell, value: u8) void {
         if (addr < @TypeOf(self.palette).item_ct) {
             self.palette.colors[addr] = value;
             c.glUseProgram(self.program);
@@ -140,11 +144,52 @@ pub const Pixels = struct {
         }
     }
 
-    pub fn fetch(self: @This(), addr: Cell) u8 {
+    pub fn fetchPalette(self: @This(), addr: Cell) u8 {
         if (addr < @TypeOf(self.palette).item_ct) {
             return self.palette.colors[addr];
         } else {
             return 0;
+        }
+    }
+
+    pub fn storeBrush(self: *@This(), addr: Cell, value: u8) void {
+        if (addr < brush_width * brush_width) {
+            self.brush[addr] = value;
+        }
+    }
+
+    pub fn fetchBrush(self: @This(), addr: Cell) u8 {
+        if (addr < brush_width * brush_width) {
+            return self.brush[addr];
+        } else {
+            return 0;
+        }
+    }
+
+    pub fn putBrush(
+        self: *@This(),
+        x: Cell,
+        y: Cell,
+        palette_idx: u4,
+    ) void {
+        var i: Cell = 0;
+        var j: Cell = 0;
+        while (i < brush_width) : (i += 1) {
+            while (j < brush_width) : (j += 1) {
+                const bw2 = brush_width / 2;
+
+                const bx = x + i;
+                const by = y + j;
+                const brush = self.brush[i * brush_width + j];
+                if (bx >= bw2 and by >= bw2 and brush < 16) {
+                    self.buffer.putXY(
+                        bx - bw2,
+                        by - bw2,
+                        palette_idx,
+                    );
+                }
+            }
+            j = 0;
         }
     }
 
@@ -155,6 +200,114 @@ pub const Pixels = struct {
         palette_idx: u4,
     ) void {
         self.buffer.putXY(x, y, palette_idx);
+    }
+
+    pub fn putLine(
+        self: *@This(),
+        x0: Cell,
+        y0: Cell,
+        x1: Cell,
+        y1: Cell,
+        palette_idx: u4,
+    ) void {
+        // Adapted from
+        // https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
+
+        const sx0 = @as(SignedCell, @intCast(x0));
+        const sy0 = @as(SignedCell, @intCast(y0));
+        const sx1 = @as(SignedCell, @intCast(x1));
+        const sy1 = @as(SignedCell, @intCast(y1));
+
+        const dx = @as(SignedCell, @intCast(@abs(sx1 - sx0)));
+        const sx: SignedCell = if (sx0 < sx1) 1 else -1;
+        const dy = -@as(SignedCell, @intCast(@abs(sy1 - sy0)));
+        const sy: SignedCell = if (sy0 < sy1) 1 else -1;
+
+        var e = dx + dy;
+        var x = sx0;
+        var y = sy0;
+
+        while (true) {
+            self.buffer.putXY(
+                @intCast(x),
+                @intCast(y),
+                palette_idx,
+            );
+            const e2 = 2 * e;
+            if (e2 >= dy) {
+                if (x == sx1) break;
+                e += dy;
+                x += sx;
+            }
+            if (e2 <= dx) {
+                if (y == sy1) break;
+                e += dx;
+                y += sy;
+            }
+        }
+    }
+
+    pub fn putRect(
+        self: *@This(),
+        x0: Cell,
+        y0: Cell,
+        x1: Cell,
+        y1: Cell,
+        palette_idx: u4,
+    ) void {
+        var x = x0;
+        var y = y0;
+        while (y < y1) : (y += 1) {
+            while (x < x1) : (x += 1) {
+                self.buffer.putXY(x, y, palette_idx);
+            }
+            x = x0;
+        }
+    }
+
+    pub fn putBrushLine(
+        self: *@This(),
+        x0: Cell,
+        y0: Cell,
+        x1: Cell,
+        y1: Cell,
+        palette_idx: u4,
+    ) void {
+        // Adapted from
+        // https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
+
+        const sx0 = @as(SignedCell, @intCast(x0));
+        const sy0 = @as(SignedCell, @intCast(y0));
+        const sx1 = @as(SignedCell, @intCast(x1));
+        const sy1 = @as(SignedCell, @intCast(y1));
+
+        const dx = @as(SignedCell, @intCast(@abs(sx1 - sx0)));
+        const sx: SignedCell = if (sx0 < sx1) 1 else -1;
+        const dy = -@as(SignedCell, @intCast(@abs(sy1 - sy0)));
+        const sy: SignedCell = if (sy0 < sy1) 1 else -1;
+
+        var e = dx + dy;
+        var x = sx0;
+        var y = sy0;
+
+        while (true) {
+            self.putBrush(
+                @intCast(x),
+                @intCast(y),
+                palette_idx,
+            );
+            const e2 = 2 * e;
+            if (e2 >= dy) {
+                if (x == sx1) break;
+                e += dy;
+                x += sx;
+            }
+            if (e2 <= dx) {
+                if (y == sy1) break;
+                e += dx;
+                y += sy;
+            }
+        }
     }
 
     pub fn update(self: *@This()) void {
