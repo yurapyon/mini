@@ -1,3 +1,39 @@
+
+
+
+: skip-current dup current @ @ = if @ then ;
+
+t: locate |: dup if 3dup name string= 0= if @ loop then then nip nip t;
+
+t: interpret word! ?dup if
+    state @ if
+      2dup cvocab @    skip-current locate ?dup if -rot 2drop >cfa execute else
+      2dup context @ @ skip-current locate ?dup if -rot 2drop >cfa , else
+      2dup fvocab @    skip-current locate ?dup if -rot 2drop >cfa , else
+      2dup >number if -rot 2drop lit, , else drop
+        0 literal state ! align wnf @ execute
+      then then then
+    else
+      2dup context @ @ locate ?dup if -rot 2drop >cfa execute else
+      2dup fvocab @    locate ?dup if -rot 2drop >cfa execute else
+      2dup >number if -rot 2drop else drop
+        wnf @ execute
+      then then
+    then
+    stay @ if loop then
+  else
+    drop
+  then t;
+
+( name len -- addr/0 )
+t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
+
+t: ' word find dup if >cfa then t;
+
+
+
+bye
+
 vocabulary asdf
 asdf definitions
 current @ @ . cr
@@ -6,9 +42,24 @@ s" here" find .s cr
 current @ @ . cr
 ' wow .s cr
 
+forth definitions
+: wow 1 . cr ;
+wow
 
+: qwer [ asdf ] qwer ;
 
+asdf definitions
+: if 1 . ;
 
+forth definitions
+: if [ asdf ] if then ;
+
+: wow [ s" wowo" define ] wow ;
+
+s" wowo" define docol# , ' wowo , ' exit ,
+s" wowo" define ] wowo [
+
+create thing thing
 
 bye
 

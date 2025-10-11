@@ -232,15 +232,12 @@ builtins[
   b: @      b: c!     b: +c!   b: c@
   b: >r     b: r>     b: r@    b: +
   b: -      b: *      b: /     b: mod
-  b: /mod   b: */     b: */mod
-   b: u/
-   b: umod
-  b: 1+     b: 1-    b: negate
+  b: /mod   b: */     b: */mod b: u/
+  b: umod   b: 1+     b: 1-    b: negate
   b: drop   b: dup    b: ?dup  b: swap
   b: flip   b: over   b: nip   b: tuck
   b: rot    b: -rot   b: move  b: mem=
-   b: rclear
-  b: extid
+  b: rclear b: extid
 println builtins ct: 
 ]builtins
 
@@ -304,15 +301,8 @@ t: name cell + c@+ t;
 
 t: string= rot over = if mem= else 3drop false then t;
 
-\ skips most recent definition if compiling
-\ returns 0 on not found
-\ assumes current @ @ doesnt == 0,
-\   the logic is convoluted but this is generally true
-( name len start -- addr/0 )
-t: locate dup current @ @ = context @ current @ = state @ and and if @ then
-  |: dup if 3dup name string= 0= if @ loop then then nip nip t;
+t: locate dup if 3dup name string= 0= if @ loop then then nip nip t;
 
-( name len -- addr/0 )
 t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
 
 \ number conversion ===
@@ -368,17 +358,17 @@ t: refill source-ptr @ if false else
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;
 
+t: skip-current dup current @ @ = if @ then t;
+
 t: interpret word! ?dup if
     state @ if
-      \ skip recent
-      2dup cvocab @ locate ?dup if -rot 2drop >cfa execute else
-      2dup find            ?dup if -rot 2drop >cfa ,       else
-      2dup >number              if -rot 2drop lit, ,       else
-        0 literal state ! align
-        drop wnf @ execute
-      then then then
+      2dup cvocab @    skip-current locate ?dup if -rot 2drop >cfa execute else
+      2dup context @ @ skip-current locate ?dup if -rot 2drop >cfa , else
+      2dup fvocab @    skip-current locate ?dup if -rot 2drop >cfa , else
+      2dup >number if -rot 2drop lit, , else
+        drop 0 literal state ! align wnf @ execute
+      then then then then
     else
-      \ no skip recent
       2dup find ?dup if -rot 2drop >cfa execute else
       2dup >number   if -rot 2drop              else
         drop wnf @ execute
@@ -387,8 +377,7 @@ t: interpret word! ?dup if
     stay @ if loop then
   else
     drop
-  then
-  t;
+  then t;
 
 \ todo this should stop accepting the current file too ?
 t: quit 0 literal source-ptr ! source-len @ >in !
