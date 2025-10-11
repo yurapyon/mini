@@ -48,6 +48,9 @@ forth definitions
 
 : space bl emit ;
 : cr    10 emit ;
+: type range |: 2dup u> if c@+ emit loop then 2drop ;
+: _wnf type '?' emit cr abort ;
+' _wnf wnf !
 
 : digit>char dup 10 < if '0' else 'W' then + ;
 0 variable #start
@@ -132,6 +135,7 @@ l[
    cell layout source-ptr
    cell layout source-len
    cell layout >in
+   cell layout wnf
 ]l internal0
 
 l[
@@ -199,7 +203,7 @@ l[
 : |:   there loop* ! ;
 : loop jump-addr t, loop* @ t, ;
 
-: >init/exec initxt t! execreg cell + t! ;
+: >init/exec/wnf initxt t! execreg cell + t! wnf t! ;
 
 \ ===
 
@@ -214,10 +218,9 @@ fvocab context t!
 true stay t!
 
 \ todo
-\ need:
-\   u/ u/mod
+\   u/mod u*/ u*/mod
+\   abort
 
-\ todo abort
 builtins[
   b: exit   b: docol  b: docon b: docre
   b: jump   b: jump0  b: lit   b: panic
@@ -229,11 +232,15 @@ builtins[
   b: @      b: c!     b: +c!   b: c@
   b: >r     b: r>     b: r@    b: +
   b: -      b: *      b: /     b: mod
-  b: /mod   b: */     b: */mod b: 1+
-  b: 1-     b: negate b: drop  b: dup
-  b: ?dup   b: swap   b: flip  b: over
-  b: nip    b: tuck   b: rot   b: -rot
-  b: move   b: mem=   b: extid
+  b: /mod   b: */     b: */mod
+   b: u/
+   b: umod
+  b: 1+     b: 1-    b: negate
+  b: drop   b: dup    b: ?dup  b: swap
+  b: flip   b: over   b: nip   b: tuck
+  b: rot    b: -rot   b: move  b: mem=
+   b: rclear
+  b: extid
 println builtins ct: 
 ]builtins
 
@@ -263,6 +270,7 @@ state        tconstant state
 base         tconstant base
 s*           tconstant s*
 s0           tconstant s0
+wnf          tconstant wnf
 
 t: 2dup  over over t;
 t: 2drop drop drop t;
@@ -347,9 +355,6 @@ t: ,  here ! cell allot t;
 t: c, here c! 1 literal allot t;
 t: lit, lit lit , t;
 
-t: .chars 2dup u> if c@+ emit loop then 2drop t;
-t: type range .chars t;
-
 t: execute execreg literal ! jump execreg t, t;
 
 t: aligned dup cell mod + t;
@@ -369,15 +374,14 @@ t: interpret word! ?dup if
       2dup cvocab @ locate ?dup if -rot 2drop >cfa execute else
       2dup find            ?dup if -rot 2drop >cfa ,       else
       2dup >number              if -rot 2drop lit, ,       else
-        \ todo word not found should abort
-        drop type '?' literal emit
+        0 literal state ! align
+        drop wnf @ execute
       then then then
     else
       \ no skip recent
       2dup find ?dup if -rot 2drop >cfa execute else
       2dup >number   if -rot 2drop              else
-        \ todo word not found should abort
-        drop type '?' literal emit
+        drop wnf @ execute
       then then
     then
     stay @ if loop then
@@ -386,6 +390,10 @@ t: interpret word! ?dup if
   then
   t;
 
+\ todo this should stop accepting the current file too ?
+t: quit 0 literal source-ptr ! source-len @ >in !
+  'tcfa interpret literal rclear t;
+t: abort s0 s* ! quit t;
 t: bye false stay ! t;
 
 t: define align here >r current @ @ ,
@@ -410,7 +418,7 @@ tforth tdefinitions
 
 \ ===
 
-exit-addr 'tcfa interpret >init/exec
+'tcfa 2drop exit-addr 'tcfa interpret >init/exec/wnf
 
 \ ===
 

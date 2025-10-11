@@ -24,21 +24,22 @@ pub const Error = error{
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
 
 pub const callbacks = [_]BytecodeFn{
-    &exit,     &docol,    &docon,     &docre,
-    &jump,     &jump0,    &lit,       &panic,
-    &accept,   &emit,     &eq,        &gt,
-    &gteq,     &eq0,      &lt,        &lteq,
-    &ugt,      &ugteq,    &ult,       &ulteq,
-    &and_,     &or_,      &xor,       &invert,
-    &lshift,   &rshift,   &store,     &storeAdd,
-    &fetch,    &storeC,   &storeAddC, &fetchC,
-    &toR,      &fromR,    &fetchR,    &plus,
-    &minus,    &multiply, &divide,    &mod,
-    &divmod,   &muldiv,   &muldivmod, &inc,
-    &dec,      &negate,   &drop,      &dup,
-    &maybeDup, &swap,     &flip,      &over,
-    &nip,      &tuck,     &rot,       &nrot,
-    &move,     &memEqual, &extId,
+    &exit,   &docol,    &docon,     &docre,
+    &jump,   &jump0,    &lit,       &panic,
+    &accept, &emit,     &eq,        &gt,
+    &gteq,   &eq0,      &lt,        &lteq,
+    &ugt,    &ugteq,    &ult,       &ulteq,
+    &and_,   &or_,      &xor,       &invert,
+    &lshift, &rshift,   &store,     &storeAdd,
+    &fetch,  &storeC,   &storeAddC, &fetchC,
+    &toR,    &fromR,    &fetchR,    &plus,
+    &minus,  &multiply, &divide,    &mod,
+    &divmod, &muldiv,   &muldivmod, &udivide,
+    &umod,   &inc,      &dec,       &negate,
+    &drop,   &dup,      &maybeDup,  &swap,
+    &flip,   &over,     &nip,       &tuck,
+    &rot,    &nrot,     &move,      &memEqual,
+    &rClear, &extId,
 };
 
 pub fn getBytecode(token: Cell) ?BytecodeFn {
@@ -341,6 +342,14 @@ pub fn mod(k: *Kernel) Error!void {
     k.data_stack.mod();
 }
 
+pub fn udivide(k: *Kernel) Error!void {
+    k.data_stack.udivide();
+}
+
+pub fn umod(k: *Kernel) Error!void {
+    k.data_stack.umod();
+}
+
 // TODO move this into DataStack definiton
 pub fn divmod(k: *Kernel) Error!void {
     const div = k.data_stack.popCell();
@@ -423,6 +432,13 @@ pub fn memEqual(k: *Kernel) Error!void {
     );
     const areEqual = std.mem.eql(u8, a_slice, b_slice);
     k.data_stack.pushCell(kernel.cellFromBoolean(areEqual));
+}
+
+pub fn rClear(k: *Kernel) Error!void {
+    const next = k.data_stack.popCell();
+    k.return_stack.clear();
+    k.return_stack.pushCell(0);
+    k.setCfaToExecute(next);
 }
 
 pub fn extId(k: *Kernel) Error!void {

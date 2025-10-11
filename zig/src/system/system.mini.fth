@@ -156,20 +156,16 @@ forth definitions
 : byte. <# h# h# #> type ;
 : short. <# h# h# h# h# #> type ;
 : print. u>?|: c@+ print loop then 2drop ;
-: line. swap 64 * + 64 range print. ;
-: list. >r 16 0 u>?|: dup dup 2 u.r space r@ line. cr 1+ loop then r> 3drop ;
-\ : list block list. ;
 : sdata s* @ s0 over - ;
 : depth sdata nip cell / ;
 : cells. swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
-: <.> <# '>' hold #s '<' hold #> type ;
-: .s depth <.> space sdata range cells. ;
+: .s depth '<' emit u. '>' emit space sdata range cells. ;
 \ todo rename []
 : [] flip over * rot + swap ;
 : spaces 0 u>?|: space 1+ loop then 2drop ;
 : ctlcode cond dup 32 u< if 3
-d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us "
-[] else 127 = if s" del" else 0 0 endcond ;
+  d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us "
+  [] else 127 = if s" del" else 0 0 endcond ;
 : bytes. u>?|: c@+ byte. space loop then 2drop ;
 : dump range u>?|: 16 split dup short. space 2dup bytes. print. cr loop then 2drop ;
 : word. name tuck type if space then ;
@@ -186,10 +182,6 @@ d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem
 compiler definitions
 : ." [compile] s" ['] type , ;
 forth definitions
-
-\ : bthis-line 64 / 64 * ;
-\ : bnext-line 64 + bthis-line ;
-\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
 
 ( os externals )
 external time-utc
@@ -223,6 +215,12 @@ external pbrushline
 : region create >r >r >r , r> , r> , r> , ;
 : region>stack @+ swap @+ swap @+ swap @ ;
 
+0 variable o.x
+0 variable o.y
+
+: >o o.y ! o.x ! ;
+: o.reg>stk @+ o.x @ + swap @+ o.y @ + swap @+ o.x @ + swap @ o.y @ + ;
+
 ( x y x0 y0 x1 y1 -- t/f )
 : inside? >r swap >r rot >r in[,) r> r> r> in[,) and ;
 
@@ -236,16 +234,19 @@ external pbrushline
 
 : c.current c.sel @ 0= if c.0 else c.1 then ;
 
- 0 0 25 25 region c.0.view
-25 0 50 25 region c.1.view
+ 0 0 50 25 region c.view
+ 1 1 24 24 region c.0.view
+\ 26 1 49 24 region c.1.view
 
 : c.draw
+  c.view   region>stack 0     prect
   c.0.view region>stack c.0 @ prect
-  c.1.view region>stack c.1 @ prect ;
+  25 0 >o
+  c.0.view o.reg>stk    c.1 @ prect ;
 
 : c.click
   2dup c.0.view region>stack inside? if 2drop c.0 c.adv else
-       c.1.view region>stack inside? if       c.1 c.adv else
+       c.0.view o.reg>stk    inside? if       c.1 c.adv else
   then then ;
 
 ( r g b idx -- )

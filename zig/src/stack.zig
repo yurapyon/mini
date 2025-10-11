@@ -68,6 +68,10 @@ pub fn Stack(
 
         // ===
 
+        pub fn clear(self: *@This()) void {
+            self.initTopPtr();
+        }
+
         pub fn pushCell(self: *@This(), value: Cell) void {
             self.push(1);
             const top = self.peek(0);
@@ -335,8 +339,31 @@ pub fn Stack(
             self.pop(1);
         }
 
-        // TODO these should be signed
         pub fn divide(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            if (top.* != 0) {
+                // TODO check we should use divTrunc/floor/exact here
+                second.* = @divTrunc(second.*, top.*);
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
+        }
+
+        pub fn mod(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            if (top.* != 0) {
+                // TODO check we should use mod/rem here
+                second.* = @mod(second.*, top.*);
+            } else {
+                second.* = 0;
+            }
+            self.pop(1);
+        }
+
+        pub fn udivide(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
             if (top.* != 0) {
@@ -347,8 +374,7 @@ pub fn Stack(
             self.pop(1);
         }
 
-        // TODO these should be signed
-        pub fn mod(self: *@This()) void {
+        pub fn umod(self: *@This()) void {
             const top = self.peek(0);
             const second = self.peek(1);
             if (top.* != 0) {
