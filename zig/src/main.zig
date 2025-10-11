@@ -12,7 +12,7 @@ const kernel = @import("kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const System = @import("system/system_k.zig").System;
+const System = @import("system/system.zig").System;
 
 // ===
 

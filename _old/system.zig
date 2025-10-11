@@ -1,9 +1,9 @@
 const std = @import("std");
 
-const runtime = @import("../runtime.zig");
-const Runtime = runtime.Runtime;
-const Cell = runtime.Cell;
-const ExternalError = runtime.ExternalError;
+const kernel = @import("../kernel.zig");
+const Kernel = kernel.Kernel;
+const Cell = kernel.Cell;
+const ExternalError = kernel.ExternalError;
 
 const bytecodes = @import("../bytecodes.zig");
 
@@ -40,7 +40,7 @@ const ExternalId = enum(Cell) {
     _,
 };
 
-fn externalsCallback(rt: *Runtime, token: Cell, userdata: ?*anyopaque) External.Error!bool {
+fn externalsCallback(rt: *Kernel, token: Cell, userdata: ?*anyopaque) External.Error!bool {
     const system = @as(*System, @ptrCast(@alignCast(userdata)));
 
     const external_id = @as(ExternalId, @enumFromInt(token));
@@ -136,7 +136,7 @@ const glfw_callbacks = struct {
         action: c_int,
         mods: c_int,
     ) callconv(.C) void {
-        const system: *System = @alignCast(@ptrCast(
+        const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
         // TODO
@@ -154,7 +154,7 @@ const glfw_callbacks = struct {
         x: f64,
         y: f64,
     ) callconv(.C) void {
-        const system: *System = @alignCast(@ptrCast(
+        const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
         // TODO
@@ -179,7 +179,7 @@ const glfw_callbacks = struct {
         action: c_int,
         mods: c_int,
     ) callconv(.C) void {
-        const system: *System = @alignCast(@ptrCast(
+        const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
         if (system.xts.mousedown) |ext| {
@@ -198,7 +198,7 @@ const glfw_callbacks = struct {
         win: ?*c.GLFWwindow,
         codepoint: c_uint,
     ) callconv(.C) void {
-        const system: *System = @alignCast(@ptrCast(c.glfwGetWindowUserPointer(win)));
+        const system: *System = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(win)));
         if (system.xts.char) |ext| {
             const high: Cell = @intCast((codepoint & 0xff00) >> 16);
             const low: Cell = @intCast(codepoint & 0xff);
@@ -213,7 +213,7 @@ const glfw_callbacks = struct {
         width: c_int,
         height: c_int,
     ) callconv(.C) void {
-        const system: *System = @alignCast(@ptrCast(c.glfwGetWindowUserPointer(win)));
+        const system: *System = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(win)));
         _ = system;
         _ = width;
         _ = height;
@@ -224,7 +224,7 @@ const glfw_callbacks = struct {
 };
 
 pub const System = struct {
-    rt: *Runtime,
+    k: *Kernel,
 
     xts: struct {
         frame: ?Cell,
@@ -240,24 +240,26 @@ pub const System = struct {
     // TODO
     // should_bye: bool,
 
-    pub fn init(self: *@This(), rt: *Runtime) !void {
-        self.rt = rt;
+    pub fn init(self: *@This(), k: *Kernel) !void {
+        self.k = k;
 
         try self.initWindow();
 
         self.video.init();
 
-        try self.registerExternals(rt);
+        // TODO
+        // try self.registerExternals(k);
 
-        rt.processBuffer(system_file) catch |err| switch (err) {
-            error.WordNotFound => {
-                std.debug.print("Word not found: {s}\n", .{
-                    rt.last_evaluated_word orelse unreachable,
-                });
-                return err;
-            },
-            else => return err,
-        };
+        // TODO
+        // k.processBuffer(system_file) catch |err| switch (err) {
+        // error.WordNotFound => {
+        // std.debug.print("Word not found: {s}\n", .{
+        // k.last_evaluated_word orelse unreachable,
+        // });
+        // return err;
+        // },
+        // else => return err,
+        // };
 
         self.xts.frame = null;
         self.xts.keydown = null;
@@ -321,7 +323,7 @@ pub const System = struct {
 
     // ===
 
-    fn registerExternals(self: *@This(), rt: *Runtime) !void {
+    fn registerExternals(self: *@This(), rt: *Kernel) !void {
         const external = External{
             .callback = externalsCallback,
             .userdata = self,
