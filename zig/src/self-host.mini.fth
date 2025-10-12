@@ -90,6 +90,8 @@ forth definitions
 : hex 16 base ! ;
 : decimal 10 base ! ;
 
+: third >r over r> swap ;
+
 vocabulary target
 target definitions
 
@@ -271,9 +273,7 @@ wnf          tconstant wnf
 
 t: 2dup  over over t;
 t: 2drop drop drop t;
-t: 3drop drop 2drop t;
-t: third >r over r> swap t;
-t: 3dup  third third third t;
+t: 3dup  >r 2dup r@ -rot r> t;
 
 \ input ===
 
@@ -283,8 +283,8 @@ t: source@ source drop >in @ + t;
 t: next-char source@ c@ 1 literal >in +! t;
 t: source-rest source@ source + over - t;
 
-t: /string tuck - -rot + swap t;
-t: -leading dup if over c@ bl = if 1 literal /string loop then then t;
+t: 1/string 1- swap 1+ swap t;
+t: -leading dup if over c@ bl = if 1/string loop then then t;
 t: range over + swap t;
 
 t: token -leading 2dup range
@@ -299,7 +299,7 @@ t: c@+ dup 1+ swap c@ t;
 
 t: name cell + c@+ t;
 
-t: string= rot over = if mem= else 3drop false then t;
+t: string= rot over = if mem= else drop 2drop false then t;
 
 t: locate dup if 3dup name string= 0= if @ loop then then nip nip t;
 
@@ -313,12 +313,12 @@ t: pad here 64 literal + t;
 t: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
   r> r> and and t;
 
-t: str>neg over c@ '-' literal = if 1 literal /string true else false then t;
+t: str>neg over c@ '-' literal = if 1/string true else false then t;
 
 t: str>base over c@
-   dup '%' literal = if drop 1 literal /string  2 literal else
-   dup '#' literal = if drop 1 literal /string 10 literal else
-       '$' literal = if      1 literal /string 16 literal else
+   dup '%' literal = if drop 1/string  2 literal else
+   dup '#' literal = if drop 1/string 10 literal else
+       '$' literal = if      1/string 16 literal else
      base @
    then then then t;
 
@@ -358,13 +358,13 @@ t: refill source-ptr @ if false else
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;
 
-t: skip-current dup current @ @ = if @ then t;
+t: cfind dup current @ @ = if @ then locate t;
 
 t: interpret word! ?dup if
     state @ if
-      2dup cvocab @    skip-current locate ?dup if -rot 2drop >cfa execute else
-      2dup context @ @ skip-current locate ?dup if -rot 2drop >cfa , else
-      2dup fvocab @    skip-current locate ?dup if -rot 2drop >cfa , else
+      2dup cvocab @    cfind ?dup if -rot 2drop >cfa execute else
+      2dup context @ @ cfind ?dup if -rot 2drop >cfa , else
+      2dup fvocab @    cfind ?dup if -rot 2drop >cfa , else
       2dup >number if -rot 2drop lit, , else
         drop 0 literal state ! align wnf @ execute
       then then then then

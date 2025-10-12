@@ -46,6 +46,8 @@ forth definitions
 : _wnf type '?' emit cr abort ;
 ' _wnf wnf !
 
+: 3drop drop 2drop ;
+
 : ( next-char ')' = 0= if loop then ;
 compiler definitions
 : ( ( ; \ )
@@ -213,7 +215,7 @@ external time-utc
 external shell
 : $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
 external accept-file
-: include source-rest 1 /string source-len @ >in ! accept-file ;
+: include source-rest 1/string source-len @ >in ! accept-file ;
 
 \ 3 cells constant saved-source
 
