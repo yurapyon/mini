@@ -2,8 +2,8 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 
-const runtime = @import("../runtime.zig");
-const Cell = runtime.Cell;
+const kernel = @import("../kernel.zig");
+const Cell = kernel.Cell;
 
 // ===
 
@@ -17,11 +17,11 @@ pub const Handles = struct {
 
     pub fn init(self: *@This(), allocator: Allocator) void {
         self.allocator = allocator;
-        self.lookup = ArrayList(Handle).init(allocator);
+        self.lookup = .empty;
     }
 
     pub fn deinit(self: *@This()) void {
-        self.lookup.deinit();
+        self.lookup.deinit(self.allocator);
     }
 
     pub fn getHandleForPtr(self: *@This(), ptr: *anyopaque) !Cell {
@@ -47,7 +47,7 @@ pub const Handles = struct {
             }
 
             const handle_id: Cell = @intCast(self.lookup.items.len);
-            const handle = try self.lookup.addOne();
+            const handle = try self.lookup.addOne(self.allocator);
             handle.ptr = ptr;
             return handle_id;
         }
@@ -63,7 +63,7 @@ pub const Handles = struct {
             }
 
             // TODO dont catch unreachable
-            self.lookup.resize(last_null_idx) catch unreachable;
+            self.lookup.resize(self.allocator, last_null_idx) catch unreachable;
         } else {
             self.lookup.items[handle_id].ptr = null;
         }

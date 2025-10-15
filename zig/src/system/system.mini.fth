@@ -46,6 +46,8 @@ forth definitions
 : _wnf type '?' emit cr abort ;
 ' _wnf wnf !
 
+: 3drop drop 2drop ;
+
 : ( next-char ')' = 0= if loop then ;
 compiler definitions
 : ( ( ; \ )
@@ -213,7 +215,7 @@ external time-utc
 external shell
 : $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
 external accept-file
-: include source-rest 1 /string source-len @ >in ! accept-file ;
+: include source-rest 1/string source-len @ >in ! accept-file ;
 
 \ ===
 
@@ -291,6 +293,9 @@ a0 a0 a0 $f ppalette!
 decimal
 
 0 0 640 400 1 prect
+
+100 100 356 356 0 prect
+101 101 355 355 1 prect
 
 : setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then ;
 

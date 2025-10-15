@@ -1,0 +1,78 @@
+mini specs ===
+
+vm:
+  cell size:     2 bytes
+  address space: 64k bytes
+  endianness:    little
+  negatives:     twos compilment
+  threading:     token threaded
+  type system:   untyped
+
+language:
+  case-sensitive
+  max input line length: 128 chars
+  max word name length:  256 chars
+  max numeric base:      36
+
+interpreter states:
+  0x0 interpret
+  0x1 compile
+
+word definition layout:
+  align(2)0               16      24                      x
+  |?......|previous-------|namelen|.......|.......|?align-|code...
+
+bytecodes (acutally u16) :
+  exit   docol  docon docre
+  jump   jump0  lit   panic
+  accept emit   =     >
+  >=     0=     <     <=
+  u>     u>=    u<    u<=
+  and    or     xor   invert
+  lshift rshift !     +!
+  @      c!     +c!   c@
+  >r     r>     r@    +
+  -      *      /     mod
+  /mod   */     */mod u/
+  umod   1+     1-    negate
+  drop   dup    ?dup  swap
+  flip   over   nip   tuck
+  rot    -rot   move  mem=
+  rclear extid
+
+non-standard bytecodes:
+  jump   - absolute jump
+  jump0  - absolute conditional jump
+  flip   - ( a b c -- c b a )
+  rclear - ( xt -- )             clears return stack and executes xt
+  extid  - ( str len -- number ) gets system specific id for an external function
+  mem=   - ( a b len -- t/f )    compares memory
+  panic  - ( -- )                dies
+
+memory layout:
+0x00000
+     cell: program counter
+     cell: address of currently executing xt
+     cell: data stack *
+     cell: rstack *
+  2 cells: execution register
+     cell: xt to init on forth start
+     cell: stay ( : bye false stay ! ; )
+     cell: h
+     cell: forth vocabulary last
+     cell: compiler vocabulary last
+     cell: current
+     cell: context
+     cell: state
+     cell: base
+     cell: source-ptr
+     cell: source-len
+     cell: >in
+     cell: vector to run on word not found
+...
+         : data stack top
+128 bytes: input-buffer
+ 64 cells: rstack bottom
+         : rstack top
+     cell: _space
+0x10000

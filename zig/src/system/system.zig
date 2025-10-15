@@ -278,7 +278,8 @@ pub const System = struct {
 
         try self.initWindow();
 
-        self.video.init();
+        // TODO allow for different allocator than the kernels
+        self.video.init(k.allocator);
 
         self.xts.key = null;
         self.xts.mousemove = null;
@@ -296,7 +297,8 @@ pub const System = struct {
         try k.execute();
     }
 
-    pub fn deinit(_: @This()) void {
+    pub fn deinit(self: *@This()) void {
+        self.video.deinit();
         c.glfwTerminate();
     }
 

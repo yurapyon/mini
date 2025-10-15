@@ -217,6 +217,8 @@ external shell
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
 
+\ : /string tuck - -rot + swap ;
+
 \ 3 cells constant saved-source
 
 
