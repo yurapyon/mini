@@ -1,33 +1,25 @@
 todo
 
 probably
-  doubles and unsigned
+  doubles
     may need to extend bytecode count
-  set system images from within forth
-    load block vocab by default
-  random numbers
   search-order
+  externals
+    random numbers
   errors
+    abort
+      compare to ansi forth
+      catch stack underflow
     better errors in console when vm crashes
     less crashes in general
       if some internal state can be invalidated from forth,
         just truncate/wrap the value in zig ie state, base
         do it on read ie >> const state = state_from_forth & 1;
     maybe have a debug mode cli option
-  refiller idea probably isnt necessary
-    unsure if 'refilling' itself is necessary
-      difference between sending strings to forth and having it execute them or
-        having forth block and wait for input on its own
 
 maybe
+  floats
 
 probably not
   coroutines
   locals
-
----
-
-notes
-
-repl can use files but system mostly works with images
-

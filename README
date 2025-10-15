@@ -2,21 +2,20 @@
 
 goals:
   clear simple and obvious
-    both forth code and implementation
-  balanced
     don't sacrifice readibility for performance
   evolution of a classic
-    modern forth not 'forth-y [something else]'
+    "write a forth" is more important than "design a modern language"
 
 roadmap:
-  planned:
+  in progress
     io
       graphics
       keyboard/mouse
-    cross-compiler for avr/pic
-  maybe:
+  planned:
     io
       audio
+    cross-compiler for avr/pic
+  maybe:
 
 you need:
   zig
