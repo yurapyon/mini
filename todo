@@ -1,6 +1,7 @@
 todo
 
 probably
+  make sure it compiles on linux
   doubles
     may need to extend bytecode count
   search-order
@@ -19,6 +20,8 @@ probably
 
 maybe
   floats
+  typescript executor for web
+    npm package?
 
 probably not
   coroutines
