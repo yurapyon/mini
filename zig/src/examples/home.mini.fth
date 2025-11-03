@@ -1,4 +1,23 @@
+\ ===
+\
 \ pwd formatter
+\
+\ ex:
+\   home-dir: /Users/yurapyon
+\   pwd:      /Users/yurapyon/Documents/programming
+\   output:   ~/Documents/programming
+\
+\ ex:
+\   home-dir: /Users/yurapyon
+\   pwd:      /Users/yurapyon/Documents/programming/mini
+\   output:   .../programming/mini
+\
+\ ex:
+\   home-dir: /Users/yurapyon
+\   pwd:      /
+\   output:   /
+\
+\ ===
 
 : fsdepth range 0 -rot u>?|: c@+ '/' = if rot 1+ -rot then loop then 2drop ;
 

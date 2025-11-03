@@ -1,4 +1,8 @@
+\ ===
+\
 \ conways game of life
+\
+\ ===
 
 compiler definitions
 : [by2] ' dup \ >r swap >r __ r> r> __
@@ -7,7 +11,6 @@ forth definitions
 
 \ double buffers ===
 
-\ todo db.fill
 : double-buffer create false , dup , 2 * allot ;
 : db.>s @+ swap @+ swap ;
 : db.erase db.>s swap 2 * erase drop ;
