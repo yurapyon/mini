@@ -217,10 +217,30 @@ external shell
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
 
-\ : /string tuck - -rot + swap ;
+\ todo how to handle envvar not found?
+external get-env
+\ create last-env 128 allot
+\ : get-env last-env 128 get-env last-env swap ;
+
+external cwd
+\ create last-cwd 128 allot
+\ : cwd last-cwd 128 cwd last-cwd swap ;
+
+: /string tuck - -rot + swap ;
 
 \ 3 cells constant saved-source
 
+\ todo
+\ this behavior might be weird and maybe doesnt panic on EoF
+: [if] 0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
+: [then] ;
+: [defined] word find 0= 0= ;
+
+compiler definitions
+: [if]      [if] ;
+: [then]    [then] ;
+: [defined] [defined] ;
+forth definitions
 
 \    cell layout saved*
 \ 8 saved-source *
@@ -254,3 +274,4 @@ external accept-file
 
 \ include src/testing/sh.mini.fth
 \ include src/testing/cal.mini.fth
+include src/testing/home.mini.fth

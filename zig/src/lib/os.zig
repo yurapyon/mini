@@ -66,6 +66,59 @@ fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.setAcceptBuffer(file) catch return error.ExternalPanic;
 }
 
+fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const buf_len = k.data_stack.popCell();
+    const buf_addr = k.data_stack.popCell();
+    const env_len = k.data_stack.popCell();
+    const env_addr = k.data_stack.popCell();
+
+    const env_var = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        env_addr,
+        env_len,
+    );
+
+    const value = std.process.getEnvVarOwned(k.allocator, env_var) catch |err| switch (err) {
+        error.EnvironmentVariableNotFound => null,
+        else => return error.Panic,
+    };
+
+    if (value) |str| {
+        defer k.allocator.free(str);
+
+        const buf = try mem.sliceFromAddrAndLen(
+            k.memory,
+            buf_addr,
+            buf_len,
+        );
+
+        // TODO think about how to handle this error
+        if (str.len <= buf.len) {
+            @memcpy(buf[0..str.len], str);
+            k.data_stack.pushCell(@truncate(str.len));
+        } else {
+            k.data_stack.pushSignedCell(-1);
+        }
+    } else {
+        k.data_stack.pushCell(0);
+    }
+}
+
+fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const buf_len = k.data_stack.popCell();
+    const buf_addr = k.data_stack.popCell();
+
+    const buf = try mem.sliceFromAddrAndLen(
+        k.memory,
+        buf_addr,
+        buf_len,
+    );
+
+    const str = std.fs.cwd().realpath(".", buf) catch return error.Panic;
+
+    k.data_stack.pushCell(@truncate(str.len));
+}
+
 pub fn registerExternals(k: *Kernel) !void {
     try k.addExternal("sleep", .{
         .callback = sleep,
@@ -85,6 +138,14 @@ pub fn registerExternals(k: *Kernel) !void {
     });
     try k.addExternal("accept-file", .{
         .callback = setAcceptFile,
+        .userdata = null,
+    });
+    try k.addExternal("get-env", .{
+        .callback = getEnv,
+        .userdata = null,
+    });
+    try k.addExternal("cwd", .{
+        .callback = cwd,
         .userdata = null,
     });
 }
