@@ -1,3 +1,5 @@
+\ calendar
+
 2025 value year
 : leap? year 4 mod 0= year 100 mod and year 400 mod 0= or ;
 \ jan 1st 1968 was a monday

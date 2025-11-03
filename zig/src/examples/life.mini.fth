@@ -1,3 +1,30 @@
+\ conways game of life
+
+compiler definitions
+: [by2] ' dup \ >r swap >r __ r> r> __
+  ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
+forth definitions
+
+\ double buffers ===
+
+\ todo db.fill
+: double-buffer create false , dup , 2 * allot ;
+: db.>s @+ swap @+ swap ;
+: db.erase db.>s swap 2 * erase drop ;
+: db.swap dup @ invert swap ! ;
+: db.get db.>s rot >r rot r> xor if nip else + then ;
+
+\ grid ===
+
+: lastcol? ( i w -- t/f ) swap 1+ swap mod 0= ;
+: xy>i     ( x y w -- i ) * + ;
+: i>xy     ( i w -- x y ) /mod swap ;
+: wrap     ( val max -- ) tuck + swap mod ;
+: xy+    [by2] + ;
+: wrapxy [by2] wrap ;
+
+\ ===
+
 vocabulary life
 life definitions
 
@@ -24,7 +51,7 @@ size double-buffer grid
 : cell.next dup g@ over neighbors alive? 1 and over g! ;
 
 : .cell if '#' else bl then emit ;
-: .grid size 0 |: 2dup > if dup g@ .cell dup width ?cr
+: .grid size 0 |: 2dup > if dup g@ .cell dup width mod 0= if cr then
   1+ loop then 2drop ;
 
 : init  grid db.erase ;

@@ -16,11 +16,12 @@ files:
     run.sh                     - run the forth repl, expects 'zig build' has already been called
     system.sh                  - run the virtual pc, expects 'zig build' has already been called
   src/
+    examples/                  - more complete scripts
+    sketch/                    - random unfinished scripts
     lib/                       - "libraries" of external functions
       dynamic.zig              - externals for dynamic memory allocation
       os.zig                   - externals for OS access
     system/                    - virtual PC
-    testing/                   - random scripts
     utils/                     - zig utils
     bytecodes.zig              - bytecode behaviors and the code-field lookup table
     cli_options.zig            - basic commandline option interpreter
