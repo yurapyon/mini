@@ -197,12 +197,19 @@ compiler definitions
 : ." [compile] s" ['] type , ;
 forth definitions
 
-\ : bthis-line 64 / 64 * ;
-\ : bnext-line 64 + bthis-line ;
-\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
-\ : line. swap 64 * + 64 range print. ;
-\ : list. >r 16 0 u>?|: dup dup 2 u.r space r@ line. cr 1+ loop then r> 3drop ;
-\ : list block list. ;
+: /string tuck - -rot + swap ;
+
+\ todo
+\ this behavior might be weird and maybe doesnt panic on EoF
+: [if] 0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
+: [then] ;
+: [defined] word find 0= 0= ;
+
+compiler definitions
+: [if]      [if] ;
+: [then]    [then] ;
+: [defined] [defined] ;
+forth definitions
 
 ( os externals )
 external time-utc
@@ -217,30 +224,19 @@ external shell
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
 
-\ todo how to handle envvar not found?
 external get-env
-\ create last-env 128 allot
-\ : get-env last-env 128 get-env last-env swap ;
-
 external cwd
-\ create last-cwd 128 allot
-\ : cwd last-cwd 128 cwd last-cwd swap ;
 
-: /string tuck - -rot + swap ;
+." (mini)" cr
+
+\ : bthis-line 64 / 64 * ;
+\ : bnext-line 64 + bthis-line ;
+\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
+\ : line. swap 64 * + 64 range print. ;
+\ : list. >r 16 0 u>?|: dup dup 2 u.r space r@ line. cr 1+ loop then r> 3drop ;
+\ : list block list. ;
 
 \ 3 cells constant saved-source
-
-\ todo
-\ this behavior might be weird and maybe doesnt panic on EoF
-: [if] 0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
-: [then] ;
-: [defined] word find 0= 0= ;
-
-compiler definitions
-: [if]      [if] ;
-: [then]    [then] ;
-: [defined] [defined] ;
-forth definitions
 
 \    cell layout saved*
 \ 8 saved-source *
@@ -270,8 +266,6 @@ forth definitions
 
 \ t: evaluate save-source set-source interpret restore-source t;
 
-." (mini)" cr
-
 \ include src/testing/sh.mini.fth
 \ include src/testing/cal.mini.fth
-include src/testing/home.mini.fth
+\ include src/testing/home.mini.fth

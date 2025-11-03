@@ -1,6 +1,7 @@
 todo
 
 probably
+  interpret files from paths on the commandline
   make sure it compiles on linux
   doubles
     may need to extend bytecode count
