@@ -19,7 +19,6 @@ files:
     examples/                  - more complete scripts
     sketch/                    - random unfinished scripts
     lib/                       - "libraries" of external functions
-      dynamic.zig              - externals for dynamic memory allocation
       os.zig                   - externals for OS access
     system/                    - virtual PC
     utils/                     - zig utils
