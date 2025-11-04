@@ -254,6 +254,7 @@ println builtins ct:
 2     tconstant cell
 0     tconstant false
 $FFFF tconstant true
+$FFFF tconstant eof
 stay         tconstant stay
 source-ptr   tconstant source-ptr
 source-len   tconstant source-len
@@ -351,9 +352,11 @@ t: aligned dup cell mod + t;
 t: align here aligned h ! t;
 t: >cfa name + aligned t;
 
-t: refill source-ptr @ if false else
-  input-buffer 128 literal accept source-len ! 0 literal >in !
-  true then t;
+t: refill
+  source-ptr @ if false else
+    input-buffer 128 literal accept
+    dup eof = if drop false else source-len ! 0 literal >in ! true then
+  then t;
 
 t: word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then t;

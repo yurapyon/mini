@@ -129,11 +129,11 @@ pub fn accept(k: *Kernel) Error!void {
                 @import("std").debug.print("{}\n", .{err});
                 return error.CannotAccept;
             };
+
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
-            k.clearAcceptBuffer();
-            k.data_stack.pushCell(0);
+            k.data_stack.pushCell(kernel.EoF);
         }
     } else if (k.accept_closure) |closure| {
         const size = try closure.callback(out, closure.userdata);

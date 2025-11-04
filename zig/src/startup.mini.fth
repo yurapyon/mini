@@ -4,6 +4,12 @@
 : compiler cvocab context ! ;
 : definitions context @ current ! ;
 
+: cells cell * ;
+: @+ dup cell + swap @ ;
+: !+ tuck ! cell + ;
+: c@+ dup 1+ swap c@ ;
+: c!+ tuck c! 1+ ;
+
 compiler definitions
 : literal lit, , ;
 : [compile] ' , ;
@@ -70,15 +76,25 @@ compiler definitions
 forth definitions
 : does> last :noname swap >does ! ;
 
-: cells cell * ;
+: >value 2 cells + ;
+
+: noop ;
+: doer create ['] noop cell + , does> @ >r ;
+0 variable make*
+compiler definitions
+: make (lit), lit, ' >value , ['] ! ,
+  here make* ! ['] exit , 0 , this! ;
+: ;and ['] exit , ['] jump make* @ !+ this! ;
+forth definitions
+: make :noname cell + ' >value ! ;
+: undo ['] noop cell + ' >value ! ;
 
 : value create , does> @ ;
-: vname ' 2 cells + ;
-: to vname ! ;
-: +to vname +! ;
+: to ' >value ! ;
+: +to ' >value +! ;
 compiler definitions
-: to lit, vname , ['] ! , ;
-: +to lit, vname , ['] +! , ;
+: to lit, ' >value , ['] ! , ;
+: +to lit, ' >value , ['] +! , ;
 forth definitions
 
 : vocabulary create 0 , does> context ! ;
@@ -107,11 +123,6 @@ forth definitions
 : clamp rot min max ;
 : in[,] rot tuck >= -rot <= and ;
 : in[,) 1- in[,] ;
-
-: @+ dup cell + swap @ ;
-: !+ tuck ! cell + ;
-: c@+ dup 1+ swap c@ ;
-: c!+ tuck c! 1+ ;
 
 : split over + tuck swap ;
 : (data), (lit), ['] jump , (later), swap this! ;
@@ -231,7 +242,6 @@ external shell
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
 
-
 ." (mini)" cr
 
 \ : bthis-line 64 / 64 * ;
@@ -270,7 +280,3 @@ external accept-file
 \ t: set-source source-len ! source-ptr ! 0 literal >in ! t;
 
 \ t: evaluate save-source set-source interpret restore-source t;
-
-\ include src/testing/sh.mini.fth
-\ include src/testing/cal.mini.fth
-\ include src/testing/home.mini.fth

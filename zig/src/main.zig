@@ -27,6 +27,8 @@ fn emitStdOut(char: u8, userdata: ?*anyopaque) void {
 }
 
 fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
+    // TODO handle EoF
+
     var buf = [_]u8{0} ** 256;
 
     var bw = std.Io.Writer.fixed(out);
@@ -49,7 +51,7 @@ pub fn main() !void {
 
     var cli_options: CliOptions = undefined;
     try cli_options.initFromProcessArgs(allocator);
-    defer cli_options.deinit();
+    defer cli_options.deinit(allocator);
 
     const memory = try mem.allocateMemory(allocator);
     defer allocator.free(memory);
@@ -64,8 +66,9 @@ pub fn main() !void {
         k.setAcceptClosure(acceptStdIn, &input_file);
         k.setEmitClosure(emitStdOut, &output_file);
 
-        const precompiled = try readFile(allocator, precompiled_filepath);
-        k.load(precompiled);
+        const image = try readFile(allocator, precompiled_filepath);
+        defer allocator.free(image);
+        k.loadImage(image);
 
         if (cli_options.precompile) {
             try k.setAcceptBuffer(self_host_file);
@@ -99,6 +102,27 @@ pub fn main() !void {
             try k.setAcceptBuffer(startup_file);
             k.initForth();
             try k.execute();
+
+            for (cli_options.filepaths.items) |fp| {
+                const file = try readFile(allocator, fp);
+                defer allocator.free(file);
+                std.debug.print(">> {s}\n", .{fp});
+
+                try k.setAcceptBuffer(file);
+                k.initForth();
+                try k.execute();
+            }
+
+            k.clearAcceptBuffer();
+
+            const should_start_repl =
+                cli_options.interactive or
+                cli_options.filepaths.items.len == 0;
+
+            if (should_start_repl) {
+                k.initForth();
+                try k.execute();
+            }
         }
 
         return;

@@ -1,29 +1,26 @@
 todo
 
-probably
-  interpret files from paths on the commandline
-  make sure it compiles on linux
-  doubles
-    may need to extend bytecode count
-  search-order
-  externals
-    random numbers
-  errors
-    abort
-      compare to ansi forth
-      catch stack underflow
-    better errors in console when vm crashes
-    less crashes in general
-      if some internal state can be invalidated from forth,
-        just truncate/wrap the value in zig ie state, base
-        do it on read ie >> const state = state_from_forth & 1;
-    maybe have a debug mode cli option
+*: probably will do
+-: might do
+x: probably won't do
 
-maybe
-  floats
-  typescript executor for web
+=== os/build ===
+* make sure it compiles on linux
+* set up installation
+- typescript executor for web
     npm package?
 
-probably not
-  coroutines
-  locals
+=== libraries ===
+* random number generation
+- floats
+x 32bit math
+
+=== vm ===
+* better error handling
+*   make sure abort works as intended
+      compare to ansi forth
+      catch stack over/underflow
+*   stack traces
+      could have a debug mode cli option
+- search-order
+- locals

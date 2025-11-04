@@ -41,6 +41,8 @@ pub fn isTruthy(value: Cell) bool {
 pub const block_size = 1024;
 pub const block_count = 256;
 
+pub const EoF = 0xffff;
+
 const NamedExternal = struct {
     name: []const u8,
     external: External,
@@ -147,7 +149,7 @@ pub const Kernel = struct {
         }
     }
 
-    pub fn load(self: *@This(), data: []u8) void {
+    pub fn loadImage(self: *@This(), data: []u8) void {
         self.clear();
         @memcpy(self.memory[0..data.len], data);
         self.data_stack.initTopPtr();

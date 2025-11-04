@@ -3,7 +3,6 @@ const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
 pub const CliOptions = struct {
-    allocator: Allocator,
     interactive: bool,
     run_system: bool,
     precompile: bool,
@@ -11,20 +10,15 @@ pub const CliOptions = struct {
     kernel_filepath: ?[]u8,
 
     pub fn initFromProcessArgs(self: *@This(), allocator: Allocator) !void {
-        self.allocator = allocator;
-
-        var iter = try std.process.argsWithAllocator(self.allocator);
+        var iter = try std.process.argsWithAllocator(allocator);
         defer iter.deinit();
 
-        self.interactive = true;
+        self.interactive = false;
         self.run_system = false;
         self.precompile = false;
 
         self.filepaths = .empty;
-        errdefer self.filepaths.deinit(self.allocator);
-
-        // var expect_image_filepath = false;
-        // self.image_filepath = null;
+        errdefer self.filepaths.deinit(allocator);
 
         var expect_kernel_filepath = false;
         self.kernel_filepath = null;
@@ -36,8 +30,9 @@ pub const CliOptions = struct {
 
             if (expect_kernel_filepath and self.kernel_filepath == null) {
                 expect_kernel_filepath = false;
-                // TODO errdefer
-                const filepath = try self.allocator.alloc(u8, arg.len);
+                const filepath = try allocator.alloc(u8, arg.len);
+                errdefer allocator.free(filepath);
+
                 @memcpy(filepath, arg);
                 self.kernel_filepath = filepath;
                 continue;
@@ -53,22 +48,24 @@ pub const CliOptions = struct {
                 }
             } else {
                 // assume its a filepath
-                // TODO errdefer
-                const filepath = try self.allocator.alloc(u8, arg.len);
+                const filepath = try allocator.alloc(u8, arg.len);
+                errdefer allocator.free(filepath);
+
                 @memcpy(filepath, arg);
                 try self.filepaths.append(allocator, filepath);
             }
         }
     }
 
-    pub fn deinit(self: *@This()) void {
-        // if (self.image_filepath) |image_filepath| {
-        // self.allocator.free(image_filepath);
-        // }
+    pub fn deinit(self: *@This(), allocator: Allocator) void {
         var i: usize = 0;
         while (i < self.filepaths.items.len) : (i += 1) {
-            self.allocator.free(self.filepaths.items[i]);
+            allocator.free(self.filepaths.items[i]);
         }
-        self.filepaths.deinit(self.allocator);
+        self.filepaths.deinit(allocator);
+
+        if (self.kernel_filepath) |kfp| {
+            allocator.free(kfp);
+        }
     }
 };
