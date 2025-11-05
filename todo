@@ -9,6 +9,7 @@ x: probably won't do
 * set up installation
 - typescript executor for web
     npm package?
+* cleanup 'accept' flow when switching from reading from file->stdin
 
 === libraries ===
 * random number generation
@@ -22,5 +23,6 @@ x 32bit math
       catch stack over/underflow
 *   stack traces
       could have a debug mode cli option
+- automatic tailcall optimization
 - search-order
 - locals

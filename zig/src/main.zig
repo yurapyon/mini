@@ -53,24 +53,22 @@ pub fn main() !void {
     try cli_options.initFromProcessArgs(allocator);
     defer cli_options.deinit(allocator);
 
-    const memory = try mem.allocateMemory(allocator);
-    defer allocator.free(memory);
-
     var input_file = std.fs.File.stdin();
     var output_file = std.fs.File.stdout();
 
     if (cli_options.kernel_filepath) |precompiled_filepath| {
         var k: Kernel = undefined;
         try k.init(allocator);
-
-        k.setAcceptClosure(acceptStdIn, &input_file);
-        k.setEmitClosure(emitStdOut, &output_file);
+        defer k.deinit();
 
         const image = try readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
         k.loadImage(image);
 
         if (cli_options.precompile) {
+            k.setAcceptClosure(acceptStdIn, &input_file);
+            k.setEmitClosure(emitStdOut, &output_file);
+
             try k.setAcceptBuffer(self_host_file);
             k.initForth();
             try k.execute();
@@ -93,12 +91,27 @@ pub fn main() !void {
 
             var sys: System = undefined;
 
+            k.clearAcceptClosure();
+            k.setEmitClosure(emitStdOut, &output_file);
+
+            k.debug_accept_buffer = false;
+
+            std.debug.print(">> startup\n", .{});
+            try k.setAcceptBuffer(startup_file);
+            k.initForth();
+            try k.execute();
+
             try sys.init(&k);
             defer sys.deinit();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
 
+            k.clearAcceptClosure();
+            k.setEmitClosure(emitStdOut, &output_file);
+
             k.debug_accept_buffer = false;
+
+            std.debug.print(">> startup\n", .{});
             try k.setAcceptBuffer(startup_file);
             k.initForth();
             try k.execute();
@@ -113,13 +126,14 @@ pub fn main() !void {
                 try k.execute();
             }
 
-            k.clearAcceptBuffer();
-
             const should_start_repl =
                 cli_options.interactive or
                 cli_options.filepaths.items.len == 0;
 
             if (should_start_repl) {
+                std.debug.print("(mini)\n", .{});
+
+                k.setAcceptClosure(acceptStdIn, &input_file);
                 k.initForth();
                 try k.execute();
             }

@@ -292,6 +292,7 @@ pub const System = struct {
 
         try self.registerExternals(k);
 
+        std.debug.print("pyon vPC\n", .{});
         try k.setAcceptBuffer(system_file);
         k.initForth();
         try k.execute();

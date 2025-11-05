@@ -221,7 +221,6 @@ true stay t!
 
 \ todo
 \   u/mod u*/ u*/mod
-\   abort
 
 builtins[
   b: exit   b: docol  b: docon b: docre
@@ -363,6 +362,11 @@ t: word! word ?dup 0= if drop refill if loop else
 
 t: cfind dup current @ @ = if @ then locate t;
 
+\ todo
+\ you can put automatic TCO here at '>cfa ,' invocations
+\ save location of last compiled word
+\ if ';' is called, can check if we want to compile an exit or jump
+\ when
 t: interpret word! ?dup if
     state @ if
       2dup cvocab @    cfind ?dup if -rot 2drop >cfa execute else

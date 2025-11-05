@@ -139,8 +139,8 @@ pub const Kernel = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        // TODO free memory
-        _ = self;
+        self.externals.deinit(self.allocator);
+        self.allocator.free(self.memory);
     }
 
     pub fn clear(self: *@This()) void {

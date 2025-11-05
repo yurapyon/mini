@@ -50,6 +50,9 @@ pub fn getBytecode(token: Cell) ?BytecodeFn {
     }
 }
 
+// TODO
+// you might be able to put automatic TCO here
+// if k.pc.fetch().* === exit, then you don't need to push it to the return stack (?)
 pub fn docol(k: *Kernel) Error!void {
     k.return_stack.pushCell(k.program_counter.fetch());
     k.program_counter.store(k.current_token_addr.fetch() + @sizeOf(Cell));
@@ -133,7 +136,12 @@ pub fn accept(k: *Kernel) Error!void {
         if (slice) |slc| {
             k.data_stack.pushCell(@truncate(slc.len));
         } else {
-            k.data_stack.pushCell(kernel.EoF);
+            if (k.accept_closure) |_| {
+                k.clearAcceptBuffer();
+                k.data_stack.pushCell(0);
+            } else {
+                k.data_stack.pushCell(kernel.EoF);
+            }
         }
     } else if (k.accept_closure) |closure| {
         const size = try closure.callback(out, closure.userdata);
