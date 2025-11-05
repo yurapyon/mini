@@ -41,7 +41,7 @@ compiler definitions
 : |:       set-loop ;             \ ( -- )
 : loop     ['] jump , loop* @ , ; \ ( -- )
 forth definitions
-: :        ) : set-loop ;         \ ( -- )
+: :        : set-loop ;         \ ( -- )
 
 : (later), here 0 , ;      \ ( -- a )
 : (lit),   lit, (later), ; \ ( -- a )
@@ -249,7 +249,7 @@ compiler definitions
 : [defined] [defined] ;
 forth definitions
 
-\ os externals ===
+\ os ===
 
 external sleep
 external sleeps
@@ -270,6 +270,34 @@ external shell
 
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
+
+\ floats ===
+
+external f+
+external f-
+external f*
+external f/
+external f>str
+external str>f
+
+: fswap 2swap ;
+: fdrop 2drop ;
+: fdup  2dup ;
+
+create fbuf 128 allot
+: f. fbuf 128 f>str fbuf swap type ;
+
+: F word str>f drop ;
+compiler definitions
+: F word str>f drop swap lit, , lit, , ;
+forth definitions
+
+: f, swap , , ;
+: f@ @+ swap @ ;
+: fconstant create f, does> f@ ;
+
+\ todo this is messy
+: u>f <# #s #> str>f drop ;
 
 \ blocks ===
 

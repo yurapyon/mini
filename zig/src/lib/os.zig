@@ -80,7 +80,7 @@ fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
 
     const value = std.process.getEnvVarOwned(k.allocator, env_var) catch |err| switch (err) {
         error.EnvironmentVariableNotFound => null,
-        else => return error.Panic,
+        else => return error.ExternalPanic,
     };
 
     if (value) |str| {
@@ -114,7 +114,7 @@ fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
         buf_len,
     );
 
-    const str = std.fs.cwd().realpath(".", buf) catch return error.Panic;
+    const str = std.fs.cwd().realpath(".", buf) catch return error.ExternalPanic;
 
     k.data_stack.pushCell(@truncate(str.len));
 }
