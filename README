@@ -18,7 +18,7 @@ features:
   language features:
     covers most of the ANSI Forth 'Core' word set
     vocabularies
-    string escapes
+    string escapes, including multiline strings
     easy-to-use FFI, currently builds in:
       OS access
       32-bit floats
