@@ -41,7 +41,7 @@ compiler definitions
 : |:       set-loop ;             \ ( -- )
 : loop     ['] jump , loop* @ , ; \ ( -- )
 forth definitions
-: :        ) : set-loop ;         \ ( -- )
+: :        : set-loop ;         \ ( -- )
 
 : (later), here 0 , ;      \ ( -- a )
 : (lit),   lit, (later), ; \ ( -- a )
