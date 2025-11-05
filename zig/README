@@ -19,7 +19,8 @@ files:
     examples/                  - more complete scripts
     sketch/                    - random unfinished scripts
     lib/                       - "libraries" of external functions
-      os.zig                   - externals for OS access
+      os.zig                   - OS access
+      floats.zig               - 32 bit floats
     system/                    - virtual PC
     utils/                     - zig utils
     bytecodes.zig              - bytecode behaviors and the code-field lookup table

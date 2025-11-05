@@ -105,6 +105,7 @@ pub fn main() !void {
             defer sys.deinit();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
+            try @import("lib/floats.zig").registerExternals(&k);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);

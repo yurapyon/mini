@@ -16,7 +16,6 @@
 : <>    = 0= ;             \ ( a b -- t/f )
 : 2swap >r flip r> flip ;  \ ( a b c d -- c d a b )
 : 3drop drop 2drop ;       \ ( a b c -- )
-: split over + tuck swap ; \ ( a n -- a+n a+n a )
 
 : space bl emit ; \ ( -- )
 : cr    10 emit ; \ ( -- )
@@ -41,7 +40,7 @@ compiler definitions
 : |:       set-loop ;             \ ( -- )
 : loop     ['] jump , loop* @ , ; \ ( -- )
 forth definitions
-: :        : set-loop ;         \ ( -- )
+: :        : set-loop ;           \ ( -- )
 
 : (later), here 0 , ;      \ ( -- a )
 : (lit),   lit, (later), ; \ ( -- a )
@@ -107,7 +106,7 @@ forth definitions
 : vocabulary ( "name" -- ) create 0 , does> context ! ;
 
 0 constant s[
-: ]s     ( n "name" -- ) constant ;
+: ]s     ( n "name" -- )     constant ;
 : +field ( a n "name" -- a ) over create , + does> @ + ;
 : field  ( a n "name" -- a ) swap aligned swap +field ;
 
@@ -195,22 +194,19 @@ forth definitions
 
 : printable ( n -- t/f) 32 126 in[,] ;
 : print     ( n -- )    dup printable 0= if drop '.' then emit ;
-: byte.     ( n -- )    <# h# h# #> type ;
-: short.    ( n -- )    <# h# h# h# h# #> type ;
-: print.    ( a a -- )  u>?|: c@+ print loop then 2drop ;
+: .byte     ( n -- )    <# h# h# #> type ;
+: .short    ( n -- )    <# h# h# h# h# #> type ;
+: .print    ( a a -- )  u>?|: c@+ print loop then 2drop ;
 
-: cells.    ( a a -- ) swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
+: .cells    ( a a -- ) swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
 
 : sdata ( -- a n ) s* @ s0 over - ;
 : depth ( -- n )   sdata nip cell / ;
-: .s    ( -- )     depth ." <" u. ." > " sdata range cells. ;
+: .s    ( -- )     depth ." <" u. ." > " sdata range .cells ;
 
-\ todo could move r* and r0 into the system image
-: r*     s* cell + ;
-: r0     $fffe ;
 : rdata  ( -- a n ) r* @ r0 over - cell /string ;
 : rdepth ( -- n )   rdata nip cell / 1- ;
-: .r     ( -- )     rdepth ." (" u. ." ) " rdata range cells. ;
+: .r     ( -- )     rdepth ." (" u. ." ) " rdata range .cells ;
 
 : spaces ( n -- ) 0 u>?|: space 1+ loop then 2drop ;
 
@@ -225,16 +221,17 @@ forth definitions
     127 =     if s" del" else
     0 0
   endcond ;
-: ascii. ( n -- ) dup printable if emit else ctlcode type then ;
-: col.   ( n -- ) dup 3 u.r space dup byte. space ascii. 2 spaces ;
-: row.   ( n -- ) 128 range u>?|: dup col. 32 + loop then 2drop ;
-: ashy   ( -- )   32 0 u>?|: dup row. cr 1+ loop then 2drop ;
+: .ascii ( n -- ) dup printable if emit else ctlcode type then ;
+: .col   ( n -- ) dup 3 u.r space dup .byte space .ascii 2 spaces ;
+: .row   ( n -- ) 128 range u>?|: dup .col 32 + loop then 2drop ;
+: ashy   ( -- )   32 0 u>?|: dup .row cr 1+ loop then 2drop ;
 
-: bytes. ( a a -- ) u>?|: c@+ byte. space loop then 2drop ;
-: dump   ( a n -- ) range u>?|: 16 split dup short. space 2dup bytes. print. cr loop then 2drop ;
+: split  ( a n -- a+n a+n a ) over + tuck swap ;
+: .bytes ( a a -- ) u>?|: c@+ .byte space loop then 2drop ;
+: dump   ( a n -- ) range u>?|: 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
 
-: word. ( a -- ) name tuck type if space then ;
-: words ( -- )   context @ @ dup?|: dup word. @ loop then drop ;
+: .word ( a -- ) name tuck type if space then ;
+: words ( -- )   context @ @ dup?|: dup .word @ loop then drop ;
 
 \ ===
 
@@ -249,7 +246,7 @@ compiler definitions
 : [defined] [defined] ;
 forth definitions
 
-\ os externals ===
+\ os ===
 
 external sleep
 external sleeps
@@ -262,14 +259,42 @@ external time-utc
 : 24>12     12 mod dup 0= if drop 12 then ;
 : time      time-utc flip hour-adj + 24 mod flip ;
 : 00:#      # # drop ':' hold ;
-: time24.   <# 00:# 00:# # # #> type ;
-: time12hm. drop <# 00:# 24>12 # # #> type ;
+: .time24   <# 00:# 00:# # # #> type ;
+: .time12hm drop <# 00:# 24>12 # # #> type ;
 
 external shell
 : $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
 
 external accept-file
 : include source-rest 1/string source-len @ >in ! accept-file ;
+
+\ floats ===
+
+external f+
+external f-
+external f*
+external f/
+external f>str
+external str>f
+
+: fswap 2swap ;
+: fdrop 2drop ;
+: fdup  2dup ;
+
+create fbuf 128 allot
+: f. fbuf 128 f>str fbuf swap type ;
+
+: F word str>f drop ;
+compiler definitions
+: F word str>f drop swap lit, , lit, , ;
+forth definitions
+
+: f, swap , , ;
+: f@ @+ swap @ ;
+: fconstant create f, does> f@ ;
+
+\ todo this is messy
+: u>f <# #s #> str>f drop ;
 
 \ blocks ===
 
