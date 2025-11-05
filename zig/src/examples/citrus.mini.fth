@@ -18,7 +18,7 @@
 
 \ ===
 
-: batt.
+: .batt
   s" capacity" bprop u.
   s" status" bprop cond
     dup 'D' = if drop ."  " else
@@ -30,9 +30,9 @@
 
 0 value anim-at
 
-: anim. anim-at 4 d" *(oo (oo (oo" [] type
+: .anim anim-at 4 d" *(oo (oo (oo" [] type
   anim-at 1+ 3 mod to anim-at ;
 
-: bar time time12hm. space batt. space anim. cr ;
+: bar time .time12hm space .batt space .anim cr ;
 : main bar 1 sleeps loop ;
 

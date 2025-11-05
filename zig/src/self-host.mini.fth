@@ -269,6 +269,8 @@ state        tconstant state
 base         tconstant base
 s*           tconstant s*
 s0           tconstant s0
+r*           tconstant r*
+r0           tconstant r0
 wnf          tconstant wnf
 
 t: 2dup  over over t;
