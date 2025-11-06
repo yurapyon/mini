@@ -81,7 +81,9 @@ false variable m0-held
 
 make on-key 1 = if 'X' = if c.toggle then then ;
 
-make on-mouse-move mx @ mx-last ! my @ my-last ! my ! mx !
+make on-mouse-move ( mx my -- ) [ 2 tags, ]
+  @0 @1
+  mx @ mx-last ! my @ my-last ! my ! mx !
   m0-held @ if drawline
   then ;
 

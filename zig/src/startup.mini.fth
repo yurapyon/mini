@@ -301,6 +301,8 @@ forth definitions
 create tstack 8 cells allot
 here constant t0
 
+\ todo
+\ for the best space usage/performance, could turn 'tags' into an external or builtin
 : tags  ( ... n -- )    cells >r s* @ t0 r@ - r@ move r> s* +! ;
 : tag   ( n "name" -- ) create 1+ cells t0 swap - , does> @ @ ;
 : tags, ( n -- )        cells >r

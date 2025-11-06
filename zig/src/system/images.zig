@@ -6,6 +6,8 @@ const Cell = kernel.Cell;
 
 const Handles = @import("../utils/handles.zig").Handles;
 
+const loadImageFromFilepath = @import("utils/load-image.zig").loadImageFromFilepath;
+
 // ===
 
 pub const Image = struct {
@@ -24,6 +26,9 @@ pub const Images = struct {
 
         const id = self.createImage(100, 100) catch unreachable;
         self.freeImage(id) catch unreachable;
+
+        const x = loadImageFromFilepath(allocator, "") catch unreachable;
+        _ = x;
     }
 
     pub fn deinit(self: *@This()) void {
