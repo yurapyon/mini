@@ -1,4 +1,6 @@
-: region create >r >r >r , r> , r> , r> , ;
+: region 4 tags create @0 , @1 , @2 , @3 , ;
+
+\ : region create >r >r >r , r> , r> , r> , ;
 : region>stack @+ swap @+ swap @+ swap @ ;
 
 0 variable o.x
@@ -8,7 +10,8 @@
 : o.reg>stk @+ o.x @ + swap @+ o.y @ + swap @+ o.x @ + swap @ o.y @ + ;
 
 ( x y x0 y0 x1 y1 -- t/f )
-: inside? >r swap >r rot >r in[,) r> r> r> in[,) and ;
+: inside? [ 4 tags, ] @1 @3 in[,) swap @0 @2 in[,) and ;
+\ : inside? >r swap >r rot >r in[,) r> r> r> in[,) and ;
 
 0 variable c.0
 1 variable c.1
@@ -87,6 +90,9 @@ make on-mouse-down drop dup $7 and 0= if $10 and dup m0-held !
   if mx @ my @ c.click then
   drawline
   else drop then ;
+
+make on-char
+  nip emit ;
 
 make frame c.draw ;
 

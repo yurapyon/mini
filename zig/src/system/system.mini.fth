@@ -12,14 +12,22 @@ external pbrush@
 external pbrush
 external pbrushline
 
+doer on-key
 doer on-mouse-move
 doer on-mouse-down
-doer on-key
-doer frame
-
-: main frame draw/poll close? 0= if loop then deinit ;
+doer on-char
 
 ' on-key        0 setxt
 ' on-mouse-move 1 setxt
 ' on-mouse-down 2 setxt
+' on-char       3 setxt
+
+make on-key        2drop ;
+make on-mouse-move 2drop ;
+make on-mouse-down 2drop ;
+make on-char       2drop ;
+
+doer frame
+
+: main frame draw/poll close? 0= if loop then deinit ;
 

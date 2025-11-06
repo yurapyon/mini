@@ -296,6 +296,19 @@ forth definitions
 \ todo this is messy
 : u>f <# #s #> str>f drop ;
 
+\ tags ===
+
+create tstack 8 cells allot
+here constant t0
+
+: tags  ( ... n -- )    cells >r s* @ t0 r@ - r@ move r> s* +! ;
+: tag   ( n "name" -- ) create 1+ cells t0 swap - , does> @ @ ;
+: tags, ( n -- )        cells >r
+                        ['] s* , ['] @ , lit, t0 r@ - , lit, r@ , ['] move ,
+                        lit, r> , ['] s* , ['] +! , ;
+0 tag @0 1 tag @1 2 tag @2 3 tag @3
+4 tag @4 5 tag @5 6 tag @6 7 tag @7
+
 \ blocks ===
 
 : fill  ( a n n -- ) >r range u>?|: r@ swap c!+ loop then r> 3drop ;
