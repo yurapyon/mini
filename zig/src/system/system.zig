@@ -293,9 +293,7 @@ pub const System = struct {
         try self.registerExternals(k);
 
         std.debug.print("pyon vPC\n", .{});
-        try k.setAcceptBuffer(system_file);
-        k.initForth();
-        try k.execute();
+        try k.evaluate(system_file);
     }
 
     pub fn deinit(self: *@This()) void {
