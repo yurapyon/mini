@@ -6,6 +6,8 @@ const Cell = kernel.Cell;
 
 const Handles = @import("../utils/handles.zig").Handles;
 
+const loadImageFromFilepath = @import("utils/load-image.zig").loadImageFromFilepath;
+
 // ===
 
 pub const Image = struct {
@@ -38,6 +40,24 @@ pub const Images = struct {
         newImage.width = width;
         newImage.height = height;
         newImage.data = try self.allocator.alloc(u8, width * height);
+
+        const id = try self.handles.getHandleForPtr(newImage);
+
+        return id;
+    }
+
+    pub fn createImageFromFile(self: *@This(), filepath: []const u8) !Cell {
+        const img = try loadImageFromFilepath(self.allocator, filepath);
+
+        const newImage = try self.allocator.create(Image);
+
+        newImage.width = @intCast(img.width);
+        newImage.height = @intCast(img.height);
+        newImage.data = img.data;
+
+        // TODO check if this needs to be flipped
+        // TODO need to convert palette
+        // reallocate
 
         const id = try self.handles.getHandleForPtr(newImage);
 

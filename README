@@ -23,7 +23,7 @@ features:
       OS access
       32-bit floats
   virtual PC:
-    based off of the Japanese PC-98 computer
+    based off of the PC-98 computer
     pixel buffer
     character buffer
     mouse/keyboard callbacks

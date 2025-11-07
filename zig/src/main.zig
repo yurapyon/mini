@@ -88,6 +88,7 @@ pub fn main() !void {
             writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
             try @import("lib/os.zig").registerExternals(&k);
+            try @import("lib/floats.zig").registerExternals(&k);
 
             var sys: System = undefined;
 
@@ -97,12 +98,18 @@ pub fn main() !void {
             k.debug_accept_buffer = false;
 
             std.debug.print(">> startup\n", .{});
-            try k.setAcceptBuffer(startup_file);
-            k.initForth();
-            try k.execute();
+            try k.evaluate(startup_file);
 
             try sys.init(&k);
             defer sys.deinit();
+
+            for (cli_options.filepaths.items) |fp| {
+                const file = try readFile(allocator, fp);
+                defer allocator.free(file);
+
+                std.debug.print(">> {s}\n", .{fp});
+                try k.evaluate(file);
+            }
         } else {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);
@@ -113,18 +120,14 @@ pub fn main() !void {
             k.debug_accept_buffer = false;
 
             std.debug.print(">> startup\n", .{});
-            try k.setAcceptBuffer(startup_file);
-            k.initForth();
-            try k.execute();
+            try k.evaluate(startup_file);
 
             for (cli_options.filepaths.items) |fp| {
                 const file = try readFile(allocator, fp);
                 defer allocator.free(file);
-                std.debug.print(">> {s}\n", .{fp});
 
-                try k.setAcceptBuffer(file);
-                k.initForth();
-                try k.execute();
+                std.debug.print(">> {s}\n", .{fp});
+                try k.evaluate(file);
             }
 
             const should_start_repl =

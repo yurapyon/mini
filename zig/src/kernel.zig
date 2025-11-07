@@ -304,4 +304,12 @@ pub const Kernel = struct {
     pub fn clearEmitClosure(self: *@This()) void {
         self.emit_closure = null;
     }
+
+    // ===
+
+    pub fn evaluate(self: *@This(), str: []const u8) !void {
+        try self.setAcceptBuffer(str);
+        self.initForth();
+        try self.execute();
+    }
 };
