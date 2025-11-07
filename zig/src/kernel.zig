@@ -222,6 +222,9 @@ pub const Kernel = struct {
     pub fn callXt(self: *@This(), xt: Cell) !void {
         self.return_stack.pushCell(self.program_counter.fetch());
         self.setCfaToExecute(xt);
+        // TODO NOTE
+        // If this aborts,
+        //   rstack will be cleared and the next line will crash
         try self.execute();
         self.program_counter.store(self.return_stack.popCell());
     }

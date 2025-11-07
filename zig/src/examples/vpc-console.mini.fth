@@ -21,22 +21,27 @@ create lbuf 128 allot
 
 : line lbuf lat @ ;
 
-: putline
-  line type cr
+: clearline 0 lat @ 2 * range u>?|: dup 0 putc 1+ loop then 2drop ;
+
+: putline line type cr
   0 lat @ range u>?|: dup 2 * over lbuf + c@ putc 1+ loop then 2drop ;
 
+: bksp   lat @ if clearline -1 lat +! putline then ;
 : record line + c! 1 lat +! putline ;
-
-\ todo
-\ if evaluate aborts the system crashes for some reason
-: run    ." run:" line type cr line evaluate 0 lat ! ;
+: run    ." running: " line type cr line evaluate clearline 0 lat ! ;
 
 : pressed? 1 = ;
 
 257 constant %enter
+259 constant %bksp
+
+\ todo should clear return stack somehow
+: abort s0 s* ! 0 source-ptr ! source-len @ >in ! ;
+:noname type '?' emit cr abort ; wnf !
 
 make on-key pressed? if cond
-    dup %enter = if run else
+    dup %enter = if drop run else
+    dup %bksp =  if drop bksp else
       drop
     endcond
   else
@@ -44,5 +49,8 @@ make on-key pressed? if cond
   then ;
 
 make on-char nip record ;
+
+make on-mouse-down
+  2drop ;
 
 main

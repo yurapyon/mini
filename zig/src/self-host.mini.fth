@@ -384,6 +384,7 @@ t: interpret word! ?dup if
   then t;
 
 \ todo this should stop accepting the current file too ?
+\ todo this should only kill the 'closest' interpreter ?
 t: quit 0 literal source-ptr ! source-len @ >in !
   'tcfa interpret literal rclear t;
 t: abort s0 s* ! quit t;

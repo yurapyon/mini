@@ -50,13 +50,6 @@ pub const Image = struct {
 
             self.data[i / 4] = palette;
         }
-
-        std.debug.print("img {} {} {} {}\n", .{
-            self.width,
-            self.height,
-            self.data.len,
-            img.data.len,
-        });
     }
 
     pub fn deinit(self: *@This(), allocator: Allocator) void {

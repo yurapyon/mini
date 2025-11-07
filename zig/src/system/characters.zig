@@ -92,7 +92,7 @@ pub const Characters = struct {
 
     fn initBuffers(self: *@This(), allocator: Allocator) !void {
         for (&self.characters) |*char| {
-            char.* = 64;
+            char.* = 0;
         }
 
         // try self.spritesheet.init(
