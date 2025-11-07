@@ -61,77 +61,92 @@ pub const Image = struct {
             0,
             0,
             0,
-            self.width,
-            self.height,
+            @intCast(self.width),
+            @intCast(self.height),
             c.GL_RED,
             c.GL_UNSIGNED_BYTE,
-            &self.data,
+            self.data.ptr,
         );
     }
 
     // ===
 
+    pub fn fill(self: *@This(), color: u8) void {
+        for (self.data) |*pixel| {
+            pixel.* = color;
+        }
+    }
+
     pub fn randomize(self: *@This(), palette_size: u8) void {
-        random.fillWithRandomBytes(&self.buffer);
-        for (&self.buffer) |*color| {
+        random.fillWithRandomBytes(self.data);
+        for (self.data) |*color| {
             color.* %= palette_size;
         }
     }
 
-    pub fn getXY(self: *@This(), x: usize, y: usize) u8 {
-        const at = x + y * self.width;
-        return self.buffer[at];
+    pub fn getXY(self: *const @This(), x: isize, y: isize) u8 {
+        if (x < 0 or y < 0 or x > self.width or y > self.height) {
+            return 0;
+        }
+
+        const ux: usize = @intCast(x);
+        const uy: usize = @intCast(y);
+
+        const at = ux + uy * self.width;
+        return self.data[at];
     }
 
     pub fn putXY(
         self: *@This(),
-        x: usize,
-        y: usize,
-        palette_idx: u8,
+        x: isize,
+        y: isize,
+        color: u8,
     ) void {
-        const at = x + y * self.width;
-        self.buffer[at] = palette_idx;
+        if (x < 0 or y < 0 or x > self.width or y > self.height) {
+            return;
+        }
+
+        const ux: usize = @intCast(x);
+        const uy: usize = @intCast(y);
+
+        const at = ux + uy * self.width;
+        self.data[at] = color;
     }
 
     pub fn putLine(
         self: *@This(),
-        x0: usize,
-        y0: usize,
-        x1: usize,
-        y1: usize,
-        palette_idx: u4,
+        x0: isize,
+        y0: isize,
+        x1: isize,
+        y1: isize,
+        color: u8,
     ) void {
         // Adapted from
         // https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
 
-        const sx0 = @as(isize, @intCast(x0));
-        const sy0 = @as(isize, @intCast(y0));
-        const sx1 = @as(isize, @intCast(x1));
-        const sy1 = @as(isize, @intCast(y1));
-
-        const dx = @as(isize, @intCast(@abs(sx1 - sx0)));
-        const sx: isize = if (sx0 < sx1) 1 else -1;
-        const dy = -@as(isize, @intCast(@abs(sy1 - sy0)));
-        const sy: isize = if (sy0 < sy1) 1 else -1;
+        const dx = @as(isize, @intCast(@abs(x1 - x0)));
+        const sx: isize = if (x0 < x1) 1 else -1;
+        const dy = -@as(isize, @intCast(@abs(y1 - y0)));
+        const sy: isize = if (y0 < y1) 1 else -1;
 
         var e = dx + dy;
-        var x = sx0;
-        var y = sy0;
+        var x = x0;
+        var y = y0;
 
         while (true) {
             self.putXY(
-                @intCast(x),
-                @intCast(y),
-                palette_idx,
+                x,
+                y,
+                color,
             );
             const e2 = 2 * e;
             if (e2 >= dy) {
-                if (x == sx1) break;
+                if (x == x1) break;
                 e += dy;
                 x += sx;
             }
             if (e2 <= dx) {
-                if (y == sy1) break;
+                if (y == y1) break;
                 e += dx;
                 y += sy;
             }
@@ -140,17 +155,17 @@ pub const Image = struct {
 
     pub fn putRect(
         self: *@This(),
-        x0: usize,
-        y0: usize,
-        x1: usize,
-        y1: usize,
-        palette_idx: u4,
+        x0: isize,
+        y0: isize,
+        x1: isize,
+        y1: isize,
+        palette_idx: u8,
     ) void {
         var x = x0;
         var y = y0;
         while (y < y1) : (y += 1) {
             while (x < x1) : (x += 1) {
-                self.buffer.putXY(x, y, palette_idx);
+                self.putXY(x, y, palette_idx);
             }
             x = x0;
         }
@@ -159,21 +174,22 @@ pub const Image = struct {
     pub fn blitXY(
         self: *@This(),
         other: Image,
-        // TODO allow negatives
-        x: usize,
-        y: usize,
+        transparent: u8,
+        x: isize,
+        y: isize,
     ) void {
-        var i: usize = 0;
-        var j: usize = 0;
+        var i: isize = 0;
+        var j: isize = 0;
         while (i < other.width) : (i += 1) {
             while (j < other.height) : (j += 1) {
                 const other_value = other.getXY(i, j);
-                // TODO check for overflow
-                self.putXY(
-                    x + i,
-                    y + j,
-                    other_value,
-                );
+                if (other_value != transparent) {
+                    self.putXY(
+                        x + i,
+                        y + j,
+                        other_value,
+                    );
+                }
             }
             j = 0;
         }
@@ -182,43 +198,39 @@ pub const Image = struct {
     pub fn blitLine(
         self: *@This(),
         other: Image,
-        // TODO allow negatives
-        x0: usize,
-        y0: usize,
-        x1: usize,
-        y1: usize,
+        transparent: u8,
+        x0: isize,
+        y0: isize,
+        x1: isize,
+        y1: isize,
     ) void {
         // Adapted from
         // https://en.wikipedia.org/wiki/Bresenham's_line_algorithm
 
-        const sx0 = @as(isize, @intCast(x0));
-        const sy0 = @as(isize, @intCast(y0));
-        const sx1 = @as(isize, @intCast(x1));
-        const sy1 = @as(isize, @intCast(y1));
-
-        const dx = @as(isize, @intCast(@abs(sx1 - sx0)));
-        const sx: isize = if (sx0 < sx1) 1 else -1;
-        const dy = -@as(isize, @intCast(@abs(sy1 - sy0)));
-        const sy: isize = if (sy0 < sy1) 1 else -1;
+        const dx = @as(isize, @intCast(@abs(x1 - x0)));
+        const sx: isize = if (x0 < x1) 1 else -1;
+        const dy = -@as(isize, @intCast(@abs(y1 - y0)));
+        const sy: isize = if (y0 < y1) 1 else -1;
 
         var e = dx + dy;
-        var x = sx0;
-        var y = sy0;
+        var x = x0;
+        var y = y0;
 
         while (true) {
             self.blitXY(
                 other,
-                @intCast(x),
-                @intCast(y),
+                transparent,
+                x,
+                y,
             );
             const e2 = 2 * e;
             if (e2 >= dy) {
-                if (x == sx1) break;
+                if (x == x1) break;
                 e += dy;
                 x += sx;
             }
             if (e2 <= dx) {
-                if (y == sy1) break;
+                if (y == y1) break;
                 e += dx;
                 y += sy;
             }

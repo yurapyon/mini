@@ -35,8 +35,8 @@ pub const Video = struct {
     characters: Characters,
     images: Images,
 
-    pub fn init(self: *@This(), allocator: Allocator) void {
-        self.pixels.init();
+    pub fn init(self: *@This(), allocator: Allocator) !void {
+        try self.pixels.init(allocator);
         self.characters.init();
         self.images.init(allocator);
     }
@@ -45,7 +45,7 @@ pub const Video = struct {
         // TODO
         self.images.deinit();
         // characters
-        // pixels
+        self.pixels.deinit();
     }
 
     pub fn update(self: *@This()) void {

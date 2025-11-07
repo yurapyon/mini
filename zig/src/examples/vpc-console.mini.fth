@@ -11,7 +11,7 @@ hex
 ff ff ff 1 ppalette!
 decimal
 
-0 0 640 400 0 prect
+\ 0 0 640 400 0 prect
 
 create lbuf 128 allot
 0 variable lat

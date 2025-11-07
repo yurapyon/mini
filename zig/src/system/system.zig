@@ -183,7 +183,6 @@ const exts = struct {
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putPixel(x, y, @truncate(idx));
     }
 
@@ -196,7 +195,6 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putLine(x0, y0, x1, y1, @truncate(idx));
     }
 
@@ -209,7 +207,6 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putRect(x0, y0, x1, y1, @truncate(idx));
     }
 
@@ -220,7 +217,6 @@ const exts = struct {
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putBrush(x, y, @truncate(idx));
     }
 
@@ -252,7 +248,6 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putBrushLine(x0, y0, x1, y1, @truncate(idx));
     }
 };
@@ -279,7 +274,7 @@ pub const System = struct {
         try self.initWindow();
 
         // TODO allow for different allocator than the kernels
-        self.video.init(k.allocator);
+        try self.video.init(k.allocator);
 
         self.xts.key = null;
         self.xts.mousemove = null;
