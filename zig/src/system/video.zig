@@ -32,18 +32,14 @@ pub const screen_height = 400;
 pub const Video = struct {
     pixels: Pixels,
     characters: Characters,
-    // images: Images,
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
         try self.pixels.init(allocator);
         try self.characters.init(allocator);
-        // self.images.init(allocator);
     }
 
     pub fn deinit(self: *@This()) void {
-        // TODO
-        // self.images.deinit();
-        // characters
+        self.characters.deinit();
         self.pixels.deinit();
     }
 

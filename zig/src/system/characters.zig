@@ -106,8 +106,6 @@ pub const Characters = struct {
             "src/system/content/font.png",
         );
 
-        // std.debug.print("{any}\n", .{self.spritesheet.data});
-
         self.texture = cgfx.texture.createEmpty(
             @intCast(self.spritesheet.width),
             @intCast(self.spritesheet.height),
