@@ -23,6 +23,6 @@ x 32bit math
       catch stack over/underflow
 *   stack traces
       could have a debug mode cli option
-- automatic tailcall optimization
+*   some type of exceptions ?
 - search-order
 - locals
