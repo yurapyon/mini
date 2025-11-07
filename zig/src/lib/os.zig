@@ -119,6 +119,22 @@ fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.data_stack.pushCell(@truncate(str.len));
 }
 
+fn zeroEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    k.debug.exec_counter = 0;
+}
+
+fn fetchEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    k.data_stack.pushCell(k.debug.exec_counter);
+}
+
+fn enableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    k.debug.enable_tco = true;
+}
+
+fn disableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    k.debug.enable_tco = false;
+}
+
 pub fn registerExternals(k: *Kernel) !void {
     try k.addExternal("sleep", .{
         .callback = sleep,
@@ -146,6 +162,22 @@ pub fn registerExternals(k: *Kernel) !void {
     });
     try k.addExternal("cwd", .{
         .callback = cwd,
+        .userdata = null,
+    });
+    try k.addExternal("_0ec!", .{
+        .callback = zeroEC,
+        .userdata = null,
+    });
+    try k.addExternal("_ec@", .{
+        .callback = fetchEC,
+        .userdata = null,
+    });
+    try k.addExternal("_tco", .{
+        .callback = enableTCO,
+        .userdata = null,
+    });
+    try k.addExternal("_no-tco", .{
+        .callback = disableTCO,
         .userdata = null,
     });
 }

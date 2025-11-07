@@ -1,17 +1,77 @@
-: thingy  tailcall .r ;
+: t .r noop ;
+: tt t noop ;
+: ttt tt noop ;
 
-: thingy2 tailcall thingy ;
+.r cr
+t cr
+tt cr
+ttt cr
 
-: thingy3 tailcall thingy2 ;
+: x s" t cr tt cr ttt cr" evaluate ;
 
-.r
-cr
+s" x" evaluate
+
+doer asdf
+
+: thingy
+  |:
+    make asdf ." hello\n"
+    make asdf ." world\n"
+  loop ;
 
 thingy
+asdf
+asdf
+asdf
+asdf
+asdf
+asdf
+
+external _tco
+external _no-tco
+external _0ec!
+external _ec@
+
+: a .r ;
+: aa a ;
+: aaa aa ;
+
+_tco
+_0ec! aaa _ec@
 cr
-thingy2
+." tco: " . cr
+
+_no-tco
+_0ec! aaa _ec@
 cr
-thingy3
+." no tco: " . cr
+
+_tco
+_0ec!
+: qwer .s cr ;
+_ec@
 cr
-thingy
+." tco: " . cr
+
+_no-tco
+_0ec!
+: qwer .s cr ;
+_ec@
 cr
+." no tco: " . cr
+
+_tco
+_0ec! 0 128 dump _ec@
+." tco: " . cr
+
+_no-tco
+_0ec! 0 128 dump _ec@
+." no tco: " . cr
+
+\ : b .r noop ;
+\ : bb b noop ;
+\ : bbb bb noop ;
+
+\ _0ec! bbb _ec@
+\ cr
+\ ." b: " . cr

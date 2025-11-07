@@ -50,11 +50,14 @@ pub fn getBytecode(token: Cell) ?BytecodeFn {
     }
 }
 
-// TODO
-// you might be able to put automatic TCO here
-// if k.pc.fetch().* === exit, then you don't need to push it to the return stack (?)
+pub fn getExitCode() Cell {
+    // NOTE
+    // This has to be updated if 'exit' moves in the bytecode list
+    return 0;
+}
+
 pub fn docol(k: *Kernel) Error!void {
-    k.return_stack.pushCell(k.program_counter.fetch());
+    try k.pushReturnAddr();
     k.program_counter.store(k.current_token_addr.fetch() + @sizeOf(Cell));
 }
 
@@ -69,7 +72,7 @@ pub fn docre(k: *Kernel) Error!void {
     const body_addr = does_addr + @sizeOf(Cell);
     const does = mem.readCell(k.memory, does_addr) catch unreachable;
     k.data_stack.pushCell(body_addr);
-    k.return_stack.pushCell(k.program_counter.fetch());
+    try k.pushReturnAddr();
     k.setCfaToExecute(does);
 }
 
@@ -79,7 +82,7 @@ pub fn exit(k: *Kernel) Error!void {
 
 pub fn execute(k: *Kernel) Error!void {
     const cfa_addr = k.data_stack.popCell();
-    k.return_stack.pushCell(k.program_counter.fetch());
+    try k.pushReturnAddr();
     k.setCfaToExecute(cfa_addr);
 }
 

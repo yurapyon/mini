@@ -298,6 +298,8 @@ forth definitions
 
 \ tags ===
 
+\ todo fixme note
+\ this only works on the top level
 create tstack 8 cells allot
 here constant t0
 
@@ -326,32 +328,7 @@ here constant t0
 
 \ evaluate ===
 
-\ 3 cells constant saved-source
+: src@ source-ptr @ source-len @ >in @ ;
+: src! >in ! source-len ! source-ptr ! ;
 
-\    cell layout saved*
-\ 8 saved-source *
-        \ layout saved-stack
-
-\ saved-stack saved* t!
-
-\ saved*       tconstant saved*
-
-\ t: ss>ptr t;
-\ t: ss>len cell + t;
-\ t: ss>>in 2 literal cells + t;
-
-\ t: save-source
-  \ source-ptr @ saved* @ ss>ptr !
-  \ source-len @ saved* @ ss>len !
-  \ >in @        saved* @ ss>>in !
-  \ saved-source literal saved* +! t;
-
-\ t: restore-source
-  \ saved-source literal negate saved* +!
-  \ saved* @ ss>ptr @ source-ptr !
-  \ saved* @ ss>len @ source-len !
-  \ saved* @ ss>>in @ >in ! t;
-
-\ t: set-source source-len ! source-ptr ! 0 literal >in ! t;
-
-\ t: evaluate save-source set-source interpret restore-source t;
+: evaluate src@ >r >r >r 0 src! interpret r> r> r> src! ;

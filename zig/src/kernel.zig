@@ -117,6 +117,11 @@ pub const Kernel = struct {
         RAMLayout.offsetOf("return_stack"),
     ),
 
+    debug: struct {
+        enable_tco: bool,
+        exec_counter: Cell,
+    },
+
     pub fn init(
         self: *@This(),
         allocator: Allocator,
@@ -136,6 +141,9 @@ pub const Kernel = struct {
 
         self.debug_accept_buffer = true;
         self.accept_buffer = null;
+
+        self.debug.enable_tco = true;
+        self.debug.exec_counter = 0;
     }
 
     pub fn deinit(self: *@This()) void {
@@ -179,6 +187,8 @@ pub const Kernel = struct {
         //     directly without having to do any math
 
         while (self.program_counter.fetch() != 0) {
+            self.debug.exec_counter +%= 1;
+
             const token_addr = try mem.readCell(
                 self.memory,
                 self.program_counter.fetch(),
@@ -214,6 +224,24 @@ pub const Kernel = struct {
         self.setCfaToExecute(xt);
         try self.execute();
         self.program_counter.store(self.return_stack.popCell());
+    }
+
+    pub fn pushReturnAddr(self: *@This()) !void {
+        // TODO this seems to work but theres a chance it doesnt
+
+        // NOTE
+        //   if k.pc.fetch().* === exit, then you don't need to push pc to the return stack
+        // but you need to make sure that:
+        //   everywhere raw data is compiled into a definition, its preceded by a builtin
+        //   (something when dereferenced isn't docol)
+
+        const pc = self.program_counter.fetch();
+        const token_at_pc = try mem.readCell(self.memory, pc);
+        const deref = try mem.readCell(self.memory, token_at_pc);
+        const exit_code = bytecodes.getExitCode();
+        if (!(self.debug.enable_tco and deref == exit_code)) {
+            self.return_stack.pushCell(pc);
+        }
     }
 
     // ===

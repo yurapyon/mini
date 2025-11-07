@@ -15,6 +15,7 @@ features:
       parser and interpreter written in forth
       boots from a system image
         included system image is pretty small, around 2.5kb
+    automatic tailcall optimization
   language features:
     covers most of the ANSI Forth 'Core' word set
     vocabularies
