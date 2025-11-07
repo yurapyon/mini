@@ -29,5 +29,7 @@ make on-char       2drop ;
 
 doer frame
 
+: close? close? stay @ 0= or ;
+
 : main frame draw/poll close? 0= if loop then deinit ;
 

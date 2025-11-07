@@ -32,41 +32,41 @@ external _no-tco
 external _0ec!
 external _ec@
 
+: tco[    _tco _0ec! ;
+: no-tco[ _no-tco _0ec! ;
+: ]tco    _ec@ 288 - ." tco: " . cr ;
+: ]no-tco _ec@ 296 - ." no tco: " . cr ;
+
+tco[ ]tco
+no-tco[ ]no-tco
+
 : a .r ;
 : aa a ;
 : aaa aa ;
+: aaaa aaa ;
+: aaaaa aaaa ;
+: aaaaaa aaaaa ;
 
-_tco
-_0ec! aaa _ec@
-cr
-." tco: " . cr
+tco[ aaaaaa ]tco
+no-tco[ aaaaaa ]no-tco
 
-_no-tco
-_0ec! aaa _ec@
-cr
-." no tco: " . cr
+vocabulary voc0
+voc0 definitions
+tco[ : qwer .s cr ; ]tco
 
-_tco
-_0ec!
-: qwer .s cr ;
-_ec@
-cr
-." tco: " . cr
+vocabulary voc1
+voc1 definitions
+no-tco[ : qwer .s cr ; ]no-tco
 
-_no-tco
-_0ec!
-: qwer .s cr ;
-_ec@
-cr
-." no tco: " . cr
+' noop
+tco[ execute ]tco
+' noop
+no-tco[ execute ]no-tco
 
-_tco
-_0ec! 0 128 dump _ec@
-." tco: " . cr
-
-_no-tco
-_0ec! 0 128 dump _ec@
-." no tco: " . cr
+0 64 ' dump
+tco[ execute ]tco
+0 64 ' dump
+no-tco[ execute ]no-tco
 
 \ : b .r noop ;
 \ : bb b noop ;
