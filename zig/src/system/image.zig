@@ -28,7 +28,11 @@ pub const Image = struct {
         const img = try loadImageFromFilepath(allocator, filepath);
         defer allocator.free(img.data);
 
-        self.init(allocator, @intCast(img.width), @intCast(img.height));
+        try self.init(
+            allocator,
+            @intCast(img.width),
+            @intCast(img.height),
+        );
 
         var i: usize = 0;
         while (i < img.data.len) : (i += 4) {
@@ -42,10 +46,17 @@ pub const Image = struct {
             _ = b;
 
             // TODO better mapping
-            const palette = if (a > 0) 1 else 0;
+            const palette: u8 = if (a > 0) 1 else 0;
 
             self.data[i / 4] = palette;
         }
+
+        std.debug.print("img {} {} {} {}\n", .{
+            self.width,
+            self.height,
+            self.data.len,
+            img.data.len,
+        });
     }
 
     pub fn deinit(self: *@This(), allocator: Allocator) void {
@@ -84,7 +95,7 @@ pub const Image = struct {
         }
     }
 
-    pub fn getXY(self: *const @This(), x: isize, y: isize) u8 {
+    pub fn getXY(self: @This(), x: isize, y: isize) u8 {
         if (x < 0 or y < 0 or x > self.width or y > self.height) {
             return 0;
         }

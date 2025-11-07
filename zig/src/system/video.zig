@@ -37,7 +37,7 @@ pub const Video = struct {
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
         try self.pixels.init(allocator);
-        self.characters.init();
+        try self.characters.init(allocator);
         self.images.init(allocator);
     }
 
@@ -56,7 +56,7 @@ pub const Video = struct {
     pub fn draw(self: *@This()) void {
         c.glClear(c.GL_COLOR_BUFFER_BIT);
         self.pixels.draw();
-        // self.characters.draw();
+        self.characters.draw();
     }
 
     pub fn copyImageToScreen(

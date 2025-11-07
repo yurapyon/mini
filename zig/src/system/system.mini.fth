@@ -11,6 +11,8 @@ external pbrush!
 external pbrush@
 external pbrush
 external pbrushline
+external chars!
+external chars@
 
 doer on-key
 doer on-mouse-move
