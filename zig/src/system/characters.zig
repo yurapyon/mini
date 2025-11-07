@@ -1,3 +1,6 @@
+const std = @import("std");
+const Allocator = std.mem.Allocator;
+
 const c = @import("c.zig").c;
 const cgfx = @import("c.zig").gfx;
 
@@ -11,8 +14,7 @@ const math = @import("math.zig");
 const random = @import("../utils/random.zig");
 
 const Palette = @import("palette.zig").Palette;
-
-const PixelBuffer = @import("pixel_buffer.zig").PixelBuffer;
+const Image = @import("image.zig").Image;
 
 // ===
 
@@ -45,10 +47,9 @@ pub const Characters = struct {
     };
 
     palette: Palette(8),
-    spritesheet: PixelBuffer(
-        16 * character_width,
-        16 * character_height,
-    ),
+    spritesheet: Image,
+    // TODO rename
+    texture: c.GLuint,
     characters: [buffer_width * buffer_height * 2]u32,
 
     screen: math.m3.Mat3,
@@ -63,13 +64,10 @@ pub const Characters = struct {
         screen: c.GLint,
     },
 
-    pub fn init(self: *@This()) void {
+    pub fn init(self: *@This(), allocator: Allocator) !void {
         self.palette.init();
 
-        self.initBuffers();
-        self.spritesheet.init();
-        self.spritesheet.randomize(2);
-        self.spritesheet.pushToTexture();
+        try self.initBuffers(allocator);
 
         math.m3.orthoScreen(
             &self.screen,
@@ -92,10 +90,28 @@ pub const Characters = struct {
         self.palette.updateProgramUniforms(self.locations.palette);
     }
 
-    fn initBuffers(self: *@This()) void {
+    fn initBuffers(self: *@This(), allocator: Allocator) !void {
         for (&self.characters) |*char| {
-            char.* = 0;
+            char.* = 64;
         }
+
+        // try self.spritesheet.init(
+        // allocator,
+        // 16 * character_width,
+        // 16 * character_height,
+        // );
+
+        try self.spritesheet.initFromFile(
+            allocator,
+            "src/system/content/font.png",
+        );
+
+        self.texture = cgfx.texture.createEmpty(
+            @intCast(self.spritesheet.width),
+            @intCast(self.spritesheet.height),
+        );
+
+        self.spritesheet.pushToTexture(self.texture);
     }
 
     fn initProgram(self: *@This()) void {
@@ -204,6 +220,11 @@ pub const Characters = struct {
         c.glBindVertexArray(0);
     }
 
+    pub fn deinit(self: *@This()) void {
+        // TODO
+        _ = self;
+    }
+
     fn updateInstanceBuffer(self: *@This()) void {
         c.glBindBuffer(c.GL_ARRAY_BUFFER, self.instance_vbo);
         c.glBufferSubData(
@@ -223,7 +244,7 @@ pub const Characters = struct {
             &self.screen,
         );
 
-        c.glBindTexture(c.GL_TEXTURE_2D, self.spritesheet.texture);
+        c.glBindTexture(c.GL_TEXTURE_2D, self.texture);
         c.glActiveTexture(c.GL_TEXTURE0);
 
         c.glBindVertexArray(self.vao);
@@ -242,7 +263,7 @@ pub const Characters = struct {
     pub fn store(self: *@This(), addr: Cell, value: u8) void {
         const break0 = @TypeOf(self.palette).item_ct;
         const break1 = break0 + 16 * 16 * 10;
-        const break2 = break1 + buffer_width * buffer_height;
+        const break2 = break1 + buffer_width * buffer_height * 2;
         if (addr < break0) {
             self.palette.colors[addr] = value;
             c.glUseProgram(self.program);
@@ -252,10 +273,10 @@ pub const Characters = struct {
             var temp = value;
             var i: usize = 0;
             while (i < 8) : (i += 1) {
-                self.spritesheet.buffer[start_addr + 7 - i] = temp & 1;
+                self.spritesheet.data[start_addr + 7 - i] = temp & 1;
                 temp >>= 1;
             }
-            self.spritesheet.pushToTexture();
+            self.spritesheet.pushToTexture(self.texture);
         } else if (addr < break2) {
             self.characters[addr - break1] = value;
         }
@@ -264,7 +285,7 @@ pub const Characters = struct {
     pub fn fetch(self: @This(), addr: Cell) u8 {
         const break0 = @TypeOf(self.palette).item_ct;
         const break1 = break0 + 16 * 16 * 10;
-        const break2 = break1 + buffer_width * buffer_height;
+        const break2 = break1 + buffer_width * buffer_height * 2;
         if (addr < break0) {
             return self.palette.colors[addr];
         } else if (addr < break1) {
@@ -272,7 +293,7 @@ pub const Characters = struct {
             var value: u8 = 0;
             var i: usize = 0;
             while (i < 8) : (i += 1) {
-                const is_set = self.spritesheet.buffer[start_addr + i] > 0;
+                const is_set = self.spritesheet.data[start_addr + i] > 0;
                 value |= if (is_set) 1 else 0;
                 value <<= 1;
             }

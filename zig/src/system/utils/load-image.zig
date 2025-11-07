@@ -26,7 +26,7 @@ fn loadImageFromMemory(allocator: Allocator, buf: []u8) !LoadImageResult {
     ) orelse return error.CouldNotLoadImage;
     defer c.stbi_image_free(raw_data);
 
-    const out = try allocator.alloc(u8, @intCast(w * h));
+    const out = try allocator.alloc(u8, @intCast(w * h * 4));
     @memcpy(out, raw_data);
     return .{
         .data = out,

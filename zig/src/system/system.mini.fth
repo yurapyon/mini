@@ -11,6 +11,8 @@ external pbrush!
 external pbrush@
 external pbrush
 external pbrushline
+external chars!
+external chars@
 
 doer on-key
 doer on-mouse-move
@@ -28,6 +30,8 @@ make on-mouse-down 2drop ;
 make on-char       2drop ;
 
 doer frame
+
+: close? close? stay @ 0= or ;
 
 : main frame draw/poll close? 0= if loop then deinit ;
 

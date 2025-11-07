@@ -183,7 +183,6 @@ const exts = struct {
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putPixel(x, y, @truncate(idx));
     }
 
@@ -196,7 +195,6 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putLine(x0, y0, x1, y1, @truncate(idx));
     }
 
@@ -209,7 +207,6 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putRect(x0, y0, x1, y1, @truncate(idx));
     }
 
@@ -220,7 +217,6 @@ const exts = struct {
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putBrush(x, y, @truncate(idx));
     }
 
@@ -252,8 +248,26 @@ const exts = struct {
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        // TODO fit in screen w/h
         s.video.pixels.putBrushLine(x0, y0, x1, y1, @truncate(idx));
+    }
+
+    fn charsStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+        const value = k.data_stack.popCell();
+
+        s.video.characters.store(addr, @truncate(value));
+    }
+
+    fn charsFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const addr = k.data_stack.popCell();
+
+        const value = s.video.characters.fetch(addr);
+
+        k.data_stack.pushCell(value);
     }
 };
 
@@ -279,7 +293,7 @@ pub const System = struct {
         try self.initWindow();
 
         // TODO allow for different allocator than the kernels
-        self.video.init(k.allocator);
+        try self.video.init(k.allocator);
 
         self.xts.key = null;
         self.xts.mousemove = null;
@@ -397,6 +411,15 @@ pub const System = struct {
         });
         try k.addExternal("pbrushline", .{
             .callback = exts.brushLine,
+            .userdata = self,
+        });
+
+        try k.addExternal("chars!", .{
+            .callback = exts.charsStore,
+            .userdata = self,
+        });
+        try k.addExternal("chars@", .{
+            .callback = exts.charsFetch,
             .userdata = self,
         });
     }

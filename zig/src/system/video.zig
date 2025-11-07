@@ -8,7 +8,6 @@ const Cell = kernel.Cell;
 
 const Pixels = @import("pixels.zig").Pixels;
 const Characters = @import("characters.zig").Characters;
-const Images = @import("images.zig").Images;
 
 // ===
 
@@ -33,19 +32,15 @@ pub const screen_height = 400;
 pub const Video = struct {
     pixels: Pixels,
     characters: Characters,
-    images: Images,
 
-    pub fn init(self: *@This(), allocator: Allocator) void {
-        self.pixels.init();
-        self.characters.init();
-        self.images.init(allocator);
+    pub fn init(self: *@This(), allocator: Allocator) !void {
+        try self.pixels.init(allocator);
+        try self.characters.init(allocator);
     }
 
     pub fn deinit(self: *@This()) void {
-        // TODO
-        self.images.deinit();
-        // characters
-        // pixels
+        self.characters.deinit();
+        self.pixels.deinit();
     }
 
     pub fn update(self: *@This()) void {
@@ -56,26 +51,6 @@ pub const Video = struct {
     pub fn draw(self: *@This()) void {
         c.glClear(c.GL_COLOR_BUFFER_BIT);
         self.pixels.draw();
-        // self.characters.draw();
-    }
-
-    pub fn copyImageToScreen(
-        self: *@This(),
-        image_id: Cell,
-        ix: Cell,
-        iy: Cell,
-        sx: Cell,
-        sy: Cell,
-        w: Cell,
-        h: Cell,
-    ) void {
-        _ = self;
-        _ = image_id;
-        _ = ix;
-        _ = iy;
-        _ = sx;
-        _ = sy;
-        _ = w;
-        _ = h;
+        self.characters.draw();
     }
 };

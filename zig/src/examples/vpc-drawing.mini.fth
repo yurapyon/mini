@@ -1,3 +1,9 @@
+\ ===
+\
+\ WIP drawing app
+\
+\ ===
+
 : region 4 tags create @0 , @1 , @2 , @3 , ;
 
 \ : region create >r >r >r , r> , r> , r> , ;
@@ -65,7 +71,9 @@ decimal
 100 100 356 356 0 prect
 101 101 355 355 1 prect
 
-: setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then ;
+: setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then
+ 1 24 pbrush!
+;
 
 setupbrush
 
