@@ -103,7 +103,7 @@ decimal
 \ color selector ===
 
 0 variable c.pri
-0 variable c.sec
+1 variable c.sec
 
 : offhex
   16 /mod digit>char 1 0 rot offchar
