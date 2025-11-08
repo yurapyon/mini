@@ -1,6 +1,11 @@
 \ ===
 \
-\ WIP drawing app
+\ drawing app (WIP)
+\
+\ click on the palette on the left to select a primary color
+\ shift+click ..                   to select a secondary color
+\ press 'x' to switch primary and secondary colors
+\ press 'e' to open color editor
 \
 \ ===
 
