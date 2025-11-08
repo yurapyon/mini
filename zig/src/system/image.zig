@@ -16,11 +16,20 @@ pub const Image = struct {
     width: usize,
     height: usize,
     data: []u8,
+    use_mask: bool,
+    mask: struct {
+        // TODO should these be usize?
+        x0: isize,
+        y0: isize,
+        x1: isize,
+        y1: isize,
+    },
 
     pub fn init(self: *@This(), allocator: Allocator, width: usize, height: usize) !void {
         self.width = width;
         self.height = height;
         self.data = try allocator.alloc(u8, width * height);
+        self.use_mask = false;
     }
 
     pub fn initFromFile(self: *@This(), allocator: Allocator, filepath: []const u8) !void {
@@ -76,20 +85,45 @@ pub const Image = struct {
     // ===
 
     pub fn fill(self: *@This(), color: u8) void {
-        for (self.data) |*pixel| {
-            pixel.* = color;
+        for (0..self.width) |x| {
+            for (0..self.height) |y| {
+                self.putXY(
+                    @intCast(x),
+                    @intCast(y),
+                    color,
+                );
+            }
         }
     }
 
     pub fn randomize(self: *@This(), palette_size: u8) void {
-        random.fillWithRandomBytes(self.data);
-        for (self.data) |*color| {
-            color.* %= palette_size;
+        // TODO use global rng
+        var xo = std.Random.Xoshiro256.init(0xdeadbeef);
+        for (0..self.width) |x| {
+            for (0..self.height) |y| {
+                const color = xo.random().int(u8);
+                self.putXY(
+                    @intCast(x),
+                    @intCast(y),
+                    color % palette_size,
+                );
+            }
         }
     }
 
     pub fn getXY(self: @This(), x: isize, y: isize) u8 {
-        if (x < 0 or y < 0 or x > self.width or y > self.height) {
+        const within_mask =
+            !self.use_mask or
+            x >= self.mask.x0 and
+                y >= self.mask.y0 and
+                x < self.mask.x1 and
+                y < self.mask.y1;
+        const within_image =
+            x >= 0 and
+            y >= 0 and
+            x < self.width and
+            y < self.height;
+        if (!within_mask or !within_image) {
             return 0;
         }
 
@@ -106,7 +140,18 @@ pub const Image = struct {
         y: isize,
         color: u8,
     ) void {
-        if (x < 0 or y < 0 or x > self.width or y > self.height) {
+        const within_mask =
+            !self.use_mask or
+            x >= self.mask.x0 and
+                y >= self.mask.y0 and
+                x < self.mask.x1 and
+                y < self.mask.y1;
+        const within_image =
+            x >= 0 and
+            y >= 0 and
+            x < self.width and
+            y < self.height;
+        if (!within_mask or !within_image) {
             return;
         }
 

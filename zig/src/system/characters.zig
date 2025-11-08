@@ -260,16 +260,31 @@ pub const Characters = struct {
 
     // ===
 
-    pub fn store(self: *@This(), addr: Cell, value: u8) void {
-        const break0 = @TypeOf(self.palette).item_ct;
-        const break1 = break0 + 16 * 16 * 10;
-        const break2 = break1 + buffer_width * buffer_height * 2;
-        if (addr < break0) {
+    pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
+        if (addr < self.palette.colors.len) {
             self.palette.colors[addr] = value;
             c.glUseProgram(self.program);
             self.palette.updateProgramUniforms(self.locations.palette);
-        } else if (addr < break1) {
-            const start_addr = (addr - break0) * 8;
+        }
+    }
+
+    pub fn paletteFetch(self: *@This(), addr: Cell) u8 {
+        if (addr < self.palette.colors.len) {
+            return self.palette.colors[addr];
+        } else {
+            return 0;
+        }
+    }
+
+    pub fn getSpritesheet(self: *@This()) *Image {
+        return self.spritesheet;
+    }
+
+    pub fn store(self: *@This(), addr: Cell, value: u8) void {
+        const break1 = 16 * 16 * 10;
+        const break2 = break1 + buffer_width * buffer_height * 2;
+        if (addr < break1) {
+            const start_addr = addr * 8;
             var temp = value;
             var i: usize = 0;
             while (i < 8) : (i += 1) {
@@ -283,13 +298,10 @@ pub const Characters = struct {
     }
 
     pub fn fetch(self: @This(), addr: Cell) u8 {
-        const break0 = @TypeOf(self.palette).item_ct;
-        const break1 = break0 + 16 * 16 * 10;
+        const break1 = 16 * 16 * 10;
         const break2 = break1 + buffer_width * buffer_height * 2;
-        if (addr < break0) {
-            return self.palette.colors[addr];
-        } else if (addr < break1) {
-            const start_addr = (addr - break0) * 8;
+        if (addr < break1) {
+            const start_addr = addr * 8;
             var value: u8 = 0;
             var i: usize = 0;
             while (i < 8) : (i += 1) {

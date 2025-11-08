@@ -17,8 +17,6 @@ const Image = @import("image.zig").Image;
 
 // ===
 
-const brush_width = 7;
-
 pub const Pixels = struct {
     const shader_strings = struct {
         const vert = @embedFile("shaders/pixels_vert.glsl");
@@ -35,7 +33,6 @@ pub const Pixels = struct {
     palette: Palette(16),
     image: Image,
     texture: c.GLuint,
-    brush: Image,
 
     vao: c.GLuint,
     vbo: c.GLuint,
@@ -49,7 +46,6 @@ pub const Pixels = struct {
     pub fn init(self: *@This(), allocator: Allocator) !void {
         self.palette.init();
         try self.initBuffer(allocator);
-        try self.initBrush(allocator);
 
         self.vao = cgfx.vertex_array.create();
         self.initQuad();
@@ -141,11 +137,6 @@ pub const Pixels = struct {
         c.glBindVertexArray(0);
     }
 
-    pub fn initBrush(self: *@This(), allocator: Allocator) !void {
-        try self.brush.init(allocator, brush_width, brush_width);
-        self.brush.fill(16);
-    }
-
     pub fn deinit(self: *@This()) void {
         // TODO deinit
         _ = self;
@@ -165,7 +156,7 @@ pub const Pixels = struct {
 
     // ===
 
-    pub fn storePalette(self: *@This(), addr: Cell, value: u8) void {
+    pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < @TypeOf(self.palette).item_ct) {
             self.palette.colors[addr] = value;
             c.glUseProgram(self.program);
@@ -173,105 +164,12 @@ pub const Pixels = struct {
         }
     }
 
-    pub fn fetchPalette(self: @This(), addr: Cell) u8 {
+    pub fn paletteFetch(self: @This(), addr: Cell) u8 {
         if (addr < @TypeOf(self.palette).item_ct) {
             return self.palette.colors[addr];
         } else {
             return 0;
         }
-    }
-
-    pub fn storeBrush(self: *@This(), addr: Cell, value: u8) void {
-        if (addr < brush_width * brush_width) {
-            self.brush.data[addr] = value;
-        }
-    }
-
-    pub fn fetchBrush(self: @This(), addr: Cell) u8 {
-        if (addr < brush_width * brush_width) {
-            return self.brush.data[addr];
-        } else {
-            return 0;
-        }
-    }
-
-    pub fn putBrush(
-        self: *@This(),
-        x: Cell,
-        y: Cell,
-        // TODO
-        palette_idx: u8,
-    ) void {
-        _ = palette_idx;
-        self.image.blitXY(
-            self.brush,
-            16,
-            @as(isize, @intCast(x)) - brush_width / 2,
-            @as(isize, @intCast(y)) - brush_width / 2,
-        );
-    }
-
-    pub fn putPixel(
-        self: *@This(),
-        x: Cell,
-        y: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putXY(@intCast(x), @intCast(y), palette_idx);
-    }
-
-    pub fn putLine(
-        self: *@This(),
-        x0: Cell,
-        y0: Cell,
-        x1: Cell,
-        y1: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putLine(
-            @intCast(x0),
-            @intCast(y0),
-            @intCast(x1),
-            @intCast(y1),
-            palette_idx,
-        );
-    }
-
-    pub fn putRect(
-        self: *@This(),
-        x0: Cell,
-        y0: Cell,
-        x1: Cell,
-        y1: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putRect(
-            @intCast(x0),
-            @intCast(y0),
-            @intCast(x1),
-            @intCast(y1),
-            palette_idx,
-        );
-    }
-
-    pub fn putBrushLine(
-        self: *@This(),
-        x0: Cell,
-        y0: Cell,
-        x1: Cell,
-        y1: Cell,
-        // TODO
-        palette_idx: u8,
-    ) void {
-        _ = palette_idx;
-        self.image.blitLine(
-            self.brush,
-            16,
-            @as(isize, @intCast(x0)) - brush_width / 2,
-            @as(isize, @intCast(y0)) - brush_width / 2,
-            @as(isize, @intCast(x1)) - brush_width / 2,
-            @as(isize, @intCast(y1)) - brush_width / 2,
-        );
     }
 
     pub fn update(self: *@This()) void {
