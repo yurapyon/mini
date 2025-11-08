@@ -1,3 +1,14 @@
+
+: flipy [ 3 tags, ] @2 @1 @0 ;
+
+1 2 3 flipy .s cr
+
+
+
+
+
+bye
+
 create tstack 8 cells allot
 here constant t0
 

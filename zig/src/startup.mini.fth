@@ -177,26 +177,25 @@ forth definitions
 : digit>char ( n -- n ) dup 10 < if '0' else 'W' then + ;
 
 0 variable #start
-: #len pad #start @ - ;
-: <#   pad #start ! ;
-: #>   drop #start @ #len ;
-: hold -1 #start +! #start @ c! ;
-: #    base @ /mod digit>char hold ;
-: #s   dup 0= if # else |: # dup if loop then then ;
-: #pad dup #len > if over hold loop then 2drop ;
-: h#   16 /mod digit>char hold ;
+: #len ( -- n )     pad #start @ - ;
+: <#   ( -- )       pad #start ! ;
+: #>   ( n -- a n ) drop #start @ #len ;
+: hold ( n -- )     -1 #start +! #start @ c! ;
+: #    ( n -- n )   base @ /mod digit>char hold ;
+: #s   ( n -- n )   dup 0= if # else |: # dup if loop then then ;
+: #pad ( c n -- )   dup #len > if over hold loop then 2drop ;
+: h#   ( n -- n )   16 /mod digit>char hold ;
 
-: u.pad ( n -- ) rot <# #s flip #pad #> type ;
-: u.r   ( n -- ) bl u.pad ;
-: u.0   ( n -- ) '0' u.pad ;
-: u.    ( n -- ) <# #s #> type ;
-: .     ( n -- ) u. space ;
+: u.pad ( n n c -- ) rot <# #s flip #pad #> type ;
+: u.r   ( n n -- )   bl u.pad ;
+: u.0   ( n n -- )   '0' u.pad ;
+: u.    ( n -- )     <# #s #> type ;
+: .     ( n -- )     u. space ;
 
 : printable ( n -- t/f) 32 126 in[,] ;
 : print     ( n -- )    dup printable 0= if drop '.' then emit ;
 : .byte     ( n -- )    <# h# h# #> type ;
 : .short    ( n -- )    <# h# h# h# h# #> type ;
-: .print    ( a a -- )  u>?|: c@+ print loop then 2drop ;
 
 : .cells    ( a a -- ) swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
 
@@ -228,6 +227,7 @@ forth definitions
 
 : split  ( a n -- a+n a+n a ) over + tuck swap ;
 : .bytes ( a a -- ) u>?|: c@+ .byte space loop then 2drop ;
+: .print ( a a -- ) u>?|: c@+ print loop then 2drop ;
 : dump   ( a n -- ) range u>?|: 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
 
 : .word ( a -- ) name tuck type if space then ;
@@ -298,20 +298,19 @@ forth definitions
 
 \ tags ===
 
-\ todo fixme note
-\ this only works on the top level
-create tstack 8 cells allot
-here constant t0
-
 \ todo
-\ for the best space usage/performance, could turn 'tags' into an external or builtin
-: tags  ( ... n -- )    cells >r s* @ t0 r@ - r@ move r> s* +! ;
-: tag   ( n "name" -- ) create 1+ cells t0 swap - , does> @ @ ;
+\ for the better performance, could turn 's>mem' into an external or builtin
+: s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
+
+0 variable tags*
 : tags, ( n -- )        cells >r
-                        ['] s* , ['] @ , lit, t0 r@ - , lit, r@ , ['] move ,
-                        lit, r> , ['] s* , ['] +! , ;
+                        (lit), lit, r@ , ['] s>mem , ['] jump , (later),
+                        swap this! r> allot this! here tags* ! ;
+: tag   ( n "name" -- ) create cells , does> @ tags* @ swap - cell - lit, , ['] @ , ;
+compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
+forth definitions
 
 \ blocks ===
 

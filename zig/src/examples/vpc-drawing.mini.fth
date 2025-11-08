@@ -4,7 +4,7 @@
 \
 \ ===
 
-: region 4 tags create @0 , @1 , @2 , @3 , ;
+: region [ 4 tags, ] create @0 , @1 , @2 , @3 , ;
 
 \ : region create >r >r >r , r> , r> , r> , ;
 : region>stack @+ swap @+ swap @+ swap @ ;
@@ -34,10 +34,10 @@
 \ 26 1 49 24 region c.1.view
 
 : c.draw
-  c.view   region>stack 0     prect
-  c.0.view region>stack c.0 @ prect
+  c.view   region>stack 0     putrect
+  c.0.view region>stack c.0 @ putrect
   25 0 >o
-  c.0.view o.reg>stk    c.1 @ prect ;
+  c.0.view o.reg>stk    c.1 @ putrect ;
 
 : c.click
   2dup c.0.view region>stack inside? if 2drop c.0 c.adv else
@@ -45,31 +45,31 @@
   then then ;
 
 ( r g b idx -- )
-: ppalette! 3 * tuck 2 + pcolors! tuck 1 + pcolors! pcolors! ;
+: pal! 3 * tuck 2 + p! tuck 1 + p! p! ;
 
 hex
-00 00 00 $0 ppalette!
-ff ff ff $1 ppalette!
-00 00 ff $2 ppalette!
-00 ff 00 $3 ppalette!
-ff 00 00 $4 ppalette!
-00 ff ff $5 ppalette!
-ff ff 00 $6 ppalette!
-ff 00 ff $7 ppalette!
-40 40 40 $8 ppalette!
-40 40 a0 $9 ppalette!
-40 a0 40 $a ppalette!
-a0 40 40 $b ppalette!
-40 a0 a0 $c ppalette!
-a0 a0 40 $d ppalette!
-a0 40 a0 $e ppalette!
-a0 a0 a0 $f ppalette!
+00 00 00 $0 pal!
+ff ff ff $1 pal!
+00 00 ff $2 pal!
+00 ff 00 $3 pal!
+ff 00 00 $4 pal!
+00 ff ff $5 pal!
+ff ff 00 $6 pal!
+ff 00 ff $7 pal!
+40 40 40 $8 pal!
+40 40 a0 $9 pal!
+40 a0 40 $a pal!
+a0 40 40 $b pal!
+40 a0 a0 $c pal!
+a0 a0 40 $d pal!
+a0 40 a0 $e pal!
+a0 a0 a0 $f pal!
 decimal
 
-0 0 640 400 1 prect
+0 0 640 400 1 putrect
 
-100 100 356 356 0 prect
-101 101 355 355 1 prect
+100 100 356 356 0 putrect
+101 101 355 355 1 putrect
 
 : setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then
  1 24 pbrush!
@@ -85,7 +85,7 @@ false variable m0-held
 
 \ : hovered? mx @ my @ rot region>stack inside? ;
 
-: drawline mx @ my @ mx-last @ my-last @ c.current @ pbrushline ;
+: drawline mx @ my @ mx-last @ my-last @ c.current @ putline ;
 
 make on-key 1 = if 'X' = if c.toggle then then ;
 

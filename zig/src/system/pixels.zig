@@ -165,7 +165,7 @@ pub const Pixels = struct {
 
     // ===
 
-    pub fn storePalette(self: *@This(), addr: Cell, value: u8) void {
+    pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < @TypeOf(self.palette).item_ct) {
             self.palette.colors[addr] = value;
             c.glUseProgram(self.program);
@@ -173,7 +173,7 @@ pub const Pixels = struct {
         }
     }
 
-    pub fn fetchPalette(self: @This(), addr: Cell) u8 {
+    pub fn paletteFetch(self: @This(), addr: Cell) u8 {
         if (addr < @TypeOf(self.palette).item_ct) {
             return self.palette.colors[addr];
         } else {
@@ -208,49 +208,6 @@ pub const Pixels = struct {
             16,
             @as(isize, @intCast(x)) - brush_width / 2,
             @as(isize, @intCast(y)) - brush_width / 2,
-        );
-    }
-
-    pub fn putPixel(
-        self: *@This(),
-        x: Cell,
-        y: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putXY(@intCast(x), @intCast(y), palette_idx);
-    }
-
-    pub fn putLine(
-        self: *@This(),
-        x0: Cell,
-        y0: Cell,
-        x1: Cell,
-        y1: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putLine(
-            @intCast(x0),
-            @intCast(y0),
-            @intCast(x1),
-            @intCast(y1),
-            palette_idx,
-        );
-    }
-
-    pub fn putRect(
-        self: *@This(),
-        x0: Cell,
-        y0: Cell,
-        x1: Cell,
-        y1: Cell,
-        palette_idx: u8,
-    ) void {
-        self.image.putRect(
-            @intCast(x0),
-            @intCast(y0),
-            @intCast(x1),
-            @intCast(y1),
-            palette_idx,
         );
     }
 

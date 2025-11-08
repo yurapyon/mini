@@ -116,6 +116,8 @@ const glfw_callbacks = struct {
 };
 
 const exts = struct {
+    // main/glfw ===
+
     fn setXt(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
@@ -157,58 +159,120 @@ const exts = struct {
         s.deinit();
     }
 
-    fn pixelPaletteStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    // video ===
+
+    fn getImageIds(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+        k.data_stack.pushCell(s.video.handles.screen);
+        k.data_stack.pushCell(s.video.handles.characters);
+    }
+
+    fn paletteStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
-        s.video.pixels.storePalette(addr, @truncate(value));
+        if (addr & 0x8000 > 0) {
+            const masked_addr = addr & 0x7fff;
+            s.video.characters.paletteStore(masked_addr, @truncate(value));
+        } else {
+            s.video.pixels.paletteStore(addr, @truncate(value));
+        }
     }
 
-    fn pixelPaletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn paletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
         const addr = k.data_stack.popCell();
 
-        const value = s.video.pixels.fetchPalette(addr);
+        const value = if (addr & 0x8000 > 0)
+            s.video.characters.paletteFetch(addr & 0x7fff)
+        else
+            s.video.pixels.paletteFetch(addr);
 
         k.data_stack.pushCell(value);
     }
 
-    fn pixelSet(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn createImage(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
-        const idx = k.data_stack.popCell();
+        const height = k.data_stack.popCell();
+        const width = k.data_stack.popCell();
+        const id = s.video.image_handles.create(
+            width,
+            height,
+        ) catch return error.ExternalPanic;
+
+        k.data_stack.pushCell(id);
+    }
+
+    fn freeImage(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const id = k.data_stack.popCell();
+
+        // TODO
+        _ = s;
+        _ = id;
+    }
+
+    fn imagePutXY(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const image_id = k.data_stack.popCell();
+        const color = k.data_stack.popCell();
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        s.video.pixels.putPixel(x, y, @truncate(idx));
+        const image = s.video.getImage(image_id);
+
+        image.putXY(@intCast(x), @intCast(y), @truncate(color));
     }
 
-    fn pixelLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn imagePutLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
-        const idx = k.data_stack.popCell();
+        const image_id = k.data_stack.popCell();
+        const color = k.data_stack.popCell();
         const y1 = k.data_stack.popCell();
         const x1 = k.data_stack.popCell();
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        s.video.pixels.putLine(x0, y0, x1, y1, @truncate(idx));
+        const image = s.video.getImage(image_id);
+
+        image.putLine(
+            @intCast(x0),
+            @intCast(y0),
+            @intCast(x1),
+            @intCast(y1),
+            @truncate(color),
+        );
     }
 
-    fn pixelRect(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn imagePutRect(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
-        const idx = k.data_stack.popCell();
+        const image_id = k.data_stack.popCell();
+        const color = k.data_stack.popCell();
         const y1 = k.data_stack.popCell();
         const x1 = k.data_stack.popCell();
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        s.video.pixels.putRect(x0, y0, x1, y1, @truncate(idx));
+        const image = s.video.getImage(image_id);
+
+        image.putRect(
+            @intCast(x0),
+            @intCast(y0),
+            @intCast(x1),
+            @intCast(y1),
+            @truncate(color),
+        );
     }
+
+    // ===
 
     fn brushSet(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
@@ -377,26 +441,39 @@ pub const System = struct {
             .callback = exts.deinit,
             .userdata = self,
         });
-        try k.addExternal("pcolors!", .{
-            .callback = exts.pixelPaletteStore,
+        try k.addExternal("image-ids", .{
+            .callback = exts.getImageIds,
             .userdata = self,
         });
-        try k.addExternal("pcolors@", .{
-            .callback = exts.pixelPaletteFetch,
+        try k.addExternal("p!", .{
+            .callback = exts.paletteStore,
             .userdata = self,
         });
-        try k.addExternal("pset", .{
-            .callback = exts.pixelSet,
+        try k.addExternal("p@", .{
+            .callback = exts.paletteFetch,
             .userdata = self,
         });
-        try k.addExternal("pline", .{
-            .callback = exts.pixelLine,
+        try k.addExternal("ialloc", .{
+            .callback = exts.createImage,
             .userdata = self,
         });
-        try k.addExternal("prect", .{
-            .callback = exts.pixelRect,
+        try k.addExternal("ifree", .{
+            .callback = exts.freeImage,
             .userdata = self,
         });
+        try k.addExternal("i!xy", .{
+            .callback = exts.imagePutXY,
+            .userdata = self,
+        });
+        try k.addExternal("i!line", .{
+            .callback = exts.imagePutLine,
+            .userdata = self,
+        });
+        try k.addExternal("i!rect", .{
+            .callback = exts.imagePutRect,
+            .userdata = self,
+        });
+
         try k.addExternal("pbrush!", .{
             .callback = exts.brushStore,
             .userdata = self,

@@ -2,11 +2,13 @@ external setxt
 external close?
 external draw/poll
 external deinit
-external pcolors!
-external pcolors@
-external pset
-external pline
-external prect
+external image-ids
+external p!
+external p@
+external i!xy
+external i!line
+external i!rect
+
 external pbrush!
 external pbrush@
 external pbrush
@@ -30,6 +32,14 @@ make on-mouse-down 2drop ;
 make on-char       2drop ;
 
 doer frame
+
+image-ids
+constant _chars
+constant _screen
+
+: putp _screen i!xy ;
+: putline _screen i!line ;
+: putrect _screen i!rect ;
 
 : close? close? stay @ 0= or ;
 

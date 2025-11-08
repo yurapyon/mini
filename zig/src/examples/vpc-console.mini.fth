@@ -4,17 +4,29 @@
 \
 \ ===
 
-: ppalette! 3 * tuck 2 + pcolors! tuck 1 + pcolors! pcolors! ;
+: pal! 3 * tuck 2 + p! tuck 1 + p! p! ;
+: cpal! $8000 or pal! ;
 
 hex
-00 00 00 0 ppalette!
-ff ff ff 1 ppalette!
+00 00 00 0 pal!
+ff ff ff 1 pal!
+
+00 ff 00 0 cpal!
+00 00 00 1 cpal!
+ff ff ff 2 cpal!
+ff ff ff 3 cpal!
+ff ff ff 4 cpal!
+ff ff ff 5 cpal!
+ff ff ff 6 cpal!
+ff ff ff 7 cpal!
 decimal
 
-0 0 640 400 0 prect
+0 0 640 400 0 putrect
+
+20 20 1 putp
 
 ( i c -- )
-: putc swap 8 3 * + 16 16 10 * * + chars! ;
+: putc swap 16 16 10 * * + chars! ;
 
 create lbuf 128 allot
 0 variable lat
