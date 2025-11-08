@@ -8,11 +8,12 @@ external p@
 external i!xy
 external i!line
 external i!rect
+external i!blit
+external i!blitline
 
-external pbrush!
-external pbrush@
-external pbrush
-external pbrushline
+external ialloc
+external ifree
+
 external chars!
 external chars@
 
@@ -37,9 +38,11 @@ image-ids
 constant _chars
 constant _screen
 
-: putp _screen i!xy ;
-: putline _screen i!line ;
-: putrect _screen i!rect ;
+: putp     _screen i!xy ;
+: putline  _screen i!line ;
+: putrect  _screen i!rect ;
+: blit     _screen i!blit ;
+: blitline _screen i!blitline ;
 
 : close? close? stay @ 0= or ;
 

@@ -42,6 +42,30 @@ pub const ImageHandles = struct {
         return try self.register(image);
     }
 
+    pub fn free(self: *@This(), id: Cell) void {
+        const image = self.getPtr(id);
+
+        self.handles.freeHandle(id);
+
+        var index: ?usize = null;
+        for (0..self.created_images.items.len) |i| {
+            if (self.created_images.items[i] == image) {
+                index = i;
+                break;
+            }
+        }
+
+        if (index) |idx| {
+            _ = self.created_images.swapRemove(idx);
+        } else {
+            // TODO
+            // handle image not found
+        }
+
+        image.deinit(self.allocator);
+        self.allocator.destroy(image);
+    }
+
     pub fn register(self: *@This(), image: *Image) !Cell {
         const handle = try self.handles.getHandleForPtr(image);
         return handle;

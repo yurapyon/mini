@@ -72,6 +72,14 @@ pub const Video = struct {
         self.characters.draw();
     }
 
+    pub fn createImage(self: *@This(), width: Cell, height: Cell) !Cell {
+        return try self.image_handles.create(width, height);
+    }
+
+    pub fn freeImage(self: *@This(), id: Cell) void {
+        self.image_handles.free(id);
+    }
+
     pub fn getImage(self: *@This(), id: Cell) *Image {
         return self.image_handles.getPtr(id);
     }

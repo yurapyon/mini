@@ -4,6 +4,18 @@
 \
 \ ===
 
+7 7 ialloc constant brush
+
+: setupbrush
+  49 0 u>?|: dup 7 /mod 0 brush i!xy 1+ loop then
+  4 4 1 brush i!xy ;
+
+: brushline 16 brush blitline ;
+
+setupbrush
+
+\ ===
+
 : region [ 4 tags, ] create @0 , @1 , @2 , @3 , ;
 
 \ : region create >r >r >r , r> , r> , r> , ;
@@ -71,12 +83,6 @@ decimal
 100 100 356 356 0 putrect
 101 101 355 355 1 putrect
 
-: setupbrush 49 0 u>?|: 0 over pbrush! 1+ loop then
- 1 24 pbrush!
-;
-
-setupbrush
-
 0 variable mx
 0 variable my
 0 variable mx-last
@@ -85,7 +91,7 @@ false variable m0-held
 
 \ : hovered? mx @ my @ rot region>stack inside? ;
 
-: drawline mx @ my @ mx-last @ my-last @ c.current @ putline ;
+: drawline mx @ my @ mx-last @ my-last @ brushline ;
 
 make on-key 1 = if 'X' = if c.toggle then then ;
 

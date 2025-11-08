@@ -199,7 +199,7 @@ const exts = struct {
 
         const height = k.data_stack.popCell();
         const width = k.data_stack.popCell();
-        const id = s.video.image_handles.create(
+        const id = s.video.createImage(
             width,
             height,
         ) catch return error.ExternalPanic;
@@ -212,10 +212,10 @@ const exts = struct {
 
         const id = k.data_stack.popCell();
 
-        // TODO
-        _ = s;
-        _ = id;
+        s.video.freeImage(id);
     }
+
+    // TODO all image editing should probably use signed cells
 
     fn imagePutXY(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
@@ -272,48 +272,52 @@ const exts = struct {
         );
     }
 
-    // ===
-
-    fn brushSet(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn imageBlit(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
-        const idx = k.data_stack.popCell();
+        const image_id = k.data_stack.popCell();
+        const other_id = k.data_stack.popCell();
+        const transparent = k.data_stack.popCell();
         const y = k.data_stack.popCell();
         const x = k.data_stack.popCell();
 
-        s.video.pixels.putBrush(x, y, @truncate(idx));
+        // TODO handle errors on image not found
+        const image = s.video.getImage(image_id);
+        const other = s.video.getImage(other_id);
+
+        image.blitXY(
+            other.*,
+            @truncate(transparent),
+            @intCast(x),
+            @intCast(y),
+        );
     }
 
-    fn brushStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+    fn imageBlitLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
-        const addr = k.data_stack.popCell();
-        const value = k.data_stack.popCell();
-
-        s.video.pixels.storeBrush(addr, @truncate(value));
-    }
-
-    fn brushFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        const s: *System = @ptrCast(@alignCast(userdata));
-
-        const addr = k.data_stack.popCell();
-
-        const value = s.video.pixels.fetchBrush(addr);
-
-        k.data_stack.pushCell(value);
-    }
-
-    fn brushLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        const s: *System = @ptrCast(@alignCast(userdata));
-
-        const idx = k.data_stack.popCell();
+        const image_id = k.data_stack.popCell();
+        const other_id = k.data_stack.popCell();
+        const transparent = k.data_stack.popCell();
         const y1 = k.data_stack.popCell();
         const x1 = k.data_stack.popCell();
         const y0 = k.data_stack.popCell();
         const x0 = k.data_stack.popCell();
 
-        s.video.pixels.putBrushLine(x0, y0, x1, y1, @truncate(idx));
+        const image = s.video.getImage(image_id);
+        const other = s.video.getImage(other_id);
+
+        image.blitLine(
+            other.*,
+            @truncate(transparent),
+            @intCast(x0),
+            @intCast(y0),
+            @intCast(x1),
+            @intCast(y1),
+        );
     }
+
+    // ===
 
     fn charsStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
@@ -473,24 +477,14 @@ pub const System = struct {
             .callback = exts.imagePutRect,
             .userdata = self,
         });
-
-        try k.addExternal("pbrush!", .{
-            .callback = exts.brushStore,
+        try k.addExternal("i!blit", .{
+            .callback = exts.imageBlit,
             .userdata = self,
         });
-        try k.addExternal("pbrush@", .{
-            .callback = exts.brushFetch,
+        try k.addExternal("i!blitline", .{
+            .callback = exts.imageBlitLine,
             .userdata = self,
         });
-        try k.addExternal("pbrush", .{
-            .callback = exts.brushSet,
-            .userdata = self,
-        });
-        try k.addExternal("pbrushline", .{
-            .callback = exts.brushLine,
-            .userdata = self,
-        });
-
         try k.addExternal("chars!", .{
             .callback = exts.charsStore,
             .userdata = self,
