@@ -4,23 +4,7 @@
 \
 \ ===
 
-: 3p!   tuck 2 + p! tuck 1 + p! p! ;
-: pal!  3 * 3p! ;
-: cpal! 3 * $8000 or 3p! ;
-
-hex
-00 00 00 0 pal!
-ff ff ff 1 pal!
-
-00 ff 00 0 cpal!
-00 00 00 1 cpal!
-ff ff ff 2 cpal!
-ff ff ff 3 cpal!
-ff ff ff 4 cpal!
-ff ff ff 5 cpal!
-ff ff ff 6 cpal!
-ff ff ff 7 cpal!
-decimal
+pdefault
 
 0 0 640 400 0 putrect
 
