@@ -215,8 +215,9 @@ forth definitions
 : []      ( n n a -- a n ) flip over * rot + swap ;
 : ctlcode ( n -- a n )
   cond
-    dup 32 u< if 3
-      d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " [] else
+    dup 32 u< if
+      3 d" nulsohstxetxeotenqackbelbs ht lf vt ff cr so si dledc1dc2dc3dc4naksynetbcanem subescfs gs rs us " []
+    else
     127 =     if s" del" else
     0 0
   endcond ;
@@ -303,14 +304,26 @@ forth definitions
 : s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
 
 0 variable tags*
-: tags, ( n -- )        cells >r
-                        (lit), lit, r@ , ['] s>mem , ['] jump , (later),
-                        swap this! r> allot this! here tags* ! ;
+: tags, ( n -- )        cells >r ['] jump , (later), here swap r@ allot this! here tags* !
+                        lit, , lit, r> , ['] s>mem , ;
 : tag   ( n "name" -- ) create cells , does> @ tags* @ swap - cell - lit, , ['] @ , ;
 compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
 forth definitions
+
+0 [if]
+: postpone word cond
+  2dup cvocab @ cfind ?dup if -rot 2drop >cfa , else
+  2dup find           ?dup if -rot 2drop >cfa literal ['] , , else
+    wnf
+  endcond ;
+
+: tags, ( n -- )        cells >r
+                        (lit), lit, r@ , ['] s>mem , ['] jump , (later),
+                        swap this! r> allot this! here tags* ! ;
+[then]
+
 
 \ blocks ===
 

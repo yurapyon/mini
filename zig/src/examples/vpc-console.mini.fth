@@ -4,8 +4,9 @@
 \
 \ ===
 
-: pal! 3 * tuck 2 + p! tuck 1 + p! p! ;
-: cpal! $8000 or pal! ;
+: 3p!   tuck 2 + p! tuck 1 + p! p! ;
+: pal!  3 * 3p! ;
+: cpal! 3 * $8000 or 3p! ;
 
 hex
 00 00 00 0 pal!

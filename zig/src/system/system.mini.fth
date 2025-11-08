@@ -5,6 +5,9 @@ external deinit
 external image-ids
 external p!
 external p@
+external i!mask
+external i!fill
+external i!rand
 external i!xy
 external i!line
 external i!rect
@@ -43,6 +46,12 @@ constant _screen
 : putrect  _screen i!rect ;
 : blit     _screen i!blit ;
 : blitline _screen i!blitline ;
+
+: setmask   ( x0 y0 x1 y1 id -- ) true swap i!mask ;
+: clearmask ( id -- )             >r 0 0 0 0 false r> i!mask ;
+
+: scissor   _screen setmask ;
+: unscissor _screen clearmask ;
 
 : close? close? stay @ 0= or ;
 

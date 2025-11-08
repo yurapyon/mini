@@ -82,6 +82,12 @@ pub fn Stack(
             self.pushCell(kernel.cellFromBoolean(value));
         }
 
+        pub fn popBoolean(self: *@This()) bool {
+            const top = self.peek(0);
+            self.pop(1);
+            return kernel.isTruthy(top.*);
+        }
+
         pub fn popCell(self: *@This()) Cell {
             const top = self.peek(0);
             self.pop(1);

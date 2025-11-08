@@ -215,15 +215,53 @@ const exts = struct {
         s.video.freeImage(id);
     }
 
-    // TODO all image editing should probably use signed cells
+    fn imageSetMask(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const image_id = k.data_stack.popCell();
+        const use_mask = k.data_stack.popBoolean();
+        const y1 = k.data_stack.popSignedCell();
+        const x1 = k.data_stack.popSignedCell();
+        const y0 = k.data_stack.popSignedCell();
+        const x0 = k.data_stack.popSignedCell();
+
+        const image = s.video.getImage(image_id);
+
+        image.use_mask = use_mask;
+        image.mask.x0 = @intCast(x0);
+        image.mask.y0 = @intCast(y0);
+        image.mask.x1 = @intCast(x1);
+        image.mask.y1 = @intCast(y1);
+    }
+
+    fn imageFill(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const image_id = k.data_stack.popCell();
+        const color = k.data_stack.popCell();
+
+        const image = s.video.getImage(image_id);
+
+        image.fill(@truncate(color));
+    }
+
+    fn imageRandomize(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const image_id = k.data_stack.popCell();
+
+        const image = s.video.getImage(image_id);
+
+        image.randomize(16);
+    }
 
     fn imagePutXY(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
         const image_id = k.data_stack.popCell();
         const color = k.data_stack.popCell();
-        const y = k.data_stack.popCell();
-        const x = k.data_stack.popCell();
+        const y = k.data_stack.popSignedCell();
+        const x = k.data_stack.popSignedCell();
 
         const image = s.video.getImage(image_id);
 
@@ -235,10 +273,10 @@ const exts = struct {
 
         const image_id = k.data_stack.popCell();
         const color = k.data_stack.popCell();
-        const y1 = k.data_stack.popCell();
-        const x1 = k.data_stack.popCell();
-        const y0 = k.data_stack.popCell();
-        const x0 = k.data_stack.popCell();
+        const y1 = k.data_stack.popSignedCell();
+        const x1 = k.data_stack.popSignedCell();
+        const y0 = k.data_stack.popSignedCell();
+        const x0 = k.data_stack.popSignedCell();
 
         const image = s.video.getImage(image_id);
 
@@ -256,10 +294,10 @@ const exts = struct {
 
         const image_id = k.data_stack.popCell();
         const color = k.data_stack.popCell();
-        const y1 = k.data_stack.popCell();
-        const x1 = k.data_stack.popCell();
-        const y0 = k.data_stack.popCell();
-        const x0 = k.data_stack.popCell();
+        const y1 = k.data_stack.popSignedCell();
+        const x1 = k.data_stack.popSignedCell();
+        const y0 = k.data_stack.popSignedCell();
+        const x0 = k.data_stack.popSignedCell();
 
         const image = s.video.getImage(image_id);
 
@@ -278,8 +316,8 @@ const exts = struct {
         const image_id = k.data_stack.popCell();
         const other_id = k.data_stack.popCell();
         const transparent = k.data_stack.popCell();
-        const y = k.data_stack.popCell();
-        const x = k.data_stack.popCell();
+        const y = k.data_stack.popSignedCell();
+        const x = k.data_stack.popSignedCell();
 
         // TODO handle errors on image not found
         const image = s.video.getImage(image_id);
@@ -299,10 +337,10 @@ const exts = struct {
         const image_id = k.data_stack.popCell();
         const other_id = k.data_stack.popCell();
         const transparent = k.data_stack.popCell();
-        const y1 = k.data_stack.popCell();
-        const x1 = k.data_stack.popCell();
-        const y0 = k.data_stack.popCell();
-        const x0 = k.data_stack.popCell();
+        const y1 = k.data_stack.popSignedCell();
+        const x1 = k.data_stack.popSignedCell();
+        const y0 = k.data_stack.popSignedCell();
+        const x0 = k.data_stack.popSignedCell();
 
         const image = s.video.getImage(image_id);
         const other = s.video.getImage(other_id);
@@ -463,6 +501,18 @@ pub const System = struct {
         });
         try k.addExternal("ifree", .{
             .callback = exts.freeImage,
+            .userdata = self,
+        });
+        try k.addExternal("i!mask", .{
+            .callback = exts.imageSetMask,
+            .userdata = self,
+        });
+        try k.addExternal("i!fill", .{
+            .callback = exts.imageFill,
+            .userdata = self,
+        });
+        try k.addExternal("i!rand", .{
+            .callback = exts.imageRandomize,
             .userdata = self,
         });
         try k.addExternal("i!xy", .{
