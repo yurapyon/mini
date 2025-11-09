@@ -26,14 +26,6 @@ setupbrush
 
 \ initial palette ===
 
-: 3p@   ( addr -- r g b ) dup p@ swap 1+ dup p@ swap 1+ p@ ;
-: pal@  ( n -- r g b )    3 * 3p@ ;
-: cpal@ ( n -- r g b )    3 * $8000 or 3p@ ;
-
-: 3p!   ( r g b addr -- ) tuck 2 + p! tuck 1 + p! p! ;
-: pal!  ( r g b n -- )    3 * 3p! ;
-: cpal! ( r g b n -- )    3 * $8000 or 3p! ;
-
 hex
 00 00 00 0 pal!
 ff ff ff 1 pal!

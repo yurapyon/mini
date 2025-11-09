@@ -2,9 +2,18 @@ external setxt
 external close?
 external draw/poll
 external deinit
+
 external image-ids
 external p!
 external p@
+
+external talloc
+external tfree
+external t!
+external t@
+
+external ialloc
+external ifree
 external i!mask
 external i!fill
 external i!rand
@@ -13,9 +22,6 @@ external i!line
 external i!rect
 external i!blit
 external i!blitline
-
-external ialloc
-external ifree
 
 external chars!
 external chars@
@@ -50,8 +56,23 @@ constant _screen
 : setmask   ( x0 y0 x1 y1 id -- ) true swap i!mask ;
 : clearmask ( id -- )             >r 0 0 0 0 false r> i!mask ;
 
-: scissor   _screen setmask ;
-: unscissor _screen clearmask ;
+: scissor   ( x0 y0 x1 y1 -- ) _screen setmask ;
+: unscissor ( -- )             _screen clearmask ;
+
+: 3p@   ( addr -- r g b ) dup p@ swap 1+ dup p@ swap 1+ p@ ;
+: pal@  ( n -- r g b )    3 * 3p@ ;
+: cpal@ ( n -- r g b )    3 * $8000 or 3p@ ;
+
+: 3p!   ( r g b addr -- ) tuck 2 + p! tuck 1 + p! p! ;
+: pal!  ( r g b n -- )    3 * 3p! ;
+: cpal! ( r g b n -- )    3 * $8000 or 3p! ;
+
+: pdefault [ hex ]
+  00 00 00 0 pal!
+  ff ff ff 1 pal!
+  ff ff ff 0 cpal!
+  00 00 00 1 cpal!
+  [ decimal ] ;
 
 : close? close? stay @ 0= or ;
 

@@ -9,7 +9,6 @@ const Cell = kernel.Cell;
 const Pixels = @import("pixels.zig").Pixels;
 const Characters = @import("characters.zig").Characters;
 const Image = @import("image.zig").Image;
-const ImageHandles = @import("image-handles.zig").ImageHandles;
 
 // ===
 
@@ -32,33 +31,17 @@ pub const screen_width = 640;
 pub const screen_height = 400;
 
 pub const Video = struct {
-    image_handles: ImageHandles,
-
     pixels: Pixels,
     characters: Characters,
-
-    handles: struct {
-        screen: Cell,
-        characters: Cell,
-    },
 
     pub fn init(self: *@This(), allocator: Allocator) !void {
         try self.pixels.init(allocator);
         try self.characters.init(allocator);
-        try self.image_handles.init(allocator);
-
-        self.handles.screen = try self.image_handles.register(
-            &self.pixels.image,
-        );
-        self.handles.characters = try self.image_handles.register(
-            &self.characters.spritesheet,
-        );
     }
 
     pub fn deinit(self: *@This()) void {
         self.characters.deinit();
         self.pixels.deinit();
-        self.image_handles.deinit();
     }
 
     pub fn update(self: *@This()) void {
@@ -70,17 +53,5 @@ pub const Video = struct {
         c.glClear(c.GL_COLOR_BUFFER_BIT);
         self.pixels.draw();
         self.characters.draw();
-    }
-
-    pub fn createImage(self: *@This(), width: Cell, height: Cell) !Cell {
-        return try self.image_handles.create(width, height);
-    }
-
-    pub fn freeImage(self: *@This(), id: Cell) void {
-        self.image_handles.free(id);
-    }
-
-    pub fn getImage(self: *@This(), id: Cell) *Image {
-        return self.image_handles.getPtr(id);
     }
 };
