@@ -12,6 +12,10 @@ const c = @import("c.zig").c;
 const video = @import("video.zig");
 const Video = video.Video;
 
+const resource_manager = @import("resource-manager.zig");
+const Resource = resource_manager.Resource;
+const ResourceManager = resource_manager.ResourceManager;
+
 // ===
 
 const window_title = "pyon vPC";
@@ -163,8 +167,8 @@ const exts = struct {
 
     fn getImageIds(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
-        k.data_stack.pushCell(s.video.handles.screen);
-        k.data_stack.pushCell(s.video.handles.characters);
+        k.data_stack.pushCell(s.resources.screen.handle);
+        k.data_stack.pushCell(s.resources.characters.handle);
     }
 
     fn paletteStore(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -194,12 +198,59 @@ const exts = struct {
         k.data_stack.pushCell(value);
     }
 
+    fn createTimer(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const id = s.resource_manager.createTimer() catch return error.ExternalPanic;
+
+        k.data_stack.pushCell(id);
+    }
+
+    fn freeTimer(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const id = k.data_stack.popCell();
+
+        // TODO
+        // s.video.freeImage(id);
+        _ = id;
+        _ = s;
+    }
+
+    fn setTimer(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const timer_id = k.data_stack.popCell();
+        const fraction = k.data_stack.popCell();
+        const seconds = k.data_stack.popCell();
+
+        const timer = s.resource_manager.getResource(timer_id).*.timer;
+
+        const f64_seconds: f64 = @floatFromInt(seconds);
+        const f64_fraction: f64 = @as(f64, @floatFromInt(fraction)) / 65536;
+        const limit = f64_seconds + f64_fraction;
+
+        timer.limit = limit;
+    }
+
+    fn checkTimer(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const timer_id = k.data_stack.popCell();
+
+        const timer = s.resource_manager.getResource(timer_id).*.timer;
+
+        const ct = timer.update(c.glfwGetTime());
+
+        k.data_stack.pushCell(@truncate(ct));
+    }
+
     fn createImage(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
         const height = k.data_stack.popCell();
         const width = k.data_stack.popCell();
-        const id = s.video.createImage(
+        const id = s.resource_manager.createImage(
             width,
             height,
         ) catch return error.ExternalPanic;
@@ -212,7 +263,10 @@ const exts = struct {
 
         const id = k.data_stack.popCell();
 
-        s.video.freeImage(id);
+        // TODO
+        // s.video.freeImage(id);
+        _ = id;
+        _ = s;
     }
 
     fn imageSetMask(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -225,7 +279,7 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.video.getImage(image_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.use_mask = use_mask;
         image.mask.x0 = @intCast(x0);
@@ -240,7 +294,9 @@ const exts = struct {
         const image_id = k.data_stack.popCell();
         const color = k.data_stack.popCell();
 
-        const image = s.video.getImage(image_id);
+        // TODO could do better error reporting
+        // resource_manager.getImage
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.fill(@truncate(color));
     }
@@ -250,7 +306,7 @@ const exts = struct {
 
         const image_id = k.data_stack.popCell();
 
-        const image = s.video.getImage(image_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.randomize(16);
     }
@@ -263,7 +319,7 @@ const exts = struct {
         const y = k.data_stack.popSignedCell();
         const x = k.data_stack.popSignedCell();
 
-        const image = s.video.getImage(image_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.putXY(@intCast(x), @intCast(y), @truncate(color));
     }
@@ -278,7 +334,7 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.video.getImage(image_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.putLine(
             @intCast(x0),
@@ -299,7 +355,7 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.video.getImage(image_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
 
         image.putRect(
             @intCast(x0),
@@ -320,8 +376,8 @@ const exts = struct {
         const x = k.data_stack.popSignedCell();
 
         // TODO handle errors on image not found
-        const image = s.video.getImage(image_id);
-        const other = s.video.getImage(other_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
+        const other = s.resource_manager.getResource(other_id).*.image;
 
         image.blitXY(
             other.*,
@@ -342,8 +398,8 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.video.getImage(image_id);
-        const other = s.video.getImage(other_id);
+        const image = s.resource_manager.getResource(image_id).*.image;
+        const other = s.resource_manager.getResource(other_id).*.image;
 
         image.blitLine(
             other.*,
@@ -377,6 +433,11 @@ const exts = struct {
     }
 };
 
+const ResourceAndHandle = struct {
+    resource: Resource,
+    handle: Cell,
+};
+
 pub const System = struct {
     k: *Kernel,
 
@@ -390,6 +451,13 @@ pub const System = struct {
     window: *c.GLFWwindow,
     video: Video,
 
+    resources: struct {
+        screen: ResourceAndHandle,
+        characters: ResourceAndHandle,
+    },
+
+    resource_manager: ResourceManager,
+
     // TODO
     // should_bye: bool,
 
@@ -400,6 +468,17 @@ pub const System = struct {
 
         // TODO allow for different allocator than the kernels
         try self.video.init(k.allocator);
+
+        try self.resource_manager.init(k.allocator);
+        self.resources.screen.resource.image = &self.video.pixels.image;
+        self.resources.screen.handle = try self.resource_manager.register(
+            &self.resources.screen.resource,
+        );
+
+        self.resources.characters.resource.image = &self.video.characters.spritesheet;
+        self.resources.characters.handle = try self.resource_manager.register(
+            &self.resources.characters.resource,
+        );
 
         self.xts.key = null;
         self.xts.mousemove = null;
@@ -493,6 +572,22 @@ pub const System = struct {
         });
         try k.addExternal("p@", .{
             .callback = exts.paletteFetch,
+            .userdata = self,
+        });
+        try k.addExternal("talloc", .{
+            .callback = exts.createTimer,
+            .userdata = self,
+        });
+        try k.addExternal("tfree", .{
+            .callback = exts.freeTimer,
+            .userdata = self,
+        });
+        try k.addExternal("t!", .{
+            .callback = exts.setTimer,
+            .userdata = self,
+        });
+        try k.addExternal("t@", .{
+            .callback = exts.checkTimer,
             .userdata = self,
         });
         try k.addExternal("ialloc", .{

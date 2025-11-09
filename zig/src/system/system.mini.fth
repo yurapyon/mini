@@ -2,9 +2,18 @@ external setxt
 external close?
 external draw/poll
 external deinit
+
 external image-ids
 external p!
 external p@
+
+external talloc
+external tfree
+external t!
+external t@
+
+external ialloc
+external ifree
 external i!mask
 external i!fill
 external i!rand
@@ -13,9 +22,6 @@ external i!line
 external i!rect
 external i!blit
 external i!blitline
-
-external ialloc
-external ifree
 
 external chars!
 external chars@
