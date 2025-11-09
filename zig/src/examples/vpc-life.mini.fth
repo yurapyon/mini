@@ -6,8 +6,8 @@
 
 : wrap ( val max -- ) tuck + swap mod ;
 
-20 constant width
-15 constant height
+30 constant width
+30 constant height
 width height * constant size
 create b0 size allot
 create b1 size allot
@@ -57,21 +57,18 @@ doer rowp
   make rowp  ;and
   over-cells ;
 
-0 [if]
-: .cell if '#' else bl then emit ;
+: offrect [ 5 tags, ]
+  @0 offx @ + @1 offy @ + @2 offx @ + @3 offy @ + @4
+  putrect ;
 
-: .grid
-  make cellp width * + front @ + c@ .cell ;and
-  make rowp  cr ;and
+: draw
+  make cellp
+    2dup width * + front @ + c@ >r
+    swap 10 * 10 + swap 10 * 10 + >off 0 0 9 9 r> offrect ;and
+  make rowp ;and
   over-cells ;
 
-: steps 0 |: dup . cr .grid 2dup u> if frame 1+ loop then 2drop ;
-
-[then]
-
 : init b0 size erase b1 size erase ;
-
-: frame process bswap ;
 
 : set   1 offf! ;
 : clear 0 offf! ;
@@ -80,8 +77,24 @@ doer rowp
   1 0 set 2 1 set 0 2 set
   1 2 set 2 2 set ;
 
+talloc constant timer
+0 true 10 u/ timer t!
+
 init
 0 0 glider
 
+pdefault
+hex
+00 aa 00 2 pal!
+decimal
+
+0 0 640 400 2 putrect
+
 make frame
-  ;
+  timer t@ if
+    draw
+    process
+    bswap
+  then ;
+
+main
