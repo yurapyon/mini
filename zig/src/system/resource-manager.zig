@@ -109,7 +109,33 @@ pub const ResourceManager = struct {
         return r.handle;
     }
 
-    pub fn getResource(self: *@This(), id: Cell) *Resource {
-        return @ptrCast(@alignCast(self.handles.getHandlePtr(id)));
+    pub fn getResource(self: *@This(), id: Cell) !*Resource {
+        const ptr = self.handles.getHandlePtr(id);
+
+        if (ptr) |p| {
+            return @ptrCast(@alignCast(p));
+        } else {
+            return error.ResourceNotFound;
+        }
+    }
+
+    pub fn getImage(self: *@This(), id: Cell) !*Image {
+        const resource = try self.getResource(id);
+        switch (resource.*) {
+            .image => |image| return image,
+            else => {
+                return error.NotAnImage;
+            },
+        }
+    }
+
+    pub fn getTimer(self: *@This(), id: Cell) !*Timer {
+        const resource = try self.getResource(id);
+        switch (resource.*) {
+            .timer => |timer| return timer,
+            else => {
+                return error.NotATimer;
+            },
+        }
     }
 };

@@ -159,8 +159,9 @@ const exts = struct {
     }
 
     fn deinit(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        // TODO does anything actually have to be here?
         const s: *System = @ptrCast(@alignCast(userdata));
-        s.deinit();
+        _ = s;
     }
 
     // video ===
@@ -212,7 +213,6 @@ const exts = struct {
         const id = k.data_stack.popCell();
 
         // TODO
-        // s.video.freeImage(id);
         _ = id;
         _ = s;
     }
@@ -224,7 +224,8 @@ const exts = struct {
         const fraction = k.data_stack.popCell();
         const seconds = k.data_stack.popCell();
 
-        const timer = s.resource_manager.getResource(timer_id).*.timer;
+        const timer = s.resource_manager.getTimer(timer_id) catch
+            return error.ExternalPanic;
 
         const f64_seconds: f64 = @floatFromInt(seconds);
         const f64_fraction: f64 = @as(f64, @floatFromInt(fraction)) / 65536;
@@ -238,7 +239,8 @@ const exts = struct {
 
         const timer_id = k.data_stack.popCell();
 
-        const timer = s.resource_manager.getResource(timer_id).*.timer;
+        const timer = s.resource_manager.getTimer(timer_id) catch
+            return error.ExternalPanic;
 
         const ct = timer.update(c.glfwGetTime());
 
@@ -264,7 +266,6 @@ const exts = struct {
         const id = k.data_stack.popCell();
 
         // TODO
-        // s.video.freeImage(id);
         _ = id;
         _ = s;
     }
@@ -279,7 +280,8 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.use_mask = use_mask;
         image.mask.x0 = @intCast(x0);
@@ -294,9 +296,8 @@ const exts = struct {
         const image_id = k.data_stack.popCell();
         const color = k.data_stack.popCell();
 
-        // TODO could do better error reporting
-        // resource_manager.getImage
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.fill(@truncate(color));
     }
@@ -306,7 +307,8 @@ const exts = struct {
 
         const image_id = k.data_stack.popCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.randomize(16);
     }
@@ -319,7 +321,8 @@ const exts = struct {
         const y = k.data_stack.popSignedCell();
         const x = k.data_stack.popSignedCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.putXY(@intCast(x), @intCast(y), @truncate(color));
     }
@@ -334,7 +337,8 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.putLine(
             @intCast(x0),
@@ -355,7 +359,8 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
 
         image.putRect(
             @intCast(x0),
@@ -375,9 +380,10 @@ const exts = struct {
         const y = k.data_stack.popSignedCell();
         const x = k.data_stack.popSignedCell();
 
-        // TODO handle errors on image not found
-        const image = s.resource_manager.getResource(image_id).*.image;
-        const other = s.resource_manager.getResource(other_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
+        const other = s.resource_manager.getImage(other_id) catch
+            return error.ExternalPanic;
 
         image.blitXY(
             other.*,
@@ -398,8 +404,10 @@ const exts = struct {
         const y0 = k.data_stack.popSignedCell();
         const x0 = k.data_stack.popSignedCell();
 
-        const image = s.resource_manager.getResource(image_id).*.image;
-        const other = s.resource_manager.getResource(other_id).*.image;
+        const image = s.resource_manager.getImage(image_id) catch
+            return error.ExternalPanic;
+        const other = s.resource_manager.getImage(other_id) catch
+            return error.ExternalPanic;
 
         image.blitLine(
             other.*,
@@ -458,9 +466,6 @@ pub const System = struct {
 
     resource_manager: ResourceManager,
 
-    // TODO
-    // should_bye: bool,
-
     pub fn init(self: *@This(), k: *Kernel) !void {
         self.k = k;
 
@@ -496,6 +501,7 @@ pub const System = struct {
     }
 
     pub fn deinit(self: *@This()) void {
+        self.resource_manager.deinit();
         self.video.deinit();
         c.glfwTerminate();
     }

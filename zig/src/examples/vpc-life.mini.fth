@@ -6,8 +6,8 @@
 
 : wrap ( val max -- ) tuck + swap mod ;
 
-30 constant width
-30 constant height
+40 constant width
+40 constant height
 width height * constant size
 create b0 size allot
 create b1 size allot
@@ -15,6 +15,7 @@ create b1 size allot
 b0 variable front
 b1 variable back
 
+: bclear b0 size erase b1 size erase ;
 : bswap ( -- )     front @ back @ front ! back ! ;
 : f@    ( i -- n ) front @ + c@ ;
 : b!    ( n i -- ) back @ + c! ;
@@ -44,17 +45,15 @@ b1 variable back
   tuck 2 = and swap 3 = or ;
 
 doer cellp
-doer rowp
 
 : over-row ( y -- ) >r
   width 0 u>?|: dup r@ cellp 1+ loop then
   r> 3drop ;
 
-: over-cells height 0 u>?|: dup over-row rowp 1+ loop then 2drop ;
+: over-cells height 0 u>?|: dup over-row 1+ loop then 2drop ;
 
 : process
   make cellp 2dup alive? 1 and -rot width * + b! ;and
-  make rowp  ;and
   over-cells ;
 
 : offrect [ 5 tags, ]
@@ -64,11 +63,8 @@ doer rowp
 : draw
   make cellp
     2dup width * + front @ + c@ >r
-    swap 10 * 10 + swap 10 * 10 + >off 0 0 9 9 r> offrect ;and
-  make rowp ;and
+    swap 8 * 8 + swap 8 * 8 + >off 0 0 7 7 r> offrect ;and
   over-cells ;
-
-: init b0 size erase b1 size erase ;
 
 : set   1 offf! ;
 : clear 0 offf! ;
@@ -77,18 +73,18 @@ doer rowp
   1 0 set 2 1 set 0 2 set
   1 2 set 2 2 set ;
 
+: lwss ( x y -- ) >off
+  1 0 set 4 0 set 0 1 set
+  0 2 set 4 2 set 0 3 set
+  1 3 set 2 3 set 3 3 set ;
+
 talloc constant timer
 0 true 10 u/ timer t!
-
-init
-0 0 glider
 
 pdefault
 hex
 00 aa 00 2 pal!
 decimal
-
-0 0 640 400 2 putrect
 
 make frame
   timer t@ if
@@ -96,5 +92,11 @@ make frame
     process
     bswap
   then ;
+
+bclear
+0 0 glider
+20 30 lwss
+
+0 0 640 400 2 putrect
 
 main

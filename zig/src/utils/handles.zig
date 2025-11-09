@@ -21,7 +21,6 @@ pub const Handles = struct {
     }
 
     pub fn deinit(self: *@This()) void {
-        // TODO i think this crashes sometimes
         self.lookup.deinit(self.allocator);
     }
 
