@@ -28,7 +28,7 @@ compiler definitions
 : [']       ' [compile] literal ; \ ( "name" -- )
 forth definitions
 
-: constant word define ['] docon @ , , ;          \ ( n "name" -- )
+: constant word define ['] docon @ , , ;          \ ( n "name" -- ) define ['] docre , ['] exit ,
 : enum     dup constant 1+ ;                      \ ( n "name" -- n )
 : flag     dup constant 1 lshift ;                \ ( n "name" -- n )
 : create   word define ['] docre @ , ['] exit , ; \ ( "name" -- )
