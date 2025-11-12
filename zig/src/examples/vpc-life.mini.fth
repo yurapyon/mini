@@ -82,6 +82,26 @@ doer process
     swap 9 * swap 9 * >c 0 0 9 9 r> offrect c>
   ;and cclear 140 20 >c for-all c> ;
 
+\ ui ===
+
+: offtype ( a n -- ) 1-
+  |: 2dup + c@ over 0 rot offchar dup if 1- loop then 2drop ;
+
+: label create current @ @ name 1/string swap , , swap , , ;
+: l>stk @+ swap @+ swap @+ swap @ ;
+: l>x   cell + @+ 8 * swap @ 8 * swap over + ;
+: l>y   3 cells + @ 10 * dup 10 + ;
+
+: l.draw    ( c l -- )
+  0 0 >offset
+  swap >r dup l>x rot l>y >r swap r> r> offrect ;
+: l.print   ( l -- )   l>stk >offset offtype ;
+: l.inside? ( x y l -- t/f ) tuck l>y in[,] -rot l>x in[,] and ;
+
+compiler definitions
+: t" ['] >offset , [compile] s" ['] offtype , ;
+forth definitions
+
 \ ===
 
 : set   1 -rot grid+ xy>i f! ;
@@ -98,6 +118,12 @@ doer process
 
 \ ===
 
+0 variable mx
+0 variable my
+0 variable mx-last
+0 variable my-last
+false variable mheld
+
 false variable playing
 : toggle playing @ 0= playing ! ;
 
@@ -106,37 +132,22 @@ false variable playing
   130 10 510 390 1 putrect
   131 11 509 389 2 putrect ;
 
-: offtype ( a n -- ) 1-
-  |: 2dup + c@ over 0 rot offchar dup if 1- loop then 2drop ;
+1 1 label %reset
 
-: label create current @ @ name 1/string swap , , offx @ , offy @ , ;
-: l>stk @+ swap @+ swap @+ swap @ ;
-: l>x   cell + @+ 8 * swap @ 8 * swap over + ;
-: l>y   3 cells + @ 10 * dup 10 + ;
-
-: l.draw    ( c l -- )
-  0 0 >offset
-  swap >r dup l>x rot l>y >r swap r> r> offrect ;
-: l.print   ( l -- )   l>stk >offset offtype ;
-: l.inside? ( x y l -- t/f ) tuck l>y in[,] -rot l>x in[,] and ;
-
-1 1 >offset label %reset
-1 3 >offset label %reset2
-
-compiler definitions
-: t" ['] >offset , [compile] s" ['] offtype , ;
-forth definitions
+: l.button ( l -- )
+  >r
+  mx @ my @ r@ l.inside? if mheld @ if 5 else 4 then else 3 then
+  r@ l.draw r> l.print ;
 
 : ui
   \ 1 1 t" play"
   \ 1 3 t" clear"
   \ 1 5 t" glider"
   \ 1 7 t" lwss"
-  3 %reset l.draw %reset l.print
-  3 %reset2 l.draw %reset2 l.print
+  %reset l.button
   ;
 
-: starting
+: reset
   bclear
   7 0 glider
   10 1 glider
@@ -144,14 +155,9 @@ forth definitions
   30 0 glider
   45 15 lwss
   45 23 lwss
-  45 31 lwss
-  ;
+  45 31 lwss ;
 
-0 variable mx
-0 variable my
-0 variable mx-last
-0 variable my-last
-false variable mheld
+\ ===
 
 talloc constant timer
 0 true 10 u/ timer t!
@@ -159,7 +165,9 @@ talloc constant timer
 pdefault
 hex
 00 aa 00 2 pal!
-11 11 99 3 pal!
+22 22 bb 3 pal!
+66 11 11 4 pal!
+99 00 00 5 pal!
 decimal
 
 : mnext mx @ mx-last ! my @ my-last ! my ! mx ! ;
@@ -167,15 +175,15 @@ decimal
 : mpressed? $10 and ;
 : shift?    $1 and ;
 
-make on-mouse-move mnext ;
+make on-mouse-move mnext ui ;
 
 make on-mouse-down drop mpressed? dup mheld !
   if mx @ my @ cond
-    2dup %reset  l.inside? if 2drop starting else
-    2dup %reset2 l.inside? if 2drop ." reset2" cr else
+    2dup %reset  l.inside? if 2drop reset else
       2drop
     endcond
-  then ;
+  then
+  ui ;
 
 make frame timer t@ if show next then ;
 
