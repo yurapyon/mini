@@ -56,6 +56,9 @@ compiler definitions
 : u>?|:  [compile] |: ['] 2dup , ['] u> , [compile] if ; \ ( -- a )
 : dup?|: [compile] |: ['] dup , [compile] if ;           \ ( -- a )
 
+: check>  [compile] |: ['] 2dup , ['] u> , ; \ ( -- a )
+: check!0 [compile] |: ['] dup , ;           \ ( -- a )
+
 0 constant cond
 : endcond dup?|: [compile] then loop then drop ; \ ( 0 ... a -- )
 

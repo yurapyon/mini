@@ -70,11 +70,11 @@ create coords #coords /coord * allot
 
 doer process
 
-: for-row ( y -- ) >r
-  width 0 u>?|: dup r@ process 1+ loop then r> 3drop ;
+: for-row ( y -- ) >r width 0
+  check> if dup r@ process 1+ loop then r> 3drop ;
 
-: for-all ( -- )
-  height 0 u>?|: dup for-row 1+ loop then 2drop ;
+: for-all ( -- ) height 0
+  check> if dup for-row 1+ loop then 2drop ;
 
 : g.update make process
     2dup alive? 1 and -rot xy>i b!
@@ -109,6 +109,47 @@ doer process
 compiler definitions
 : t" ['] >offset , [compile] s" ['] offtype , ;
 forth definitions
+
+\ note, unused ===
+
+doer mmove
+doer mclick
+
+: region: ( x0 y0 x1 y1 -- )
+  0 0 define >r flip , , , r> , [compile] ] ;
+
+: in-region? ( x y r -- t/f )
+  >cfa >r
+    r@ cell + @ r@ 3 cells + @ in[,] swap
+    r@        @ r@ 2 cells + @ in[,] and
+  r> drop ;
+
+vocabulary regions
+regions definitions
+
+0 0 640 480 region:
+  make mmove  2drop                ;and
+  make mclick 2drop ." clickbg" cr ;
+
+0 0 10 10 region:
+  make mmove  swap . . cr           ;and
+  make mclick ." click" swap . . cr ;
+
+forth definitions
+
+: (test) ( x y a -- )
+  check!0 if
+    3dup in-region? if
+      >cfa 4 cells + >r 2drop exit
+    else
+      @ loop
+    then
+  then 3drop ;
+
+: test regions context @ @ (test) ;
+
+make mmove 2drop ;
+make mclick 2drop ;
 
 \ ===
 
