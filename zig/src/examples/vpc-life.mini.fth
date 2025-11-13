@@ -4,6 +4,9 @@
 \
 \ ===
 
+: defer create ['] noop , does> @ execute ;
+: is    ' >value ! ;
+
 ( x y c -- )
 : putchar >r 80 * + 2 * 16 16 10 * * + r> swap chars! ;
 
@@ -73,11 +76,11 @@ doer process
 : for-all ( -- )
   height 0 u>?|: dup for-row 1+ loop then 2drop ;
 
-: next make process
+: g.update make process
     2dup alive? 1 and -rot xy>i b!
   ;and for-all bswap ;
 
-: show make process
+: g.draw make process
     2dup xy>i f@ >r
     swap 9 * swap 9 * >c 0 0 9 9 r> offrect c>
   ;and cclear 140 20 >c for-all c> ;
@@ -131,13 +134,12 @@ false variable mheld
 
 \ ===
 
-true variable playing
-: toggle playing @ 0= playing ! ;
+doer show
+doer toggle
+doer %tport
+doer click-grid
 
-doer tool
-make tool 2drop ;
-
-: click-grid ( x y -- ) px>grid tool ;
+4 variable active
 
 \ ===
 
@@ -158,14 +160,16 @@ make tool 2drop ;
   mx @ my @ r@ l.inside? if mheld @ if 5 else 4 then else 3 then
   r@ l.draw r> l.print ;
 
-: %tport playing @ if %|| else %>> then ;
-
 : ui
   %tport l.button
   %reset l.button
   %draw l.button
   %glider l.button
   %lwss l.button
+  0 4 0 putchar
+  0 6 0 putchar
+  0 8 0 putchar
+  0 active @ '*' putchar
   ;
 
 : reset
@@ -178,6 +182,19 @@ make tool 2drop ;
   \ 45 23 lwss
   \ 45 31 lwss ;
   ;
+
+defer pause
+
+: play
+  make show   g.update g.draw ;and
+  make toggle pause           ;and
+  make %tport %||             ;
+
+:noname
+  make show   g.draw ;and
+  make toggle play   ;and
+  make %tport %>>    ;
+  is pause
 
 \ ===
 
@@ -203,16 +220,16 @@ make on-mouse-down drop mpressed? dup mheld !
   if mx @ my @ cond
     2dup %tport  l.inside? if 2drop toggle else
     2dup %reset  l.inside? if 2drop reset else
-    2dup %draw   l.inside? if 2drop make tool cclear set ;and else
-    2dup %glider l.inside? if 2drop make tool glider ;and else
-    2dup %lwss   l.inside? if 2drop make tool lwss   ;and else
-    2dup in-grid?          if click-grid else
+    2dup %draw   l.inside? if 2drop make click-grid cclear set ;and 4 active ! else
+    2dup %glider l.inside? if 2drop make click-grid glider     ;and 6 active ! else
+    2dup %lwss   l.inside? if 2drop make click-grid lwss       ;and 8 active ! else
+    2dup in-grid?          if px>grid click-grid else
       2drop
     endcond
   then
   ui ;
 
-make frame timer t@ if show playing @ if next then then ;
+make frame timer t@ if show then ;
 
 bclear
 7 0 glider
@@ -223,6 +240,7 @@ bclear
 45 23 lwss
 45 31 lwss
 
+play
 background
 ui
 
