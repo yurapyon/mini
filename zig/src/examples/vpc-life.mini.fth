@@ -82,6 +82,11 @@ doer process
     swap 9 * swap 9 * >c 0 0 9 9 r> offrect c>
   ;and cclear 140 20 >c for-all c> ;
 
+: px>grid swap 140 - 9 / swap 20 - 9 / ;
+: in-grid?
+  swap 140 [ width 9 * 140 + ] literal in[,]
+  swap  20 [ height 9 * 20 + ] literal in[,] and ;
+
 \ ui ===
 
 : offtype ( a n -- ) 1-
@@ -124,38 +129,55 @@ forth definitions
 0 variable my-last
 false variable mheld
 
-false variable playing
+\ ===
+
+true variable playing
 : toggle playing @ 0= playing ! ;
+
+doer tool
+make tool 2drop ;
+
+: click-grid ( x y -- ) px>grid tool ;
+
+\ ===
 
 : background
     0  0 640 400 0 putrect
   130 10 510 390 1 putrect
   131 11 509 389 2 putrect ;
 
-1 1 label %reset
+1 0 label %>>
+1 0 label %||
+1 2 label %reset
+1 4 label %draw
+1 6 label %glider
+1 8 label %lwss
 
 : l.button ( l -- )
   >r
   mx @ my @ r@ l.inside? if mheld @ if 5 else 4 then else 3 then
   r@ l.draw r> l.print ;
 
+: %tport playing @ if %|| else %>> then ;
+
 : ui
-  \ 1 1 t" play"
-  \ 1 3 t" clear"
-  \ 1 5 t" glider"
-  \ 1 7 t" lwss"
+  %tport l.button
   %reset l.button
+  %draw l.button
+  %glider l.button
+  %lwss l.button
   ;
 
 : reset
   bclear
-  7 0 glider
-  10 1 glider
-  20 3 glider
-  30 0 glider
-  45 15 lwss
-  45 23 lwss
-  45 31 lwss ;
+  \ 7 0 glider
+  \ 10 1 glider
+  \ 20 3 glider
+  \ 30 0 glider
+  \ 45 15 lwss
+  \ 45 23 lwss
+  \ 45 31 lwss ;
+  ;
 
 \ ===
 
@@ -179,13 +201,18 @@ make on-mouse-move mnext ui ;
 
 make on-mouse-down drop mpressed? dup mheld !
   if mx @ my @ cond
+    2dup %tport  l.inside? if 2drop toggle else
     2dup %reset  l.inside? if 2drop reset else
+    2dup %draw   l.inside? if 2drop make tool cclear set ;and else
+    2dup %glider l.inside? if 2drop make tool glider ;and else
+    2dup %lwss   l.inside? if 2drop make tool lwss   ;and else
+    2dup in-grid?          if click-grid else
       2drop
     endcond
   then
   ui ;
 
-make frame timer t@ if show next then ;
+make frame timer t@ if show playing @ if next then then ;
 
 bclear
 7 0 glider
