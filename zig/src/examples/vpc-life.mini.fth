@@ -4,7 +4,12 @@
 \
 \ ===
 
-64 constant width
+( x y c -- )
+: putchar >r 80 * + 2 * 16 16 10 * * + r> swap chars! ;
+
+\ ===
+
+40 constant width
 40 constant height
 width height * constant #squares
 : xy>i ( x y -- i ) width * + ;
@@ -19,6 +24,8 @@ squares #squares + variable bback
 : b!     ( n i -- ) bback @ + c! ;
 : f!     ( n i -- ) bfront @ + c! ;
 
+\ ===
+
 0 variable offx
 0 variable offy
 : >offset offy ! offx ! ;
@@ -27,23 +34,25 @@ squares #squares + variable bback
   @0 offx @ + @1 offy @ + @2 offx @ + @3 offy @ + @4
   putrect ;
 
+: offchar >r >r offx @ + r> offy @ + r> putchar ;
+
 2 cells constant /coord
 16 constant #coords
 create coords #coords /coord * allot
 0 variable coord#
 : coord coords coord# /coord * + ;
 : cclear 0 coord# ! 0 0 >offset ;
-: >c     2dup offy +! offx +!
-         swap coord !+ ! 1 coord# +! ;
+: >c     2dup offy +! offx +! swap coord !+ !
+         1 coord# +! ;
 : c>     coord @+ negate offx +! @ negate offy +!
          -1 coord# +! ;
 
 \ ===
 
-: offset+ ( x y -- x y )
+: grid+ ( x y -- x y )
   swap offx @ + width wrap swap offy @ + height wrap ;
 
-: f@off ( x y -- n ) offset+ xy>i f@ ;
+: f@off ( x y -- n ) grid+ xy>i f@ ;
 
 : neighbors ( x y -- n ) >offset
   -1 -1 f@off   0 -1 f@off + 1 -1 f@off +
@@ -56,26 +65,52 @@ create coords #coords /coord * allot
 
 \ ===
 
-doer cellp
-: over-row   ( y -- ) >r
-  width 0 u>?|: dup r@ cellp 1+ loop then r> 3drop ;
-: over-cells ( -- )
-  height 0 u>?|: dup over-row 1+ loop then 2drop ;
+doer process
 
-: process
-  make cellp 2dup alive? 1 and -rot xy>i b!
-  ;and over-cells ;
+: for-row ( y -- ) >r
+  width 0 u>?|: dup r@ process 1+ loop then r> 3drop ;
 
-: draw
-  make cellp
+: for-all ( -- )
+  height 0 u>?|: dup for-row 1+ loop then 2drop ;
+
+: next make process
+    2dup alive? 1 and -rot xy>i b!
+  ;and for-all bswap ;
+
+: show make process
     2dup xy>i f@ >r
-    swap 8 * swap 8 * >c 0 0 7 7 r> offrect c>
-  ;and cclear 20 20 >c over-cells c> ;
+    swap 9 * swap 9 * >c 0 0 9 9 r> offrect c>
+  ;and cclear 140 20 >c for-all c> ;
+
+: px>grid swap 140 - 9 / swap 20 - 9 / ;
+: in-grid?
+  swap 140 [ width 9 * 140 + ] literal in[,]
+  swap  20 [ height 9 * 20 + ] literal in[,] and ;
+
+\ ui ===
+
+: offtype ( a n -- ) 1-
+  |: 2dup + c@ over 0 rot offchar dup if 1- loop then 2drop ;
+
+: label create current @ @ name 1/string swap , , swap , , ;
+: l>stk @+ swap @+ swap @+ swap @ ;
+: l>x   cell + @+ 8 * swap @ 8 * swap over + ;
+: l>y   3 cells + @ 10 * dup 10 + ;
+
+: l.draw    ( c l -- )
+  0 0 >offset
+  swap >r dup l>x rot l>y >r swap r> r> offrect ;
+: l.print   ( l -- )   l>stk >offset offtype ;
+: l.inside? ( x y l -- t/f ) tuck l>y in[,] -rot l>x in[,] and ;
+
+compiler definitions
+: t" ['] >offset , [compile] s" ['] offtype , ;
+forth definitions
 
 \ ===
 
-: set   1 -rot offset+ xy>i f! ;
-: clear 0 -rot offset+ xy>i f! ;
+: set   1 -rot grid+ xy>i f! ;
+: clear 0 -rot grid+ xy>i f! ;
 
 : glider ( x y -- ) >offset
   1 0 set 2 1 set 0 2 set
@@ -88,8 +123,63 @@ doer cellp
 
 \ ===
 
-false variable playing
+0 variable mx
+0 variable my
+0 variable mx-last
+0 variable my-last
+false variable mheld
+
+\ ===
+
+true variable playing
 : toggle playing @ 0= playing ! ;
+
+doer tool
+make tool 2drop ;
+
+: click-grid ( x y -- ) px>grid tool ;
+
+\ ===
+
+: background
+    0  0 640 400 0 putrect
+  130 10 510 390 1 putrect
+  131 11 509 389 2 putrect ;
+
+1 0 label %>>
+1 0 label %||
+1 2 label %reset
+1 4 label %draw
+1 6 label %glider
+1 8 label %lwss
+
+: l.button ( l -- )
+  >r
+  mx @ my @ r@ l.inside? if mheld @ if 5 else 4 then else 3 then
+  r@ l.draw r> l.print ;
+
+: %tport playing @ if %|| else %>> then ;
+
+: ui
+  %tport l.button
+  %reset l.button
+  %draw l.button
+  %glider l.button
+  %lwss l.button
+  ;
+
+: reset
+  bclear
+  \ 7 0 glider
+  \ 10 1 glider
+  \ 20 3 glider
+  \ 30 0 glider
+  \ 45 15 lwss
+  \ 45 23 lwss
+  \ 45 31 lwss ;
+  ;
+
+\ ===
 
 talloc constant timer
 0 true 10 u/ timer t!
@@ -97,14 +187,43 @@ talloc constant timer
 pdefault
 hex
 00 aa 00 2 pal!
+22 22 bb 3 pal!
+66 11 11 4 pal!
+99 00 00 5 pal!
 decimal
 
-make frame timer t@ if draw process bswap then ;
+: mnext mx @ mx-last ! my @ my-last ! my ! mx ! ;
+
+: mpressed? $10 and ;
+: shift?    $1 and ;
+
+make on-mouse-move mnext ui ;
+
+make on-mouse-down drop mpressed? dup mheld !
+  if mx @ my @ cond
+    2dup %tport  l.inside? if 2drop toggle else
+    2dup %reset  l.inside? if 2drop reset else
+    2dup %draw   l.inside? if 2drop make tool cclear set ;and else
+    2dup %glider l.inside? if 2drop make tool glider ;and else
+    2dup %lwss   l.inside? if 2drop make tool lwss   ;and else
+    2dup in-grid?          if click-grid else
+      2drop
+    endcond
+  then
+  ui ;
+
+make frame timer t@ if show playing @ if next then then ;
 
 bclear
-0 0 glider
-45 30 lwss
+7 0 glider
+10 1 glider
+20 3 glider
+30 0 glider
+45 15 lwss
+45 23 lwss
+45 31 lwss
 
-0 0 640 400 2 putrect
+background
+ui
 
 main
