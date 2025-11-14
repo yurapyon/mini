@@ -17,6 +17,8 @@ const Stack = stack.Stack;
 const register = @import("register.zig");
 const Register = register.Register;
 
+const Handles = @import("utils/handles.zig").Handles;
+
 // ===
 
 comptime {
@@ -78,6 +80,7 @@ pub const Kernel = struct {
     allocator: Allocator,
 
     memory: mem.MemoryPtr,
+    handles: Handles,
     externals: ArrayList(NamedExternal),
 
     debug_accept_buffer: bool,
@@ -129,6 +132,7 @@ pub const Kernel = struct {
         self.allocator = allocator;
 
         self.memory = try mem.allocateMemory(allocator);
+        self.handles.init(self.allocator);
         self.externals = .empty;
 
         self.program_counter.init(self.memory);
@@ -148,6 +152,7 @@ pub const Kernel = struct {
 
     pub fn deinit(self: *@This()) void {
         self.externals.deinit(self.allocator);
+        self.handles.deinit();
         self.allocator.free(self.memory);
     }
 

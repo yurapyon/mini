@@ -52,40 +52,31 @@ decimal
 0 variable offx
 0 variable offy
 : >offset offy ! offx ! ;
+: offset+ swap offx @ + swap offy @ + ;
+: offset2+ >r >r offset+ r> r> offset+ ;
 
-: offp >r >r offx @ + r> offy @ + r> putp ;
+: offline >r offset2+ r> putline ;
+: offrect >r offset2+ r> putrect ;
+: offblit >r >r offset+ r> r> blit ;
 
-: offline [ 5 tags, ]
-  @0 offx @ + @1 offy @ + @2 offx @ + @3 offy @ + @4
-  putline ;
+: offchar >r offset+ swap 8 / swap 10 / r> putchar ;
 
-: offrect [ 5 tags, ]
-  @0 offx @ + @1 offy @ + @2 offx @ + @3 offy @ + @4
-  putrect ;
+: offtype ( a n -- ) swap >r
+  0 check> if dup 0 over 8 * flip r@ + c@ offchar 1+ loop then
+  r> 3drop ;
 
-: offblit [ 4 tags, ] @0 offx @ + @1 offy @ + @2 @3 blit ;
-
-\ todo
-\ offchar should div x by 8 and y by 10
-: offchar >r >r offx @ + r> offy @ + r> putchar ;
-
-: offhex
-  16 /mod digit>char 1 0 rot offchar
-  16 /mod digit>char 0 0 rot offchar
-  drop ;
+: offhex <# h# h# #> offtype ;
 
 2 cells constant /coord
 16 constant #coords
 create coords #coords /coord * allot
 0 variable coord#
-: coord coords coord# /coord * + ;
+: coord coords coord# @ /coord * + ;
 : cclear 0 coord# ! 0 0 >offset ;
-: >c     2dup offy +! offx +! swap coord !+ !
-         1 coord# +! ;
-: c>     coord @+ negate offx +! @ negate offy +!
-         -1 coord# +! ;
+: >c     offy @ offx @ coord !+ ! offset+ >offset 1 coord# +! ;
+: c>     -1 coord# +! coord @+ swap @ >offset ;
 
-\ page ===
+\ canvas ===
 
 600 360 ialloc constant canvas
 
@@ -93,18 +84,16 @@ create coords #coords /coord * allot
 0 variable stagey
 
 : setupcanvas
-  1 canvas i!fill
+  $ff canvas i!fill
   35 stagex ! 10 stagey !
   ;
-
-: drawcanvas
-  stagex @ stagey @ >offset
-  0 0 $ff canvas offblit ;
 
 : drawstage
   25 0 640 400 scissor
   0 0 640 400 0 putrect
-  drawcanvas
+  stagex @ stagey @ >offset
+  0 0 600 360 1 offrect
+  0 0 $ff canvas offblit
   unscissor ;
 
 \ color selector ===
@@ -112,27 +101,28 @@ create coords #coords /coord * allot
 0 variable c.pri
 1 variable c.sec
 
-: values
-  4 2 >offset offhex
-  4 1 >offset offhex
-  4 0 >offset offhex
-  32 0 >offset 0 0 16 30 0 offrect ;
+: e.hide 32 0 >offset
+  0  0 0 offchar 8  0 0 offchar
+  0 10 0 offchar 8 10 0 offchar
+  0 20 0 offchar 8 20 0 offchar ;
 
-: hidevalues 4 0 >offset
-  0 0 0 offchar 1 0 0 offchar
-  0 1 0 offchar 1 1 0 offchar
-  0 2 0 offchar 1 2 0 offchar ;
+: slider >r
+  0 0 16 10 0 offrect
+  r@ offhex
+  16 0 >c
+     0 0 256 10 0 offrect
+    r@ 0  r@  9 1 offline
+  c>
+  r> drop ;
 
-( n -- )
-: slider 0 0  256 10 0 offrect 0 over  9 1 offline ;
-
-( n n n -- )
-: sliders
-  48 20 >offset slider
-  48 10 >offset slider
-  48  0 >offset slider ;
-
-: e.draw c.pri @ pal@ 3dup values sliders ;
+: e.draw
+  c.pri @ pal@
+  cclear
+  32 0 >c
+    0 20 >c slider c>
+    0 10 >c slider c>
+    0  0 >c slider c>
+  c> ;
 
 ( x y -- )
 : slide
@@ -158,13 +148,13 @@ create coords #coords /coord * allot
 
 : drawdot swap stagex @ - swap stagey @ -
   c.pri @ canvas i!xy
-  drawcanvas
+  drawstage
   ;
 
 : drawline [ 4 tags, ]
   @0 stagex @ - @1 stagey @ - @2 stagex @ - @3 stagey @ -
   c.pri @ canvas i!line
-  drawcanvas ;
+  drawstage ;
 
 \ ===
 
@@ -185,7 +175,6 @@ false variable mheld
 
 doer mmove
 doer mdown
-doer ui
 doer e.toggle
 
 : click-colors
@@ -206,8 +195,7 @@ defer hide-editor
       mx @ my @ slide selector e.draw
     then
   ;and
-  make ui    selector e.draw ;and
-    ui
+  selector e.draw
   ;
 
 :noname
@@ -220,8 +208,7 @@ defer hide-editor
       mx @ my @ drawdot
     then
   ;and
-  make ui    selector hidevalues drawstage ;and
-    ui
+  selector e.hide drawstage
   ; is hide-editor
 
 \ ===

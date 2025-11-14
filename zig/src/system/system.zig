@@ -474,7 +474,7 @@ pub const System = struct {
         // TODO allow for different allocator than the kernels
         try self.video.init(k.allocator);
 
-        try self.resource_manager.init(k.allocator);
+        try self.resource_manager.init(k.allocator, &k.handles);
         self.resources.screen.resource.image = &self.video.pixels.image;
         self.resources.screen.handle = try self.resource_manager.register(
             &self.resources.screen.resource,
