@@ -315,6 +315,17 @@ compiler definitions
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
 forth definitions
 
+\ dynamic ===
+
+external allocate
+external free
+external reallocate
+external dyn!
+external dyn@
+
+\ ===
+
+
 0 [if]
 : postpone word cond
   2dup cvocab @ cfind ?dup if -rot 2drop >cfa , else
