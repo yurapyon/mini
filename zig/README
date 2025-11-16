@@ -17,10 +17,18 @@ files:
     system.sh                  - run the virtual pc, expects 'zig build' has already been called
   src/
     examples/                  - more complete scripts
-    sketch/                    - random unfinished scripts
+      cal.mini.fth             - prints a calendar
+      citrus.mini.fth          - computer status bar
+      home.mini.fth            - formats pwd for shell prompts
+      life.mini.fth            - conways game of life
+      vpc-drawing.mini.fth     - GUI program, for drawing
+      vpc-life.mini.fth        - GUI program, conways game of life
+      vpc-console.mini.fth     - [WIP] GUI program, simple terminal interface
+    sketch/                    - random unfinished/testing scripts
     lib/                       - "libraries" of external functions
       os.zig                   - OS access
       floats.zig               - 32 bit floats
+      dynamic.zig              - dynamic memory
     system/                    - virtual PC
     utils/                     - zig utils
     bytecodes.zig              - bytecode behaviors and the code-field lookup table

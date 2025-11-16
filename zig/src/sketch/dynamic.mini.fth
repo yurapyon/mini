@@ -1,24 +1,57 @@
 256 allocate constant mem
 
+\ store and fetch ===
+
+: .mem
+  ." dec: "
+  0 mem dyn@ .
+  2 mem dyn@ .
+  4 mem dyn@ .
+  6 mem dyn@ . cr
+
+  ." hex: "
+  hex
+  0 mem dyn@ .
+  2 mem dyn@ .
+  4 mem dyn@ .
+  6 mem dyn@ . cr
+
+  ." chars: "
+  4 mem dync@ .
+  5 mem dync@ .
+  6 mem dync@ .
+  7 mem dync@ . cr
+  decimal
+  ;
+
 0 0 mem dyn!
 5 2 mem dyn!
 $dead 4 mem dyn!
 $beef 6 mem dyn!
 
-0 mem dyn@ .
-2 mem dyn@ .
-hex
-4 mem dyn@ .
-6 mem dyn@ . cr
-decimal
+.mem cr
 
 128 mem reallocate
 
-0 mem dyn@ .
-2 mem dyn@ .
+.mem cr
+
+2 0 mem dyn+!
+1 4 mem dyn+c!
+
+.mem cr
+
+\ copying ===
+
+create to-copy $abcd , $1234 ,
+
+to-copy 0 mem 2 cells >dyn
+
+.mem cr
+
+4 mem to-copy 2 cells dyn>
+
 hex
-4 mem dyn@ .
-6 mem dyn@ . cr
+to-copy @+ . @ . cr
 decimal
 
 mem free

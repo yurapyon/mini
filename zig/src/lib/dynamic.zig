@@ -12,11 +12,16 @@ const External = externals.External;
 
 // ===
 
-fn getMemoryFromHandle(k: *Kernel, handle_id: Cell) ?struct {
+// TODO
+// dynmove
+// saving and loading dynamic memory from file
+
+fn getMemoryFromHandle(k: *Kernel, handle_id: Cell) !struct {
     ptr: *[]u8,
     slice: []u8,
 } {
-    const any_ptr = k.handles.getHandlePtr(handle_id) orelse return null;
+    const any_ptr = k.handles.getHandlePtr(handle_id) orelse
+        return error.InvalidHandleId;
     const ptr = @as(*[]u8, @ptrCast(@alignCast(any_ptr)));
     const slice = ptr.*;
     return .{
@@ -25,13 +30,13 @@ fn getMemoryFromHandle(k: *Kernel, handle_id: Cell) ?struct {
     };
 }
 
-fn getSliceFromHandle(k: *Kernel, handle_id: Cell) ?[]u8 {
-    const m = getMemoryFromHandle(k, handle_id) orelse return null;
+fn getSliceFromHandle(k: *Kernel, handle_id: Cell) ![]u8 {
+    const m = try getMemoryFromHandle(k, handle_id);
     return m.slice;
 }
 
-fn getCellSliceFromHandle(k: *Kernel, handle_id: Cell) ?[]Cell {
-    const m = getMemoryFromHandle(k, handle_id) orelse return null;
+fn getCellSliceFromHandle(k: *Kernel, handle_id: Cell) ![]Cell {
+    const m = try getMemoryFromHandle(k, handle_id);
 
     const cell_ptr = @as([*]Cell, @ptrCast(@alignCast(m.slice.ptr)));
 
@@ -71,24 +76,23 @@ fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
 fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const handle_id = k.data_stack.popCell();
 
-    const memory = getMemoryFromHandle(k, handle_id);
-    if (memory) |m| {
-        k.allocator.free(m.slice);
-        k.allocator.destroy(m.ptr);
-        k.handles.freeHandle(handle_id);
-    }
+    const m = getMemoryFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    k.allocator.free(m.slice);
+    k.allocator.destroy(m.ptr);
+    k.handles.freeHandle(handle_id);
 }
 
 fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const handle_id = k.data_stack.popCell();
     const new_size = k.data_stack.popCell();
 
-    const memory = getMemoryFromHandle(k, handle_id);
-    if (memory) |m| {
-        const realloced_slice = k.allocator.realloc(m.slice, new_size) catch
-            return error.ExternalPanic;
-        m.ptr.* = realloced_slice;
-    }
+    const m = getMemoryFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+    const realloced_slice = k.allocator.realloc(m.slice, new_size) catch
+        return error.ExternalPanic;
+    m.ptr.* = realloced_slice;
 }
 
 fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
@@ -96,30 +100,152 @@ fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
 
-    const slice = getCellSliceFromHandle(k, handle_id);
+    const slice = getCellSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
 
-    if (slice) |slc| {
-        // TODO test length
-        // TODO check alignment
-        slc[addr / 2] = value;
+    try mem.assertCellAccess(addr);
+
+    if (addr / 2 >= slice.len) {
+        return error.OutOfBounds;
     }
+
+    slice[addr / 2] = value;
+}
+
+fn dynPlusStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
+
+    const slice = getCellSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    try mem.assertCellAccess(addr);
+
+    if (addr / 2 >= slice.len) {
+        return error.OutOfBounds;
+    }
+
+    slice[addr / 2] +%= value;
 }
 
 fn dynFetch(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 
-    const slice = getCellSliceFromHandle(k, handle_id);
+    const slice = getCellSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
 
-    if (slice) |slc| {
-        // TODO test length
-        // TODO check alignment
-        const value = slc[addr / 2];
-        k.data_stack.pushCell(value);
-    } else {
-        // TODO what to do here?
-        k.data_stack.pushCell(0);
+    try mem.assertCellAccess(addr);
+
+    if (addr / 2 >= slice.len) {
+        return error.OutOfBounds;
     }
+
+    const value = slice[addr / 2];
+    k.data_stack.pushCell(value);
+}
+
+fn dynStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
+
+    const slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    if (addr >= slice.len) {
+        return error.OutOfBounds;
+    }
+
+    slice[addr] = @truncate(value);
+}
+
+fn dynPlusStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+    const value = k.data_stack.popCell();
+
+    const slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    if (addr >= slice.len) {
+        return error.OutOfBounds;
+    }
+
+    slice[addr] +%= @truncate(value);
+}
+
+fn dynFetchC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = k.data_stack.popCell();
+    const addr = k.data_stack.popCell();
+
+    const slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    if (addr >= slice.len) {
+        return error.OutOfBounds;
+    }
+
+    const value = slice[addr];
+    k.data_stack.pushCell(value);
+}
+
+fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const count = k.data_stack.popCell();
+    const handle_id = k.data_stack.popCell();
+    const destination = k.data_stack.popCell();
+    const source = k.data_stack.popCell();
+
+    const dynamic_slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    const end_addr = @as(u32, destination) + @as(u32, count);
+
+    if (end_addr >= dynamic_slice.len) {
+        return error.OutOfBounds;
+    }
+
+    const source_slice = try mem.constSliceFromAddrAndLen(
+        k.memory,
+        source,
+        count,
+    );
+
+    const destination_slice = dynamic_slice[destination..(destination + count)];
+
+    @memcpy(destination_slice, source_slice);
+}
+
+fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const count = k.data_stack.popCell();
+    const destination = k.data_stack.popCell();
+    const handle_id = k.data_stack.popCell();
+    const source = k.data_stack.popCell();
+
+    const dynamic_slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    const end_addr = @as(u32, source) + @as(u32, count);
+
+    if (end_addr >= dynamic_slice.len) {
+        return error.OutOfBounds;
+    }
+
+    const source_slice = dynamic_slice[source..(source + count)];
+
+    const destination_slice = try mem.sliceFromAddrAndLen(
+        k.memory,
+        destination,
+        count,
+    );
+
+    @memcpy(destination_slice, source_slice);
+}
+
+fn dynMove(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    _ = k;
+    // TODO
 }
 
 pub fn registerExternals(k: *Kernel) !void {
@@ -139,8 +265,36 @@ pub fn registerExternals(k: *Kernel) !void {
         .callback = dynStore,
         .userdata = null,
     });
+    try k.addExternal("dyn+!", .{
+        .callback = dynPlusStore,
+        .userdata = null,
+    });
     try k.addExternal("dyn@", .{
         .callback = dynFetch,
+        .userdata = null,
+    });
+    try k.addExternal("dync!", .{
+        .callback = dynStoreC,
+        .userdata = null,
+    });
+    try k.addExternal("dyn+c!", .{
+        .callback = dynPlusStoreC,
+        .userdata = null,
+    });
+    try k.addExternal("dync@", .{
+        .callback = dynFetchC,
+        .userdata = null,
+    });
+    try k.addExternal(">dyn", .{
+        .callback = toDyn,
+        .userdata = null,
+    });
+    try k.addExternal("dyn>", .{
+        .callback = fromDyn,
+        .userdata = null,
+    });
+    try k.addExternal("dynmove", .{
+        .callback = dynMove,
         .userdata = null,
     });
 }
