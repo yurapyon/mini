@@ -12,4 +12,13 @@ hex
 6 mem dyn@ . cr
 decimal
 
+128 mem reallocate
+
+0 mem dyn@ .
+2 mem dyn@ .
+hex
+4 mem dyn@ .
+6 mem dyn@ . cr
+decimal
+
 mem free
