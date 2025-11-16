@@ -200,6 +200,7 @@ fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const dynamic_slice = getSliceFromHandle(k, handle_id) catch
         return error.ExternalPanic;
 
+    // TODO calculating bounds like this is kindof messy
     const end_addr = @as(u32, destination) + @as(u32, count);
 
     if (end_addr >= dynamic_slice.len) {
@@ -226,6 +227,7 @@ fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const dynamic_slice = getSliceFromHandle(k, handle_id) catch
         return error.ExternalPanic;
 
+    // TODO calculating bounds like this is kindof messy
     const end_addr = @as(u32, source) + @as(u32, count);
 
     if (end_addr >= dynamic_slice.len) {

@@ -10,11 +10,13 @@ files:
   mini-out/
     precomiled.mini.bin        - main startup image, created as output of self-host.mini.fth
     precomiled-stable.mini.bin - backup startup image, for if there is an error in precompiled.mini.bin, created manually
+
   shell/
     precompile-stable.sh       - compile the startup image, using precompiled-stable.mini.bin as the runtime
     precompile.sh              - compile the startup image, using precompiled.mini.bin as the runtime
     run.sh                     - run the forth repl, expects 'zig build' has already been called
     system.sh                  - run the virtual pc, expects 'zig build' has already been called
+
   src/
     examples/                  - more complete scripts
       cal.mini.fth             - prints a calendar
@@ -24,13 +26,34 @@ files:
       vpc-drawing.mini.fth     - GUI program, for drawing
       vpc-life.mini.fth        - GUI program, conways game of life
       vpc-console.mini.fth     - [WIP] GUI program, simple terminal interface
+
     sketch/                    - random unfinished/testing scripts
+
     lib/                       - "libraries" of external functions
       os.zig                   - OS access
       floats.zig               - 32 bit floats
       dynamic.zig              - dynamic memory
+
     system/                    - virtual PC
+      content/                 - system resources (images)
+      deps/                    - external libraries
+      shaders/                 - GLSL shaders
+      utils/                   - system utils
+
+      c.zig                    - c bindings
+      characters.zig           - character buffer
+      image.zig                - images (the main data structure for working with pixel data)
+      math.zig                 - graphics math
+      palette.zig              - structure to manage sets of colors
+      pixels.zig               - pixel buffer
+      resource-manager.zig     - for working with images and timers
+      system.mini.fth          - system startup file for mini
+      system.zig               - main file for the virtual PC
+      timer.zig                - abstraction for time and fps management
+      video.zig                - sets up the character and pixel buffers
+
     utils/                     - zig utils
+
     bytecodes.zig              - bytecode behaviors and the code-field lookup table
     cli_options.zig            - basic commandline option interpreter
     externals.zig              - struct for defining external functions
