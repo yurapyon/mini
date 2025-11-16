@@ -19,18 +19,22 @@ pub const Resource = union(enum) {
 
 pub const ResourceManager = struct {
     allocator: Allocator,
-    handles: Handles,
+    handles: *Handles,
     resources: ArrayList(*Resource),
 
-    pub fn init(self: *@This(), allocator: Allocator) !void {
+    pub fn init(
+        self: *@This(),
+        allocator: Allocator,
+        handles: *Handles,
+    ) !void {
         self.allocator = allocator;
-        self.handles.init(allocator);
+        self.handles = handles;
         self.resources = .empty;
     }
 
     pub fn deinit(self: *@This()) void {
         // TODO deinit and free all resources
-        self.handles.deinit();
+        _ = self;
     }
 
     fn createResource(self: *@This()) !struct {

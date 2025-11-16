@@ -1,5 +1,8 @@
 : \ source-len @ >in ! ;
 
+\ NOTE
+\ Max line length in this file is 128 chars
+
 : forth       fvocab context ! ;    \ ( -- )
 : compiler    cvocab context ! ;    \ ( -- )
 : definitions context @ current ! ; \ ( -- )
@@ -314,6 +317,25 @@ compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
 forth definitions
+
+\ dynamic ===
+
+external allocate
+external free
+external reallocate
+external dyn!
+external dyn+!
+external dyn@
+external dync!
+external dyn+c!
+external dync@
+
+external >dyn    \ ( s d h l -- )     copies from forth memory to dynamic memory
+external dyn>    \ ( s h d l -- )     copies from dynamic memory to forth memory
+external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
+
+\ ===
+
 
 0 [if]
 : postpone word cond

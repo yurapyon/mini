@@ -6,6 +6,8 @@ goals:
   evolution of a classic
     "writing a forth" is more important than "designing a modern language"
 
+checkout zig/src/examples for code samples
+
 features:
   overall:
     clean, self-documenting codebase (hopefully)
@@ -23,6 +25,7 @@ features:
     easy-to-use FFI, currently builds in:
       OS access
       32-bit floats
+      dynamic memory
   virtual PC:
     based off of the PC-98 computer
     pixel buffer
@@ -31,9 +34,6 @@ features:
 
 roadmap:
   in progress:
-    io
-      graphics
-      keyboard/mouse
   planned:
     io
       audio

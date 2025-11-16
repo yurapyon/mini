@@ -119,6 +119,7 @@ fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.data_stack.pushCell(@truncate(str.len));
 }
 
+// TODO could move these somewhere else maybe?
 fn zeroEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.debug.exec_counter = 0;
 }

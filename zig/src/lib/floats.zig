@@ -14,9 +14,9 @@ const Float = f32;
 
 // TODO
 // it would be hard to reinterpret the stack memory as float*
-// this would require the stack is float aligned, which isn't guaranteed
-// this would be better for performance though
-// using a separate float stack could be ok
+//   this would require the stack is float aligned, which isn't guaranteed
+//   this could be better for performance though
+// think about using a separte float stack
 
 fn popFloat(k: *Kernel) Float {
     const hi: u32 = k.data_stack.popCell();
