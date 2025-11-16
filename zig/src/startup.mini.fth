@@ -330,9 +330,9 @@ external dync!
 external dyn+c!
 external dync@
 
-external >dyn    \ ( s d l h -- )     copies from forth memory to dynamic memory
-external dyn>    \ ( s d l h -- )     copies from dynamic memory to forth memory
-external dynmove \ ( s d l h0 h1 -- ) copies between dynamic memory
+external >dyn    \ ( s d h l -- )     copies from forth memory to dynamic memory
+external dyn>    \ ( s h d l -- )     copies from dynamic memory to forth memory
+external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ ===
 
