@@ -1,24 +1,17 @@
 import type { Component } from 'solid-js';
 import { TitleBar } from "./components/TitleBar";
+import { Documentation } from "./components/documentation/Documentation";
 
 const ScriptEditor = () => {
-  return <div class="bg-[#201010] text-sm shrink-0" style={{
+  return <div class="bg-[#201010] text-xs" style={{
     width: "64ch"
   }}>
     Script editor
   </div>;
 }
 
-const Documentation = () => {
-  return <div class="bg-[#102010] text-sm" style={{
-    width: "64ch"
-  }}>
-    Documentation
-  </div>;
-}
-
 const Terminal = () => {
-  return <div class="bg-[#000010] text-sm shrink-0 flex flex-col" style={{
+  return <div class="bg-[#000010] text-xs flex flex-col" style={{
     width: "64ch"
   }}>
     <div class="min-h-0 grow">
