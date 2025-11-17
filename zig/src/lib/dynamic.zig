@@ -73,6 +73,27 @@ fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.data_stack.pushCell(handle_id);
 }
 
+fn allocate0(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const slice = k.allocator.allocWithOptions(
+        u8,
+        0,
+        std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
+        null,
+    ) catch return error.ExternalPanic;
+    errdefer k.allocator.free(slice);
+
+    const ptr = k.allocator.create([]u8) catch
+        return error.ExternalPanic;
+    errdefer k.allocator.destroy(ptr);
+
+    ptr.* = slice;
+
+    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
+        return error.ExternalPanic;
+
+    k.data_stack.pushCell(handle_id);
+}
+
 fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const handle_id = k.data_stack.popCell();
 
@@ -253,6 +274,10 @@ fn dynMove(k: *Kernel, _: ?*anyopaque) External.Error!void {
 pub fn registerExternals(k: *Kernel) !void {
     try k.addExternal("allocate", .{
         .callback = allocate,
+        .userdata = null,
+    });
+    try k.addExternal("allocate0", .{
+        .callback = allocate0,
         .userdata = null,
     });
     try k.addExternal("free", .{

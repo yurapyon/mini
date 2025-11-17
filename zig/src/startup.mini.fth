@@ -321,6 +321,7 @@ forth definitions
 \ dynamic ===
 
 external allocate
+external allocate0
 external free
 external reallocate
 external dyn!

@@ -78,6 +78,20 @@ create coords #coords /coord * allot
 
 \ canvas ===
 
+0 [if]
+s[
+  cell field >canvas-id
+]s /layer
+
+0 variable #layers
+allocate0 constant layers
+
+: add-layer
+  #layers @ dup 1+ /layer * layers reallocate
+  600 360 ialloc swap layers dyn!
+  ;
+[then]
+
 600 360 ialloc constant canvas
 
 0 variable stagex
