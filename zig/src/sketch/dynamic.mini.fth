@@ -3,6 +3,8 @@
 \ store and fetch ===
 
 : .mem
+  ." size: " mem dynsize . cr
+
   ." dec: "
   0 mem dyn@ .
   2 mem dyn@ .
@@ -54,4 +56,17 @@ hex
 to-copy @+ . @ . cr
 decimal
 
+0 allocate constant mem2
+
+mem2 . cr
+mem2 dynsize . cr
+
+4 cells mem2 reallocate
+
+$abcd 0 mem2 dyn!
+
+0 mem2 dyn@ .short cr
+mem2 dynsize . cr
+
 mem free
+mem2 free

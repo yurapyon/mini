@@ -47,50 +47,35 @@ fn getCellSliceFromHandle(k: *Kernel, handle_id: Cell) ![]Cell {
     return cell_slice;
 }
 
+fn allocateAndGetHandleId(k: *Kernel, size: usize) External.Error!Cell {
+    const slice = mem.allocate(
+        k.allocator,
+        size,
+    ) catch return error.ExternalPanic;
+    errdefer k.allocator.free(slice);
+
+    const ptr = k.allocator.create([]u8) catch
+        return error.ExternalPanic;
+    errdefer k.allocator.destroy(ptr);
+
+    ptr.* = slice;
+
+    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
+        return error.ExternalPanic;
+
+    return handle_id;
+}
+
 //
 
 fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const size = k.data_stack.popCell();
-
-    const adj_size: usize = if (size == 0) mem.memory_size else size;
-    const slice = k.allocator.allocWithOptions(
-        u8,
-        adj_size,
-        std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
-        null,
-    ) catch return error.ExternalPanic;
-    errdefer k.allocator.free(slice);
-
-    const ptr = k.allocator.create([]u8) catch
-        return error.ExternalPanic;
-    errdefer k.allocator.destroy(ptr);
-
-    ptr.* = slice;
-
-    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
-        return error.ExternalPanic;
-
+    const handle_id = try allocateAndGetHandleId(k, size);
     k.data_stack.pushCell(handle_id);
 }
 
-fn allocate0(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    const slice = k.allocator.allocWithOptions(
-        u8,
-        0,
-        std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
-        null,
-    ) catch return error.ExternalPanic;
-    errdefer k.allocator.free(slice);
-
-    const ptr = k.allocator.create([]u8) catch
-        return error.ExternalPanic;
-    errdefer k.allocator.destroy(ptr);
-
-    ptr.* = slice;
-
-    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
-        return error.ExternalPanic;
-
+fn allocatePage(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = try allocateAndGetHandleId(k, mem.forth_memory_size);
     k.data_stack.pushCell(handle_id);
 }
 
@@ -114,6 +99,15 @@ fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
     const realloced_slice = k.allocator.realloc(m.slice, new_size) catch
         return error.ExternalPanic;
     m.ptr.* = realloced_slice;
+}
+
+fn dynSize(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = k.data_stack.popCell();
+
+    const slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    k.data_stack.pushCell(@truncate(slice.len));
 }
 
 fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
@@ -276,8 +270,8 @@ pub fn registerExternals(k: *Kernel) !void {
         .callback = allocate,
         .userdata = null,
     });
-    try k.addExternal("allocate0", .{
-        .callback = allocate0,
+    try k.addExternal("allocate-page", .{
+        .callback = allocatePage,
         .userdata = null,
     });
     try k.addExternal("free", .{
@@ -286,6 +280,10 @@ pub fn registerExternals(k: *Kernel) !void {
     });
     try k.addExternal("reallocate", .{
         .callback = reallocate,
+        .userdata = null,
+    });
+    try k.addExternal("dynsize", .{
+        .callback = dynSize,
         .userdata = null,
     });
     try k.addExternal("dyn!", .{
