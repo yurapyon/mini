@@ -334,11 +334,9 @@ t: char>digit
   then then then t;
 
 t: str>number 0 literal pad ! >r range |: 2dup u> if
-    dup c@ char>digit r@ 2dup < if pad @ * + pad ! 1+ loop else 2drop then
+    dup c@ char>digit r@ 2dup u< if pad @ * + pad ! 1+ loop else 2drop then
   then r> drop = pad @ swap t;
 
-\ todo
-\ this parses '2*' as 19
 t: >number 2dup str>char if -rot 2drop true exit else drop then
   str>neg >r str>base str>number tuck r> and if negate then swap t;
 

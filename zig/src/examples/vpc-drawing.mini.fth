@@ -78,10 +78,16 @@ create coords #coords /coord * allot
 
 \ canvas ===
 
-0 [if]
 s[
   cell field >canvas-id
+  cell field >name
 ]s /layer
+
+<array> constant layers
+
+: add-layer
+  600 360 ialloc layers push
+  <array> layers push ;
 
 0 variable #layers
 allocate0 constant layers
@@ -90,6 +96,8 @@ allocate0 constant layers
   #layers @ dup 1+ /layer * layers reallocate
   600 360 ialloc swap layers dyn!
   ;
+
+0 [if]
 [then]
 
 600 360 ialloc constant canvas
