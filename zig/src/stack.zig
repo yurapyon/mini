@@ -37,6 +37,12 @@ pub fn Stack(
             return top_addr - current_top;
         }
 
+        pub fn assertWontUnderflow(self: @This(), expected: Cell) !void {
+            if (self.depth() < expected * @sizeOf(Cell)) {
+                return error.StackUnderflow;
+            }
+        }
+
         fn peek(self: *@This(), at: Cell) *Cell {
             // TODO handle stack underflow
             const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
