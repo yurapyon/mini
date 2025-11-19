@@ -82,6 +82,8 @@ pub fn exit(k: *Kernel) Error!void {
 }
 
 pub fn execute(k: *Kernel) Error!void {
+    try k.data_stac.assertWontUnderflow(1);
+
     const cfa_addr = k.data_stack.popCell();
     try k.pushReturnAddr();
     k.setCfaToExecute(cfa_addr);
@@ -89,8 +91,10 @@ pub fn execute(k: *Kernel) Error!void {
 
 pub fn jump(k: *Kernel) Error!void {
     try k.assertValidProgramCounter();
+
     const addr = try mem.readCell(k.memory, k.program_counter.fetch());
     try mem.assertOffsetInBounds(addr, @sizeOf(Cell));
+
     k.program_counter.store(addr);
 }
 
@@ -107,6 +111,7 @@ pub fn jump0(k: *Kernel) Error!void {
 
 pub fn lit(k: *Kernel) Error!void {
     try k.assertValidProgramCounter();
+
     const value = try mem.readCell(k.memory, k.program_counter.fetch());
     k.data_stack.pushCell(value);
     try k.advancePC(@sizeOf(Cell));
@@ -168,112 +173,134 @@ pub fn emit(k: *Kernel) Error!void {
 
 pub fn eq(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.eq();
 }
 
 pub fn eq0(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.eq0();
 }
 
 pub fn gt(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.gt();
 }
 
 pub fn gteq(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.gteq();
 }
 
 pub fn lt(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.lt();
 }
 
 pub fn lteq(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.lteq();
 }
 
 pub fn ugt(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.ugt();
 }
 
 pub fn ugteq(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.ugteq();
 }
 
 pub fn ult(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.ult();
 }
 
 pub fn ulteq(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.ulteq();
 }
 
 pub fn and_(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.and_();
 }
 
 pub fn or_(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.ior();
 }
 
 pub fn xor(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.xor();
 }
 
 pub fn invert(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.invert();
 }
 
 pub fn lshift(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.lshift();
 }
 
 pub fn rshift(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.rshift();
 }
 
 pub fn inc(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.inc();
 }
 
 pub fn dec(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.dec();
 }
 
 pub fn negate(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     const value = k.data_stack.popSignedCell();
     k.data_stack.pushSignedCell(-value);
 }
 
 pub fn drop(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.drop();
 }
 
 pub fn dup(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.data_stack.dup();
 }
 
 pub fn maybeDup(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     const top = k.data_stack.peekCell();
     if (kernel.isTruthy(top)) {
         k.data_stack.dup();
@@ -282,41 +309,49 @@ pub fn maybeDup(k: *Kernel) Error!void {
 
 pub fn swap(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.swap();
 }
 
 pub fn flip(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
+
     k.data_stack.flip();
 }
 
 pub fn over(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.over();
 }
 
 pub fn nip(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.nip();
 }
 
 pub fn tuck(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.tuck();
 }
 
 pub fn rot(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
+
     k.data_stack.rot();
 }
 
 pub fn nrot(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
+
     k.data_stack.nrot();
 }
 
 pub fn store(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
     try mem.writeCell(k.memory, addr, value);
@@ -324,6 +359,7 @@ pub fn store(k: *Kernel) Error!void {
 
 pub fn storeAdd(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
     (try mem.cellPtr(k.memory, addr)).* +%= value;
@@ -331,12 +367,14 @@ pub fn storeAdd(k: *Kernel) Error!void {
 
 pub fn fetch(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     const addr = k.data_stack.popCell();
     k.data_stack.pushCell(try mem.readCell(k.memory, addr));
 }
 
 pub fn storeC(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
@@ -345,6 +383,7 @@ pub fn storeC(k: *Kernel) Error!void {
 
 pub fn storeAddC(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
     const value_u8: u8 = @truncate(value);
@@ -353,63 +392,75 @@ pub fn storeAddC(k: *Kernel) Error!void {
 
 pub fn fetchC(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     const addr = k.data_stack.popCell();
     k.data_stack.pushCell(k.memory[addr]);
 }
 
 pub fn toR(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     k.return_stack.pushCell(k.data_stack.popCell());
 }
 
 pub fn fromR(k: *Kernel) Error!void {
     try k.return_stack.assertWontUnderflow(1);
+
     k.data_stack.pushCell(k.return_stack.popCell());
 }
 
 pub fn fetchR(k: *Kernel) Error!void {
     try k.return_stack.assertWontUnderflow(1);
+
     k.data_stack.pushCell(k.return_stack.peekCell());
 }
 
 pub fn plus(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.add();
 }
 
 pub fn minus(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.subtract();
 }
 
 pub fn multiply(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.multiply();
 }
 
 pub fn divide(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.divide();
 }
 
 pub fn mod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.mod();
 }
 
 pub fn udivide(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.udivide();
 }
 
 pub fn umod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     k.data_stack.umod();
 }
 
 // TODO move this into DataStack definiton
 pub fn divmod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const div = k.data_stack.popCell();
     const value = k.data_stack.popCell();
     const q = value / div;
@@ -421,6 +472,7 @@ pub fn divmod(k: *Kernel) Error!void {
 // TODO move this into DataStack definiton
 pub fn muldiv(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
+
     const div = k.data_stack.popCell();
     const mul = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -436,6 +488,7 @@ pub fn muldiv(k: *Kernel) Error!void {
 // TODO move this into DataStack definiton
 pub fn muldivmod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
+
     const div = k.data_stack.popCell();
     const mul = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -454,6 +507,7 @@ pub fn move(k: *Kernel) Error!void {
     const std = @import("std");
 
     try k.data_stack.assertWontUnderflow(3);
+
     const count = k.data_stack.popCell();
     const destination = k.data_stack.popCell();
     const source = k.data_stack.popCell();
@@ -479,6 +533,7 @@ pub fn memEqual(k: *Kernel) Error!void {
     const std = @import("std");
 
     try k.data_stack.assertWontUnderflow(3);
+
     const count = k.data_stack.popCell();
     const b_addr = k.data_stack.popCell();
     const a_addr = k.data_stack.popCell();
@@ -498,6 +553,7 @@ pub fn memEqual(k: *Kernel) Error!void {
 
 pub fn rClear(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(1);
+
     const next = k.data_stack.popCell();
     k.return_stack.clear();
     k.return_stack.pushCell(0);
@@ -506,6 +562,7 @@ pub fn rClear(k: *Kernel) Error!void {
 
 pub fn extId(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
+
     const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 

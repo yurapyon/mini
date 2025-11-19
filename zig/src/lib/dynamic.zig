@@ -69,6 +69,8 @@ fn allocateAndGetHandleId(k: *Kernel, size: usize) External.Error!Cell {
 //
 
 fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const size = k.data_stack.popCell();
     const handle_id = try allocateAndGetHandleId(k, size);
     k.data_stack.pushCell(handle_id);
@@ -80,6 +82,8 @@ fn allocatePage(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const handle_id = k.data_stack.popCell();
 
     const m = getMemoryFromHandle(k, handle_id) catch
@@ -91,6 +95,8 @@ fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const new_size = k.data_stack.popCell();
 
@@ -102,6 +108,8 @@ fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynSize(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const handle_id = k.data_stack.popCell();
 
     const slice = getSliceFromHandle(k, handle_id) catch
@@ -111,6 +119,8 @@ fn dynSize(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -128,6 +138,8 @@ fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynPlusStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -145,6 +157,8 @@ fn dynPlusStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynFetch(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 
@@ -162,6 +176,8 @@ fn dynFetch(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -177,6 +193,8 @@ fn dynStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynPlusStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -192,6 +210,8 @@ fn dynPlusStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynFetchC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 
@@ -207,6 +227,8 @@ fn dynFetchC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(4);
+
     const count = k.data_stack.popCell();
     const handle_id = k.data_stack.popCell();
     const destination = k.data_stack.popCell();
@@ -234,6 +256,8 @@ fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(4);
+
     const count = k.data_stack.popCell();
     const destination = k.data_stack.popCell();
     const handle_id = k.data_stack.popCell();
@@ -261,8 +285,20 @@ fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynMove(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    _ = k;
+    try k.data_stack.assertWontUnderflow(5);
+
+    const count = k.data_stack.popCell();
+    const destination_id = k.data_stack.popCell();
+    const destination = k.data_stack.popCell();
+    const source_id = k.data_stack.popCell();
+    const source = k.data_stack.popCell();
+
     // TODO
+    _ = count;
+    _ = destination_id;
+    _ = destination;
+    _ = source_id;
+    _ = source;
 }
 
 pub fn registerExternals(k: *Kernel) !void {
