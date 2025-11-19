@@ -49,6 +49,7 @@ forth definitions
 : (lit),   lit, (later), ; \ ( -- a )
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
+\ todo probably don't need dist
 : dist     this - ;        \ ( a -- n )
 
 compiler definitions
@@ -122,6 +123,8 @@ forth definitions
 
 : type ( a n -- ) range check> if c@+ emit loop then 2drop ;
 :noname type '?' emit cr abort ; wnf !
+
+: external word 2dup extid -rot define , ;
 
 \ math ===
 

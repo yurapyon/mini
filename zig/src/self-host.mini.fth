@@ -2,20 +2,28 @@ fvocab context ! context @ current !
 
 : \ source-len @ >in ! ;
 
+\ NOTE
+\ Max line length in this file is 80 chars
+
+\ system ===
+
 : cells cell * ;
 
 : forth fvocab context ! ;
 : compiler cvocab context ! ;
 : definitions context @ current ! ;
+
 compiler definitions
 : literal lit, , ;
 : [compile] ' , ;
 : ['] ' lit, , ;
 forth definitions
+
 : constant word define ['] docon @ , , ;
 : enum dup constant 1+ ;
 : create word define ['] docre @ , ['] exit , ;
 : variable create , ;
+
 0 variable loop*
 : set-loop here loop* ! ;
 compiler definitions
@@ -23,36 +31,42 @@ compiler definitions
 : loop ['] jump , loop* @ , ;
 forth definitions
 : : : set-loop ;
+
 : (later), here 0 , ;
 : (lit), lit, (later), ;
 : this here swap ;
 : this! this ! ;
-: dist this - ;
+
 compiler definitions
-: if ['] jump0 , (later), ;
+: if   ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
+
+: check> [compile] |: ['] 2dup , ['] u> , ;
 forth definitions
-: ( next-char ')' = 0= if loop then ;
+
 : last current @ @ >cfa ;
 : >does cell + ;
 compiler definitions
 : does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
   ['] docol @ , ;
 forth definitions
+
 : value create , does> @ ;
 : vname ' 2 cells + ;
 : to  vname ! ;
 : +to vname +! ;
+
 : vocabulary create 0 , does> context ! ;
 
 : space bl emit ;
 : cr    10 emit ;
-: type range |: 2dup u> if c@+ emit loop then 2drop ;
+: type range check> if c@+ emit loop then 2drop ;
 : _wnf type '?' emit cr abort ;
 ' _wnf wnf !
 
 : digit>char dup 10 < if '0' else 'W' then + ;
+
 0 variable #start
 : #len pad #start @ - ;
 : <# pad #start ! ;
@@ -62,28 +76,25 @@ forth definitions
 : #s dup 0= if # else |: # dup if loop then then ;
 : #pad dup #len > if over hold loop then 2drop ;
 : h# 16 /mod digit>char hold ;
-: u.pad rot <# #s flip #pad #> type ;
-: u.r bl u.pad ;
-: u.0 '0' u.pad ;
+
 : u. <# #s #> type ;
-: . u. space ;
+: .  u. space ;
+
 : printable 32 126 in[,] ;
 : print dup printable 0= if drop '.' then emit ;
-: byte. <# h# h# #> type ;
-: short. <# h# h# h# h# #> type ;
+: .byte <# h# h# #> type ;
+: .short <# h# h# h# h# #> type ;
 
-: print. 2dup u> if c@+ print loop then 2drop ;
-: bytes. 2dup u> if c@+ byte. space loop then 2drop ;
+: .print 2dup u> if c@+ print loop then 2drop ;
+: .bytes 2dup u> if c@+ .byte space loop then 2drop ;
 
 : split over + tuck swap ;
 
+: .cells swap cell - check> 0= if dup @ . cell - loop then 2drop ;
+
 : sdata s* @ s0 over - ;
 : depth sdata nip cell / ;
-
-: .cells swap cell - |: 2dup <= if dup @ . cell - loop then
-  2drop ;
-: <.> <# '>' hold #s '<' hold #> type ;
-: .s depth <.> space sdata range .cells ;
+: .s    depth '<' emit u. '>' emit space sdata range .cells ;
 
 : println next-char drop source-rest type source-len @ >in ! ;
 
@@ -91,6 +102,8 @@ forth definitions
 : decimal 10 base ! ;
 
 : third >r over r> swap ;
+
+\ metacompiler ===
 
 vocabulary target
 target definitions
@@ -105,8 +118,8 @@ create mem 6 1024 * allot
 : t+c! mem + +c! ;
 : >t   swap mem + swap move ;
 
-: mem. swap mem + swap range |: 2dup u> if
-    16 split dup mem - short. space 2dup bytes. print.
+: .mem swap mem + swap range check> if
+    16 split dup mem - .short space 2dup .bytes .print
   cr loop then 2drop ;
 
 : l[ 0 ;
@@ -281,13 +294,13 @@ t: 3dup  >r 2dup r@ -rot r> t;
 
 t: source source-ptr @ ?dup 0= if input-buffer then source-len @ t;
 
-t: source@ source drop >in @ + t;
-t: next-char source@ c@ 1 literal >in +! t;
+t: source@     source drop >in @ + t;
+t: next-char   source@ c@ 1 literal >in +! t;
 t: source-rest source@ source + over - t;
 
 t: 1/string 1- swap 1+ swap t;
 t: -leading dup if over c@ bl = if 1/string loop then then t;
-t: range over + swap t;
+t: range    over + swap t;
 
 t: token -leading 2dup range
   |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip
@@ -297,20 +310,16 @@ t: word source-rest token 2dup + source drop - >in ! t;
 
 \ lookups ===
 
-t: c@+ dup 1+ swap c@ t;
-
-t: name cell + c@+ t;
-
+t: c@+     dup 1+ swap c@ t;
+t: name    cell + c@+ t;
 t: string= rot over = if mem= else drop 2drop false then t;
-
-t: locate dup if 3dup name string= 0= if @ loop then then nip nip t;
-
-t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
+t: locate  dup if 3dup name string= 0= if @ loop then then nip nip t;
+t: find    2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
 
 \ number conversion ===
 
 t: here h @ t;
-t: pad here 64 literal + t;
+t: pad  here 64 literal + t;
 
 t: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
   r> r> and and t;
@@ -342,16 +351,15 @@ t: >number 2dup str>char if -rot 2drop true exit else drop then
 
 \ interpret/compile ===
 
-t: allot h +! t;
-t: ,  here ! cell allot t;
-t: c, here c! 1 literal allot t;
-t: lit, lit lit , t;
+t: allot   h +! t;
+t: ,       here ! cell allot t;
+t: c,      here c! 1 literal allot t;
+t: lit,    lit lit , t;
+t: aligned dup cell mod + t;
+t: align   here aligned h ! t;
+t: >cfa    name + aligned t;
 
 t: execute execreg literal ! jump execreg t, t;
-
-t: aligned dup cell mod + t;
-t: align here aligned h ! t;
-t: >cfa name + aligned t;
 
 t: refill
   source-ptr @ if false else
@@ -394,8 +402,6 @@ t: define align here >r current @ @ ,
   dup c, tuck here swap move allot
   align r> current @ ! t;
 
-t: external word 2dup extid -rot define , t;
-
 \ extras ===
 
 t: ' word find dup if >cfa then t;
@@ -416,7 +422,7 @@ tforth tdefinitions
 
 \ ===
 
-0 there mem.
+0 there .mem
 println after compile: 
 .s cr
 println mem size: 
