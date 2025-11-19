@@ -250,7 +250,6 @@ forth definitions
 
 \ ===
 
-\ todo this behavior might be weird and maybe doesnt panic on EoF
 : [if]      0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
 : [then]    ;
 : [defined] word find 0= 0= ;

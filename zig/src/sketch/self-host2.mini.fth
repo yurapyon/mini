@@ -98,8 +98,7 @@ forth definitions
 
 : println next-char drop source-rest type source-len @ >in ! ;
 
-: c!+   tuck c! 1+ ;
-: fill  >r range check> if r@ swap c!+ loop then 2drop r> drop ;
+: fill  >r range check> if r@ swap c!+ loop then r> 3drop ;
 : erase 0 fill ;
 
 : third >r over r> swap ;
