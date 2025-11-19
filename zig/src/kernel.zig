@@ -131,7 +131,7 @@ pub const Kernel = struct {
     ) !void {
         self.allocator = allocator;
 
-        self.memory = try mem.allocateMemory(allocator);
+        self.memory = try mem.allocateForthMemory(allocator);
         self.handles.init(self.allocator);
         self.externals = .empty;
 
