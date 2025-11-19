@@ -56,14 +56,14 @@ compiler definitions
 : else ['] jump , (later), swap this! ; \ ( a -- a )
 : then this! ;                          \ ( a -- )
 
-: u>?|:  [compile] |: ['] 2dup , ['] u> , [compile] if ; \ ( -- a )
-: dup?|: [compile] |: ['] dup , [compile] if ;           \ ( -- a )
+: u>?|:  [compile] |: ['] 2dup , ['] u> , [compile] if ; \ ( -- a ) deprecated
+: dup?|: [compile] |: ['] dup , [compile] if ;           \ ( -- a ) deprecated
 
-: check>  [compile] |: ['] 2dup , ['] u> , ; \ ( -- a )
-: check!0 [compile] |: ['] dup , ;           \ ( -- a )
+: check>  [compile] |: ['] 2dup , ['] u> , ; \ ( -- )
+: check!0 [compile] |: ['] dup , ;           \ ( -- )
 
 0 constant cond
-: endcond dup?|: [compile] then loop then drop ; \ ( 0 ... a -- )
+: endcond check!0 if [compile] then loop then drop ; \ ( 0 ... a -- )
 
 : tailcall ['] jump , ' cell + , ; \ ( "name" -- )
 forth definitions
@@ -101,6 +101,7 @@ forth definitions
 : make ( "name" -- ) :noname cell + ' >value ! ;
 : undo ( "name" -- ) ['] noop cell + ' >value ! ;
 
+\ todo maybe dont need values
 : value ( n "name" -- ) create , does> @ ;
 : to    ( n "name" -- ) ' >value ! ;
 : +to   ( n "name" -- ) ' >value +! ;
@@ -109,6 +110,9 @@ compiler definitions
 : +to   ( "name" -- )   lit, ' >value , ['] +! , ;
 forth definitions
 
+: defer ( "name" -- )  create ['] noop , ['] exit , does> >r ;
+: is    ( a "name" --) ' >value ! ;
+
 : vocabulary ( "name" -- ) create 0 , does> context ! ;
 
 0 constant s[
@@ -116,7 +120,7 @@ forth definitions
 : +field ( a n "name" -- a ) over create , + does> @ + ;
 : field  ( a n "name" -- a ) swap aligned swap +field ;
 
-: type ( a n -- ) range |: 2dup u> if c@+ emit loop then 2drop ;
+: type ( a n -- ) range check> if c@+ emit loop then 2drop ;
 :noname type '?' emit cr abort ; wnf !
 
 \ math ===
@@ -128,8 +132,9 @@ forth definitions
 : min ( n0 n1 -- n ) 2dup > if swap then drop ;
 : max ( n0 n1 -- n ) 2dup < if swap then drop ;
 
--1 enum %lt enum %eq constant %gt
-: compare ( n0 n1 -- n ) 2dup = if 2drop %eq else > if %gt else %lt then then ;
+\ todo probably don't need compare
+\ -1 enum %lt enum %eq constant %gt
+\ : compare ( n0 n1 -- n ) 2dup = if 2drop %eq else > if %gt else %lt then then ;
 
 : clamp ( n min max -- n ) rot min max ;
 : in[,] ( n min max -- n ) rot tuck >= -rot <= and ;
@@ -203,7 +208,7 @@ forth definitions
 : .byte     ( n -- )    <# h# h# #> type ;
 : .short    ( n -- )    <# h# h# h# h# #> type ;
 
-: .cells    ( a a -- ) swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
+: .cells    ( a a -- ) swap cell - check> 0= if dup @ . cell - loop then 2drop ;
 
 : sdata ( -- a n ) s* @ s0 over - ;
 : depth ( -- n )   sdata nip cell / ;
@@ -213,7 +218,7 @@ forth definitions
 : rdepth ( -- n )   rdata nip cell / 1- ;
 : .r     ( -- )     rdepth ." (" u. ." ) " rdata range .cells ;
 
-: spaces ( n -- ) 0 u>?|: space 1+ loop then 2drop ;
+: spaces ( n -- ) 0 check> if space 1+ loop then 2drop ;
 
 \ applications ===
 
@@ -229,16 +234,16 @@ forth definitions
   endcond ;
 : .ascii ( n -- ) dup printable if emit else ctlcode type then ;
 : .col   ( n -- ) dup 3 u.r space dup .byte space .ascii 2 spaces ;
-: .row   ( n -- ) 128 range u>?|: dup .col 32 + loop then 2drop ;
-: ashy   ( -- )   32 0 u>?|: dup .row cr 1+ loop then 2drop ;
+: .row   ( n -- ) 128 range check> if dup .col 32 + loop then 2drop ;
+: ashy   ( -- )   32 0 check> if dup .row cr 1+ loop then 2drop ;
 
 : split  ( a n -- a+n a+n a ) over + tuck swap ;
-: .bytes ( a a -- ) u>?|: c@+ .byte space loop then 2drop ;
-: .print ( a a -- ) u>?|: c@+ print loop then 2drop ;
-: dump   ( a n -- ) range u>?|: 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
+: .bytes ( a a -- ) check> if c@+ .byte space loop then 2drop ;
+: .print ( a a -- ) check> if c@+ print loop then 2drop ;
+: dump   ( a n -- ) range check> if 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
 
 : .word ( a -- ) name tuck type if space then ;
-: words ( -- )   context @ @ dup?|: dup .word @ loop then drop ;
+: words ( -- )   context @ @ check!0 if dup .word @ loop then drop ;
 
 \ ===
 
@@ -354,7 +359,7 @@ external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ blocks ===
 
-: fill  ( a n n -- ) >r range u>?|: r@ swap c!+ loop then r> 3drop ;
+: fill  ( a n n -- ) >r range check> if r@ swap c!+ loop then r> 3drop ;
 : erase ( a n -- )   0 fill ;
 : blank ( a n -- )   bl fill ;
 
