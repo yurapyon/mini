@@ -50,7 +50,7 @@ forth definitions
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
 \ todo probably don't need dist
-: dist     this - ;        \ ( a -- n )
+\ : dist     this - ;        \ ( a -- n )
 
 compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
@@ -121,8 +121,13 @@ forth definitions
 : +field ( a n "name" -- a ) over create , + does> @ + ;
 : field  ( a n "name" -- a ) swap aligned swap +field ;
 
-: type ( a n -- ) range check> if c@+ emit loop then 2drop ;
+: type   ( a n -- ) range check> if c@+ emit loop then 2drop ;
+: spaces ( n -- )   0 check> if space 1+ loop then 2drop ;
+
 :noname type '?' emit cr abort ; wnf !
+\ todo
+\ :noname source-ptr @ 0= if source type cr >in @ spaces '*' emit cr then ;
+\ on-quit !
 
 : external word 2dup extid -rot define , ;
 
@@ -220,8 +225,6 @@ forth definitions
 : rdata  ( -- a n ) r* @ r0 over - cell /string ;
 : rdepth ( -- n )   rdata nip cell / 1- ;
 : .r     ( -- )     rdepth ." (" u. ." ) " rdata range .cells ;
-
-: spaces ( n -- ) 0 check> if space 1+ loop then 2drop ;
 
 \ applications ===
 

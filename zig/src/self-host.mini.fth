@@ -157,7 +157,9 @@ l[
    cell layout source-ptr
    cell layout source-len
    cell layout >in
+   \ todo could rename to on-wnf
    cell layout wnf
+   cell layout on-quit
 ]l internal0
 
 l[
@@ -212,7 +214,11 @@ target definitions
 : t.compiler    cvocab context ! ;
 : t.definitions context @ current ! ;
 
-: >init/exec/wnf initxt ! execreg cell + ! wnf ! ;
+: >sysinit
+  initxt !
+  execreg cell + !
+  wnf !
+  on-quit ! ;
 
 \ defining words ===
 
@@ -295,6 +301,7 @@ s0           constant s0
 r*           constant r*
 r0           constant r0
 wnf          constant wnf
+on-quit      constant on-quit
 
 : 2dup  over over ;
 : 2drop drop drop ;
@@ -401,7 +408,8 @@ wnf          constant wnf
     drop
   then ;
 
-: (quit) 0 literal source-ptr ! source-len @ >in ! interpret ;
+: (quit) on-quit @ execute
+  0 literal source-ptr ! source-len @ >in ! interpret ;
 
 : abort s0 s* ! quit ;
 : bye false stay ! ;
@@ -410,7 +418,11 @@ wnf          constant wnf
   dup c, tuck here swap move allot
   align r> current @ ! ;
 
-' 2drop exit-addr ' (quit) >init/exec/wnf
+' exit
+' 2drop
+exit-addr
+' (quit)
+>sysinit
 
 \ extras ===
 

@@ -387,6 +387,7 @@ pub const Kernel = struct {
     pub fn abort(self: *@This()) void {
         // TODO
         // maybe this should stop accepting the current file ?
+        // could print return stack
 
         const init_xt = self.init_xt.fetch();
 
