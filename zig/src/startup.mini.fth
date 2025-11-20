@@ -49,7 +49,8 @@ forth definitions
 : (lit),   lit, (later), ; \ ( -- a )
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
-: dist     this - ;        \ ( a -- n )
+\ todo probably don't need dist
+\ : dist     this - ;        \ ( a -- n )
 
 compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
@@ -120,8 +121,15 @@ forth definitions
 : +field ( a n "name" -- a ) over create , + does> @ + ;
 : field  ( a n "name" -- a ) swap aligned swap +field ;
 
-: type ( a n -- ) range check> if c@+ emit loop then 2drop ;
+: type   ( a n -- ) range check> if c@+ emit loop then 2drop ;
+: spaces ( n -- )   0 check> if space 1+ loop then 2drop ;
+
 :noname type '?' emit cr abort ; wnf !
+\ todo
+\ :noname source-ptr @ 0= if source type cr >in @ spaces '*' emit cr then ;
+\ on-quit !
+
+: external word 2dup extid -rot define , ;
 
 \ math ===
 
@@ -218,8 +226,6 @@ forth definitions
 : rdepth ( -- n )   rdata nip cell / 1- ;
 : .r     ( -- )     rdepth ." (" u. ." ) " rdata range .cells ;
 
-: spaces ( n -- ) 0 check> if space 1+ loop then 2drop ;
-
 \ applications ===
 
 \ todo rename []
@@ -247,7 +253,6 @@ forth definitions
 
 \ ===
 
-\ todo this behavior might be weird and maybe doesnt panic on EoF
 : [if]      0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
 : [then]    ;
 : [defined] word find 0= 0= ;

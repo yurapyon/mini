@@ -201,13 +201,53 @@ pub const Kernel = struct {
             self.current_token_addr.store(token_addr);
             try self.advancePC(@sizeOf(Cell));
 
-            const token = try mem.readCell(self.memory, token_addr);
+            // TODO
+            // print more debug info
+
+            const token = mem.readCell(self.memory, token_addr) catch |err| {
+                const message = switch (err) {
+                    error.MisalignedAddress => "Misaligned Address",
+                };
+
+                std.debug.print("Token Lookup Error: {s}\n", .{message});
+                self.abort();
+
+                continue;
+            };
 
             if (bytecodes.getBytecode(token)) |callback| {
-                try callback(self);
+                callback(self) catch |err| {
+                    const message = switch (err) {
+                        error.Panic => "Panic",
+                        error.InvalidProgramCounter => "Invalid Program Counter",
+                        error.OutOfBounds => "Out of Bounds",
+                        error.MisalignedAddress => "Misaligned Address",
+                        error.CannotAccept => "Cannot Accept",
+                        error.CannotEmit => "Cannot Emit",
+                        error.StackUnderflow => "Stack Underflow",
+                    };
+
+                    std.debug.print("Error: {s} {}\n", .{ message, token });
+                    self.abort();
+                };
             } else {
                 const ext_token = token - @as(Cell, @intCast(bytecodes.callbacks.len));
-                try self.processExternals(ext_token);
+                self.processExternals(ext_token) catch |err| {
+                    const message = switch (err) {
+                        error.Panic => "Panic",
+                        error.ExternalPanic => "External Panic",
+                        error.InvalidProgramCounter => "Invalid Program Counter",
+                        error.OutOfBounds => "Out of Bounds",
+                        error.MisalignedAddress => "Misaligned Address",
+                        error.CannotAccept => "Cannot Accept",
+                        error.CannotEmit => "Cannot Emit",
+                        error.StackUnderflow => "Stack Underflow",
+                        error.UnhandledExternal => "Unhandled External",
+                    };
+
+                    std.debug.print("External error: {s} {}\n", .{ message, ext_token });
+                    self.abort();
+                };
             }
         }
     }
@@ -235,8 +275,6 @@ pub const Kernel = struct {
     }
 
     pub fn pushReturnAddr(self: *@This()) !void {
-        // TODO this seems to work but theres a chance it doesnt
-
         // NOTE
         //   if k.pc.fetch().* === exit, then you don't need to push pc to the return stack
         // but you need to make sure that:
@@ -266,9 +304,6 @@ pub const Kernel = struct {
         if (ext_token < self.externals.items.len) {
             try self.externals.items[ext_token].external.call(self);
         } else {
-            std.debug.print("Unhandled external: {}\n", .{
-                ext_token,
-            });
             return error.UnhandledExternal;
         }
     }
@@ -347,5 +382,17 @@ pub const Kernel = struct {
         try self.setAcceptBuffer(str);
         self.initForth();
         try self.execute();
+    }
+
+    pub fn abort(self: *@This()) void {
+        // TODO
+        // maybe this should stop accepting the current file ?
+        // could print return stack
+
+        const init_xt = self.init_xt.fetch();
+
+        self.return_stack.clear();
+        self.return_stack.pushCell(0);
+        self.setCfaToExecute(init_xt);
     }
 };
