@@ -48,8 +48,7 @@ forth definitions
 : last current @ @ >cfa ;
 : >does cell + ;
 compiler definitions
-: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
-  ['] docol @ , ;
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
 forth definitions
 
 : value create , does> @ ;
@@ -262,7 +261,7 @@ builtins[
   b: drop   b: dup    b: ?dup  b: swap
   b: flip   b: over   b: nip   b: tuck
   b: rot    b: -rot   b: move  b: mem=
-  b: rclear b: extid
+  b: quit   b: extid
 println builtins ct: 
 ]builtins
 
@@ -402,9 +401,8 @@ wnf          constant wnf
     drop
   then ;
 
-\ todo this should stop accepting the current file too ?
-\ todo this should only kill the 'closest' interpreter ?
-: quit 0 literal source-ptr ! source-len @ >in ! ' interpret literal rclear ;
+: (quit) 0 literal source-ptr ! source-len @ >in ! interpret ;
+
 : abort s0 s* ! quit ;
 : bye false stay ! ;
 
@@ -412,7 +410,7 @@ wnf          constant wnf
   dup c, tuck here swap move allot
   align r> current @ ! ;
 
-' 2drop exit-addr ' interpret >init/exec/wnf
+' 2drop exit-addr ' (quit) >init/exec/wnf
 
 \ extras ===
 
