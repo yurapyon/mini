@@ -16,7 +16,19 @@ const resource_manager = @import("resource-manager.zig");
 const Resource = resource_manager.Resource;
 const ResourceManager = resource_manager.ResourceManager;
 
+const input_event = @import("input-event.zig");
+const InputChannel = input_event.InputChannel;
+
 // ===
+
+// Multithreading strategy
+// There need to be 3 different threads
+//   1. Forth kernel
+//   2. Graphics
+//   3. Audio (in the future)
+// An easy way to handle thread-safety is:
+//   1. Graphics->Forth, All GLFW events are put into a queue for Forth to poll
+//   2. Forth->Graphics, All drawing events are sent through a queue?
 
 const window_title = "pyon vPC";
 
@@ -33,15 +45,26 @@ const glfw_callbacks = struct {
         const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        // TODO
-        _ = scancode;
-        _ = mods;
+
         if (system.xts.key) |xt| {
             system.k.data_stack.pushCell(@intCast(keycode));
             system.k.data_stack.pushCell(@intCast(action));
             // TODO error
             system.k.callXt(xt) catch unreachable;
         }
+
+        // system.input_channel.push(.{
+        // .key = .{
+        // .keycode = keycode,
+        // .scancode = scancode,
+        // .action = action,
+        // .mods = mods,
+        // },
+        // TODO handle error
+        // }) catch unreachable;
+
+        _ = scancode;
+        _ = mods;
     }
 
     fn cursorPosition(
@@ -156,6 +179,19 @@ const exts = struct {
 
         std.Thread.sleep(30_000_000);
         // std.Thread.sleep(100_000_000);
+    }
+
+    fn poll(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+
+        const event = s.input_channel.pop();
+        if (event) |ev| {
+            // TODO push to stack
+            @import("std").debug.print("ev: {}\n", .{ev});
+            k.data_stack.pushBoolean(true);
+        } else {
+            k.data_stack.pushBoolean(false);
+        }
     }
 
     fn deinit(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -457,6 +493,7 @@ pub const System = struct {
     },
 
     window: *c.GLFWwindow,
+    input_channel: InputChannel,
     video: Video,
 
     resources: struct {
@@ -466,12 +503,14 @@ pub const System = struct {
 
     resource_manager: ResourceManager,
 
+    // TODO allow for different allocator than the kernels
     pub fn init(self: *@This(), k: *Kernel) !void {
         self.k = k;
 
         try self.initWindow();
 
-        // TODO allow for different allocator than the kernels
+        try self.input_channel.init(k.allocator);
+
         try self.video.init(k.allocator);
 
         try self.resource_manager.init(k.allocator, &k.handles);
@@ -562,6 +601,10 @@ pub const System = struct {
         });
         try k.addExternal("draw/poll", .{
             .callback = exts.drawPoll,
+            .userdata = self,
+        });
+        try k.addExternal("poll", .{
+            .callback = exts.poll,
             .userdata = self,
         });
         try k.addExternal("deinit", .{

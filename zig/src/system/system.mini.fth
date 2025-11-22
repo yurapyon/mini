@@ -1,6 +1,7 @@
 external setxt
 external close?
 external draw/poll
+external poll
 external deinit
 
 external image-ids
@@ -75,6 +76,8 @@ constant _screen
   [ decimal ] ;
 
 : close? close? stay @ 0= or ;
+
+: poll! poll check!0 if drop loop then ;
 
 : main frame draw/poll close? 0= if loop then deinit ;
 
