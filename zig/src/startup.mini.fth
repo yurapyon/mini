@@ -50,7 +50,7 @@ forth definitions
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
 \ todo probably don't need dist
-\ : dist     this - ;        \ ( a -- n )
+: dist     this - ;        \ ( a -- n )
 
 compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
