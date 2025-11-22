@@ -1,5 +1,7 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
+const Thread = std.Thread;
 
 const mem = @import("memory.zig");
 
@@ -41,6 +43,16 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
     ) catch return error.CannotAccept;
 
     return @truncate(len);
+}
+
+fn kernelRunFiles(k: *Kernel, filepaths: ArrayList([]u8)) !void {
+    for (filepaths.items) |fp| {
+        const file = try readFile(k.allocator, fp);
+        defer k.allocator.free(file);
+
+        std.debug.print(">> {s}\n", .{fp});
+        try k.evaluate(file);
+    }
 }
 
 const startup_file = @embedFile("startup.mini.fth");
@@ -104,13 +116,17 @@ pub fn main() !void {
             try sys.init(&k);
             defer sys.deinit();
 
-            for (cli_options.filepaths.items) |fp| {
-                const file = try readFile(allocator, fp);
-                defer allocator.free(file);
+            const kernel_thread = try Thread.spawn(
+                .{},
+                kernelRunFiles,
+                .{ &k, cli_options.filepaths },
+            );
 
-                std.debug.print(">> {s}\n", .{fp});
-                try k.evaluate(file);
-            }
+            try sys.run();
+            // TODO
+            // defer end system
+
+            kernel_thread.join();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);

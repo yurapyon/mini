@@ -10,14 +10,15 @@ const Cell = kernel.Cell;
 // ===
 
 pub const InputEventTag = enum(Cell) {
+    close,
     key,
     mouse_position,
     mouse_button,
     char,
-    should_close = 16,
 };
 
 pub const InputEvent = union(InputEventTag) {
+    close,
     key: struct {
         keycode: c_int,
         scancode: c_int,
@@ -36,7 +37,6 @@ pub const InputEvent = union(InputEventTag) {
     char: struct {
         codepoint: c_uint,
     },
-    should_close: bool,
 };
 
 pub const InputChannel = struct {

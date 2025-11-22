@@ -1,4 +1,5 @@
 const std = @import("std");
+const Mutex = std.Thread.Mutex;
 
 const kernel = @import("../kernel.zig");
 const Kernel = kernel.Kernel;
@@ -9,18 +10,17 @@ const External = externals.External;
 
 const c = @import("c.zig").c;
 
-const video = @import("video.zig");
-const Video = video.Video;
-
 const resource_manager = @import("resource-manager.zig");
 const Resource = resource_manager.Resource;
 const ResourceManager = resource_manager.ResourceManager;
 
 const input_event = @import("input-event.zig");
+const InputEventTag = input_event.InputEventTag;
 const InputChannel = input_event.InputChannel;
 
-const system_event = @import("system-event.zig");
-const SystemChannel = system_event.SystemChannel;
+const Pixels = @import("pixels.zig").Pixels;
+const Characters = @import("characters.zig").Characters;
+const Image = @import("image.zig").Image;
 
 // ===
 
@@ -132,25 +132,6 @@ const glfw_callbacks = struct {
 const exts = struct {
     // main/glfw ===
 
-    fn shouldClose(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        const s: *System = @ptrCast(@alignCast(userdata));
-
-        const should_close = c.glfwWindowShouldClose(s.window) == c.GL_TRUE;
-        k.data_stack.pushBoolean(should_close);
-    }
-
-    fn drawPoll(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        const s: *System = @ptrCast(@alignCast(userdata));
-
-        s.video.update();
-        s.video.draw();
-        c.glfwSwapBuffers(s.window);
-        c.glfwPollEvents();
-
-        std.Thread.sleep(30_000_000);
-        // std.Thread.sleep(100_000_000);
-    }
-
     fn poll(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
@@ -189,8 +170,7 @@ const exts = struct {
                     k.data_stack.pushCell(high);
                     k.data_stack.pushCell(low);
                 },
-                // TODO
-                .should_close => {},
+                .close => {},
             }
             const event_type = @intFromEnum(ev);
             k.data_stack.pushCell(event_type);
@@ -223,9 +203,9 @@ const exts = struct {
 
         if (addr & 0x8000 > 0) {
             const masked_addr = addr & 0x7fff;
-            s.video.characters.paletteStore(masked_addr, @truncate(value));
+            s.characters.paletteStore(masked_addr, @truncate(value));
         } else {
-            s.video.pixels.paletteStore(addr, @truncate(value));
+            s.pixels.paletteStore(addr, @truncate(value));
         }
     }
 
@@ -235,9 +215,9 @@ const exts = struct {
         const addr = k.data_stack.popCell();
 
         const value = if (addr & 0x8000 > 0)
-            s.video.characters.paletteFetch(addr & 0x7fff)
+            s.characters.paletteFetch(addr & 0x7fff)
         else
-            s.video.pixels.paletteFetch(addr);
+            s.pixels.paletteFetch(addr);
 
         k.data_stack.pushCell(value);
     }
@@ -470,7 +450,7 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
-        s.video.characters.store(addr, @truncate(value));
+        s.characters.store(addr, @truncate(value));
     }
 
     fn charsFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -478,7 +458,7 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
-        const value = s.video.characters.fetch(addr);
+        const value = s.characters.fetch(addr);
 
         k.data_stack.pushCell(value);
     }
@@ -488,6 +468,24 @@ const ResourceAndHandle = struct {
     resource: Resource,
     handle: Cell,
 };
+
+// Inspired by pc-98
+// 640x400, 4bit color, 24bit palette
+// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
+//   7x11 characters, drawn in 8x16 boxes
+// 80x40 character mode
+//   7x9 characters, drawn in 8x10 boxes
+
+// Character buffer on top of pixel buffer
+
+// Note
+// Pixel buffer isn't exposed to forth
+//   pixel writes are done through pixelSet(x, y, color)-type
+//     interfaces only
+// Other buffers & palettes are directly accesible from forth
+
+pub const screen_width = 640;
+pub const screen_height = 400;
 
 pub const System = struct {
     k: *Kernel,
@@ -499,12 +497,10 @@ pub const System = struct {
     // reader: Forth thread
     input_channel: InputChannel,
 
-    // NOTE
-    // reader: Graphics thread
-    // writer: Forth thread
-    system_channel: SystemChannel,
+    video_mutex: Mutex,
 
-    video: Video,
+    pixels: Pixels,
+    characters: Characters,
 
     resources: struct {
         screen: ResourceAndHandle,
@@ -520,17 +516,18 @@ pub const System = struct {
         try self.initWindow();
 
         try self.input_channel.init(k.allocator);
-        try self.system_channel.init(k.allocator);
+        self.video_mutex = .{};
 
-        try self.video.init(k.allocator);
+        try self.pixels.init(k.allocator);
+        try self.characters.init(k.allocator);
 
         try self.resource_manager.init(k.allocator, &k.handles);
-        self.resources.screen.resource.image = &self.video.pixels.image;
+        self.resources.screen.resource.image = &self.pixels.image;
         self.resources.screen.handle = try self.resource_manager.register(
             &self.resources.screen.resource,
         );
 
-        self.resources.characters.resource.image = &self.video.characters.spritesheet;
+        self.resources.characters.resource.image = &self.characters.spritesheet;
         self.resources.characters.handle = try self.resource_manager.register(
             &self.resources.characters.resource,
         );
@@ -547,7 +544,9 @@ pub const System = struct {
 
     pub fn deinit(self: *@This()) void {
         self.resource_manager.deinit();
-        self.video.deinit();
+        self.characters.deinit();
+        self.pixels.deinit();
+        self.input_channel.deinit();
         c.glfwTerminate();
     }
 
@@ -572,8 +571,8 @@ pub const System = struct {
         // note: window creation fails if we can't get the desired opengl version
 
         const window = c.glfwCreateWindow(
-            video.screen_width * 2,
-            video.screen_height * 2,
+            screen_width * 2,
+            screen_height * 2,
             window_title,
             null,
             null,
@@ -596,15 +595,31 @@ pub const System = struct {
         self.window = window;
     }
 
+    pub fn run(self: *@This()) !void {
+        while (true) {
+            const should_close = c.glfwWindowShouldClose(self.window) == c.GL_TRUE;
+            if (should_close) {
+                try self.input_channel.push(InputEventTag.close);
+                break;
+            }
+
+            self.pixels.update();
+            self.characters.update();
+
+            c.glClear(c.GL_COLOR_BUFFER_BIT);
+            self.pixels.draw();
+            self.characters.draw();
+
+            c.glfwSwapBuffers(self.window);
+            c.glfwPollEvents();
+
+            std.Thread.sleep(30_000_000);
+        }
+    }
+
+    // ===
+
     fn registerExternals(self: *@This(), k: *Kernel) !void {
-        try k.addExternal("close?", .{
-            .callback = exts.shouldClose,
-            .userdata = self,
-        });
-        try k.addExternal("draw/poll", .{
-            .callback = exts.drawPoll,
-            .userdata = self,
-        });
         try k.addExternal("poll", .{
             .callback = exts.poll,
             .userdata = self,

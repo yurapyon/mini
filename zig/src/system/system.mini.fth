@@ -1,5 +1,6 @@
-external close?
-external draw/poll
+\ todo
+\ external close?
+\ external draw/poll
 external poll
 external deinit
 
@@ -26,17 +27,20 @@ external i!blitline
 external chars!
 external chars@
 
+doer on-close
 doer on-key
 doer on-mouse-move
 doer on-mouse-down
 doer on-char
 
 create event-cbs
+  ' on-close      ,
   ' on-key        ,
   ' on-mouse-move ,
   ' on-mouse-down ,
   ' on-char       ,
 
+\ nothing for on-close
 make on-key        2drop ;
 make on-mouse-move 2drop ;
 make on-mouse-down 2drop ;
@@ -44,9 +48,13 @@ make on-char       2drop ;
 
 doer frame
 
-image-ids
-constant _chars
-constant _screen
+\ TODO
+\ image-ids
+\ constant _chars
+\ constant _screen
+
+0 constant _chars
+0 constant _screen
 
 : putp     _screen i!xy ;
 : putline  _screen i!line ;
@@ -75,11 +83,18 @@ constant _screen
   00 00 00 1 cpal!
   [ decimal ] ;
 
-: close? close? stay @ 0= or ;
+\ : close? close? stay @ 0= or ;
 
 : poll! poll check!0 if
     drop cells event-cbs + @ execute
   poll loop then drop ;
 
-: main frame draw/poll poll! close? 0= if loop then deinit ;
+true variable continue
+
+make on-close false continue ! ;
+
+: main true continue !
+  |: continue @ if frame poll! loop then ;
+
+\ : main frame draw/poll poll! close? 0= if loop then deinit ;
 
