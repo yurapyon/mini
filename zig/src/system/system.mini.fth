@@ -90,6 +90,3 @@ make on-close false continue ! ;
 
 : main true continue !
   |: continue @ if <v frame poll! v> 30 sleep loop then ;
-
-\ : main frame draw/poll poll! close? 0= if loop then deinit ;
-

@@ -14,6 +14,7 @@
 
 \ ===
 
+0 [if]
 7 7 ialloc constant brush
 
 : setupbrush
@@ -21,6 +22,7 @@
   3 3 1 brush i!xy ;
 
 : brushline >r >r >r 3 - r> 3 - r> 3 - r> 3 - $f brush blitline ;
+[then]
 
 \ initial palette ===
 
@@ -247,7 +249,7 @@ make on-key kpressed? if cond
 
 <v
 initpal
-setupbrush
+\ setupbrush
 setupcanvas
 hide-editor
 v>

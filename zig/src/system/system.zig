@@ -31,7 +31,11 @@ const Image = @import("image.zig").Image;
 //   3. Audio (in the future)
 // An easy way to handle thread-safety is:
 //   1. Graphics->Forth, All GLFW events are put into a queue for Forth to poll
-//   2. Forth->Graphics, All drawing events are sent through a queue?
+//   2. Forth->Graphics, video_mutex has to be locked/unlocked as needed
+
+// TODO
+// test that image/timer allocation wont lead to threading issues
+// test timers
 
 const window_title = "pyon vPC";
 
