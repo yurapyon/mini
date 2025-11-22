@@ -4,13 +4,17 @@ const Allocator = std.mem.Allocator;
 const channel = @import("../utils/channel.zig");
 const Queue = channel.Queue;
 
+const kernel = @import("../kernel.zig");
+const Cell = kernel.Cell;
+
 // ===
 
-pub const InputEventTag = enum(u16) {
-    key = 0,
-    mouse_position = 1,
-    mouse_button = 2,
-    char = 3,
+pub const InputEventTag = enum(Cell) {
+    key,
+    mouse_position,
+    mouse_button,
+    char,
+    should_close = 16,
 };
 
 pub const InputEvent = union(InputEventTag) {
@@ -32,6 +36,7 @@ pub const InputEvent = union(InputEventTag) {
     char: struct {
         codepoint: c_uint,
     },
+    should_close: bool,
 };
 
 pub const InputChannel = struct {

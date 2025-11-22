@@ -19,6 +19,9 @@ const ResourceManager = resource_manager.ResourceManager;
 const input_event = @import("input-event.zig");
 const InputChannel = input_event.InputChannel;
 
+const system_event = @import("system-event.zig");
+const SystemChannel = system_event.SystemChannel;
+
 // ===
 
 // Multithreading strategy
@@ -46,25 +49,15 @@ const glfw_callbacks = struct {
             c.glfwGetWindowUserPointer(win),
         ));
 
-        if (system.xts.key) |xt| {
-            system.k.data_stack.pushCell(@intCast(keycode));
-            system.k.data_stack.pushCell(@intCast(action));
-            // TODO error
-            system.k.callXt(xt) catch unreachable;
-        }
-
-        // system.input_channel.push(.{
-        // .key = .{
-        // .keycode = keycode,
-        // .scancode = scancode,
-        // .action = action,
-        // .mods = mods,
-        // },
-        // TODO handle error
-        // }) catch unreachable;
-
-        _ = scancode;
-        _ = mods;
+        system.input_channel.push(.{
+            .key = .{
+                .keycode = keycode,
+                .scancode = scancode,
+                .action = action,
+                .mods = mods,
+            },
+            // TODO handle error
+        }) catch unreachable;
     }
 
     fn cursorPosition(
@@ -75,22 +68,14 @@ const glfw_callbacks = struct {
         const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        // TODO
-        //   use signed cell ?
-        //     probably not
-        //   limit to intMax
-        //   write a fn for the xy transform
-        if (system.xts.mousemove) |xt| {
-            // const x_float = x / 2 - (video.screen_width - 400) / 2;
-            // const y_float = y / 2 - (video.screen_height - 300) / 2;
-            const x_float = x / 2;
-            const y_float = y / 2;
-            const x_cell: Cell = if (x_float < 0) 0 else @intFromFloat(x_float);
-            const y_cell: Cell = if (y_float < 0) 0 else @intFromFloat(y_float);
-            system.k.data_stack.pushCell(x_cell);
-            system.k.data_stack.pushCell(y_cell);
-            system.k.callXt(xt) catch unreachable;
-        }
+
+        system.input_channel.push(.{
+            .mouse_position = .{
+                .x = x,
+                .y = y,
+            },
+            // TODO handle error
+        }) catch unreachable;
     }
 
     fn mouseButton(
@@ -102,29 +87,31 @@ const glfw_callbacks = struct {
         const system: *System = @ptrCast(@alignCast(
             c.glfwGetWindowUserPointer(win),
         ));
-        if (system.xts.mousedown) |xt| {
-            var value = @as(Cell, @intCast(button)) & 0x7;
-            if (action == c.GLFW_PRESS) {
-                value |= 0x10;
-            }
-            system.k.data_stack.pushCell(value);
-            system.k.data_stack.pushCell(@intCast(mods));
-            system.k.callXt(xt) catch unreachable;
-        }
+
+        system.input_channel.push(.{
+            .mouse_button = .{
+                .button = button,
+                .action = action,
+                .mods = mods,
+            },
+            // TODO handle error
+        }) catch unreachable;
     }
 
     fn char(
         win: ?*c.GLFWwindow,
         codepoint: c_uint,
     ) callconv(.c) void {
-        const system: *System = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(win)));
-        if (system.xts.char) |xt| {
-            const high: Cell = @intCast((codepoint & 0xff00) >> 16);
-            const low: Cell = @intCast(codepoint & 0xff);
-            system.k.data_stack.pushCell(high);
-            system.k.data_stack.pushCell(low);
-            system.k.callXt(xt) catch unreachable;
-        }
+        const system: *System = @ptrCast(@alignCast(
+            c.glfwGetWindowUserPointer(win),
+        ));
+
+        system.input_channel.push(.{
+            .char = .{
+                .codepoint = codepoint,
+            },
+            // TODO handle error
+        }) catch unreachable;
     }
 
     fn windowSize(
@@ -144,23 +131,6 @@ const glfw_callbacks = struct {
 
 const exts = struct {
     // main/glfw ===
-
-    fn setXt(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        const s: *System = @ptrCast(@alignCast(userdata));
-
-        const idx = k.data_stack.popCell();
-        const addr = k.data_stack.popCell();
-
-        const xt = if (addr == 0) null else addr;
-
-        switch (idx) {
-            0 => s.xts.key = xt,
-            1 => s.xts.mousemove = xt,
-            2 => s.xts.mousedown = xt,
-            3 => s.xts.char = xt,
-            else => {},
-        }
-    }
 
     fn shouldClose(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
@@ -186,8 +156,44 @@ const exts = struct {
 
         const event = s.input_channel.pop();
         if (event) |ev| {
-            // TODO push to stack
-            @import("std").debug.print("ev: {}\n", .{ev});
+            // @import("std").debug.print("ev: {}\n", .{ev});
+            switch (ev) {
+                .key => |data| {
+                    // TODO handle scancode and mods
+                    k.data_stack.pushCell(@intCast(data.keycode));
+                    k.data_stack.pushCell(@intCast(data.action));
+                },
+                .mouse_position => |data| {
+                    const x_float = data.x / 2;
+                    const y_float = data.y / 2;
+                    // TODO
+                    //   use a signed cell ?
+                    //   limit to intMax
+                    //   write a fn for the xy transform that takes into account video scale
+                    const x_cell: Cell = if (x_float < 0) 0 else @intFromFloat(x_float);
+                    const y_cell: Cell = if (y_float < 0) 0 else @intFromFloat(y_float);
+                    k.data_stack.pushCell(x_cell);
+                    k.data_stack.pushCell(y_cell);
+                },
+                .mouse_button => |data| {
+                    var value = @as(Cell, @intCast(data.button)) & 0x7;
+                    if (data.action == c.GLFW_PRESS) {
+                        value |= 0x10;
+                    }
+                    k.data_stack.pushCell(value);
+                    k.data_stack.pushCell(@intCast(data.mods));
+                },
+                .char => |data| {
+                    const high: Cell = @intCast((data.codepoint & 0xff00) >> 16);
+                    const low: Cell = @intCast(data.codepoint & 0xff);
+                    k.data_stack.pushCell(high);
+                    k.data_stack.pushCell(low);
+                },
+                // TODO
+                .should_close => {},
+            }
+            const event_type = @intFromEnum(ev);
+            k.data_stack.pushCell(event_type);
             k.data_stack.pushBoolean(true);
         } else {
             k.data_stack.pushBoolean(false);
@@ -202,6 +208,7 @@ const exts = struct {
 
     // video ===
 
+    // TODO this could just get called after system is initialized
     fn getImageIds(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
         k.data_stack.pushCell(s.resources.screen.handle);
@@ -485,15 +492,18 @@ const ResourceAndHandle = struct {
 pub const System = struct {
     k: *Kernel,
 
-    xts: struct {
-        key: ?Cell,
-        mousemove: ?Cell,
-        mousedown: ?Cell,
-        char: ?Cell,
-    },
-
     window: *c.GLFWwindow,
+
+    // NOTE
+    // writer: Graphics thread
+    // reader: Forth thread
     input_channel: InputChannel,
+
+    // NOTE
+    // reader: Graphics thread
+    // writer: Forth thread
+    system_channel: SystemChannel,
+
     video: Video,
 
     resources: struct {
@@ -510,6 +520,7 @@ pub const System = struct {
         try self.initWindow();
 
         try self.input_channel.init(k.allocator);
+        try self.system_channel.init(k.allocator);
 
         try self.video.init(k.allocator);
 
@@ -523,11 +534,6 @@ pub const System = struct {
         self.resources.characters.handle = try self.resource_manager.register(
             &self.resources.characters.resource,
         );
-
-        self.xts.key = null;
-        self.xts.mousemove = null;
-        self.xts.mousedown = null;
-        self.xts.char = null;
 
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);
@@ -591,10 +597,6 @@ pub const System = struct {
     }
 
     fn registerExternals(self: *@This(), k: *Kernel) !void {
-        try k.addExternal("setxt", .{
-            .callback = exts.setXt,
-            .userdata = self,
-        });
         try k.addExternal("close?", .{
             .callback = exts.shouldClose,
             .userdata = self,

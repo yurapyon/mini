@@ -14,7 +14,7 @@ pub fn Queue(comptime T: type) type {
         write_pt: usize,
         read_pt: usize,
 
-        fn next_idx(self: @This(), idx: usize) usize {
+        fn nextIndex(self: @This(), idx: usize) usize {
             return (idx + 1) % self.data.len;
         }
 
@@ -35,11 +35,11 @@ pub fn Queue(comptime T: type) type {
                 &self.read_pt,
                 .monotonic,
             );
-            if (read_pt == self.next_idx(self.write_pt)) {
+            if (read_pt == self.nextIndex(self.write_pt)) {
                 return error.Overflow;
             }
             self.data[self.write_pt] = val;
-            self.write_pt = self.next_idx(self.write_pt);
+            self.write_pt = self.nextIndex(self.write_pt);
         }
 
         pub fn pop(self: *@This()) !T {
@@ -52,7 +52,7 @@ pub fn Queue(comptime T: type) type {
                 return error.Underflow;
             }
             const ret = self.data[self.read_pt];
-            self.read_pt = self.next_idx(self.read_pt);
+            self.read_pt = self.nextIndex(self.read_pt);
             return ret;
         }
     };

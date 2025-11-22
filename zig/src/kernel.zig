@@ -263,6 +263,9 @@ pub const Kernel = struct {
         self.program_counter.storeAdd(offset);
     }
 
+    // TODO
+    //   this might not be needed after changes to system/multitreading?
+    //     before it ws being used to execute callbacks from glfw
     // Sets up 'xt' for execution, finishes execution of xt before returning
     pub fn callXt(self: *@This(), xt: Cell) !void {
         self.return_stack.pushCell(self.program_counter.fetch());

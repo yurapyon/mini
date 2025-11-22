@@ -1,4 +1,3 @@
-external setxt
 external close?
 external draw/poll
 external poll
@@ -32,10 +31,11 @@ doer on-mouse-move
 doer on-mouse-down
 doer on-char
 
-' on-key        0 setxt
-' on-mouse-move 1 setxt
-' on-mouse-down 2 setxt
-' on-char       3 setxt
+create event-cbs
+  ' on-key        ,
+  ' on-mouse-move ,
+  ' on-mouse-down ,
+  ' on-char       ,
 
 make on-key        2drop ;
 make on-mouse-move 2drop ;
@@ -77,7 +77,9 @@ constant _screen
 
 : close? close? stay @ 0= or ;
 
-: poll! poll check!0 if drop loop then ;
+: poll! poll check!0 if
+    drop cells event-cbs + @ execute
+  poll loop then drop ;
 
-: main frame draw/poll close? 0= if loop then deinit ;
+: main frame draw/poll poll! close? 0= if loop then deinit ;
 
