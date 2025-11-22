@@ -159,8 +159,6 @@ pub const Pixels = struct {
     pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < @TypeOf(self.palette).item_ct) {
             self.palette.colors[addr] = value;
-            c.glUseProgram(self.program);
-            self.palette.updateProgramUniforms(self.locations.palette);
         }
     }
 
@@ -173,6 +171,9 @@ pub const Pixels = struct {
     }
 
     pub fn update(self: *@This()) void {
+        c.glUseProgram(self.program);
+        self.palette.updateProgramUniforms(self.locations.palette);
+
         self.image.pushToTexture(self.texture);
     }
 };

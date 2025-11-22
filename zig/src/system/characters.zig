@@ -263,8 +263,6 @@ pub const Characters = struct {
     pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < self.palette.colors.len) {
             self.palette.colors[addr] = value;
-            c.glUseProgram(self.program);
-            self.palette.updateProgramUniforms(self.locations.palette);
         }
     }
 
@@ -318,6 +316,10 @@ pub const Characters = struct {
     }
 
     pub fn update(self: *@This()) void {
+        c.glUseProgram(self.program);
+        self.palette.updateProgramUniforms(self.locations.palette);
+
         self.updateInstanceBuffer();
+        self.spritesheet.pushToTexture(self.texture);
     }
 };

@@ -1,9 +1,8 @@
-\ todo
-\ external close?
-\ external draw/poll
 external poll
 external deinit
 
+external <v
+external v>
 external image-ids
 external p!
 external p@
@@ -48,13 +47,9 @@ make on-char       2drop ;
 
 doer frame
 
-\ TODO
-\ image-ids
-\ constant _chars
-\ constant _screen
-
-0 constant _chars
-0 constant _screen
+image-ids
+constant _chars
+constant _screen
 
 : putp     _screen i!xy ;
 : putline  _screen i!line ;
@@ -94,7 +89,7 @@ true variable continue
 make on-close false continue ! ;
 
 : main true continue !
-  |: continue @ if frame poll! loop then ;
+  |: continue @ if <v frame poll! v> 30 sleep loop then ;
 
 \ : main frame draw/poll poll! close? 0= if loop then deinit ;
 

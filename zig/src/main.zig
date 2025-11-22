@@ -114,7 +114,6 @@ pub fn main() !void {
             try k.evaluate(startup_file);
 
             try sys.init(&k);
-            defer sys.deinit();
 
             const kernel_thread = try Thread.spawn(
                 .{},
@@ -123,10 +122,10 @@ pub fn main() !void {
             );
 
             try sys.run();
-            // TODO
-            // defer end system
 
             kernel_thread.join();
+
+            sys.deinit();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);

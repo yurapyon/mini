@@ -137,7 +137,6 @@ const exts = struct {
 
         const event = s.input_channel.pop();
         if (event) |ev| {
-            // @import("std").debug.print("ev: {}\n", .{ev});
             switch (ev) {
                 .key => |data| {
                     // TODO handle scancode and mods
@@ -181,12 +180,23 @@ const exts = struct {
     }
 
     fn deinit(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
-        // TODO does anything actually have to be here?
+        // TODO
+        // close the system somehow
         const s: *System = @ptrCast(@alignCast(userdata));
         _ = s;
     }
 
     // video ===
+
+    fn videoLock(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+        s.video_mutex.lock();
+    }
+
+    fn videoUnlock(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+        s.video_mutex.unlock();
+    }
 
     // TODO this could just get called after system is initialized
     fn getImageIds(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -201,12 +211,14 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
+        // s.video_mutex.lock();
         if (addr & 0x8000 > 0) {
             const masked_addr = addr & 0x7fff;
             s.characters.paletteStore(masked_addr, @truncate(value));
         } else {
             s.pixels.paletteStore(addr, @truncate(value));
         }
+        // s.video_mutex.unlock();
     }
 
     fn paletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -214,10 +226,12 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
+        // s.video_mutex.lock();
         const value = if (addr & 0x8000 > 0)
             s.characters.paletteFetch(addr & 0x7fff)
         else
             s.pixels.paletteFetch(addr);
+        // s.video_mutex.unlock();
 
         k.data_stack.pushCell(value);
     }
@@ -293,6 +307,10 @@ const exts = struct {
         _ = s;
     }
 
+    // TODO
+    // only have to lock/unlock video_mutex for image edits
+    //   when editing pixel buffer or character spritesheet
+
     fn imageSetMask(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 
@@ -322,7 +340,9 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.fill(@truncate(color));
+        // s.video_mutex.unlock();
     }
 
     fn imageRandomize(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -333,7 +353,9 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.randomize(16);
+        // s.video_mutex.unlock();
     }
 
     fn imagePutXY(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -347,7 +369,9 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.putXY(@intCast(x), @intCast(y), @truncate(color));
+        // s.video_mutex.unlock();
     }
 
     fn imagePutLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -363,6 +387,7 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.putLine(
             @intCast(x0),
             @intCast(y0),
@@ -370,6 +395,7 @@ const exts = struct {
             @intCast(y1),
             @truncate(color),
         );
+        // s.video_mutex.unlock();
     }
 
     fn imagePutRect(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -385,6 +411,7 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.putRect(
             @intCast(x0),
             @intCast(y0),
@@ -392,6 +419,7 @@ const exts = struct {
             @intCast(y1),
             @truncate(color),
         );
+        // s.video_mutex.unlock();
     }
 
     fn imageBlit(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -408,12 +436,14 @@ const exts = struct {
         const other = s.resource_manager.getImage(other_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.blitXY(
             other.*,
             @truncate(transparent),
             @intCast(x),
             @intCast(y),
         );
+        // s.video_mutex.unlock();
     }
 
     fn imageBlitLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -432,6 +462,7 @@ const exts = struct {
         const other = s.resource_manager.getImage(other_id) catch
             return error.ExternalPanic;
 
+        // s.video_mutex.lock();
         image.blitLine(
             other.*,
             @truncate(transparent),
@@ -440,6 +471,7 @@ const exts = struct {
             @intCast(x1),
             @intCast(y1),
         );
+        // s.video_mutex.unlock();
     }
 
     // ===
@@ -450,7 +482,9 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
+        // s.video_mutex.lock();
         s.characters.store(addr, @truncate(value));
+        // s.video_mutex.unlock();
     }
 
     fn charsFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -458,7 +492,9 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
+        // s.video_mutex.lock();
         const value = s.characters.fetch(addr);
+        // s.video_mutex.unlock();
 
         k.data_stack.pushCell(value);
     }
@@ -510,6 +546,7 @@ pub const System = struct {
     resource_manager: ResourceManager,
 
     // TODO allow for different allocator than the kernels
+    // TODO restructure this so you could call it from within forth as an external
     pub fn init(self: *@This(), k: *Kernel) !void {
         self.k = k;
 
@@ -603,8 +640,11 @@ pub const System = struct {
                 break;
             }
 
-            self.pixels.update();
-            self.characters.update();
+            if (self.video_mutex.tryLock()) {
+                self.pixels.update();
+                self.characters.update();
+                self.video_mutex.unlock();
+            }
 
             c.glClear(c.GL_COLOR_BUFFER_BIT);
             self.pixels.draw();
@@ -613,7 +653,7 @@ pub const System = struct {
             c.glfwSwapBuffers(self.window);
             c.glfwPollEvents();
 
-            std.Thread.sleep(30_000_000);
+            std.Thread.sleep(15_000_000);
         }
     }
 
@@ -626,6 +666,14 @@ pub const System = struct {
         });
         try k.addExternal("deinit", .{
             .callback = exts.deinit,
+            .userdata = self,
+        });
+        try k.addExternal("<v", .{
+            .callback = exts.videoLock,
+            .userdata = self,
+        });
+        try k.addExternal("v>", .{
+            .callback = exts.videoUnlock,
             .userdata = self,
         });
         try k.addExternal("image-ids", .{
