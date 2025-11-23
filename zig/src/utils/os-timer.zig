@@ -32,7 +32,7 @@ pub const OSTimer = struct {
 
 const expect = std.testing.expect;
 
-test "Timer" {
+test "OSTimer" {
     var tm = try OSTimer.start();
     const first = tm.now();
 

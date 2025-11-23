@@ -316,10 +316,6 @@ const exts = struct {
         _ = s;
     }
 
-    // TODO
-    // only have to lock/unlock video_mutex for image edits
-    //   when editing pixel buffer or character spritesheet
-
     fn imageSetMask(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
 

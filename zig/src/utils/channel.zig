@@ -228,7 +228,7 @@ test "EventChannel: send recv" {
     var send = chan.makeSender();
     var recv = chan.makeReceiver();
 
-    var tm = try @import("timer.zig").OSTimer.start();
+    var tm = try @import("os-timer.zig").OSTimer.start();
 
     try send.send(tm.now(), 0);
     try send.send(tm.now(), 1);

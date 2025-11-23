@@ -188,6 +188,6 @@ pub fn main() !void {
 test "lib-testing" {}
 
 test "end-to-end" {
-    _ = @import("utils/timer.zig");
+    _ = @import("utils/os-timer.zig");
     _ = @import("utils/channel.zig");
 }
