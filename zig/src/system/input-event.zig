@@ -52,8 +52,10 @@ pub const InputChannel = struct {
         self.queue.deinit();
     }
 
-    pub fn push(self: *@This(), event: InputEvent) !void {
-        try self.queue.push(event);
+    pub fn push(self: *@This(), event: InputEvent) void {
+        self.queue.push(event) catch {
+            std.debug.print("InputChannel overflow: {}\n", .{event});
+        };
     }
 
     pub fn pop(self: *@This()) ?InputEvent {

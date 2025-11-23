@@ -24,18 +24,23 @@ const Image = @import("image.zig").Image;
 
 // ===
 
+// NOTE outdated
+// Inspired by pc-98
+// 640x400, 4bit color, 24bit palette
+// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
+//   7x11 characters, drawn in 8x16 boxes
+// 80x40 character mode
+//   7x9 characters, drawn in 8x10 boxes
+// Character buffer on top of pixel buffer
+
 // Multithreading strategy
 // There need to be 3 different threads
 //   1. Forth kernel
 //   2. Graphics
-//   3. Audio (in the future)
+//   3. Audio
 // An easy way to handle thread-safety is:
 //   1. Graphics->Forth, All GLFW events are put into a queue for Forth to poll
 //   2. Forth->Graphics, video_mutex has to be locked/unlocked as needed
-
-// TODO
-// test that image/timer allocation wont lead to threading issues
-// test timers
 
 const window_title = "pyon vPC";
 
@@ -60,8 +65,7 @@ const glfw_callbacks = struct {
                 .action = action,
                 .mods = mods,
             },
-            // TODO handle error
-        }) catch unreachable;
+        });
     }
 
     fn cursorPosition(
@@ -78,8 +82,7 @@ const glfw_callbacks = struct {
                 .x = x,
                 .y = y,
             },
-            // TODO handle error
-        }) catch unreachable;
+        });
     }
 
     fn mouseButton(
@@ -98,8 +101,7 @@ const glfw_callbacks = struct {
                 .action = action,
                 .mods = mods,
             },
-            // TODO handle error
-        }) catch unreachable;
+        });
     }
 
     fn char(
@@ -114,10 +116,10 @@ const glfw_callbacks = struct {
             .char = .{
                 .codepoint = codepoint,
             },
-            // TODO handle error
-        }) catch unreachable;
+        });
     }
 
+    // TODO
     fn windowSize(
         win: ?*c.GLFWwindow,
         width: c_int,
@@ -127,9 +129,6 @@ const glfw_callbacks = struct {
         _ = system;
         _ = width;
         _ = height;
-        // vm.push(cintToCell(height)) catch unreachable;
-        // vm.push(cintToCell(width)) catch unreachable;
-        // vm.execute(xts.windowSize) catch unreachable;
     }
 };
 
@@ -197,6 +196,13 @@ const exts = struct {
         s.video_mutex.lock();
     }
 
+    fn videoTryLock(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const s: *System = @ptrCast(@alignCast(userdata));
+        const was_locked = s.video_mutex.tryLock();
+
+        k.data_stack.pushBoolean(was_locked);
+    }
+
     fn videoUnlock(_: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const s: *System = @ptrCast(@alignCast(userdata));
         s.video_mutex.unlock();
@@ -215,14 +221,12 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
-        // s.video_mutex.lock();
         if (addr & 0x8000 > 0) {
             const masked_addr = addr & 0x7fff;
             s.characters.paletteStore(masked_addr, @truncate(value));
         } else {
             s.pixels.paletteStore(addr, @truncate(value));
         }
-        // s.video_mutex.unlock();
     }
 
     fn paletteFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -230,12 +234,10 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
-        // s.video_mutex.lock();
         const value = if (addr & 0x8000 > 0)
             s.characters.paletteFetch(addr & 0x7fff)
         else
             s.pixels.paletteFetch(addr);
-        // s.video_mutex.unlock();
 
         k.data_stack.pushCell(value);
     }
@@ -283,6 +285,9 @@ const exts = struct {
         const timer = s.resource_manager.getTimer(timer_id) catch
             return error.ExternalPanic;
 
+        // NOTE
+        // glfwGetTime can be called from any thread
+        // This doesn't need to be made threadsafe unless glfwSetTime is being used somewhere
         const ct = timer.update(c.glfwGetTime());
 
         k.data_stack.pushCell(@truncate(ct));
@@ -344,9 +349,7 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.fill(@truncate(color));
-        // s.video_mutex.unlock();
     }
 
     fn imageRandomize(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -357,9 +360,7 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.randomize(16);
-        // s.video_mutex.unlock();
     }
 
     fn imagePutXY(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -373,9 +374,7 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.putXY(@intCast(x), @intCast(y), @truncate(color));
-        // s.video_mutex.unlock();
     }
 
     fn imagePutLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -391,7 +390,6 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.putLine(
             @intCast(x0),
             @intCast(y0),
@@ -399,7 +397,6 @@ const exts = struct {
             @intCast(y1),
             @truncate(color),
         );
-        // s.video_mutex.unlock();
     }
 
     fn imagePutRect(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -415,7 +412,6 @@ const exts = struct {
         const image = s.resource_manager.getImage(image_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.putRect(
             @intCast(x0),
             @intCast(y0),
@@ -423,7 +419,6 @@ const exts = struct {
             @intCast(y1),
             @truncate(color),
         );
-        // s.video_mutex.unlock();
     }
 
     fn imageBlit(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -440,14 +435,12 @@ const exts = struct {
         const other = s.resource_manager.getImage(other_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.blitXY(
             other.*,
             @truncate(transparent),
             @intCast(x),
             @intCast(y),
         );
-        // s.video_mutex.unlock();
     }
 
     fn imageBlitLine(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -466,7 +459,6 @@ const exts = struct {
         const other = s.resource_manager.getImage(other_id) catch
             return error.ExternalPanic;
 
-        // s.video_mutex.lock();
         image.blitLine(
             other.*,
             @truncate(transparent),
@@ -475,7 +467,6 @@ const exts = struct {
             @intCast(x1),
             @intCast(y1),
         );
-        // s.video_mutex.unlock();
     }
 
     // ===
@@ -486,9 +477,7 @@ const exts = struct {
         const addr = k.data_stack.popCell();
         const value = k.data_stack.popCell();
 
-        // s.video_mutex.lock();
         s.characters.store(addr, @truncate(value));
-        // s.video_mutex.unlock();
     }
 
     fn charsFetch(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
@@ -496,9 +485,7 @@ const exts = struct {
 
         const addr = k.data_stack.popCell();
 
-        // s.video_mutex.lock();
         const value = s.characters.fetch(addr);
-        // s.video_mutex.unlock();
 
         k.data_stack.pushCell(value);
     }
@@ -508,21 +495,6 @@ const ResourceAndHandle = struct {
     resource: Resource,
     handle: Cell,
 };
-
-// Inspired by pc-98
-// 640x400, 4bit color, 24bit palette
-// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
-//   7x11 characters, drawn in 8x16 boxes
-// 80x40 character mode
-//   7x9 characters, drawn in 8x10 boxes
-
-// Character buffer on top of pixel buffer
-
-// Note
-// Pixel buffer isn't exposed to forth
-//   pixel writes are done through pixelSet(x, y, color)-type
-//     interfaces only
-// Other buffers & palettes are directly accesible from forth
 
 pub const screen_width = 640;
 pub const screen_height = 400;
@@ -536,7 +508,6 @@ pub const System = struct {
     // writer: Graphics thread
     // reader: Forth thread
     input_channel: InputChannel,
-
     video_mutex: Mutex,
 
     pixels: Pixels,
@@ -572,10 +543,6 @@ pub const System = struct {
         self.resources.characters.handle = try self.resource_manager.register(
             &self.resources.characters.resource,
         );
-
-        c.glEnable(c.GL_BLEND);
-        c.glBlendEquation(c.GL_FUNC_ADD);
-        c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
 
         try self.registerExternals(k);
 
@@ -634,13 +601,17 @@ pub const System = struct {
         _ = c.glfwSetCharCallback(window, glfw_callbacks.char);
 
         self.window = window;
+
+        c.glEnable(c.GL_BLEND);
+        c.glBlendEquation(c.GL_FUNC_ADD);
+        c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     pub fn run(self: *@This()) !void {
         while (true) {
             const should_close = c.glfwWindowShouldClose(self.window) == c.GL_TRUE;
             if (should_close) {
-                try self.input_channel.push(InputEventTag.close);
+                self.input_channel.push(InputEventTag.close);
                 break;
             }
 
@@ -674,6 +645,10 @@ pub const System = struct {
         });
         try k.addExternal("<v", .{
             .callback = exts.videoLock,
+            .userdata = self,
+        });
+        try k.addExternal("<v?", .{
+            .callback = exts.videoTryLock,
             .userdata = self,
         });
         try k.addExternal("v>", .{

@@ -32,14 +32,6 @@ doer on-mouse-move
 doer on-mouse-down
 doer on-char
 
-create event-cbs
-  ' on-close      ,
-  ' on-key        ,
-  ' on-mouse-move ,
-  ' on-mouse-down ,
-  ' on-char       ,
-
-\ nothing for on-close
 make on-key        2drop ;
 make on-mouse-move 2drop ;
 make on-mouse-down 2drop ;
@@ -78,15 +70,19 @@ constant _screen
   00 00 00 1 cpal!
   [ decimal ] ;
 
-\ : close? close? stay @ 0= or ;
+create events
+  ' on-close      ,
+  ' on-key        ,
+  ' on-mouse-move ,
+  ' on-mouse-down ,
+  ' on-char       ,
 
-: poll! poll check!0 if
-    drop cells event-cbs + @ execute
-  poll loop then drop ;
+: poll! poll if cells events + @ execute loop then ;
 
 true variable continue
 
 make on-close false continue ! ;
 
-: main true continue !
-  |: continue @ if <v frame poll! v> 30 sleep loop then ;
+: main true continue ! |: continue @ if
+    <v frame poll! v> 30 sleep
+  loop then ;

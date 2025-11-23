@@ -45,13 +45,30 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
     return @truncate(len);
 }
 
-fn kernelRunFiles(k: *Kernel, filepaths: ArrayList([]u8)) !void {
+fn kernelRunFiles(
+    k: *Kernel,
+    filepaths: ArrayList([]u8),
+    start_repl: bool,
+) !void {
+    var input_file = std.fs.File.stdin();
+
     for (filepaths.items) |fp| {
         const file = try readFile(k.allocator, fp);
         defer k.allocator.free(file);
 
         std.debug.print(">> {s}\n", .{fp});
         try k.evaluate(file);
+    }
+
+    // TODO
+    // note this leds to some weird behavior
+    // can be fixed by redefining 'bye'
+    if (start_repl) {
+        std.debug.print("(mini)\n", .{});
+
+        k.setAcceptClosure(acceptStdIn, &input_file);
+        k.initForth();
+        try k.execute();
     }
 }
 
@@ -76,6 +93,10 @@ pub fn main() !void {
         const image = try readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
         k.loadImage(image);
+
+        const should_start_repl =
+            cli_options.interactive or
+            cli_options.filepaths.items.len == 0;
 
         if (cli_options.precompile) {
             k.setAcceptClosure(acceptStdIn, &input_file);
@@ -118,7 +139,11 @@ pub fn main() !void {
             const kernel_thread = try Thread.spawn(
                 .{},
                 kernelRunFiles,
-                .{ &k, cli_options.filepaths },
+                .{
+                    &k,
+                    cli_options.filepaths,
+                    should_start_repl,
+                },
             );
 
             try sys.run();
@@ -146,10 +171,6 @@ pub fn main() !void {
                 std.debug.print(">> {s}\n", .{fp});
                 try k.evaluate(file);
             }
-
-            const should_start_repl =
-                cli_options.interactive or
-                cli_options.filepaths.items.len == 0;
 
             if (should_start_repl) {
                 std.debug.print("(mini)\n", .{});
