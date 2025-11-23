@@ -1,8 +1,8 @@
-external setxt
-external close?
-external draw/poll
+external poll
 external deinit
 
+external <v
+external v>
 external image-ids
 external p!
 external p@
@@ -26,15 +26,11 @@ external i!blitline
 external chars!
 external chars@
 
+doer on-close
 doer on-key
 doer on-mouse-move
 doer on-mouse-down
 doer on-char
-
-' on-key        0 setxt
-' on-mouse-move 1 setxt
-' on-mouse-down 2 setxt
-' on-char       3 setxt
 
 make on-key        2drop ;
 make on-mouse-move 2drop ;
@@ -74,7 +70,19 @@ constant _screen
   00 00 00 1 cpal!
   [ decimal ] ;
 
-: close? close? stay @ 0= or ;
+create events
+  ' on-close      ,
+  ' on-key        ,
+  ' on-mouse-move ,
+  ' on-mouse-down ,
+  ' on-char       ,
 
-: main frame draw/poll close? 0= if loop then deinit ;
+: poll! poll if cells events + @ execute loop then ;
 
+true variable continue
+
+make on-close false continue ! ;
+
+: main true continue ! |: continue @ if
+    <v frame poll! v> 30 sleep
+  loop then ;

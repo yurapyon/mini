@@ -14,6 +14,7 @@
 
 \ ===
 
+0 [if]
 7 7 ialloc constant brush
 
 : setupbrush
@@ -21,28 +22,30 @@
   3 3 1 brush i!xy ;
 
 : brushline >r >r >r 3 - r> 3 - r> 3 - r> 3 - $f brush blitline ;
+[then]
 
 \ initial palette ===
 
-pdefault
-hex
-00 00 00 0 pal!
-ff ff ff 1 pal!
-00 00 ff 2 pal!
-00 ff 00 3 pal!
-ff 00 00 4 pal!
-00 ff ff 5 pal!
-ff ff 00 6 pal!
-ff 00 ff 7 pal!
-40 40 40 8 pal!
-40 40 a0 9 pal!
-40 a0 40 a pal!
-a0 40 40 b pal!
-40 a0 a0 c pal!
-a0 a0 40 d pal!
-a0 40 a0 e pal!
-a0 a0 a0 f pal!
-decimal
+: initpal
+  pdefault
+  [ hex ]
+  00 00 00 0 pal!
+  ff ff ff 1 pal!
+  00 00 ff 2 pal!
+  00 ff 00 3 pal!
+  ff 00 00 4 pal!
+  00 ff ff 5 pal!
+  ff ff 00 6 pal!
+  ff 00 ff 7 pal!
+  40 40 40 8 pal!
+  40 40 a0 9 pal!
+  40 a0 40 a pal!
+  a0 40 40 b pal!
+  40 a0 a0 c pal!
+  a0 a0 40 d pal!
+  a0 40 a0 e pal!
+  a0 a0 a0 f pal!
+  [ decimal ] ;
 
 \ ===
 
@@ -244,8 +247,11 @@ make on-key kpressed? if cond
     endcond
   else drop then ;
 
-setupbrush
+<v
+initpal
+\ setupbrush
 setupcanvas
 hide-editor
+v>
 
 main

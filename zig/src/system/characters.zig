@@ -7,7 +7,7 @@ const cgfx = @import("c.zig").gfx;
 const kernel = @import("../kernel.zig");
 const Cell = kernel.Cell;
 
-const video = @import("video.zig");
+const system = @import("system.zig");
 
 const math = @import("math.zig");
 
@@ -71,8 +71,8 @@ pub const Characters = struct {
 
         math.m3.orthoScreen(
             &self.screen,
-            video.screen_width,
-            video.screen_height,
+            system.screen_width,
+            system.screen_height,
         );
 
         // TODO make sure this has to be 2,2 and not 0.5,0.5
@@ -263,8 +263,6 @@ pub const Characters = struct {
     pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < self.palette.colors.len) {
             self.palette.colors[addr] = value;
-            c.glUseProgram(self.program);
-            self.palette.updateProgramUniforms(self.locations.palette);
         }
     }
 
@@ -318,6 +316,10 @@ pub const Characters = struct {
     }
 
     pub fn update(self: *@This()) void {
+        c.glUseProgram(self.program);
+        self.palette.updateProgramUniforms(self.locations.palette);
+
         self.updateInstanceBuffer();
+        self.spritesheet.pushToTexture(self.texture);
     }
 };

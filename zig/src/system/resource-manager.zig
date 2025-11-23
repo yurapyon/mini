@@ -12,6 +12,11 @@ const Timer = @import("timer.zig").Timer;
 
 // ===
 
+// TODO
+// Note
+// The resource manager is not thread-safe
+//   For now this is okay, but in the future it may be good to fix that
+
 pub const Resource = union(enum) {
     image: *Image,
     timer: *Timer,

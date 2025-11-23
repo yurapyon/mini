@@ -569,6 +569,7 @@ pub fn extId(k: *Kernel) Error!void {
 
     // TODO
     // better error when external not found
+    // Maybe external not found should kill the app?
     const ext_token = k.lookupExternal(name) orelse 0xffff;
     const token = ext_token + @as(Cell, @intCast(callbacks.len));
     k.data_stack.pushCell(token);

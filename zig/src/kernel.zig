@@ -263,16 +263,19 @@ pub const Kernel = struct {
         self.program_counter.storeAdd(offset);
     }
 
+    // TODO
+    //   this might not be needed after changes to system/multitreading?
+    //     before it ws being used to execute callbacks from glfw
     // Sets up 'xt' for execution, finishes execution of xt before returning
-    pub fn callXt(self: *@This(), xt: Cell) !void {
-        self.return_stack.pushCell(self.program_counter.fetch());
-        self.setCfaToExecute(xt);
-        // TODO NOTE
-        // If this aborts,
-        //   rstack will be cleared and the next line will crash
-        try self.execute();
-        self.program_counter.store(self.return_stack.popCell());
-    }
+    //  pub fn callXt(self: *@This(), xt: Cell) !void {
+    //      self.return_stack.pushCell(self.program_counter.fetch());
+    //      self.setCfaToExecute(xt);
+    //      // TODO NOTE
+    //      // If this aborts,
+    //      //   rstack will be cleared and the next line will crash
+    //      try self.execute();
+    //      self.program_counter.store(self.return_stack.popCell());
+    //  }
 
     pub fn pushReturnAddr(self: *@This()) !void {
         // NOTE
