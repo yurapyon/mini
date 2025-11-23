@@ -507,15 +507,6 @@ pub const System = struct {
         self.startup_semaphore = .{};
 
         try self.resource_manager.init(k.allocator, &k.handles);
-        self.resources.screen.resource.image = &self.pixels.image;
-        self.resources.screen.handle = try self.resource_manager.register(
-            &self.resources.screen.resource,
-        );
-
-        self.resources.characters.resource.image = &self.characters.spritesheet;
-        self.resources.characters.handle = try self.resource_manager.register(
-            &self.resources.characters.resource,
-        );
 
         try self.registerExternals(k);
         try k.evaluate(system_file);
@@ -584,6 +575,16 @@ pub const System = struct {
 
         try self.characters.init(self.k.allocator);
         defer self.characters.deinit();
+
+        self.resources.screen.resource.image = &self.pixels.image;
+        self.resources.screen.handle = try self.resource_manager.register(
+            &self.resources.screen.resource,
+        );
+
+        self.resources.characters.resource.image = &self.characters.spritesheet;
+        self.resources.characters.handle = try self.resource_manager.register(
+            &self.resources.characters.resource,
+        );
 
         std.debug.print("pyon vPC\n", .{});
 
