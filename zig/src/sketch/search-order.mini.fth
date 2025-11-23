@@ -1,30 +1,24 @@
-0 variable context#
-create contexts 16 cells allot
-: context contexts context# @ cells + ;
-
-: vocabulary create 0 , does> context ! ;
-
-: only 0 context# ! ;
-: also context @ 1 context# +! context ! ;
-: previous -1 context# +! ;
+\ interpreter ext
 
 false variable skip?
-: locskip skip? @ if @ @ dup current @ @ = if @ then then locate ;
+
+: locate |: skip? @ if dup current @ @ = if @ then then dup if
+    3dup name string= 0= if @ loop then
+  then nip nip ;
+
+0 variable context#
+create contexts 16 cells allot
 
 : find ( name len -- addr ) context# @
-  |: 3dup cells contexts + locskip dup 0= if
+  |: 3dup cells contexts + @ @ locate dup 0= if
     over if drop 1- loop then
   then >r 3drop r> ;
 
-: forth       fvocab context ! ;    \ ( -- )
-: compiler    cvocab context ! ;    \ ( -- )
-: definitions context @ current ! ; \ ( -- )
-
 : interpret word! ?dup if
     state @ if true skip? !
-      2dup cvocab @ locskip ?dup if -rot 2drop >cfa execute else
-      2dup find ?dup             if -rot 2drop >cfa , else
-      2dup >number               if -rot 2drop lit, , else
+      2dup cvocab @ locate ?dup if -rot 2drop >cfa execute else
+      2dup find ?dup            if -rot 2drop >cfa , else
+      2dup >number              if -rot 2drop lit, , else
         drop 0 state ! align wnf @ execute
       then then then
     else false skip? !
@@ -37,6 +31,22 @@ false variable skip?
   else
     drop
   then ;
+
+\ search order ===
+
+: context contexts context# @ cells + ;
+
+: forth       fvocab context ! ;    \ ( -- )
+: compiler    cvocab context ! ;    \ ( -- )
+: definitions context @ current ! ; \ ( -- )
+
+: vocabulary create 0 , does> context ! ;
+
+: only 0 context# ! ;
+: also context @ 1 context# +! context ! ;
+: previous -1 context# +! ;
+
+\ ===
 
 here . cr
 : hi ." hi" cr ;
@@ -79,6 +89,8 @@ def
 
 
 0 [if]
+
+
 : >> word find ?dup if >cfa execute else ." not found" cr then ;
 
 here . cr
@@ -121,5 +133,5 @@ contexts 16 cells dump
 true skip? !
 >> def
 .s cr
-[then]
 
+[then]
