@@ -1,23 +1,30 @@
-fvocab context ! context @ current !
+: context     contexts context# @ cells + ;
+: forth       fvocab context ! ;
+: compiler    cvocab context ! ;
+: definitions context @ current ! ;
+
+: only 0 context# ! ;
+: also context @ 1 context# +! context ! ;
+: previous -1 context# +! ;
+
+only forth definitions
 
 : \ source-len @ >in ! ;
+
 
 \ NOTE
 \ Max line length in this file is 80 chars
 
 \ system ===
 
+\ todo can get rid of
 : cells cell * ;
 
-: forth fvocab context ! ;
-: compiler cvocab context ! ;
-: definitions context @ current ! ;
-
-compiler definitions
+also compiler definitions
 : literal lit, , ;
 : [compile] ' , ;
 : ['] ' lit, , ;
-forth definitions
+previous definitions
 
 : constant word define ['] docon @ , , ;
 : enum dup constant 1+ ;
@@ -26,10 +33,10 @@ forth definitions
 
 0 variable loop*
 : set-loop here loop* ! ;
-compiler definitions
+also compiler definitions
 : |: set-loop ;
 : loop ['] jump , loop* @ , ;
-forth definitions
+previous definitions
 : : : set-loop ;
 
 : (later), here 0 , ;
@@ -37,19 +44,19 @@ forth definitions
 : this here swap ;
 : this! this ! ;
 
-compiler definitions
+also compiler definitions
 : if   ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
 
 : check> [compile] |: ['] 2dup , ['] u> , ;
-forth definitions
+previous definitions
 
 : last current @ @ >cfa ;
 : >does cell + ;
-compiler definitions
+also compiler definitions
 : does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
-forth definitions
+previous definitions
 
 : value create , does> @ ;
 : vname ' 2 cells + ;
@@ -123,7 +130,7 @@ create mem 6 1024 * allot
 : 'bcode    ' 3 cells + @ ;
 
 vocabulary target
-target definitions
+also target definitions
 
 : f@ @ ;
 : f! ! ;
@@ -139,27 +146,28 @@ target definitions
 
 l[
 \ kernel internal
-   cell layout _pc  \ program counter
-   cell layout _cta \ current token addr
-   cell layout s*
-   cell layout r*
-2 cells layout execreg
-   cell layout initxt
+    cell layout _pc  \ program counter
+    cell layout _cta \ current token addr
+    cell layout s*
+    cell layout r*
+ 2 cells layout execreg
+    cell layout initxt
 \ controlled by forth
-   cell layout stay
-   cell layout h
-   cell layout fvocab
-   cell layout cvocab
-   cell layout current
-   cell layout context
-   cell layout state
-   cell layout base
-   cell layout source-ptr
-   cell layout source-len
-   cell layout >in
-   \ todo could rename to on-wnf
-   cell layout wnf
-   cell layout on-quit
+    cell layout stay
+    cell layout h
+    cell layout fvocab
+    cell layout cvocab
+    cell layout current
+    cell layout context#
+16 cells layout contexts
+    cell layout state
+    cell layout base
+    cell layout source-ptr
+    cell layout source-len
+    cell layout >in
+    \ todo could rename to on-wnf
+    cell layout wnf
+    cell layout on-quit
 ]l internal0
 
 l[
@@ -180,9 +188,9 @@ l[
 : (later), here 0 , ;
 : this!    here swap ! ;
 
-forth definitions
+also forth definitions
 : there [ target ] here ;
-target definitions
+previous definitions
 
 : c@+ dup 1+ swap c@ ;
 : name cell + c@+ ;
@@ -210,6 +218,7 @@ target definitions
 : literal lit-addr , , ;
 : litjump jump-addr , , ;
 
+: context       contexts context# @ cells + ;
 : t.forth       fvocab context ! ;
 : t.compiler    cvocab context ! ;
 : t.definitions context @ current ! ;
@@ -239,6 +248,7 @@ alias ; t;
 
 mem internal0 erase
 internal0 h !
+0 context# !
 0 fvocab !
 0 cvocab !
 fvocab current !
@@ -287,11 +297,11 @@ stay         constant stay
 source-ptr   constant source-ptr
 source-len   constant source-len
 >in          constant >in
-\ todo just use s0 for input buffer
 input-buffer constant input-buffer
 h            constant h
 current      constant current
-context      constant context
+context#     constant context#
+contexts     constant contexts
 fvocab       constant fvocab
 cvocab       constant cvocab
 state        constant state
@@ -306,6 +316,7 @@ on-quit      constant on-quit
 : 2dup  over over ;
 : 2drop drop drop ;
 : 3dup  >r 2dup r@ -rot r> ;
+: cells cell * ;
 
 \ input ===
 
@@ -330,8 +341,14 @@ on-quit      constant on-quit
 : c@+     dup 1+ swap c@ ;
 : name    cell + c@+ ;
 : string= rot over = if mem= else drop 2drop false then ;
+
 : locate  dup if 3dup name string= 0= if @ loop then then nip nip ;
-: find    2dup context @ @ locate ?dup if nip nip else fvocab @ locate then ;
+
+: skip?   dup current @ @ = if @ then ;
+: (find) >r context# @
+  |: 3dup cells contexts + @ @ r@ if skip? then locate dup 0= if
+    over if drop 1- loop then
+  then r> drop nip nip nip ;
 
 \ number conversion ===
 
@@ -387,19 +404,16 @@ on-quit      constant on-quit
 : word! word ?dup 0= if drop refill if loop else
    0 literal 0 literal then then ;
 
-: cfind dup current @ @ = if @ then locate ;
-
 : interpret word! ?dup if
     state @ if
-      2dup cvocab @    cfind ?dup if -rot 2drop >cfa execute else
-      2dup context @ @ cfind ?dup if -rot 2drop >cfa , else
-      2dup fvocab @    cfind ?dup if -rot 2drop >cfa , else
-      2dup >number if -rot 2drop lit, , else
+      2dup cvocab @ skip? locate ?dup if -rot 2drop >cfa execute else
+      2dup true (find) ?dup           if -rot 2drop >cfa , else
+      2dup >number                    if -rot 2drop lit, , else
         drop 0 literal state ! align wnf @ execute
-      then then then then
+      then then then
     else
-      2dup find ?dup if -rot 2drop >cfa execute else
-      2dup >number   if -rot 2drop              else
+      2dup false (find) ?dup if -rot 2drop >cfa execute else
+      2dup >number           if -rot 2drop              else
         drop wnf @ execute
       then then
     then
@@ -426,6 +440,8 @@ exit-addr
 
 \ extras ===
 
+: find false (find) ;
+
 : ] 1 literal state ! ;
 t.compiler t.definitions
 : [ 0 literal state ! ;
@@ -440,7 +456,7 @@ t: ' word find dup if >cfa then t;
 
 \ ===
 
-forth
+only forth
 
 0 there .mem
 println after compile: 
