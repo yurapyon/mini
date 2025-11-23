@@ -1,21 +1,31 @@
 \ interpreter ext
 
-( str len top skip? -- )
-: locate >r |: r@ if dup current @ @ = if @ then then dup if
-    3dup name string= 0= if @ loop then
-  then r> drop nip nip ;
+: skip dup current @ @ = if @ then ;
 
-0 variable context#
+0 variable #order
 create contexts 16 cells allot
 
+: (find) ( name len skip? -- addr ) >r #order @ |: dup 0 u> if
+    ( name len #o )
+    3dup cells contexts + @ @ r@ if skip then locate
+    ( name len #o loc )
+    dup 0= if drop 1- loop else r> drop >r 3drop r> exit then
+  then r> 2drop 2drop 0 ;
+
+  \ |: 3dup cells contexts + @ @ r@ if skip? then locate dup 0= if
+    \ over if drop 1- loop then
+  \ then r> drop >r 3drop r> ;
+
+0 [if]
 : (find) ( name len skip? -- addr ) >r context# @
-  |: 3dup cells contexts + @ @ r@ locate dup 0= if
+  |: 3dup cells contexts + @ @ r@ if skip? then locate dup 0= if
     over if drop 1- loop then
   then r> drop >r 3drop r> ;
+[then]
 
 : interpret word! ?dup if
     state @ if
-      2dup cvocab @ true locate ?dup if -rot 2drop >cfa execute else
+      2dup cvocab @ skip locate ?dup if -rot 2drop >cfa execute else
       2dup true (find) ?dup          if -rot 2drop >cfa , else
       2dup >number                   if -rot 2drop lit, , else
         drop 0 state ! align wnf @ execute
@@ -33,26 +43,61 @@ create contexts 16 cells allot
 
 \ search order ===
 
-: find ( name len -- addr ) false (find) ;
+: context contexts #order @ cells + ;
 
-: context contexts context# @ cells + ;
+: >order 1 #order +! context ! ;
+
+: find ( name len -- addr ) false (find) ;
 
 : forth       fvocab context ! ;    \ ( -- )
 : compiler    cvocab context ! ;    \ ( -- )
 : definitions context @ current ! ; \ ( -- )
 
-: only 0 context# ! ;
-: also context @ 1 context# +! context ! ;
-: previous -1 context# +! ;
+: also context @ >order ;
+: previous -1 #order +! ;
 
 : vocabulary create 0 , does> context ! ;
+: >vocab     2 cells + ;
+
+forth
+vocabulary root
+also root definitions
+: fvocab fvocab ;
+: >order >order ;
+: forth forth ;
+previous definitions
+
+: only ['] root >vocab dup >order >order ;
 
 : words ( -- )   context @ @ check!0 if dup .word @ loop then drop ;
 
 \ ===
 
 only forth
+
 interpret
+
+vocabulary asdf
+
+also root definitions
+: + + ;
+: . . ;
+: cr cr ;
+: bye bye ;
+previous definitions
+
+only forth asdf
+
+1 2 + . cr
+
+bye
+
+: set-order 0 #order ! >r |: r@ if
+    push-order r> 1- >r
+  loop then
+  r> drop ;
+
+only forth
 
 here . cr
 : hi ." hi" cr ;
