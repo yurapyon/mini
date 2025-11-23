@@ -9,6 +9,8 @@
 : compiler    cvocab context ! ;    \ ( -- )
 : definitions context @ current ! ; \ ( -- )
 
+\ todo
+\ should have a minimal wordlist, instead of defaulting to forth
 : only 0 context# ! ;
 : also context @ 1 context# +! context ! ;
 : previous -1 context# +! ;
@@ -121,6 +123,21 @@ previous definitions
 : is    ( a "name" --) ' >value ! ;
 
 : vocabulary ( "name" -- ) create 0 , does> context ! ;
+: >vocab     2 cells + ;
+
+0 [if]
+vocabulary minimal
+also minimal definitions
+: fvocab fvocab ;
+: set-order 0 context# !
+>r |: r@ if
+  context !
+  1 context# +! >r 1- r>
+  loop then r> drop ;
+previous definitions
+
+: only ['] minimal >vocab 1 set-order ;
+[then]
 
 0 constant s[
 : ]s     ( n "name" -- )     constant ;
