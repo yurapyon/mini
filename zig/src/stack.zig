@@ -3,6 +3,7 @@ const MemoryPtr = mem.MemoryPtr;
 
 const kernel = @import("kernel.zig");
 const Cell = kernel.Cell;
+const DoubleCell = kernel.DoubleCell;
 const SignedCell = kernel.SignedCell;
 
 const register = @import("register.zig");
@@ -44,9 +45,7 @@ pub fn Stack(
         }
 
         fn peek(self: *@This(), at: Cell) *Cell {
-            // TODO handle stack underflow
             const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
-            // @import("std").debug.print("addr {} {}\n", .{ addr, top_addr });
             if (addr >= top_addr) unreachable;
             return mem.cellPtr(self.memory, addr) catch unreachable;
         }
@@ -65,9 +64,7 @@ pub fn Stack(
         }
 
         fn constPeek(self: @This(), at: Cell) Cell {
-            // TODO handle stack underflow
             const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
-            // @import("std").debug.print("addr {} {}\n", .{ addr, top_addr });
             if (addr >= top_addr) unreachable;
             return mem.readCell(self.memory, addr) catch unreachable;
         }
@@ -394,6 +391,50 @@ pub fn Stack(
             } else {
                 second.* = 0;
             }
+            self.pop(1);
+        }
+
+        // TODO should this be signed?
+        pub fn divmod(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const q = second.* / top.*;
+            const r = second.* % top.*;
+            second.* = q;
+            top.* = r;
+        }
+
+        // TODO should this be signed?
+        pub fn muldiv(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
+
+            const double_value: DoubleCell = @intCast(third.*);
+            const double_mul: DoubleCell = @intCast(second.*);
+            const calc = double_value * double_mul / top.*;
+            // NOTE
+            // truncating
+            // this can happen when mul is big and div is small
+            third.* = @truncate(calc);
+            self.pop(2);
+        }
+
+        // TODO should this be signed?
+        pub fn muldivmod(self: *@This()) void {
+            const top = self.peek(0);
+            const second = self.peek(1);
+            const third = self.peek(2);
+
+            const double_value: DoubleCell = @intCast(third.*);
+            const double_mul: DoubleCell = @intCast(second.*);
+            const q = double_value * double_mul / top.*;
+            const r = double_value * double_mul % top.*;
+            // NOTE
+            // truncating
+            // this can happen when mul is big and div is small
+            third.* = @truncate(q);
+            second.* = @truncate(r);
             self.pop(1);
         }
     };

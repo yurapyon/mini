@@ -227,11 +227,13 @@ pub const Kernel = struct {
                         error.StackUnderflow => "Stack Underflow",
                     };
 
-                    std.debug.print("Error: {s} {}\n", .{ message, token });
+                    const name = bytecodes.getBytecodeName(token) orelse "Unknown";
+
+                    std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
                     self.abort();
                 };
             } else {
-                const ext_token = token - @as(Cell, @intCast(bytecodes.callbacks.len));
+                const ext_token = token - @as(Cell, @intCast(bytecodes.bytecode_count));
                 self.processExternals(ext_token) catch |err| {
                     const message = switch (err) {
                         error.Panic => "Panic",
@@ -245,7 +247,9 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
-                    std.debug.print("External error: {s} {}\n", .{ message, ext_token });
+                    const name = self.externals.items[ext_token].name;
+
+                    std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     self.abort();
                 };
             }
@@ -262,20 +266,6 @@ pub const Kernel = struct {
         try mem.assertOffsetInBounds(self.program_counter.fetch(), offset);
         self.program_counter.storeAdd(offset);
     }
-
-    // TODO
-    //   this might not be needed after changes to system/multitreading?
-    //     before it ws being used to execute callbacks from glfw
-    // Sets up 'xt' for execution, finishes execution of xt before returning
-    //  pub fn callXt(self: *@This(), xt: Cell) !void {
-    //      self.return_stack.pushCell(self.program_counter.fetch());
-    //      self.setCfaToExecute(xt);
-    //      // TODO NOTE
-    //      // If this aborts,
-    //      //   rstack will be cleared and the next line will crash
-    //      try self.execute();
-    //      self.program_counter.store(self.return_stack.popCell());
-    //  }
 
     pub fn pushReturnAddr(self: *@This()) !void {
         // NOTE
@@ -296,11 +286,13 @@ pub const Kernel = struct {
     // ===
 
     pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
-        // TODO check that this id isn't > maxInt(cell)
         try self.externals.append(self.allocator, .{
             .name = name,
             .external = external,
         });
+        if (self.externals.items.len > std.math.maxInt(Cell)) {
+            return error.TooManyExternals;
+        }
     }
 
     fn processExternals(self: *@This(), ext_token: Cell) !void {

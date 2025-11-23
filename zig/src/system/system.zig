@@ -1,5 +1,6 @@
 const std = @import("std");
 const Mutex = std.Thread.Mutex;
+const Semaphore = std.Thread.Semaphore;
 
 const kernel = @import("../kernel.zig");
 const Kernel = kernel.Kernel;
@@ -23,15 +24,6 @@ const Characters = @import("characters.zig").Characters;
 const Image = @import("image.zig").Image;
 
 // ===
-
-// NOTE outdated
-// Inspired by pc-98
-// 640x400, 4bit color, 24bit palette
-// 80x25 character mode, 8bit "attributes" ie, blinking, reverse, etc and 16 color
-//   7x11 characters, drawn in 8x16 boxes
-// 80x40 character mode
-//   7x9 characters, drawn in 8x10 boxes
-// Character buffer on top of pixel buffer
 
 // Multithreading strategy
 // There need to be 3 different threads
@@ -118,18 +110,6 @@ const glfw_callbacks = struct {
             },
         });
     }
-
-    // TODO
-    fn windowSize(
-        win: ?*c.GLFWwindow,
-        width: c_int,
-        height: c_int,
-    ) callconv(.c) void {
-        const system: *System = @ptrCast(@alignCast(c.glfwGetWindowUserPointer(win)));
-        _ = system;
-        _ = width;
-        _ = height;
-    }
 };
 
 const exts = struct {
@@ -159,6 +139,7 @@ const exts = struct {
                     k.data_stack.pushCell(y_cell);
                 },
                 .mouse_button => |data| {
+                    // TODO this api isn't great
                     var value = @as(Cell, @intCast(data.button)) & 0x7;
                     if (data.action == c.GLFW_PRESS) {
                         value |= 0x10;
@@ -505,6 +486,7 @@ pub const System = struct {
     // reader: Forth thread
     input_channel: InputChannel,
     video_mutex: Mutex,
+    startup_semaphore: Semaphore,
 
     pixels: Pixels,
     characters: Characters,
@@ -517,17 +499,12 @@ pub const System = struct {
     resource_manager: ResourceManager,
 
     // TODO allow for different allocator than the kernels
-    // TODO restructure this so you could call it from within forth as an external
     pub fn init(self: *@This(), k: *Kernel) !void {
         self.k = k;
 
-        try self.initWindow();
-
         try self.input_channel.init(k.allocator);
         self.video_mutex = .{};
-
-        try self.pixels.init(k.allocator);
-        try self.characters.init(k.allocator);
+        self.startup_semaphore = .{};
 
         try self.resource_manager.init(k.allocator, &k.handles);
         self.resources.screen.resource.image = &self.pixels.image;
@@ -541,27 +518,17 @@ pub const System = struct {
         );
 
         try self.registerExternals(k);
-
-        std.debug.print("pyon vPC\n", .{});
         try k.evaluate(system_file);
     }
 
     pub fn deinit(self: *@This()) void {
         self.resource_manager.deinit();
-        self.characters.deinit();
-        self.pixels.deinit();
         self.input_channel.deinit();
-        c.glfwTerminate();
     }
 
     // ===
 
     fn initWindow(self: *@This()) !void {
-        if (c.glfwInit() != c.GL_TRUE) {
-            return error.CannotInitGLFW;
-        }
-        errdefer c.glfwTerminate();
-
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MAJOR, @intCast(3));
         c.glfwWindowHint(c.GLFW_CONTEXT_VERSION_MINOR, @intCast(3));
         c.glfwWindowHint(c.GLFW_OPENGL_PROFILE, c.GLFW_OPENGL_CORE_PROFILE);
@@ -583,6 +550,8 @@ pub const System = struct {
         ) orelse return error.CannotInitWindow;
         errdefer c.glfwDestroyWindow(window);
 
+        self.window = window;
+
         c.glfwMakeContextCurrent(window);
 
         var w: c_int = undefined;
@@ -596,14 +565,30 @@ pub const System = struct {
         _ = c.glfwSetMouseButtonCallback(window, glfw_callbacks.mouseButton);
         _ = c.glfwSetCharCallback(window, glfw_callbacks.char);
 
-        self.window = window;
-
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);
         c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
     }
 
     pub fn run(self: *@This()) !void {
+        if (c.glfwInit() != c.GL_TRUE) {
+            return error.CannotInitGLFW;
+        }
+        defer c.glfwTerminate();
+
+        try self.initWindow();
+        defer c.glfwDestroyWindow(self.window);
+
+        try self.pixels.init(self.k.allocator);
+        defer self.pixels.deinit();
+
+        try self.characters.init(self.k.allocator);
+        defer self.characters.deinit();
+
+        std.debug.print("pyon vPC\n", .{});
+
+        self.startup_semaphore.post();
+
         while (true) {
             const should_close = c.glfwWindowShouldClose(self.window) == c.GL_TRUE;
             if (should_close) {

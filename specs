@@ -106,3 +106,16 @@ number parsing:
     # - decimal
     $ - hexidecimal
   sign must come before base modifier, i.e. -$beef
+
+=== virtual PC ===
+
+Inspired by PC-98
+
+graphics:
+  resolution: 640x400
+  color depth:
+    pixels:     4bit, 16 color palette
+    characters: 3bit 8 color palette
+    palette:    24bit
+  character dimensions: 8x10
+

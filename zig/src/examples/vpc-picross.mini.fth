@@ -1,3 +1,9 @@
+\ ===
+\
+\ [WIP] picross GUI
+\
+\ ===
+
 vocabulary picross
 picross definitions
 

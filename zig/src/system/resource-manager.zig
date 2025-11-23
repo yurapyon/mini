@@ -12,8 +12,7 @@ const Timer = @import("timer.zig").Timer;
 
 // ===
 
-// TODO
-// Note
+// NOTE
 // The resource manager is not thread-safe
 //   For now this is okay, but in the future it may be good to fix that
 

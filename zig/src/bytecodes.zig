@@ -24,7 +24,7 @@ pub const Error = error{
 
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
 
-pub const callbacks = [_]BytecodeFn{
+const callbacks = [_]BytecodeFn{
     &exit,    &docol,    &docon,     &docre,
     &jump,    &jump0,    &lit,       &panic,
     &accept,  &emit,     &eq,        &gt,
@@ -43,9 +43,38 @@ pub const callbacks = [_]BytecodeFn{
     &sysQuit, &extId,
 };
 
+pub const bytecode_count = callbacks.len;
+
+const names = [bytecode_count][]const u8{
+    "exit",    "docol",    "docon",     "docre",
+    "jump",    "jump0",    "lit",       "panic",
+    "accept",  "emit",     "eq",        "gt",
+    "gteq",    "eq0",      "lt",        "lteq",
+    "ugt",     "ugteq",    "ult",       "ulteq",
+    "and_",    "or_",      "xor",       "invert",
+    "lshift",  "rshift",   "store",     "storeAdd",
+    "fetch",   "storeC",   "storeAddC", "fetchC",
+    "toR",     "fromR",    "fetchR",    "plus",
+    "minus",   "multiply", "divide",    "mod",
+    "divmod",  "muldiv",   "muldivmod", "udivide",
+    "umod",    "inc",      "dec",       "negate",
+    "drop",    "dup",      "maybeDup",  "swap",
+    "flip",    "over",     "nip",       "tuck",
+    "rot",     "nrot",     "move",      "memEqual",
+    "sysQuit", "extId",
+};
+
 pub fn getBytecode(token: Cell) ?BytecodeFn {
     if (token < callbacks.len) {
         return callbacks[token];
+    } else {
+        return null;
+    }
+}
+
+pub fn getBytecodeName(token: Cell) ?[]const u8 {
+    if (token < callbacks.len) {
+        return names[token];
     } else {
         return null;
     }
@@ -457,50 +486,22 @@ pub fn umod(k: *Kernel) Error!void {
     k.data_stack.umod();
 }
 
-// TODO move this into DataStack definiton
 pub fn divmod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(2);
 
-    const div = k.data_stack.popCell();
-    const value = k.data_stack.popCell();
-    const q = value / div;
-    const r = value % div;
-    k.data_stack.pushCell(@truncate(q));
-    k.data_stack.pushCell(@truncate(r));
+    k.data_stack.divmod();
 }
 
-// TODO move this into DataStack definiton
 pub fn muldiv(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
 
-    const div = k.data_stack.popCell();
-    const mul = k.data_stack.popCell();
-    const value = k.data_stack.popCell();
-    const double_value: DoubleCell = @intCast(value);
-    const double_mul: DoubleCell = @intCast(mul);
-    const calc = double_value * double_mul / div;
-    // NOTE
-    // truncating
-    // this can happen when mul is big and div is small
-    k.data_stack.pushCell(@truncate(calc));
+    k.data_stack.muldiv();
 }
 
-// TODO move this into DataStack definiton
 pub fn muldivmod(k: *Kernel) Error!void {
     try k.data_stack.assertWontUnderflow(3);
 
-    const div = k.data_stack.popCell();
-    const mul = k.data_stack.popCell();
-    const value = k.data_stack.popCell();
-    const double_value: DoubleCell = @intCast(value);
-    const double_mul: DoubleCell = @intCast(mul);
-    const q = double_value * double_mul / div;
-    const r = double_value * double_mul % div;
-    // NOTE
-    // truncating
-    // this can happen when mul is big and div is small
-    k.data_stack.pushCell(@truncate(q));
-    k.data_stack.pushCell(@truncate(r));
+    k.data_stack.muldivmod();
 }
 
 pub fn move(k: *Kernel) Error!void {
@@ -567,10 +568,8 @@ pub fn extId(k: *Kernel) Error!void {
         len,
     );
 
-    // TODO
-    // better error when external not found
-    // Maybe external not found should kill the app?
-    const ext_token = k.lookupExternal(name) orelse 0xffff;
+    const ext_token = k.lookupExternal(name) orelse
+        return error.Panic;
     const token = ext_token + @as(Cell, @intCast(callbacks.len));
     k.data_stack.pushCell(token);
 }

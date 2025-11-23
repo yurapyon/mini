@@ -140,10 +140,6 @@ forth definitions
 : min ( n0 n1 -- n ) 2dup > if swap then drop ;
 : max ( n0 n1 -- n ) 2dup < if swap then drop ;
 
-\ todo probably don't need compare
-\ -1 enum %lt enum %eq constant %gt
-\ : compare ( n0 n1 -- n ) 2dup = if 2drop %eq else > if %gt else %lt then then ;
-
 : clamp ( n min max -- n ) rot min max ;
 : in[,] ( n min max -- n ) rot tuck >= -rot <= and ;
 : in[,) ( n min max -- n ) 1- in[,] ;
@@ -315,8 +311,6 @@ forth definitions
 
 \ tags ===
 
-\ todo
-\ for the better performance, could turn 's>mem' into an external or builtin
 : s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
 
 0 variable tags*

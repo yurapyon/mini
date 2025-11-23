@@ -46,10 +46,13 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
 }
 
 fn kernelRunFiles(
+    system: *System,
     k: *Kernel,
     filepaths: ArrayList([]u8),
     start_repl: bool,
 ) !void {
+    system.startup_semaphore.wait();
+
     var input_file = std.fs.File.stdin();
 
     for (filepaths.items) |fp| {
@@ -135,11 +138,13 @@ pub fn main() !void {
             try k.evaluate(startup_file);
 
             try sys.init(&k);
+            defer sys.deinit();
 
             const kernel_thread = try Thread.spawn(
                 .{},
                 kernelRunFiles,
                 .{
+                    &sys,
                     &k,
                     cli_options.filepaths,
                     should_start_repl,
@@ -149,8 +154,6 @@ pub fn main() !void {
             try sys.run();
 
             kernel_thread.join();
-
-            sys.deinit();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);
