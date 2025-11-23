@@ -31,6 +31,7 @@ features:
     pixel buffer
     character buffer
     mouse/keyboard callbacks
+    multithreaded between graphics and interpreter
 
 roadmap:
   in progress:
