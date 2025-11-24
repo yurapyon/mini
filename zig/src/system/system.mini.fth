@@ -39,9 +39,8 @@ make on-char       2drop ;
 
 doer frame
 
-image-ids
-constant _chars
-constant _screen
+-1 value _chars
+-1 value _screen
 
 : putp     _screen i!xy ;
 : putline  _screen i!line ;
@@ -82,6 +81,8 @@ create events
 true variable continue
 
 make on-close false continue ! ;
+
+: video-init image-ids to _chars to _screen ;
 
 : main true continue ! |: continue @ if
     <v frame poll! v> 30 sleep

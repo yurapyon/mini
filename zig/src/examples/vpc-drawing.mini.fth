@@ -247,6 +247,8 @@ make on-key kpressed? if cond
     endcond
   else drop then ;
 
+video-init
+
 <v
 initpal
 \ setupbrush

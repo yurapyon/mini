@@ -4,6 +4,9 @@
 \
 \ ===
 
+\ TODO
+\ gfx in this file may be out of date since system multithreading update
+
 : defer create ['] noop , does> @ execute ;
 : is    ' >value ! ;
 
@@ -106,11 +109,13 @@ doer process
 : l.print   ( l -- )   l>stk >offset offtype ;
 : l.inside? ( x y l -- t/f ) tuck l>y in[,] -rot l>x in[,] and ;
 
-compiler definitions
+also compiler definitions
 : t" ['] >offset , [compile] s" ['] offtype , ;
-forth definitions
+previous definitions
 
 \ note, unused ===
+
+0 [if]
 
 doer mmove
 doer mclick
@@ -125,7 +130,7 @@ doer mclick
   r> drop ;
 
 vocabulary regions
-regions definitions
+also regions definitions
 
 0 0 640 480 region:
   make mmove  2drop                ;and
@@ -135,7 +140,7 @@ regions definitions
   make mmove  swap . . cr           ;and
   make mclick ." click" swap . . cr ;
 
-forth definitions
+previous definitions
 
 : (test) ( x y a -- )
   check!0 if
@@ -150,6 +155,8 @@ forth definitions
 
 make mmove 2drop ;
 make mclick 2drop ;
+
+[then]
 
 \ ===
 
