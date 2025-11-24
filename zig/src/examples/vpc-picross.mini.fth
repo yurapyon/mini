@@ -5,7 +5,7 @@
 \ ===
 
 vocabulary picross
-picross definitions
+also picross definitions
 
 \ ===
 
@@ -31,6 +31,8 @@ s[
 0 variable curr-puzzle
 : width curr-puzzle @ >width @ ;
 : height curr-puzzle @ >height @ ;
+
+0 [if]
 
 : >p>s ( x y -- p-addr s-addr )
   width * + dup curr-puzzle + over squares + ;
@@ -87,6 +89,7 @@ doer i.each
 
 \ 0 hintsy hints 0 row> go
 \ checks 0 row> go
+[then]
 
 s[
   cell field >#sets
@@ -111,9 +114,8 @@ maxh maxw 2 / hints hintsy
    last-read @ if 1 curr-hint +! then then
    last-read ! ;
 
-: hints make i.each push-hint ;and start-hints ;
+\ : hints make i.each push-hint ;and start-hints ;
 
-0 [if]
 doer hlist
 doer inc
 doer start
@@ -139,13 +141,13 @@ doer start
 : all-hints
   rows height 0 check> if dup build-hints 1+ loop then
   cols width  0 check> if dup build-hints 1+ loop then ;
-[then]
 
 
-forth definitions
+only forth definitions
 
 vocabulary puzzles
-puzzles definitions
+also picross
+also puzzles definitions
 
 : & 1 c, ;
 : _ 0 c, ;
@@ -178,9 +180,11 @@ puzzles definitions
 
 \ ===
 
-picross
+only forth
+also picross
+also puzzles
 
-puzzles one picross curr-puzzle !
+one curr-puzzle !
 all-hints
 hintsy 32 dump
 hintsx 32 dump
