@@ -3,13 +3,16 @@
 \ NOTE
 \ Max line length in this file is 128 chars
 
-: forth       fvocab context ! ;    \ ( -- )
-: compiler    cvocab context ! ;    \ ( -- )
-: definitions context @ current ! ; \ ( -- )
+\ Interpreter starts with forth as the only wordlist in the context
 
-\ utils ===
+: context     wordlists #order @ 1- cells + ; \ ( -- a )
+: push-order  1 #order +! context ! ;         \ ( n -- )
+: also        context @ push-order ;          \ ( -- )
+: previous    -1 #order +! ;                  \ ( -- )
 
-: cells cell * ; \ ( n -- n )
+: forth       fvocab context ! ;              \ ( -- )
+: compiler    cvocab context ! ;              \ ( -- )
+: definitions context @ current ! ;           \ ( -- )
 
 : @+  dup cell + swap @ ; \ ( a -- a n )
 : c@+ dup 1+ swap c@ ;    \ ( a -- a n )
@@ -25,11 +28,11 @@
 
 \ syntax and defining words ===
 
-compiler definitions
+also compiler definitions
 : literal   lit, , ;              \ ( n -- )
 : [compile] ' , ;                 \ ( "name" -- )
 : [']       ' [compile] literal ; \ ( "name" -- )
-forth definitions
+previous definitions
 
 : constant word define ['] docon @ , , ;          \ ( n "name" -- )
 : enum     dup constant 1+ ;                      \ ( n "name" -- n )
@@ -39,10 +42,10 @@ forth definitions
 
 0 variable loop*
 : set-loop here loop* ! ;         \ ( -- )
-compiler definitions
+also compiler definitions
 : |:       set-loop ;             \ ( -- )
 : loop     ['] jump , loop* @ , ; \ ( -- )
-forth definitions
+previous definitions
 : :        : set-loop ;           \ ( -- )
 
 : (later), here 0 , ;      \ ( -- a )
@@ -52,7 +55,7 @@ forth definitions
 \ todo probably don't need dist
 : dist     this - ;        \ ( a -- n )
 
-compiler definitions
+also compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
 : else ['] jump , (later), swap this! ; \ ( a -- a )
 : then this! ;                          \ ( a -- )
@@ -67,26 +70,26 @@ compiler definitions
 : endcond check!0 if [compile] then loop then drop ; \ ( 0 ... a -- )
 
 : tailcall ['] jump , ' cell + , ; \ ( "name" -- )
-forth definitions
+previous definitions
 
 : ( next-char ')' = 0= if loop then ;
-compiler definitions
+also compiler definitions
 : ( ( ; \ this comment is here to fix vim syntax highlight )
 : \ \ ;
-forth definitions
+previous definitions
 
 : :noname ( -- a ) 0 0 define here ['] docol @ , set-loop ] ;
-compiler definitions
+also compiler definitions
 : [:      ( -- a ) lit, here 6 + , ['] jump , (later), ['] docol @ , ;
 : ;]      ( a -- ) ['] exit , this! ;
-forth definitions
+previous definitions
 
 : last  ( -- a )   current @ @ >cfa ;
 : >does ( a -- a ) cell + ;
-compiler definitions
+also compiler definitions
 : does> ( -- )     (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
                    ['] docol @ , set-loop ;
-forth definitions
+previous definitions
 : does> ( -- )     last :noname swap >does ! ;
 
 : >value 2 cells + ;
@@ -94,11 +97,11 @@ forth definitions
 : noop ( -- )        ;
 : doer ( "name" -- ) create ['] noop cell + , does> @ >r ;
 0 variable make*
-compiler definitions
+also compiler definitions
 : make ( "name" -- ) (lit), lit, ' >value , ['] ! ,
                      here make* ! ['] exit , 0 , this! ;
 : ;and ( -- )        ['] exit , ['] jump make* @ !+ this! ;
-forth definitions
+previous definitions
 : make ( "name" -- ) :noname cell + ' >value ! ;
 : undo ( "name" -- ) ['] noop cell + ' >value ! ;
 
@@ -106,15 +109,13 @@ forth definitions
 : value ( n "name" -- ) create , does> @ ;
 : to    ( n "name" -- ) ' >value ! ;
 : +to   ( n "name" -- ) ' >value +! ;
-compiler definitions
+also compiler definitions
 : to    ( "name" -- )   lit, ' >value , ['] ! , ;
 : +to   ( "name" -- )   lit, ' >value , ['] +! , ;
-forth definitions
+previous definitions
 
 : defer ( "name" -- )  create ['] noop , ['] exit , does> >r ;
 : is    ( a "name" --) ' >value ! ;
-
-: vocabulary ( "name" -- ) create 0 , does> context ! ;
 
 0 constant s[
 : ]s     ( n "name" -- )     constant ;
@@ -130,6 +131,25 @@ forth definitions
 \ on-quit !
 
 : external word 2dup extid -rot define , ;
+
+\ search order ===
+
+: set-order 0 #order ! >r |: r@ if
+    push-order r> 1- >r
+  loop then r> drop ;
+
+: vocabulary ( "name" -- ) create 0 , does> context ! ;
+: >vocab     2 cells + ;
+
+vocabulary root
+
+also root definitions
+: forth forth ;
+previous definitions
+
+: only ['] root >vocab dup 2 set-order ;
+
+only forth definitions
 
 \ math ===
 
@@ -176,16 +196,16 @@ forth definitions
 : d" ( | .*" -- ) here dup string h ! ;
 : c" ( | .*" -- ) here dup cstring h ! ;
 : s" ( | .*" -- ) [compile] c" count ;
-compiler definitions
+also compiler definitions
 : d" ( | .*" -- ) (data), string align this! ;
 : c" ( | .*" -- ) (data), cstring align this! ;
 : s" ( | .*" -- ) [compile] c" ['] count , ;
-forth definitions
+previous definitions
 
 : ." ( | .*" -- ) [compile] s" type ;
-compiler definitions
+also compiler definitions
 : ." ( | .*" -- ) [compile] s" ['] type , ;
-forth definitions
+previous definitions
 
 \ printing ===
 
@@ -253,11 +273,11 @@ forth definitions
 : [then]    ;
 : [defined] word find 0= 0= ;
 
-compiler definitions
+also compiler definitions
 : [if]      [if] ;
 : [then]    [then] ;
 : [defined] [defined] ;
-forth definitions
+previous definitions
 
 \ os ===
 
@@ -298,9 +318,9 @@ create fbuf 128 allot
 : f. fbuf 128 f>str fbuf swap type ;
 
 : F word str>f drop ;
-compiler definitions
+also compiler definitions
 : F word str>f drop swap lit, , lit, , ;
-forth definitions
+previous definitions
 
 : f, swap , , ;
 : f@ @+ swap @ ;
@@ -317,10 +337,10 @@ forth definitions
 : tags, ( n -- )        cells >r ['] jump , (later), here swap r@ allot this! here tags* !
                         lit, , lit, r> , ['] s>mem , ;
 : tag   ( n "name" -- ) create cells , does> @ tags* @ swap - cell - lit, , ['] @ , ;
-compiler definitions
+also compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
-forth definitions
+previous definitions
 
 \ dynamic ===
 
