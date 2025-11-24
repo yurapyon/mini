@@ -179,6 +179,9 @@ pub fn main() !void {
                 std.debug.print("(mini)\n", .{});
 
                 k.setAcceptClosure(acceptStdIn, &input_file);
+                // TODO note
+                // This restarts the interpreter
+                // Not sure if this is best to do
                 k.initForth();
                 try k.execute();
             }

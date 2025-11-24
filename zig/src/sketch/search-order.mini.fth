@@ -6,22 +6,8 @@
 create contexts 16 cells allot
 
 : (find) ( name len skip? -- addr ) >r #order @ |: dup 0 u> if
-    ( name len #o )
-    3dup cells contexts + @ @ r@ if skip then locate
-    ( name len #o loc )
-    dup 0= if drop 1- loop else r> drop >r 3drop r> exit then
-  then r> 2drop 2drop 0 ;
-
-  \ |: 3dup cells contexts + @ @ r@ if skip? then locate dup 0= if
-    \ over if drop 1- loop then
-  \ then r> drop >r 3drop r> ;
-
-0 [if]
-: (find) ( name len skip? -- addr ) >r context# @
-  |: 3dup cells contexts + @ @ r@ if skip? then locate dup 0= if
-    over if drop 1- loop then
-  then r> drop >r 3drop r> ;
-[then]
+    3dup 1- cells contexts + @ @ r@ if skip then locate ?dup 0= if 1- loop then
+  else 0 then r> drop >r 3drop r> ;
 
 : interpret word! ?dup if
     state @ if
@@ -41,35 +27,40 @@ create contexts 16 cells allot
     drop
   then ;
 
+: find ( name len -- addr ) false (find) ;
+
 \ search order ===
 
-: context contexts #order @ cells + ;
-
-: >order 1 #order +! context ! ;
-
-: find ( name len -- addr ) false (find) ;
+: context contexts #order @ ?dup if 1- cells + else abort then ;
 
 : forth       fvocab context ! ;    \ ( -- )
 : compiler    cvocab context ! ;    \ ( -- )
 : definitions context @ current ! ; \ ( -- )
 
-: also context @ >order ;
+: push-order 1 #order +! context ! ;
+
+: set-order 0 #order ! >r |: r@ if
+    push-order r> 1- >r
+  loop then r> drop ;
+
+: also context @ push-order ;
 : previous -1 #order +! ;
 
 : vocabulary create 0 , does> context ! ;
 : >vocab     2 cells + ;
 
-forth
+: words ( -- )   context @ @ check!0 if dup .word @ loop then drop ;
+
+fvocab 1 set-order
+
 vocabulary root
+here cell - . cr
+
 also root definitions
-: fvocab fvocab ;
-: >order >order ;
 : forth forth ;
 previous definitions
 
-: only ['] root >vocab dup >order >order ;
-
-: words ( -- )   context @ @ check!0 if dup .word @ loop then drop ;
+: only ['] root >vocab dup 2 set-order ;
 
 \ ===
 
@@ -78,119 +69,20 @@ only forth
 interpret
 
 vocabulary asdf
-
-also root definitions
-: + + ;
-: . . ;
-: cr cr ;
-: bye bye ;
-previous definitions
-
-only forth asdf
-
-1 2 + . cr
-
-bye
-
-: set-order 0 #order ! >r |: r@ if
-    push-order r> 1- >r
-  loop then
-  r> drop ;
+here cell - . cr
 
 only forth
+also asdf definitions
+: wawa 10 15 + . ;
+: wawa wawa ." 2" cr ;
 
-here . cr
-: hi ." hi" cr ;
-: wa ." wa" cr ;
-
-vocabulary test
-also test definitions
-
-here . cr
-: hello ." hello" cr ;
-: wawa ." wawa" cr ;
-
-previous definitions
-
-vocabulary test2
-also test2 definitions
-
-here . cr
-: hello2 ." hello2" cr ;
-: wawa2 ." wawa2" cr ;
-
-previous definitions
-
-only forth also test also test2
-
-\ forth words
-
-hi
-wa
-hello
 wawa
-hello2
-wawa2
-wahaha
-
-only forth interpret
 
 only forth
-also test2 definitions
+wawa
 
-: def ." def" ;
-: def def ." d2" def cr ;
+interpret
 
-only forth
-also test2
+also asdf
 
-def
-
-bye
-
-
-
-
-
-: >> word find ?dup if >cfa execute else ." not found" cr then ;
-
-here . cr
-: hi ." hi" cr ;
-: wa ." wa" cr ;
-
-vocabulary test
-test definitions
-
-here . cr
-: hello ." hello" cr ;
-: wawa ." wawa" cr ;
-
-forth definitions
-
-vocabulary test2
-test2 definitions
-
-here . cr
-: hello2 ." hello2" cr ;
-: wawa2 ." wawa2" cr ;
-
-forth definitions
-
-only forth also test also test2
-
-contexts 16 cells dump
-
-.s cr
->> hi
->> wa
->> hello
->> hello2
->> wawa
->> wawa2
->> xxx
-.s cr
-
-: def ;
-true skip? !
->> def
-.s cr
+wawa
