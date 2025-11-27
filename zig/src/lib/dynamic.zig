@@ -60,7 +60,7 @@ fn allocateAndGetHandleId(k: *Kernel, size: usize) External.Error!Cell {
 
     ptr.* = slice;
 
-    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
+    const handle_id = k.handles.getHandleForPtr(k.allocator, @ptrCast(ptr)) catch
         return error.ExternalPanic;
 
     return handle_id;
@@ -91,7 +91,7 @@ fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
 
     k.allocator.free(m.slice);
     k.allocator.destroy(m.ptr);
-    k.handles.freeHandle(handle_id);
+    k.handles.freeHandle(k.allocator, handle_id);
 }
 
 fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
