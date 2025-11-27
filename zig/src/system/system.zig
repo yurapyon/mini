@@ -113,6 +113,30 @@ const glfw_callbacks = struct {
             },
         });
     }
+
+    var hacky_window_pointer_for_joysticks: ?*c.GLFWwindow = null;
+
+    fn joystick(
+        index: c_int,
+        event: c_int,
+    ) callconv(.c) void {
+        const system: *System = @ptrCast(@alignCast(
+            c.glfwGetWindowUserPointer(hacky_window_pointer_for_joysticks),
+        ));
+
+        // TODO
+        // This assumes 'event' can only be connected/disconnected which may not be the case
+        const is_connected = event == c.GLFW_CONNECTED;
+        const is_joystick_gamepad = c.glfwJoystickIsGamepad(index) == c.GLFW_TRUE;
+        gamepad.onConnectionChange(@intCast(index), is_connected and is_joystick_gamepad);
+
+        system.input_channel.push(.{
+            .gamepad_connection = .{
+                .index = @intCast(index),
+                .is_connected = is_connected,
+            },
+        });
+    }
 };
 
 const exts = struct {
@@ -158,12 +182,12 @@ const exts = struct {
                     k.data_stack.pushCell(low);
                 },
                 .gamepad => |data| {
-                    // NOTE
-                    // action can be < 1 for axes
-                    const action: SignedCell = @truncate(data.action);
-
-                    k.data_stack.pushSignedCell(action);
+                    k.data_stack.pushSignedCell(@intCast(data.action));
                     k.data_stack.pushCell(@intCast(data.button));
+                    k.data_stack.pushCell(@intCast(data.index));
+                },
+                .gamepad_connection => |data| {
+                    k.data_stack.pushBoolean(data.is_connected);
                     k.data_stack.pushCell(@intCast(data.index));
                 },
             }
@@ -567,6 +591,9 @@ pub const System = struct {
         _ = c.glfwSetCursorPosCallback(window, glfw_callbacks.cursorPosition);
         _ = c.glfwSetMouseButtonCallback(window, glfw_callbacks.mouseButton);
         _ = c.glfwSetCharCallback(window, glfw_callbacks.char);
+
+        glfw_callbacks.hacky_window_pointer_for_joysticks = window;
+        _ = c.glfwSetJoystickCallback(glfw_callbacks.joystick);
 
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);

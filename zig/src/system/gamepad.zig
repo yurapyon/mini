@@ -23,16 +23,23 @@ const Gamepad = struct {
 
 var gamepads: [16]Gamepad = undefined;
 
+pub fn onConnectionChange(index: usize, is_connected: bool) void {
+    var gamepad = &gamepads[index];
+
+    gamepad.is_connected = is_connected;
+    if (gamepad.is_connected) {
+        // TODO test for error
+        _ = c.glfwGetGamepadState(@intCast(index), &gamepad.current_state);
+        gamepad.rememberState();
+    }
+}
+
 pub fn init() void {
-    for (&gamepads, 0..) |*gamepad, i| {
+    for (0..gamepads.len) |i| {
         const is_joystick_connected = c.glfwJoystickPresent(@intCast(i)) == c.GLFW_TRUE;
         const is_joystick_gamepad = c.glfwJoystickIsGamepad(@intCast(i)) == c.GLFW_TRUE;
-        gamepad.is_connected = is_joystick_connected and is_joystick_gamepad;
-
-        if (gamepad.is_connected) {
-            // TODO test for error
-            _ = c.glfwGetGamepadState(@intCast(i), &gamepad.current_state);
-            gamepad.rememberState();
+        if (is_joystick_connected and is_joystick_gamepad) {
+            onConnectionChange(i, true);
         }
     }
 }

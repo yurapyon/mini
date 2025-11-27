@@ -16,6 +16,7 @@ pub const InputEventTag = enum(Cell) {
     mouse_button,
     char,
     gamepad,
+    gamepad_connection,
 };
 
 pub const InputEvent = union(InputEventTag) {
@@ -41,7 +42,13 @@ pub const InputEvent = union(InputEventTag) {
     gamepad: struct {
         index: c_uint,
         button: c_uint,
+        // NOTE
+        // Action can be < 0 for axes
         action: c_int,
+    },
+    gamepad_connection: struct {
+        index: c_uint,
+        is_connected: bool,
     },
 };
 

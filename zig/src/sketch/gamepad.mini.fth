@@ -12,4 +12,6 @@ make on-gamepad drop cond
   .axes cr
   ;
 
+make on-gamepad-connection .s cr 2drop ;
+
 main
