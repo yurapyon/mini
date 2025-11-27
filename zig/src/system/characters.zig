@@ -279,37 +279,14 @@ pub const Characters = struct {
     }
 
     pub fn store(self: *@This(), addr: Cell, value: u8) void {
-        const break1 = 16 * 16 * 10;
-        const break2 = break1 + buffer_width * buffer_height * 2;
-        if (addr < break1) {
-            const start_addr = addr * 8;
-            var temp = value;
-            var i: usize = 0;
-            while (i < 8) : (i += 1) {
-                self.spritesheet.data[start_addr + 7 - i] = temp & 1;
-                temp >>= 1;
-            }
-            self.spritesheet.pushToTexture(self.texture);
-        } else if (addr < break2) {
-            self.characters[addr - break1] = value;
+        if (addr < self.characters.len) {
+            self.characters[addr] = value;
         }
     }
 
     pub fn fetch(self: @This(), addr: Cell) u8 {
-        const break1 = 16 * 16 * 10;
-        const break2 = break1 + buffer_width * buffer_height * 2;
-        if (addr < break1) {
-            const start_addr = addr * 8;
-            var value: u8 = 0;
-            var i: usize = 0;
-            while (i < 8) : (i += 1) {
-                const is_set = self.spritesheet.data[start_addr + i] > 0;
-                value |= if (is_set) 1 else 0;
-                value <<= 1;
-            }
-            return value;
-        } else if (addr < break2) {
-            return @truncate(self.characters[addr - break1]);
+        if (addr < self.characters.len) {
+            return @truncate(self.characters[addr]);
         } else {
             return 0;
         }

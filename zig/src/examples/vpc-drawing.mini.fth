@@ -10,7 +10,7 @@
 \ ===
 
 ( x y c -- )
-: putchar >r 80 * + 2 * 16 16 10 * * + r> swap chars! ;
+: putchar >r 80 * + 2 * r> swap chars! ;
 
 \ ===
 

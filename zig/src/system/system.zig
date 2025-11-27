@@ -150,7 +150,9 @@ const exts = struct {
             switch (ev) {
                 .close => {},
                 .key => |data| {
-                    // TODO handle scancode and mods
+                    // TODO
+                    //   handle scancode and mods
+                    //   probably push keycode first, then action
                     k.data_stack.pushCell(@intCast(data.keycode));
                     k.data_stack.pushCell(@intCast(data.action));
                 },
