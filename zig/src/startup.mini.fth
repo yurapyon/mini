@@ -38,6 +38,7 @@ previous definitions
 : enum     dup constant 1+ ;                      \ ( n "name" -- n )
 : flag     dup constant 1 lshift ;                \ ( n "name" -- n )
 : create   word define ['] docre @ , ['] exit , ; \ ( "name" -- )
+\ todo maybe remove variable initialization
 : variable create , ;                             \ ( n "name" -- )
 
 0 variable loop*
@@ -209,6 +210,7 @@ previous definitions
 : digit>char ( n -- n ) dup 10 < if '0' else 'W' then + ;
 
 : abs   dup 0 < if negate then ;
+\ todo umod should come first, then u/, according to gforth and ansi
 : u/mod 2dup u/ -rot umod ;
 
 0 variable #start

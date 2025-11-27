@@ -7,24 +7,24 @@
 
 \ system ===
 
-: context    wordlists #order @ 1- cells + ;
-: push-order 1 #order +! context ! ;
-: also       context @ push-order ;
-: previous   -1 #order +! ;
+: context     wordlists #order @ 1- cells + ;
+: push-order  1 #order +! context ! ;
+: also        context @ push-order ;
+: previous    -1 #order +! ;
 
-: forth fvocab context ! ;
-: compiler cvocab context ! ;
+: forth       fvocab context ! ;
+: compiler    cvocab context ! ;
 : definitions context @ current ! ;
 
 also compiler definitions
-: literal lit, , ;
+: literal   lit, , ;
 : [compile] ' , ;
-: ['] ' lit, , ;
+: [']       ' lit, , ;
 previous definitions
 
 : constant word define ['] docon @ , , ;
-: enum dup constant 1+ ;
-: create word define ['] docre @ , ['] exit , ;
+: enum     dup constant 1+ ;
+: create   word define ['] docre @ , ['] exit , ;
 : variable create , ;
 
 0 variable loop*
@@ -36,9 +36,9 @@ previous definitions
 : : : set-loop ;
 
 : (later), here 0 , ;
-: (lit), lit, (later), ;
-: this here swap ;
-: this! this ! ;
+: (lit),   lit, (later), ;
+: this     here swap ;
+: this!    this ! ;
 
 also compiler definitions
 : if   ['] jump0 , (later), ;
@@ -69,18 +69,22 @@ previous definitions
 
 : digit>char dup 10 < if '0' else 'W' then + ;
 
+: abs   dup 0 < if negate then ;
+: u/mod 2dup u/ -rot umod ;
+
 0 variable #start
 : #len pad #start @ - ;
-: <# pad #start ! ;
-: #> drop #start @ #len ;
+: <#   pad #start ! ;
+: #>   drop #start @ #len ;
 : hold -1 #start +! #start @ c! ;
-: # base @ /mod digit>char hold ;
-: #s dup 0= if # else |: # dup if loop then then ;
+: #    base @ u/mod digit>char hold ;
+: #s   dup 0= if # else |: # dup if loop then then ;
 : #pad dup #len > if over hold loop then 2drop ;
-: h# 16 /mod digit>char hold ;
+: h#   16 u/mod digit>char hold ;
+: sign 0 < if '-' hold then ;
 
-: u. <# #s #> type ;
-: .  u. space ;
+: u.   <# #s #> type ;
+: .    <# dup abs #s swap sign #> type space ;
 
 : printable 32 126 in[,] ;
 : print dup printable 0= if drop '.' then emit ;
