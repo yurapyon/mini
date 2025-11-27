@@ -1,12 +1,14 @@
+const std = @import("std");
+
 const c = @import("c.zig").c;
 
 const input_event = @import("input-event.zig");
 const InputChannel = input_event.InputChannel;
 
-// ===
+const kernel = @import("../kernel.zig");
+const SignedCell = kernel.SignedCell;
 
-// TODO
-const std = @import("std");
+// ===
 
 const Gamepad = struct {
     is_connected: bool,
@@ -48,6 +50,19 @@ pub fn poll(input_channel: *InputChannel) void {
                             .index = @intCast(i),
                             .button = @intCast(j),
                             .action = curr,
+                        },
+                    });
+                }
+            }
+
+            for (gamepad.current_state.axes, 0..) |curr, j| {
+                if (curr != gamepad.last_state.axes[j]) {
+                    const action: SignedCell = @intFromFloat(curr * std.math.maxInt(SignedCell));
+                    input_channel.push(.{
+                        .gamepad = .{
+                            .index = @intCast(i),
+                            .button = @intCast(j + c.GLFW_GAMEPAD_BUTTON_LAST + 1),
+                            .action = action,
                         },
                     });
                 }

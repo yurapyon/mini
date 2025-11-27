@@ -5,6 +5,7 @@ const Semaphore = std.Thread.Semaphore;
 const kernel = @import("../kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
+const SignedCell = kernel.SignedCell;
 
 const externals = @import("../externals.zig");
 const External = externals.External;
@@ -157,8 +158,12 @@ const exts = struct {
                     k.data_stack.pushCell(low);
                 },
                 .gamepad => |data| {
+                    // NOTE
+                    // action can be < 1 for axes
+                    const action: SignedCell = @truncate(data.action);
+
+                    k.data_stack.pushSignedCell(action);
                     k.data_stack.pushCell(@intCast(data.button));
-                    k.data_stack.pushCell(@intCast(data.action));
                     k.data_stack.pushCell(@intCast(data.index));
                 },
             }

@@ -39,6 +39,29 @@ make on-mouse-down 2drop ;
 make on-char       2drop ;
 make on-gamepad    3drop ;
 
+0 enum %g.a
+  enum %g.b
+  enum %g.x
+  enum %g.y
+  enum %g.lb
+  enum %g.rb
+  enum %g.back
+  enum %g.start
+  enum %g.guide
+  enum %g.lthumb
+  enum %g.rthumb
+  enum %g.d-up
+  enum %g.d-right
+  enum %g.d-down
+  enum %g.d-left
+  enum %g.axis-lx
+  enum %g.axis-ly
+  enum %g.axis-rx
+  enum %g.axis-ry
+  enum %g.axis-lt
+  enum %g.axis-rt
+constant #g.buttons
+
 doer frame
 
 -1 value _chars
