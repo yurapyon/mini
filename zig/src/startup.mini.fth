@@ -52,8 +52,6 @@ previous definitions
 : (lit),   lit, (later), ; \ ( -- a )
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
-\ todo probably don't need dist
-: dist     this - ;        \ ( a -- n )
 
 also compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
@@ -105,7 +103,6 @@ previous definitions
 : make ( "name" -- ) :noname cell + ' >value ! ;
 : undo ( "name" -- ) ['] noop cell + ' >value ! ;
 
-\ todo maybe dont need values
 : value ( n "name" -- ) create , does> @ ;
 : to    ( n "name" -- ) ' >value ! ;
 : +to   ( n "name" -- ) ' >value +! ;
@@ -188,7 +185,7 @@ only forth definitions
       c,
   endcond loop ;
 
-: cstring ( | .*" -- ) (later), here string dist swap ! ;
+: cstring ( | .*" -- ) (later), here string this - swap ! ;
 
 : count   ( a -- a n ) @+ ;
 : (data), ( -- a )     (lit), ['] jump , (later), swap this! ;

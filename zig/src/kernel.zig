@@ -31,6 +31,7 @@ comptime {
 pub const Cell = u16;
 pub const DoubleCell = u32;
 pub const SignedCell = i16;
+pub const SignedDoubleCell = i32;
 
 pub fn cellFromBoolean(value: bool) Cell {
     return if (value) 0xffff else 0;
@@ -132,7 +133,7 @@ pub const Kernel = struct {
         self.allocator = allocator;
 
         self.memory = try mem.allocateForthMemory(allocator);
-        self.handles.init(self.allocator);
+        self.handles.init();
         self.externals = .empty;
 
         self.program_counter.init(self.memory);
@@ -152,7 +153,7 @@ pub const Kernel = struct {
 
     pub fn deinit(self: *@This()) void {
         self.externals.deinit(self.allocator);
-        self.handles.deinit();
+        self.handles.deinit(self.allocator);
         self.allocator.free(self.memory);
     }
 

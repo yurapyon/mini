@@ -7,10 +7,10 @@
 
 \ system ===
 
-: context     wordlists #order @ 1- cells + ;
-: push-order  1 #order +! context ! ;
-: also        context @ push-order ;
-: previous    -1 #order +! ;
+: context    wordlists #order @ 1- cells + ;
+: push-order 1 #order +! context ! ;
+: also       context @ push-order ;
+: previous   -1 #order +! ;
 
 : forth fvocab context ! ;
 : compiler cvocab context ! ;

@@ -165,9 +165,7 @@ pub fn accept(k: *Kernel) Error!void {
             reader.readUntilDelimiterOrEof(
                 out[0..out.len],
                 '\n',
-            ) catch |err| {
-                // TODO errors
-                @import("std").debug.print("{}\n", .{err});
+            ) catch {
                 return error.CannotAccept;
             };
 

@@ -3,8 +3,8 @@ const MemoryPtr = mem.MemoryPtr;
 
 const kernel = @import("kernel.zig");
 const Cell = kernel.Cell;
-const DoubleCell = kernel.DoubleCell;
 const SignedCell = kernel.SignedCell;
+const SignedDoubleCell = kernel.SignedDoubleCell;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -394,25 +394,26 @@ pub fn Stack(
             self.pop(1);
         }
 
-        // TODO should this be signed?
         pub fn divmod(self: *@This()) void {
-            const top = self.peek(0);
-            const second = self.peek(1);
-            const q = second.* / top.*;
-            const r = second.* % top.*;
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            // TODO check we should use divTrunc/floor/exact here
+            const q = @divTrunc(second.*, top.*);
+            // TODO check we should use mod/rem here
+            const r = @mod(second.*, top.*);
             second.* = q;
             top.* = r;
         }
 
-        // TODO should this be signed?
         pub fn muldiv(self: *@This()) void {
-            const top = self.peek(0);
-            const second = self.peek(1);
-            const third = self.peek(2);
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            const third = self.peekSigned(2);
 
-            const double_value: DoubleCell = @intCast(third.*);
-            const double_mul: DoubleCell = @intCast(second.*);
-            const calc = double_value * double_mul / top.*;
+            const double_value: SignedDoubleCell = @intCast(third.*);
+            const double_mul: SignedDoubleCell = @intCast(second.*);
+            // TODO check we should use divTrunc/floor/exact here
+            const calc = @divTrunc(double_value * double_mul, top.*);
             // NOTE
             // truncating
             // this can happen when mul is big and div is small
@@ -420,16 +421,17 @@ pub fn Stack(
             self.pop(2);
         }
 
-        // TODO should this be signed?
         pub fn muldivmod(self: *@This()) void {
-            const top = self.peek(0);
-            const second = self.peek(1);
-            const third = self.peek(2);
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            const third = self.peekSigned(2);
 
-            const double_value: DoubleCell = @intCast(third.*);
-            const double_mul: DoubleCell = @intCast(second.*);
-            const q = double_value * double_mul / top.*;
-            const r = double_value * double_mul % top.*;
+            const double_value: SignedDoubleCell = @intCast(third.*);
+            const double_mul: SignedDoubleCell = @intCast(second.*);
+            // TODO check we should use divTrunc/floor/exact here
+            const q = @divTrunc(double_value * double_mul, top.*);
+            // TODO check we should use mod/rem here
+            const r = @mod(double_value * double_mul, top.*);
             // NOTE
             // truncating
             // this can happen when mul is big and div is small

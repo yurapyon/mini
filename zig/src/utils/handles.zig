@@ -12,19 +12,17 @@ const Handle = struct {
 };
 
 pub const Handles = struct {
-    allocator: Allocator,
     lookup: ArrayList(Handle),
 
-    pub fn init(self: *@This(), allocator: Allocator) void {
-        self.allocator = allocator;
+    pub fn init(self: *@This()) void {
         self.lookup = .empty;
     }
 
-    pub fn deinit(self: *@This()) void {
-        self.lookup.deinit(self.allocator);
+    pub fn deinit(self: *@This(), allocator: Allocator) void {
+        self.lookup.deinit(allocator);
     }
 
-    pub fn getHandleForPtr(self: *@This(), ptr: *anyopaque) !Cell {
+    pub fn getHandleForPtr(self: *@This(), allocator: Allocator, ptr: *anyopaque) !Cell {
         var first_available_handle_id: ?Cell = null;
 
         for (self.lookup.items, 0..) |handle, i| {
@@ -47,13 +45,13 @@ pub const Handles = struct {
             }
 
             const handle_id: Cell = @intCast(self.lookup.items.len);
-            const handle = try self.lookup.addOne(self.allocator);
+            const handle = try self.lookup.addOne(allocator);
             handle.ptr = ptr;
             return handle_id;
         }
     }
 
-    pub fn freeHandle(self: *@This(), handle_id: Cell) void {
+    pub fn freeHandle(self: *@This(), allocator: Allocator, handle_id: Cell) void {
         if (handle_id == self.lookup.items.len - 1) {
             var last_null_idx = self.lookup.items.len - 1;
             while (last_null_idx > 0) : (last_null_idx -= 1) {
@@ -63,7 +61,7 @@ pub const Handles = struct {
             }
 
             // TODO dont catch unreachable
-            self.lookup.resize(self.allocator, last_null_idx) catch unreachable;
+            self.lookup.resize(allocator, last_null_idx) catch unreachable;
         } else {
             self.lookup.items[handle_id].ptr = null;
         }

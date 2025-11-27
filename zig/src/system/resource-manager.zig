@@ -51,7 +51,7 @@ pub const ResourceManager = struct {
         try self.resources.append(self.allocator, resource);
         errdefer _ = self.resources.pop();
 
-        const handle = try self.handles.getHandleForPtr(resource);
+        const handle = try self.handles.getHandleForPtr(self.allocator, resource);
 
         return .{
             .resource = resource,
@@ -86,7 +86,7 @@ pub const ResourceManager = struct {
     }
 
     pub fn register(self: *@This(), resource: *Resource) !Cell {
-        const handle = try self.handles.getHandleForPtr(resource);
+        const handle = try self.handles.getHandleForPtr(self.allocator, resource);
         return handle;
     }
 
