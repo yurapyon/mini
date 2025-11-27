@@ -18,10 +18,9 @@ features:
       boots from a system image
         included system image is pretty small, around 2.5kb
     automatic tailcall optimization
-    search order
   language features:
     covers most of the ANSI Forth 'Core' word set
-    vocabularies
+    vocabularies, search order
     string escapes, including multiline strings
     easy-to-use FFI, currently builds in:
       OS access

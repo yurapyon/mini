@@ -30,13 +30,12 @@ opcodes (u16) :
   drop   dup    ?dup  swap
   flip   over   nip   tuck
   rot    -rot   move  mem=
-  rclear extid
+  quit   extid
 
 non-standard opcodes:
   jump   - ( -- )                absolute jump
   jump0  - ( -- )                absolute conditional jump
   lit    - ( -- )                pushes following cell in memory to the stack
-  rclear - ( xt -- )             clears return stack and executes xt
   extid  - ( str len -- number ) gets system specific id for an external function
   mem=   - ( a b len -- t/f )    compares memory
   panic  - ( -- )                dies
@@ -54,13 +53,15 @@ memory layout:
             cell: forth vocabulary last
             cell: compiler vocabulary last
             cell: current
-            cell: context
+            cell: current # of wordlists in context, 1 indexed
+        16 cells: wordlist stack
             cell: state
             cell: base
             cell: source-ptr
             cell: source-len
             cell: >in
             cell: vector to run when word not found
+            cell: vector to run before quitting
                 : dictionary start
 
                 .
@@ -87,7 +88,7 @@ definition layouts:
 notable design decisions:
   only one, recursion-based, looping construct, '|:' and 'loop'
   compiler vocabulary is used instead of 'immediate'
-  definitions are never 'hidden'
+  definitions are never 'hidden' with a flag, they can be conditionally skipped on lookup
   variables must be initialized
   all string types accept escapes
   space and newline are the only whitespace characters supported as input
@@ -106,6 +107,9 @@ number parsing:
     # - decimal
     $ - hexidecimal
   sign must come before base modifier, i.e. -$beef
+
+words available in 'root' vocabulary:
+  forth
 
 === virtual PC ===
 
