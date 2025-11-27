@@ -5,6 +5,7 @@ const Semaphore = std.Thread.Semaphore;
 const kernel = @import("../kernel.zig");
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
+const SignedCell = kernel.SignedCell;
 
 const externals = @import("../externals.zig");
 const External = externals.External;
@@ -22,6 +23,8 @@ const InputChannel = input_event.InputChannel;
 const Pixels = @import("pixels.zig").Pixels;
 const Characters = @import("characters.zig").Characters;
 const Image = @import("image.zig").Image;
+
+const gamepad = @import("gamepad.zig");
 
 // ===
 
@@ -110,6 +113,30 @@ const glfw_callbacks = struct {
             },
         });
     }
+
+    var hacky_window_pointer_for_joysticks: ?*c.GLFWwindow = null;
+
+    fn joystick(
+        index: c_int,
+        event: c_int,
+    ) callconv(.c) void {
+        const system: *System = @ptrCast(@alignCast(
+            c.glfwGetWindowUserPointer(hacky_window_pointer_for_joysticks),
+        ));
+
+        // TODO
+        // This assumes 'event' can only be connected/disconnected which may not be the case
+        const is_connected = event == c.GLFW_CONNECTED;
+        const is_joystick_gamepad = c.glfwJoystickIsGamepad(index) == c.GLFW_TRUE;
+        gamepad.onConnectionChange(@intCast(index), is_connected and is_joystick_gamepad);
+
+        system.input_channel.push(.{
+            .gamepad_connection = .{
+                .index = @intCast(index),
+                .is_connected = is_connected,
+            },
+        });
+    }
 };
 
 const exts = struct {
@@ -121,8 +148,11 @@ const exts = struct {
         const event = s.input_channel.pop();
         if (event) |ev| {
             switch (ev) {
+                .close => {},
                 .key => |data| {
-                    // TODO handle scancode and mods
+                    // TODO
+                    //   handle scancode and mods
+                    //   probably push keycode first, then action
                     k.data_stack.pushCell(@intCast(data.keycode));
                     k.data_stack.pushCell(@intCast(data.action));
                 },
@@ -153,7 +183,15 @@ const exts = struct {
                     k.data_stack.pushCell(high);
                     k.data_stack.pushCell(low);
                 },
-                .close => {},
+                .gamepad => |data| {
+                    k.data_stack.pushSignedCell(@intCast(data.action));
+                    k.data_stack.pushCell(@intCast(data.button));
+                    k.data_stack.pushCell(@intCast(data.index));
+                },
+                .gamepad_connection => |data| {
+                    k.data_stack.pushBoolean(data.is_connected);
+                    k.data_stack.pushCell(@intCast(data.index));
+                },
             }
             const event_type = @intFromEnum(ev);
             k.data_stack.pushCell(event_type);
@@ -556,6 +594,9 @@ pub const System = struct {
         _ = c.glfwSetMouseButtonCallback(window, glfw_callbacks.mouseButton);
         _ = c.glfwSetCharCallback(window, glfw_callbacks.char);
 
+        glfw_callbacks.hacky_window_pointer_for_joysticks = window;
+        _ = c.glfwSetJoystickCallback(glfw_callbacks.joystick);
+
         c.glEnable(c.GL_BLEND);
         c.glBlendEquation(c.GL_FUNC_ADD);
         c.glBlendFunc(c.GL_SRC_ALPHA, c.GL_ONE_MINUS_SRC_ALPHA);
@@ -586,6 +627,8 @@ pub const System = struct {
             &self.resources.characters.resource,
         );
 
+        gamepad.init();
+
         std.debug.print("pyon vPC\n", .{});
 
         self.startup_semaphore.post();
@@ -608,7 +651,9 @@ pub const System = struct {
             self.characters.draw();
 
             c.glfwSwapBuffers(self.window);
+
             c.glfwPollEvents();
+            gamepad.poll(&self.input_channel);
 
             std.Thread.sleep(15_000_000);
         }

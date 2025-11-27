@@ -4,14 +4,10 @@
 \
 \ ===
 
-\ TODO
-\ gfx in this file may be out of date since system multithreading update
-
-: defer create ['] noop , does> @ execute ;
-: is    ' >value ! ;
+\ todo this code is kinda messy
 
 ( x y c -- )
-: putchar >r 80 * + 2 * 16 16 10 * * + r> swap chars! ;
+: putchar >r 80 * + 2 * r> swap chars! ;
 
 \ ===
 
@@ -35,23 +31,20 @@ squares #squares + variable bback
 0 variable offx
 0 variable offy
 : >offset offy ! offx ! ;
+: offset+ swap offx @ + swap offy @ + ;
+: offset2+ >r >r offset+ r> r> offset+ ;
 
-: offrect [ 5 tags, ]
-  @0 offx @ + @1 offy @ + @2 offx @ + @3 offy @ + @4
-  putrect ;
-
-: offchar >r >r offx @ + r> offy @ + r> putchar ;
+: offrect >r offset2+ r> putrect ;
+: offchar >r offset+ r> putchar ;
 
 2 cells constant /coord
 16 constant #coords
 create coords #coords /coord * allot
 0 variable coord#
-: coord coords coord# /coord * + ;
+: coord coords coord# @ /coord * + ;
 : cclear 0 coord# ! 0 0 >offset ;
-: >c     2dup offy +! offx +! swap coord !+ !
-         1 coord# +! ;
-: c>     coord @+ negate offx +! @ negate offy +!
-         -1 coord# +! ;
+: >c     offy @ offx @ coord !+ ! offset+ >offset 1 coord# +! ;
+: c>     -1 coord# +! coord @+ swap @ >offset ;
 
 \ ===
 
@@ -288,8 +281,11 @@ bclear
 45 23 lwss
 45 31 lwss
 
+video-init
+<v
 play
 background
 ui
+v>
 
 main

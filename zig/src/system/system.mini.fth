@@ -31,11 +31,38 @@ doer on-key
 doer on-mouse-move
 doer on-mouse-down
 doer on-char
+doer on-gamepad
+doer on-gamepad-connection
 
-make on-key        2drop ;
-make on-mouse-move 2drop ;
-make on-mouse-down 2drop ;
-make on-char       2drop ;
+make on-key                2drop ;
+make on-mouse-move         2drop ;
+make on-mouse-down         2drop ;
+make on-char               2drop ;
+make on-gamepad            3drop ;
+make on-gamepad-connection 2drop ;
+
+0 enum %g.a
+  enum %g.b
+  enum %g.x
+  enum %g.y
+  enum %g.lb
+  enum %g.rb
+  enum %g.back
+  enum %g.start
+  enum %g.guide
+  enum %g.lthumb
+  enum %g.rthumb
+  enum %g.d-up
+  enum %g.d-right
+  enum %g.d-down
+  enum %g.d-left
+  enum %g.axis-lx
+  enum %g.axis-ly
+  enum %g.axis-rx
+  enum %g.axis-ry
+  enum %g.axis-lt
+  enum %g.axis-rt
+constant #g.buttons
 
 doer frame
 
@@ -70,11 +97,13 @@ doer frame
   [ decimal ] ;
 
 create events
-  ' on-close      ,
-  ' on-key        ,
-  ' on-mouse-move ,
-  ' on-mouse-down ,
-  ' on-char       ,
+  ' on-close              ,
+  ' on-key                ,
+  ' on-mouse-move         ,
+  ' on-mouse-down         ,
+  ' on-char               ,
+  ' on-gamepad            ,
+  ' on-gamepad-connection ,
 
 : poll! poll if cells events + @ execute loop then ;
 
