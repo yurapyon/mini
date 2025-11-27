@@ -31,11 +31,13 @@ doer on-key
 doer on-mouse-move
 doer on-mouse-down
 doer on-char
+doer on-gamepad
 
 make on-key        2drop ;
 make on-mouse-move 2drop ;
 make on-mouse-down 2drop ;
 make on-char       2drop ;
+make on-gamepad    3drop ;
 
 doer frame
 
@@ -75,6 +77,7 @@ create events
   ' on-mouse-move ,
   ' on-mouse-down ,
   ' on-char       ,
+  ' on-gamepad    ,
 
 : poll! poll if cells events + @ execute loop then ;
 

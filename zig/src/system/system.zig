@@ -23,6 +23,8 @@ const Pixels = @import("pixels.zig").Pixels;
 const Characters = @import("characters.zig").Characters;
 const Image = @import("image.zig").Image;
 
+const gamepad = @import("gamepad.zig");
+
 // ===
 
 // Multithreading strategy
@@ -121,6 +123,7 @@ const exts = struct {
         const event = s.input_channel.pop();
         if (event) |ev| {
             switch (ev) {
+                .close => {},
                 .key => |data| {
                     // TODO handle scancode and mods
                     k.data_stack.pushCell(@intCast(data.keycode));
@@ -153,7 +156,11 @@ const exts = struct {
                     k.data_stack.pushCell(high);
                     k.data_stack.pushCell(low);
                 },
-                .close => {},
+                .gamepad => |data| {
+                    k.data_stack.pushCell(@intCast(data.button));
+                    k.data_stack.pushCell(@intCast(data.action));
+                    k.data_stack.pushCell(@intCast(data.index));
+                },
             }
             const event_type = @intFromEnum(ev);
             k.data_stack.pushCell(event_type);
@@ -586,6 +593,8 @@ pub const System = struct {
             &self.resources.characters.resource,
         );
 
+        gamepad.init();
+
         std.debug.print("pyon vPC\n", .{});
 
         self.startup_semaphore.post();
@@ -608,7 +617,9 @@ pub const System = struct {
             self.characters.draw();
 
             c.glfwSwapBuffers(self.window);
+
             c.glfwPollEvents();
+            gamepad.poll(&self.input_channel);
 
             std.Thread.sleep(15_000_000);
         }
