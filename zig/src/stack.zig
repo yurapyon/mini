@@ -394,6 +394,7 @@ pub fn Stack(
             self.pop(1);
         }
 
+        // TODO this should put q on top and r second
         pub fn divmod(self: *@This()) void {
             const top = self.peekSigned(0);
             const second = self.peekSigned(1);
@@ -421,6 +422,7 @@ pub fn Stack(
             self.pop(2);
         }
 
+        // TODO this should put q on top and r second
         pub fn muldivmod(self: *@This()) void {
             const top = self.peekSigned(0);
             const second = self.peekSigned(1);

@@ -208,21 +208,25 @@ previous definitions
 
 : digit>char ( n -- n ) dup 10 < if '0' else 'W' then + ;
 
+: abs   dup 0 < if negate then ;
+: u/mod 2dup u/ -rot umod ;
+
 0 variable #start
 : #len ( -- n )     pad #start @ - ;
 : <#   ( -- )       pad #start ! ;
 : #>   ( n -- a n ) drop #start @ #len ;
 : hold ( n -- )     -1 #start +! #start @ c! ;
-: #    ( n -- n )   base @ /mod digit>char hold ;
+: #    ( n -- n )   base @ u/mod digit>char hold ;
 : #s   ( n -- n )   dup 0= if # else |: # dup if loop then then ;
 : #pad ( c n -- )   dup #len > if over hold loop then 2drop ;
-: h#   ( n -- n )   16 /mod digit>char hold ;
+: h#   ( n -- n )   16 u/mod digit>char hold ;
+: sign ( n -- )     0 < if '-' hold then ;
 
 : u.pad ( n n c -- ) rot <# #s flip #pad #> type ;
 : u.r   ( n n -- )   bl u.pad ;
 : u.0   ( n n -- )   '0' u.pad ;
 : u.    ( n -- )     <# #s #> type ;
-: .     ( n -- )     u. space ;
+: .     ( n -- )     <# dup abs #s swap sign #> type space ;
 
 : printable ( n -- t/f) 32 126 in[,] ;
 : print     ( n -- )    dup printable 0= if drop '.' then emit ;

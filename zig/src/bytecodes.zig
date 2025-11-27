@@ -151,6 +151,8 @@ pub fn panic(_: *Kernel) Error!void {
 }
 
 pub fn accept(k: *Kernel) Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const out = try mem.sliceFromAddrAndLen(
@@ -188,6 +190,8 @@ pub fn accept(k: *Kernel) Error!void {
 }
 
 pub fn emit(k: *Kernel) Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const raw_char = k.data_stack.popCell();
     const char = @as(u8, @truncate(raw_char & 0xff));
 
