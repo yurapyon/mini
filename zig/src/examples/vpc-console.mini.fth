@@ -25,33 +25,59 @@ create line-buf 80 allot
 : >line      dup +char line + c! 1 line-at +! ;
 : line>      line-at @ if 0 -char -1 line-at +! then ;
 
+\ ===
+
+create history 80 40 * allot
+history 80 40 * blank
+
+: >history ( str len -- )
+  history history 80 + 80 39 * move
+  history 80 blank
+  history swap move ;
+
+: .history
+  history       80 type cr
+  history  80 + 80 type cr
+  history 160 + 80 type cr ;
+
+\ ===
+
 : pressed? 1 = ;
 
 257 constant %enter
 259 constant %bksp
 
 \ todo how to catch error
-: run ." running: " line type cr line evaluate clear-line start-line ;
+: run ." running: "
+  line type cr
+  line evaluate
+  line >history .history
+  <v clear-line start-line v> ;
 
 make on-key pressed? if cond
     dup %enter = if drop run else
-    dup %bksp =  if drop line> else
+    dup %bksp =  if drop <v line> v> else
       drop
     endcond
   else
     drop
   then ;
 
-make on-char nip >line ;
+make on-char nip <v >line v> ;
 
-: init
+: main true continue ! |: continue @ if
+    frame poll! 30 sleep
+  loop then ;
+
+: start
   video-init
+  clear-line
   start-line
   <v
-  pdefault
-  0 0 640 400 0 putrect
-  v> ;
+    pdefault
+    0 0 640 400 0 putrect
+  v>
+  main ;
 
-init
-
-main
+' start 12 !
+quit

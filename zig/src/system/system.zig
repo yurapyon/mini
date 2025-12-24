@@ -523,6 +523,8 @@ pub const System = struct {
     // writer: Graphics thread
     // reader: Forth thread
     input_channel: InputChannel,
+    // TODO
+    // might not need this if the pixel/character buffers were double buffered
     video_mutex: Mutex,
     startup_semaphore: Semaphore,
 
