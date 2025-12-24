@@ -365,6 +365,10 @@ external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ ===
 
+external random
+external >rng
+
+\ ===
 
 0 [if]
 : postpone word cond

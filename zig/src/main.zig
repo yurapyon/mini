@@ -16,6 +16,8 @@ const Cell = kernel.Cell;
 
 const System = @import("system/system.zig").System;
 
+const Randomizer = @import("lib/random.zig").Randomizer;
+
 // ===
 
 fn emitStdOut(char: u8, userdata: ?*anyopaque) void {
@@ -127,6 +129,10 @@ pub fn main() !void {
             try @import("lib/floats.zig").registerExternals(&k);
             try @import("lib/dynamic.zig").registerExternals(&k);
 
+            var r: Randomizer = undefined;
+            r.init();
+            try r.registerExternals(&k);
+
             var sys: System = undefined;
 
             k.clearAcceptClosure();
@@ -158,6 +164,10 @@ pub fn main() !void {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);
             try @import("lib/dynamic.zig").registerExternals(&k);
+
+            var r: Randomizer = undefined;
+            r.init();
+            try r.registerExternals(&k);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
