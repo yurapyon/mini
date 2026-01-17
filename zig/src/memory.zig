@@ -93,3 +93,45 @@ pub fn constSliceFromAddrAndLen(
     }
     return memory[addr..][0..len];
 }
+
+pub fn cellSliceFromAddrAndLen(
+    memory: []u8,
+    addr: Cell,
+    len: Cell,
+) ![]Cell {
+    const byte_len = len * @sizeOf(Cell);
+
+    if (byte_len > 0) {
+        try assertCellAccess(addr);
+        try assertCellAccess(addr + byte_len);
+        try assertOffsetInBounds(addr, byte_len - 1);
+    }
+
+    const u8_slice = try sliceFromAddrAndLen(memory, addr, byte_len);
+
+    var cell_slice: []Cell = undefined;
+    cell_slice.ptr = @ptrCast(@alignCast(u8_slice.ptr));
+    cell_slice.len = len;
+    return cell_slice;
+}
+
+pub fn constCellSliceFromAddrAndLen(
+    memory: []const u8,
+    addr: Cell,
+    len: Cell,
+) ![]const Cell {
+    const byte_len = len * @sizeOf(Cell);
+
+    if (byte_len > 0) {
+        try assertCellAccess(addr);
+        try assertCellAccess(addr + byte_len);
+        try assertOffsetInBounds(addr, byte_len - 1);
+    }
+
+    const u8_slice = try constSliceFromAddrAndLen(memory, addr, byte_len);
+
+    var cell_slice: []const Cell = undefined;
+    cell_slice.ptr = @ptrCast(@alignCast(u8_slice.ptr));
+    cell_slice.len = len;
+    return cell_slice;
+}

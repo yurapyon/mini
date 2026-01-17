@@ -38,7 +38,7 @@ previous definitions
 : enum     dup constant 1+ ;                      \ ( n "name" -- n )
 : flag     dup constant 1 lshift ;                \ ( n "name" -- n )
 : create   word define ['] docre @ , ['] exit , ; \ ( "name" -- )
-\ todo maybe remove variable initialization
+\ todo probably remove variable initialization
 : variable create , ;                             \ ( n "name" -- )
 
 0 variable loop*
@@ -365,6 +365,12 @@ external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ ===
 
+external random
+external >rng
+external shuffle
+external shufflec
+
+\ ===
 
 0 [if]
 : postpone word cond
