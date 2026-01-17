@@ -32,6 +32,7 @@ features:
     character buffer
     mouse/keyboard callbacks
     separate threads for graphics and interpreter
+    gamepad support
 
 roadmap:
   in progress:

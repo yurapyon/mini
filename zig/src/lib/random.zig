@@ -38,6 +38,36 @@ pub const Randomizer = struct {
         self.randomizer.seed(seed);
     }
 
+    fn shuffle(k: *Kernel, _self: ?*anyopaque) External.Error!void {
+        const self: *@This() = @ptrCast(@alignCast(_self));
+
+        const len = k.data_stack.popCell();
+        const addr = k.data_stack.popCell();
+
+        const array = try mem.cellSliceFromAddrAndLen(
+            k.memory,
+            addr,
+            len,
+        );
+
+        self.randomizer.random().shuffle(Cell, array);
+    }
+
+    fn shuffleC(k: *Kernel, _self: ?*anyopaque) External.Error!void {
+        const self: *@This() = @ptrCast(@alignCast(_self));
+
+        const len = k.data_stack.popCell();
+        const addr = k.data_stack.popCell();
+
+        const array = try mem.sliceFromAddrAndLen(
+            k.memory,
+            addr,
+            len,
+        );
+
+        self.randomizer.random().shuffle(u8, array);
+    }
+
     pub fn registerExternals(self: *@This(), k: *Kernel) !void {
         try k.addExternal("random", .{
             .callback = random,
@@ -45,6 +75,14 @@ pub const Randomizer = struct {
         });
         try k.addExternal(">rng", .{
             .callback = seedRng,
+            .userdata = self,
+        });
+        try k.addExternal("shuffle", .{
+            .callback = shuffle,
+            .userdata = self,
+        });
+        try k.addExternal("shufflec", .{
+            .callback = shuffle,
             .userdata = self,
         });
     }
