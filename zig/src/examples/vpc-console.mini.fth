@@ -5,7 +5,7 @@
 \ ===
 
 ( x y c -- )
-: putchar >r 80 * + 2 * r> swap chars! ;
+: putchar <v >r 80 * + 2 * r> swap chars! v> ;
 
 0 variable cx
 0 variable cy
@@ -52,18 +52,18 @@ history 80 40 * blank
   line type cr
   line evaluate
   line >history .history
-  <v clear-line start-line v> ;
+  clear-line start-line ;
 
 make on-key pressed? if cond
     dup %enter = if drop run else
-    dup %bksp =  if drop <v line> v> else
+    dup %bksp =  if drop line> else
       drop
     endcond
   else
     drop
   then ;
 
-make on-char nip <v >line v> ;
+make on-char nip >line ;
 
 : main true continue ! |: continue @ if
     frame poll! 30 sleep
@@ -73,10 +73,10 @@ make on-char nip <v >line v> ;
   video-init
   clear-line
   start-line
-  <v
-    pdefault
-    0 0 640 400 0 putrect
-  v>
+
+  pdefault
+  0 0 640 400 0 putrect
+
   main ;
 
 ' start 12 !

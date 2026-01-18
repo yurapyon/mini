@@ -3,6 +3,7 @@ external deinit
 
 external <v
 external v>
+
 external image-ids
 external p!
 external p@
@@ -64,28 +65,26 @@ make on-gamepad-connection 2drop ;
   enum %g.axis-rt
 constant #g.buttons
 
-doer frame
-
 -1 value _chars
 -1 value _screen
 
-: putp     _screen i!xy ;
-: putline  _screen i!line ;
-: putrect  _screen i!rect ;
-: blit     _screen i!blit ;
-: blitline _screen i!blitline ;
+: putp     <v _screen i!xy v> ;
+: putline  <v _screen i!line v> ;
+: putrect  <v _screen i!rect v> ;
+: blit     <v _screen i!blit v> ;
+: blitline <v _screen i!blitline v> ;
 
 : setmask   ( x0 y0 x1 y1 id -- ) true swap i!mask ;
 : clearmask ( id -- )             >r 0 0 0 0 false r> i!mask ;
 
-: scissor   ( x0 y0 x1 y1 -- ) _screen setmask ;
-: unscissor ( -- )             _screen clearmask ;
+: scissor   ( x0 y0 x1 y1 -- ) <v _screen setmask v> ;
+: unscissor ( -- )             <v _screen clearmask v> ;
 
-: 3p@   ( addr -- r g b ) dup p@ swap 1+ dup p@ swap 1+ p@ ;
+: 3p@   ( addr -- r g b ) <v dup p@ swap 1+ dup p@ swap 1+ p@ v> ;
 : pal@  ( n -- r g b )    3 * 3p@ ;
 : cpal@ ( n -- r g b )    3 * $8000 or 3p@ ;
 
-: 3p!   ( r g b addr -- ) tuck 2 + p! tuck 1 + p! p! ;
+: 3p!   ( r g b addr -- ) <v tuck 2 + p! tuck 1 + p! p! v> ;
 : pal!  ( r g b n -- )    3 * 3p! ;
 : cpal! ( r g b n -- )    3 * $8000 or 3p! ;
 
@@ -113,6 +112,8 @@ make on-close false continue ! ;
 
 : video-init image-ids to _chars to _screen ;
 
+doer frame
+
 : main true continue ! |: continue @ if
-    <v frame poll! v> 30 sleep
+    frame poll! 30 sleep
   loop then ;

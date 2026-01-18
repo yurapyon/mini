@@ -24,6 +24,8 @@ pub const Image = struct {
         x1: isize,
         y1: isize,
     },
+    // TODO profile to see if this is necessary
+    is_dirty: bool,
 
     pub fn init(self: *@This(), allocator: Allocator, width: usize, height: usize) !void {
         self.width = width;
