@@ -30,8 +30,8 @@ const gamepad = @import("gamepad.zig");
 
 // Multithreading strategy
 // There need to be 3 different threads
-//   1. Forth kernel
-//   2. Graphics
+//   1. Graphics (must be main thread)
+//   2. Forth kernel
 //   3. Audio
 // An easy way to handle thread-safety is:
 //   1. Graphics->Forth, All GLFW events are put into a queue for Forth to poll
@@ -523,8 +523,8 @@ pub const System = struct {
     // writer: Graphics thread
     // reader: Forth thread
     input_channel: InputChannel,
-    // TODO
-    // might not need this if the pixel/character buffers were double buffered
+    // NOTE
+    // video_mutex should be used when updating pixels/charaters
     video_mutex: Mutex,
     startup_semaphore: Semaphore,
 
