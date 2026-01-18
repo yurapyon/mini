@@ -4,6 +4,7 @@ const MemoryPtr = mem.MemoryPtr;
 const kernel = @import("kernel.zig");
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
+const SignedDoubleCell = kernel.SignedDoubleCell;
 
 const register = @import("register.zig");
 const Register = register.Register;
@@ -37,10 +38,14 @@ pub fn Stack(
             return top_addr - current_top;
         }
 
+        pub fn assertWontUnderflow(self: @This(), expected: Cell) !void {
+            if (self.depth() < expected * @sizeOf(Cell)) {
+                return error.StackUnderflow;
+            }
+        }
+
         fn peek(self: *@This(), at: Cell) *Cell {
-            // TODO handle stack underflow
             const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
-            // @import("std").debug.print("addr {} {}\n", .{ addr, top_addr });
             if (addr >= top_addr) unreachable;
             return mem.cellPtr(self.memory, addr) catch unreachable;
         }
@@ -59,9 +64,7 @@ pub fn Stack(
         }
 
         fn constPeek(self: @This(), at: Cell) Cell {
-            // TODO handle stack underflow
             const addr = self.top_ptr.fetch() + at * @sizeOf(Cell);
-            // @import("std").debug.print("addr {} {}\n", .{ addr, top_addr });
             if (addr >= top_addr) unreachable;
             return mem.readCell(self.memory, addr) catch unreachable;
         }
@@ -388,6 +391,54 @@ pub fn Stack(
             } else {
                 second.* = 0;
             }
+            self.pop(1);
+        }
+
+        // TODO this should put q on top and r second
+        pub fn divmod(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            // TODO check we should use divTrunc/floor/exact here
+            const q = @divTrunc(second.*, top.*);
+            // TODO check we should use mod/rem here
+            const r = @mod(second.*, top.*);
+            second.* = q;
+            top.* = r;
+        }
+
+        pub fn muldiv(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            const third = self.peekSigned(2);
+
+            const double_value: SignedDoubleCell = @intCast(third.*);
+            const double_mul: SignedDoubleCell = @intCast(second.*);
+            // TODO check we should use divTrunc/floor/exact here
+            const calc = @divTrunc(double_value * double_mul, top.*);
+            // NOTE
+            // truncating
+            // this can happen when mul is big and div is small
+            third.* = @truncate(calc);
+            self.pop(2);
+        }
+
+        // TODO this should put q on top and r second
+        pub fn muldivmod(self: *@This()) void {
+            const top = self.peekSigned(0);
+            const second = self.peekSigned(1);
+            const third = self.peekSigned(2);
+
+            const double_value: SignedDoubleCell = @intCast(third.*);
+            const double_mul: SignedDoubleCell = @intCast(second.*);
+            // TODO check we should use divTrunc/floor/exact here
+            const q = @divTrunc(double_value * double_mul, top.*);
+            // TODO check we should use mod/rem here
+            const r = @mod(double_value * double_mul, top.*);
+            // NOTE
+            // truncating
+            // this can happen when mul is big and div is small
+            third.* = @truncate(q);
+            second.* = @truncate(r);
             self.pop(1);
         }
     };

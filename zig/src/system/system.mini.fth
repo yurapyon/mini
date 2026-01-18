@@ -1,8 +1,8 @@
-external setxt
-external close?
-external draw/poll
+external poll
 external deinit
 
+external <v
+external v>
 external image-ids
 external p!
 external p@
@@ -26,26 +26,48 @@ external i!blitline
 external chars!
 external chars@
 
+doer on-close
 doer on-key
 doer on-mouse-move
 doer on-mouse-down
 doer on-char
+doer on-gamepad
+doer on-gamepad-connection
 
-' on-key        0 setxt
-' on-mouse-move 1 setxt
-' on-mouse-down 2 setxt
-' on-char       3 setxt
+make on-key                2drop ;
+make on-mouse-move         2drop ;
+make on-mouse-down         2drop ;
+make on-char               2drop ;
+make on-gamepad            3drop ;
+make on-gamepad-connection 2drop ;
 
-make on-key        2drop ;
-make on-mouse-move 2drop ;
-make on-mouse-down 2drop ;
-make on-char       2drop ;
+0 enum %g.a
+  enum %g.b
+  enum %g.x
+  enum %g.y
+  enum %g.lb
+  enum %g.rb
+  enum %g.back
+  enum %g.start
+  enum %g.guide
+  enum %g.lthumb
+  enum %g.rthumb
+  enum %g.d-up
+  enum %g.d-right
+  enum %g.d-down
+  enum %g.d-left
+  enum %g.axis-lx
+  enum %g.axis-ly
+  enum %g.axis-rx
+  enum %g.axis-ry
+  enum %g.axis-lt
+  enum %g.axis-rt
+constant #g.buttons
 
 doer frame
 
-image-ids
-constant _chars
-constant _screen
+-1 value _chars
+-1 value _screen
 
 : putp     _screen i!xy ;
 : putline  _screen i!line ;
@@ -74,7 +96,23 @@ constant _screen
   00 00 00 1 cpal!
   [ decimal ] ;
 
-: close? close? stay @ 0= or ;
+create events
+  ' on-close              ,
+  ' on-key                ,
+  ' on-mouse-move         ,
+  ' on-mouse-down         ,
+  ' on-char               ,
+  ' on-gamepad            ,
+  ' on-gamepad-connection ,
 
-: main frame draw/poll close? 0= if loop then deinit ;
+: poll! poll if cells events + @ execute loop then ;
 
+true variable continue
+
+make on-close false continue ! ;
+
+: video-init image-ids to _chars to _screen ;
+
+: main true continue ! |: continue @ if
+    <v frame poll! v> 30 sleep
+  loop then ;

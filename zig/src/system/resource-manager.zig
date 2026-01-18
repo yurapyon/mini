@@ -12,6 +12,10 @@ const Timer = @import("timer.zig").Timer;
 
 // ===
 
+// NOTE
+// The resource manager is not thread-safe
+//   For now this is okay, but in the future it may be good to fix that
+
 pub const Resource = union(enum) {
     image: *Image,
     timer: *Timer,
@@ -47,7 +51,7 @@ pub const ResourceManager = struct {
         try self.resources.append(self.allocator, resource);
         errdefer _ = self.resources.pop();
 
-        const handle = try self.handles.getHandleForPtr(resource);
+        const handle = try self.handles.getHandleForPtr(self.allocator, resource);
 
         return .{
             .resource = resource,
@@ -82,7 +86,7 @@ pub const ResourceManager = struct {
     }
 
     pub fn register(self: *@This(), resource: *Resource) !Cell {
-        const handle = try self.handles.getHandleForPtr(resource);
+        const handle = try self.handles.getHandleForPtr(self.allocator, resource);
         return handle;
     }
 

@@ -4,10 +4,10 @@
 \
 \ ===
 
-compiler definitions
+also compiler definitions
 : [by2] ' dup \ >r swap >r __ r> r> __
   ['] >r , ['] swap , ['] >r , , ['] r> , ['] r> , , ;
-forth definitions
+previous definitions
 
 \ double buffers ===
 
@@ -29,7 +29,7 @@ forth definitions
 \ ===
 
 vocabulary life
-life definitions
+also life definitions
 
 20 constant width
 15 constant height
@@ -61,8 +61,8 @@ size double-buffer grid
 : frame size 0 |: 2dup > if cell.next 1+ loop then 2drop ;
 : next  frame grid db.swap ;
 
-forth definitions
-life
+only forth definitions
+also life
 
 : init  init ;
 : now   .grid ;

@@ -1,5 +1,7 @@
 const std = @import("std");
+const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
+const Thread = std.Thread;
 
 const mem = @import("memory.zig");
 
@@ -13,6 +15,8 @@ const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
 const System = @import("system/system.zig").System;
+
+const Randomizer = @import("lib/random.zig").Randomizer;
 
 // ===
 
@@ -43,6 +47,36 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
     return @truncate(len);
 }
 
+fn kernelRunFiles(
+    system: *System,
+    k: *Kernel,
+    filepaths: ArrayList([]u8),
+    start_repl: bool,
+) !void {
+    system.startup_semaphore.wait();
+
+    var input_file = std.fs.File.stdin();
+
+    for (filepaths.items) |fp| {
+        const file = try readFile(k.allocator, fp);
+        defer k.allocator.free(file);
+
+        std.debug.print(">> {s}\n", .{fp});
+        try k.evaluate(file);
+    }
+
+    // TODO
+    // note this leds to some weird behavior
+    // can be fixed by redefining 'bye'
+    if (start_repl) {
+        std.debug.print("(mini)\n", .{});
+
+        k.setAcceptClosure(acceptStdIn, &input_file);
+        k.initForth();
+        try k.execute();
+    }
+}
+
 const startup_file = @embedFile("startup.mini.fth");
 const self_host_file = @embedFile("self-host.mini.fth");
 
@@ -64,6 +98,10 @@ pub fn main() !void {
         const image = try readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
         k.loadImage(image);
+
+        const should_start_repl =
+            cli_options.interactive or
+            cli_options.filepaths.items.len == 0;
 
         if (cli_options.precompile) {
             k.setAcceptClosure(acceptStdIn, &input_file);
@@ -91,6 +129,10 @@ pub fn main() !void {
             try @import("lib/floats.zig").registerExternals(&k);
             try @import("lib/dynamic.zig").registerExternals(&k);
 
+            var r: Randomizer = undefined;
+            r.init();
+            try r.registerExternals(&k);
+
             var sys: System = undefined;
 
             k.clearAcceptClosure();
@@ -104,17 +146,28 @@ pub fn main() !void {
             try sys.init(&k);
             defer sys.deinit();
 
-            for (cli_options.filepaths.items) |fp| {
-                const file = try readFile(allocator, fp);
-                defer allocator.free(file);
+            const kernel_thread = try Thread.spawn(
+                .{},
+                kernelRunFiles,
+                .{
+                    &sys,
+                    &k,
+                    cli_options.filepaths,
+                    should_start_repl,
+                },
+            );
 
-                std.debug.print(">> {s}\n", .{fp});
-                try k.evaluate(file);
-            }
+            try sys.run();
+
+            kernel_thread.join();
         } else {
             try @import("lib/os.zig").registerExternals(&k);
             try @import("lib/floats.zig").registerExternals(&k);
             try @import("lib/dynamic.zig").registerExternals(&k);
+
+            var r: Randomizer = undefined;
+            r.init();
+            try r.registerExternals(&k);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -132,14 +185,13 @@ pub fn main() !void {
                 try k.evaluate(file);
             }
 
-            const should_start_repl =
-                cli_options.interactive or
-                cli_options.filepaths.items.len == 0;
-
             if (should_start_repl) {
                 std.debug.print("(mini)\n", .{});
 
                 k.setAcceptClosure(acceptStdIn, &input_file);
+                // TODO note
+                // This restarts the interpreter
+                // Not sure if this is best to do
                 k.initForth();
                 try k.execute();
             }
@@ -151,4 +203,7 @@ pub fn main() !void {
 
 test "lib-testing" {}
 
-test "end-to-end" {}
+test "end-to-end" {
+    _ = @import("utils/os-timer.zig");
+    _ = @import("utils/channel.zig");
+}

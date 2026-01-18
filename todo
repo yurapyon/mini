@@ -18,11 +18,7 @@ x 32bit math
 
 === vm ===
 * better error handling
-*   make sure abort works as intended
-      compare to ansi forth
-      catch stack over/underflow
 *   stack traces
       could have a debug mode cli option
 *   some type of exceptions ?
-- search-order
-- locals
+x locals

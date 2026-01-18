@@ -4,50 +4,80 @@
 \
 \ ===
 
-pdefault
+( x y c -- )
+: putchar >r 80 * + 2 * r> swap chars! ;
 
-0 0 640 400 0 putrect
+0 variable cx
+0 variable cy
 
-20 20 1 putp
+: >cursor cy ! cx ! ;
+: +char   >r cx @ cy @ r> putchar 1 cx +! ;
+: -char   -1 cx +! >r cx @ cy @ r> putchar ;
 
-( i c -- )
-: putc swap 16 16 10 * * + chars! ;
+\ ===
 
-create lbuf 128 allot
-0 variable lat
+create line-buf 80 allot
+0 variable line-at
+: line line-buf line-at @ ;
 
-: line lbuf lat @ ;
+: start-line 0 0 >cursor ;
+: clear-line 80 0 check> if dup 0 0 putchar 1+ loop then 2drop 0 line-at ! ;
+: >line      dup +char line + c! 1 line-at +! ;
+: line>      line-at @ if 0 -char -1 line-at +! then ;
 
-: clearline 0 lat @ 2 * range u>?|: dup 0 putc 1+ loop then 2drop ;
+\ ===
 
-: putline line type cr
-  0 lat @ range u>?|: dup 2 * over lbuf + c@ putc 1+ loop then 2drop ;
+create history 80 40 * allot
+history 80 40 * blank
 
-: bksp   lat @ if clearline -1 lat +! putline then ;
-: record line + c! 1 lat +! putline ;
-: run    ." running: " line type cr line evaluate clearline 0 lat ! ;
+: >history ( str len -- )
+  history history 80 + 80 39 * move
+  history 80 blank
+  history swap move ;
+
+: .history
+  history       80 type cr
+  history  80 + 80 type cr
+  history 160 + 80 type cr ;
+
+\ ===
 
 : pressed? 1 = ;
 
 257 constant %enter
 259 constant %bksp
 
-\ todo should clear return stack somehow
-: abort s0 s* ! 0 source-ptr ! source-len @ >in ! ;
-:noname type '?' emit cr abort ; wnf !
+\ todo how to catch error
+: run ." running: "
+  line type cr
+  line evaluate
+  line >history .history
+  <v clear-line start-line v> ;
 
 make on-key pressed? if cond
     dup %enter = if drop run else
-    dup %bksp =  if drop bksp else
+    dup %bksp =  if drop <v line> v> else
       drop
     endcond
   else
     drop
   then ;
 
-make on-char nip record ;
+make on-char nip <v >line v> ;
 
-make on-mouse-down
-  2drop ;
+: main true continue ! |: continue @ if
+    frame poll! 30 sleep
+  loop then ;
 
-main
+: start
+  video-init
+  clear-line
+  start-line
+  <v
+    pdefault
+    0 0 640 400 0 putrect
+  v>
+  main ;
+
+' start 12 !
+quit

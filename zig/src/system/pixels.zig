@@ -10,7 +10,7 @@ const kernel = @import("../kernel.zig");
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
 
-const video = @import("video.zig");
+const system = @import("system.zig");
 
 const Palette = @import("palette.zig").Palette;
 const Image = @import("image.zig").Image;
@@ -60,8 +60,8 @@ pub const Pixels = struct {
     fn initBuffer(self: *@This(), allocator: Allocator) !void {
         try self.image.init(
             allocator,
-            video.screen_width,
-            video.screen_height,
+            system.screen_width,
+            system.screen_height,
         );
         self.image.randomize(16);
 
@@ -159,8 +159,6 @@ pub const Pixels = struct {
     pub fn paletteStore(self: *@This(), addr: Cell, value: u8) void {
         if (addr < @TypeOf(self.palette).item_ct) {
             self.palette.colors[addr] = value;
-            c.glUseProgram(self.program);
-            self.palette.updateProgramUniforms(self.locations.palette);
         }
     }
 
@@ -173,6 +171,9 @@ pub const Pixels = struct {
     }
 
     pub fn update(self: *@This()) void {
+        c.glUseProgram(self.program);
+        self.palette.updateProgramUniforms(self.locations.palette);
+
         self.image.pushToTexture(self.texture);
     }
 };

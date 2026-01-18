@@ -9,14 +9,12 @@
 \
 \ ===
 
-: defer create ['] noop , does> @ execute ;
-: is    ' >value ! ;
-
 ( x y c -- )
-: putchar >r 80 * + 2 * 16 16 10 * * + r> swap chars! ;
+: putchar >r 80 * + 2 * r> swap chars! ;
 
 \ ===
 
+0 [if]
 7 7 ialloc constant brush
 
 : setupbrush
@@ -24,28 +22,30 @@
   3 3 1 brush i!xy ;
 
 : brushline >r >r >r 3 - r> 3 - r> 3 - r> 3 - $f brush blitline ;
+[then]
 
 \ initial palette ===
 
-pdefault
-hex
-00 00 00 0 pal!
-ff ff ff 1 pal!
-00 00 ff 2 pal!
-00 ff 00 3 pal!
-ff 00 00 4 pal!
-00 ff ff 5 pal!
-ff ff 00 6 pal!
-ff 00 ff 7 pal!
-40 40 40 8 pal!
-40 40 a0 9 pal!
-40 a0 40 a pal!
-a0 40 40 b pal!
-40 a0 a0 c pal!
-a0 a0 40 d pal!
-a0 40 a0 e pal!
-a0 a0 a0 f pal!
-decimal
+: initpal
+  pdefault
+  [ hex ]
+  00 00 00 0 pal!
+  ff ff ff 1 pal!
+  00 00 ff 2 pal!
+  00 ff 00 3 pal!
+  ff 00 00 4 pal!
+  00 ff ff 5 pal!
+  ff ff 00 6 pal!
+  ff 00 ff 7 pal!
+  40 40 40 8 pal!
+  40 40 a0 9 pal!
+  40 a0 40 a pal!
+  a0 40 40 b pal!
+  40 a0 a0 c pal!
+  a0 a0 40 d pal!
+  a0 40 a0 e pal!
+  a0 a0 a0 f pal!
+  [ decimal ] ;
 
 \ ===
 
@@ -77,6 +77,29 @@ create coords #coords /coord * allot
 : c>     -1 coord# +! coord @+ swap @ >offset ;
 
 \ canvas ===
+
+0 [if]
+
+s[
+  cell field >canvas-id
+  cell field >name
+]s /layer
+
+<array> constant layers
+
+: add-layer
+  600 360 ialloc layers push
+  <array> layers push ;
+
+0 variable #layers
+allocate0 constant layers
+
+: add-layer
+  #layers @ dup 1+ /layer * layers reallocate
+  600 360 ialloc swap layers dyn!
+  ;
+
+[then]
 
 600 360 ialloc constant canvas
 
@@ -224,8 +247,13 @@ make on-key kpressed? if cond
     endcond
   else drop then ;
 
-setupbrush
+video-init
+
+<v
+initpal
+\ setupbrush
 setupcanvas
 hide-editor
+v>
 
 main

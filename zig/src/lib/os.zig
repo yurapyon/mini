@@ -18,11 +18,15 @@ const c = @cImport({
 // ===
 
 fn sleep(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const value: u64 = k.data_stack.popCell();
     std.Thread.sleep(value * 1000000);
 }
 
 fn sleepS(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const value: u64 = k.data_stack.popCell();
     std.Thread.sleep(value * 1000000000);
 }
@@ -38,6 +42,8 @@ fn time(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn shell(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const command = try mem.constSliceFromAddrAndLen(
@@ -53,6 +59,8 @@ fn shell(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     k.debug_accept_buffer = true;
 
     const len = k.data_stack.popCell();
@@ -67,6 +75,8 @@ fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(4);
+
     const buf_len = k.data_stack.popCell();
     const buf_addr = k.data_stack.popCell();
     const env_len = k.data_stack.popCell();
@@ -105,6 +115,8 @@ fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const buf_len = k.data_stack.popCell();
     const buf_addr = k.data_stack.popCell();
 

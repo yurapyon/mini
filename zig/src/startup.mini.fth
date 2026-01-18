@@ -3,13 +3,16 @@
 \ NOTE
 \ Max line length in this file is 128 chars
 
-: forth       fvocab context ! ;    \ ( -- )
-: compiler    cvocab context ! ;    \ ( -- )
-: definitions context @ current ! ; \ ( -- )
+\ Interpreter starts with forth as the only wordlist in the context
 
-\ utils ===
+: context     wordlists #order @ 1- cells + ; \ ( -- a )
+: push-order  1 #order +! context ! ;         \ ( n -- )
+: also        context @ push-order ;          \ ( -- )
+: previous    -1 #order +! ;                  \ ( -- )
 
-: cells cell * ; \ ( n -- n )
+: forth       fvocab context ! ;              \ ( -- )
+: compiler    cvocab context ! ;              \ ( -- )
+: definitions context @ current ! ;           \ ( -- )
 
 : @+  dup cell + swap @ ; \ ( a -- a n )
 : c@+ dup 1+ swap c@ ;    \ ( a -- a n )
@@ -25,67 +28,67 @@
 
 \ syntax and defining words ===
 
-compiler definitions
+also compiler definitions
 : literal   lit, , ;              \ ( n -- )
 : [compile] ' , ;                 \ ( "name" -- )
 : [']       ' [compile] literal ; \ ( "name" -- )
-forth definitions
+previous definitions
 
 : constant word define ['] docon @ , , ;          \ ( n "name" -- )
 : enum     dup constant 1+ ;                      \ ( n "name" -- n )
 : flag     dup constant 1 lshift ;                \ ( n "name" -- n )
 : create   word define ['] docre @ , ['] exit , ; \ ( "name" -- )
+\ todo probably remove variable initialization
 : variable create , ;                             \ ( n "name" -- )
 
 0 variable loop*
 : set-loop here loop* ! ;         \ ( -- )
-compiler definitions
+also compiler definitions
 : |:       set-loop ;             \ ( -- )
 : loop     ['] jump , loop* @ , ; \ ( -- )
-forth definitions
+previous definitions
 : :        : set-loop ;           \ ( -- )
 
 : (later), here 0 , ;      \ ( -- a )
 : (lit),   lit, (later), ; \ ( -- a )
 : this     here swap ;     \ ( a0 -- a1 a0 )
 : this!    this ! ;        \ ( a -- )
-: dist     this - ;        \ ( a -- n )
 
-compiler definitions
+also compiler definitions
 : if   ['] jump0 , (later), ;           \ ( -- a )
 : else ['] jump , (later), swap this! ; \ ( a -- a )
 : then this! ;                          \ ( a -- )
 
-: u>?|:  [compile] |: ['] 2dup , ['] u> , [compile] if ; \ ( -- a )
-: dup?|: [compile] |: ['] dup , [compile] if ;           \ ( -- a )
+: u>?|:  [compile] |: ['] 2dup , ['] u> , [compile] if ; \ ( -- a ) deprecated
+: dup?|: [compile] |: ['] dup , [compile] if ;           \ ( -- a ) deprecated
 
-: check>  [compile] |: ['] 2dup , ['] u> , ; \ ( -- a )
-: check!0 [compile] |: ['] dup , ;           \ ( -- a )
+: check>  [compile] |: ['] 2dup , ['] u> , ; \ ( -- )
+: check!0 [compile] |: ['] dup , ;           \ ( -- )
 
 0 constant cond
-: endcond dup?|: [compile] then loop then drop ; \ ( 0 ... a -- )
+: endcond check!0 if [compile] then loop then drop ; \ ( 0 ... a -- )
 
 : tailcall ['] jump , ' cell + , ; \ ( "name" -- )
-forth definitions
+previous definitions
 
 : ( next-char ')' = 0= if loop then ;
-compiler definitions
+also compiler definitions
 : ( ( ; \ this comment is here to fix vim syntax highlight )
 : \ \ ;
-forth definitions
+previous definitions
 
 : :noname ( -- a ) 0 0 define here ['] docol @ , set-loop ] ;
-compiler definitions
+also compiler definitions
 : [:      ( -- a ) lit, here 6 + , ['] jump , (later), ['] docol @ , ;
 : ;]      ( a -- ) ['] exit , this! ;
-forth definitions
+previous definitions
 
 : last  ( -- a )   current @ @ >cfa ;
 : >does ( a -- a ) cell + ;
-compiler definitions
+also compiler definitions
 : does> ( -- )     (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
                    ['] docol @ , set-loop ;
-forth definitions
+previous definitions
 : does> ( -- )     last :noname swap >does ! ;
 
 : >value 2 cells + ;
@@ -93,31 +96,58 @@ forth definitions
 : noop ( -- )        ;
 : doer ( "name" -- ) create ['] noop cell + , does> @ >r ;
 0 variable make*
-compiler definitions
+also compiler definitions
 : make ( "name" -- ) (lit), lit, ' >value , ['] ! ,
                      here make* ! ['] exit , 0 , this! ;
 : ;and ( -- )        ['] exit , ['] jump make* @ !+ this! ;
-forth definitions
+previous definitions
 : make ( "name" -- ) :noname cell + ' >value ! ;
 : undo ( "name" -- ) ['] noop cell + ' >value ! ;
 
 : value ( n "name" -- ) create , does> @ ;
 : to    ( n "name" -- ) ' >value ! ;
 : +to   ( n "name" -- ) ' >value +! ;
-compiler definitions
+also compiler definitions
 : to    ( "name" -- )   lit, ' >value , ['] ! , ;
 : +to   ( "name" -- )   lit, ' >value , ['] +! , ;
-forth definitions
+previous definitions
 
-: vocabulary ( "name" -- ) create 0 , does> context ! ;
+: defer ( "name" -- )  create ['] noop , ['] exit , does> >r ;
+: is    ( a "name" --) ' >value ! ;
 
 0 constant s[
 : ]s     ( n "name" -- )     constant ;
 : +field ( a n "name" -- a ) over create , + does> @ + ;
 : field  ( a n "name" -- a ) swap aligned swap +field ;
 
-: type ( a n -- ) range |: 2dup u> if c@+ emit loop then 2drop ;
+: type   ( a n -- ) range check> if c@+ emit loop then 2drop ;
+: spaces ( n -- )   0 check> if space 1+ loop then 2drop ;
+
 :noname type '?' emit cr abort ; wnf !
+\ todo
+\ :noname source-ptr @ 0= if source type cr >in @ spaces '*' emit cr then ;
+\ on-quit !
+
+: external word 2dup extid -rot define , ;
+
+\ search order ===
+
+: set-order 0 #order ! >r |: r@ if
+    push-order r> 1- >r
+  loop then r> drop ;
+
+: vocabulary ( "name" -- ) create 0 , does> context ! ;
+: >vocab     2 cells + ;
+
+vocabulary root
+
+also root definitions
+: forth forth ;
+previous definitions
+
+: only ['] root >vocab dup 2 set-order ;
+
+only forth definitions
 
 \ math ===
 
@@ -127,9 +157,6 @@ forth definitions
 
 : min ( n0 n1 -- n ) 2dup > if swap then drop ;
 : max ( n0 n1 -- n ) 2dup < if swap then drop ;
-
--1 enum %lt enum %eq constant %gt
-: compare ( n0 n1 -- n ) 2dup = if 2drop %eq else > if %gt else %lt then then ;
 
 : clamp ( n min max -- n ) rot min max ;
 : in[,] ( n min max -- n ) rot tuck >= -rot <= and ;
@@ -159,7 +186,7 @@ forth definitions
       c,
   endcond loop ;
 
-: cstring ( | .*" -- ) (later), here string dist swap ! ;
+: cstring ( | .*" -- ) (later), here string this - swap ! ;
 
 : count   ( a -- a n ) @+ ;
 : (data), ( -- a )     (lit), ['] jump , (later), swap this! ;
@@ -167,43 +194,48 @@ forth definitions
 : d" ( | .*" -- ) here dup string h ! ;
 : c" ( | .*" -- ) here dup cstring h ! ;
 : s" ( | .*" -- ) [compile] c" count ;
-compiler definitions
+also compiler definitions
 : d" ( | .*" -- ) (data), string align this! ;
 : c" ( | .*" -- ) (data), cstring align this! ;
 : s" ( | .*" -- ) [compile] c" ['] count , ;
-forth definitions
+previous definitions
 
 : ." ( | .*" -- ) [compile] s" type ;
-compiler definitions
+also compiler definitions
 : ." ( | .*" -- ) [compile] s" ['] type , ;
-forth definitions
+previous definitions
 
 \ printing ===
 
 : digit>char ( n -- n ) dup 10 < if '0' else 'W' then + ;
+
+: abs   dup 0 < if negate then ;
+\ todo umod should come first, then u/, according to gforth and ansi
+: u/mod 2dup u/ -rot umod ;
 
 0 variable #start
 : #len ( -- n )     pad #start @ - ;
 : <#   ( -- )       pad #start ! ;
 : #>   ( n -- a n ) drop #start @ #len ;
 : hold ( n -- )     -1 #start +! #start @ c! ;
-: #    ( n -- n )   base @ /mod digit>char hold ;
+: #    ( n -- n )   base @ u/mod digit>char hold ;
 : #s   ( n -- n )   dup 0= if # else |: # dup if loop then then ;
 : #pad ( c n -- )   dup #len > if over hold loop then 2drop ;
-: h#   ( n -- n )   16 /mod digit>char hold ;
+: h#   ( n -- n )   16 u/mod digit>char hold ;
+: sign ( n -- )     0 < if '-' hold then ;
 
 : u.pad ( n n c -- ) rot <# #s flip #pad #> type ;
 : u.r   ( n n -- )   bl u.pad ;
 : u.0   ( n n -- )   '0' u.pad ;
 : u.    ( n -- )     <# #s #> type ;
-: .     ( n -- )     u. space ;
+: .     ( n -- )     <# dup abs #s swap sign #> type space ;
 
 : printable ( n -- t/f) 32 126 in[,] ;
 : print     ( n -- )    dup printable 0= if drop '.' then emit ;
 : .byte     ( n -- )    <# h# h# #> type ;
 : .short    ( n -- )    <# h# h# h# h# #> type ;
 
-: .cells    ( a a -- ) swap cell - |: 2dup u<= if dup @ . cell - loop then 2drop ;
+: .cells    ( a a -- ) swap cell - check> 0= if dup @ . cell - loop then 2drop ;
 
 : sdata ( -- a n ) s* @ s0 over - ;
 : depth ( -- n )   sdata nip cell / ;
@@ -212,8 +244,6 @@ forth definitions
 : rdata  ( -- a n ) r* @ r0 over - cell /string ;
 : rdepth ( -- n )   rdata nip cell / 1- ;
 : .r     ( -- )     rdepth ." (" u. ." ) " rdata range .cells ;
-
-: spaces ( n -- ) 0 u>?|: space 1+ loop then 2drop ;
 
 \ applications ===
 
@@ -229,29 +259,28 @@ forth definitions
   endcond ;
 : .ascii ( n -- ) dup printable if emit else ctlcode type then ;
 : .col   ( n -- ) dup 3 u.r space dup .byte space .ascii 2 spaces ;
-: .row   ( n -- ) 128 range u>?|: dup .col 32 + loop then 2drop ;
-: ashy   ( -- )   32 0 u>?|: dup .row cr 1+ loop then 2drop ;
+: .row   ( n -- ) 128 range check> if dup .col 32 + loop then 2drop ;
+: ashy   ( -- )   32 0 check> if dup .row cr 1+ loop then 2drop ;
 
 : split  ( a n -- a+n a+n a ) over + tuck swap ;
-: .bytes ( a a -- ) u>?|: c@+ .byte space loop then 2drop ;
-: .print ( a a -- ) u>?|: c@+ print loop then 2drop ;
-: dump   ( a n -- ) range u>?|: 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
+: .bytes ( a a -- ) check> if c@+ .byte space loop then 2drop ;
+: .print ( a a -- ) check> if c@+ print loop then 2drop ;
+: dump   ( a n -- ) range check> if 16 split dup .short space 2dup .bytes .print cr loop then 2drop ;
 
 : .word ( a -- ) name tuck type if space then ;
-: words ( -- )   context @ @ dup?|: dup .word @ loop then drop ;
+: words ( -- )   context @ @ check!0 if dup .word @ loop then drop ;
 
 \ ===
 
-\ todo this behavior might be weird and maybe doesnt panic on EoF
 : [if]      0= if |: word! ?dup 0= if panic then s" [then]" string= 0= if loop then then ;
 : [then]    ;
 : [defined] word find 0= 0= ;
 
-compiler definitions
+also compiler definitions
 : [if]      [if] ;
 : [then]    [then] ;
 : [defined] [defined] ;
-forth definitions
+previous definitions
 
 \ os ===
 
@@ -292,9 +321,9 @@ create fbuf 128 allot
 : f. fbuf 128 f>str fbuf swap type ;
 
 : F word str>f drop ;
-compiler definitions
+also compiler definitions
 : F word str>f drop swap lit, , lit, , ;
-forth definitions
+previous definitions
 
 : f, swap , , ;
 : f@ @+ swap @ ;
@@ -305,24 +334,24 @@ forth definitions
 
 \ tags ===
 
-\ todo
-\ for the better performance, could turn 's>mem' into an external or builtin
 : s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
 
 0 variable tags*
 : tags, ( n -- )        cells >r ['] jump , (later), here swap r@ allot this! here tags* !
                         lit, , lit, r> , ['] s>mem , ;
 : tag   ( n "name" -- ) create cells , does> @ tags* @ swap - cell - lit, , ['] @ , ;
-compiler definitions
+also compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
-forth definitions
+previous definitions
 
 \ dynamic ===
 
 external allocate
+external allocate-page
 external free
 external reallocate
+external dynsize
 external dyn!
 external dyn+!
 external dyn@
@@ -336,6 +365,12 @@ external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ ===
 
+external random
+external >rng
+external shuffle
+external shufflec
+
+\ ===
 
 0 [if]
 : postpone word cond
@@ -352,7 +387,7 @@ external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
 
 \ blocks ===
 
-: fill  ( a n n -- ) >r range u>?|: r@ swap c!+ loop then r> 3drop ;
+: fill  ( a n n -- ) >r range check> if r@ swap c!+ loop then r> 3drop ;
 : erase ( a n -- )   0 fill ;
 : blank ( a n -- )   bl fill ;
 

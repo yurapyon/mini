@@ -1,143 +1,174 @@
-fvocab context ! context @ current !
-
 : \ source-len @ >in ! ;
 
-: cells cell * ;
+\ NOTE
+\ Max line length in this file is 80 chars
 
-: forth fvocab context ! ;
-: compiler cvocab context ! ;
+\ Interpreter starts with forth as the only wordlist in the context
+
+\ system ===
+
+: context     wordlists #order @ 1- cells + ;
+: push-order  1 #order +! context ! ;
+: also        context @ push-order ;
+: previous    -1 #order +! ;
+
+: forth       fvocab context ! ;
+: compiler    cvocab context ! ;
 : definitions context @ current ! ;
-compiler definitions
-: literal lit, , ;
+
+also compiler definitions
+: literal   lit, , ;
 : [compile] ' , ;
-: ['] ' lit, , ;
-forth definitions
+: [']       ' lit, , ;
+previous definitions
+
 : constant word define ['] docon @ , , ;
-: enum dup constant 1+ ;
-: create word define ['] docre @ , ['] exit , ;
+: enum     dup constant 1+ ;
+: create   word define ['] docre @ , ['] exit , ;
 : variable create , ;
+
 0 variable loop*
 : set-loop here loop* ! ;
-compiler definitions
+also compiler definitions
 : |: set-loop ;
 : loop ['] jump , loop* @ , ;
-forth definitions
+previous definitions
 : : : set-loop ;
+
 : (later), here 0 , ;
-: (lit), lit, (later), ;
-: this here swap ;
-: this! this ! ;
-: dist this - ;
-compiler definitions
-: if ['] jump0 , (later), ;
+: (lit),   lit, (later), ;
+: this     here swap ;
+: this!    this ! ;
+
+also compiler definitions
+: if   ['] jump0 , (later), ;
 : else ['] jump , (later), swap this! ;
 : then this! ;
-forth definitions
-: ( next-char ')' = 0= if loop then ;
+
+: check> [compile] |: ['] 2dup , ['] u> , ;
+previous definitions
+
 : last current @ @ >cfa ;
 : >does cell + ;
-compiler definitions
-: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this!
-  ['] docol @ , ;
-forth definitions
+also compiler definitions
+: does> (lit), ['] last , ['] >does , ['] ! , ['] exit , this! ['] docol @ , ;
+previous definitions
+
 : value create , does> @ ;
 : vname ' 2 cells + ;
 : to  vname ! ;
 : +to vname +! ;
+
 : vocabulary create 0 , does> context ! ;
 
 : space bl emit ;
 : cr    10 emit ;
-: type range |: 2dup u> if c@+ emit loop then 2drop ;
+: type range check> if c@+ emit loop then 2drop ;
 : _wnf type '?' emit cr abort ;
 ' _wnf wnf !
 
 : digit>char dup 10 < if '0' else 'W' then + ;
+
+: abs   dup 0 < if negate then ;
+: u/mod 2dup u/ -rot umod ;
+
 0 variable #start
 : #len pad #start @ - ;
-: <# pad #start ! ;
-: #> drop #start @ #len ;
+: <#   pad #start ! ;
+: #>   drop #start @ #len ;
 : hold -1 #start +! #start @ c! ;
-: # base @ /mod digit>char hold ;
-: #s dup 0= if # else |: # dup if loop then then ;
+: #    base @ u/mod digit>char hold ;
+: #s   dup 0= if # else |: # dup if loop then then ;
 : #pad dup #len > if over hold loop then 2drop ;
-: h# 16 /mod digit>char hold ;
-: u.pad rot <# #s flip #pad #> type ;
-: u.r bl u.pad ;
-: u.0 '0' u.pad ;
-: u. <# #s #> type ;
-: . u. space ;
+: h#   16 u/mod digit>char hold ;
+: sign 0 < if '-' hold then ;
+
+: u.   <# #s #> type ;
+: .    <# dup abs #s swap sign #> type space ;
+
 : printable 32 126 in[,] ;
 : print dup printable 0= if drop '.' then emit ;
-: byte. <# h# h# #> type ;
-: short. <# h# h# h# h# #> type ;
+: .byte <# h# h# #> type ;
+: .short <# h# h# h# h# #> type ;
 
-: print. 2dup u> if c@+ print loop then 2drop ;
-: bytes. 2dup u> if c@+ byte. space loop then 2drop ;
+: .print 2dup u> if c@+ print loop then 2drop ;
+: .bytes 2dup u> if c@+ .byte space loop then 2drop ;
 
 : split over + tuck swap ;
 
+: .cells swap cell - check> 0= if dup @ . cell - loop then 2drop ;
+
 : sdata s* @ s0 over - ;
 : depth sdata nip cell / ;
-
-: .cells swap cell - |: 2dup <= if dup @ . cell - loop then
-  2drop ;
-: <.> <# '>' hold #s '<' hold #> type ;
-: .s depth <.> space sdata range .cells ;
+: .s    depth '<' emit u. '>' emit space sdata range .cells ;
 
 : println next-char drop source-rest type source-len @ >in ! ;
 
-: hex 16 base ! ;
-: decimal 10 base ! ;
+: c!+   tuck c! 1+ ;
+: fill  >r range check> if r@ swap c!+ loop then 2drop r> drop ;
+: erase 0 fill ;
 
 : third >r over r> swap ;
 
-vocabulary target
-target definitions
+: alias create ' , does> @ execute ;
+
+\ metacompiler ===
 
 create mem 6 1024 * allot
 
-: t@   mem + @ ;
-: t!   mem + ! ;
-: t+!  mem + +! ;
-: tc@  mem + c@ ;
-: tc!  mem + c! ;
-: t+c! mem + +c! ;
-: >t   swap mem + swap move ;
-
-: mem. swap mem + swap range |: 2dup u> if
-    16 split dup mem - short. space 2dup bytes. print.
+: .mem swap mem + swap range check> if
+    16 split dup mem - .short space 2dup .bytes .print
   cr loop then 2drop ;
 
-: l[ 0 ;
-: ]l constant ;
+: l[      0 ;
+: ]l      constant ;
 : layout  over constant + ;
 : layout- - dup constant ;
 
-\ NOTE
-\ cell size of target == cell size of host
+: builtins[ 0 ;
+: ]builtins . cr ;
+: 'bcode    ' 3 cells + @ ;
+
+vocabulary target
+also target definitions
+
+: f@ @ ;
+: f! ! ;
+: f, , ;
+
+: @   mem + @ ;
+: !   mem + ! ;
+: +!  mem + +! ;
+: c@  mem + c@ ;
+: c!  mem + c! ;
+: +c! mem + +c! ;
+: >t  swap mem + swap move ;
 
 l[
 \ kernel internal
-   cell layout _pc  \ program counter
-   cell layout _cta \ current token addr
-   cell layout s*
-   cell layout r*
-2 cells layout execreg
-   cell layout initxt
+    cell layout _pc  \ program counter
+    cell layout _cta \ current token addr
+    cell layout s*
+    cell layout r*
+ 2 cells layout execreg
+    cell layout initxt
 \ controlled by forth
-   cell layout stay
-   cell layout h
-   cell layout fvocab
-   cell layout cvocab
-   cell layout current
-   cell layout context
-   cell layout state
-   cell layout base
-   cell layout source-ptr
-   cell layout source-len
-   cell layout >in
-   cell layout wnf
+    cell layout stay
+    cell layout h
+    \ todo could rename to forth-worldlist, compiler-wordlist
+    cell layout fvocab
+    cell layout cvocab
+    cell layout current
+    cell layout #order
+16 cells layout wordlists
+    cell layout state
+    cell layout base
+    cell layout source-ptr
+    cell layout source-len
+    cell layout >in
+    \ todo could rename to on-wnf
+    cell layout wnf
+    cell layout on-quit
 ]l internal0
 
 l[
@@ -150,28 +181,24 @@ l[
   128  layout-  input-buffer
 ]l s0
 
-: there  h t@ ;
-: tallot h t+! ;
-: t,     there t! cell tallot ;
-: tc,    there tc! 1 tallot ;
-: talign there aligned h t! ;
+: here  h @ ;
+: allot h +! ;
+: ,     here ! cell allot ;
+: c,    here c! 1 allot ;
+: align here aligned h ! ;
+: (later), here 0 , ;
+: this!    here swap ! ;
 
-: tname,  dup tc, tuck there swap >t tallot ;
-: tdefine talign there >r current t@ t@ t, tname, talign
-  r> current t@ t! ;
+also forth definitions
+: there [ target ] here ;
+previous definitions
 
-: tforth       fvocab context t! ;
-: tcompiler    cvocab context t! ;
-: tdefinitions context t@ current t! ;
+: c@+ dup 1+ swap c@ ;
+: name cell + c@+ ;
+: >cfa name + aligned ;
+: ' ' 2 cells + f@ >cfa ;
 
-: 'taddr ' 2 cells + @ ;
-
-: tc@+ dup 1+ swap tc@ ;
-: tname cell + tc@+ ;
-: t>cfa tname + aligned ;
-: 'tcfa 'taddr t>cfa ;
-
-: tclone define ['] docre @ , ['] exit , there , does> @ t>cfa t, ;
+: clone define ['] docre f@ f, ['] exit f, here f, does> f@ >cfa , ;
 
 0 value docol#
 0 value docon#
@@ -182,42 +209,55 @@ l[
 0 value lit-addr
 
 0 variable loop*
+: |:   here loop* f! ;
+: loop jump-addr , loop* f@ , ;
 
-: t: word 2dup tclone tdefine docol# t, there loop* ! ;
-: t; exit-addr t, ;
-
-: tconstant word 2dup tclone tdefine docon# t, t, ;
-
-: builtins[ 0 ;
-: ]builtins . cr ;
-: b:        dup word 2dup tclone third , tdefine t, 1+ ;
-: 'bcode '  3 cells + @ ;
-
-: (later), there 0 t, ;
-: this!    there swap t! ;
-
-: if   jump0-addr t, (later), ;
-: else jump-addr t, (later), swap this! ;
+: if   jump0-addr , (later), ;
+: else jump-addr , (later), swap this! ;
 : then this! ;
 
-: literal lit-addr t, t, ;
+: literal lit-addr , , ;
+: litjump jump-addr , , ;
 
-: |:   there loop* ! ;
-: loop jump-addr t, loop* @ t, ;
+: context       wordlists #order @ 1- cells + ;
+: t.forth       fvocab context ! ;
+: t.compiler    cvocab context ! ;
+: t.definitions context @ current ! ;
 
-: >init/exec/wnf initxt t! execreg cell + t! wnf t! ;
+: >sysinit
+  initxt !
+  execreg cell + !
+  wnf !
+  on-quit ! ;
 
-\ ===
+\ defining words ===
 
-internal0 h t!
-0 fvocab t!
-0 cvocab t!
-fvocab current t!
-fvocab context t!
-0    state t!
-10   base t!
-0    source-ptr t!
-true stay t!
+: name,  dup c, tuck here swap >t allot ;
+: define align here >r current @ @ , name, align r> current @ ! ;
+
+: b: dup word 2dup clone third f, define , 1+ ;
+
+: constant word 2dup clone define docon# , , ;
+
+: t: word 2dup clone define docol# , here loop* f! ;
+: t; exit-addr , ;
+
+alias : t:
+alias ; t;
+
+\ compile image ===
+
+mem internal0 erase
+internal0 h !
+1 #order !
+0 fvocab !
+0 cvocab !
+fvocab current !
+fvocab context !
+0    state !
+10   base !
+0    source-ptr !
+true stay !
 
 \ todo
 \   u/mod u*/ u*/mod
@@ -238,189 +278,190 @@ builtins[
   b: drop   b: dup    b: ?dup  b: swap
   b: flip   b: over   b: nip   b: tuck
   b: rot    b: -rot   b: move  b: mem=
-  b: rclear b: extid
+  b: quit   b: extid
 println builtins ct: 
 ]builtins
 
 'bcode docol to docol#
 'bcode docon to docon#
-'tcfa exit  to exit-addr
-'tcfa jump  to jump-addr
-'tcfa jump0 to jump0-addr
-'tcfa lit   to lit-addr
+' exit  to exit-addr
+' jump  to jump-addr
+' jump0 to jump0-addr
+' lit   to lit-addr
 
-32    tconstant bl
-2     tconstant cell
-0     tconstant false
-$FFFF tconstant true
-$FFFF tconstant eof
-stay         tconstant stay
-source-ptr   tconstant source-ptr
-source-len   tconstant source-len
->in          tconstant >in
-\ todo just use s0 for input buffer
-input-buffer tconstant input-buffer
-h            tconstant h
-current      tconstant current
-context      tconstant context
-fvocab       tconstant fvocab
-cvocab       tconstant cvocab
-state        tconstant state
-base         tconstant base
-s*           tconstant s*
-s0           tconstant s0
-r*           tconstant r*
-r0           tconstant r0
-wnf          tconstant wnf
+32    constant bl
+2     constant cell
+0     constant false
+$FFFF constant true
+$FFFF constant eof
+stay         constant stay
+source-ptr   constant source-ptr
+source-len   constant source-len
+>in          constant >in
+input-buffer constant input-buffer
+h            constant h
+current      constant current
+#order       constant #order
+wordlists    constant wordlists
+fvocab       constant fvocab
+cvocab       constant cvocab
+state        constant state
+base         constant base
+s*           constant s*
+s0           constant s0
+r*           constant r*
+r0           constant r0
+wnf          constant wnf
+on-quit      constant on-quit
 
-t: 2dup  over over t;
-t: 2drop drop drop t;
-t: 3dup  >r 2dup r@ -rot r> t;
+: 2dup  over over ;
+: 2drop drop drop ;
+: 3dup  >r 2dup r@ -rot r> ;
+: 3drop 2drop drop ;
+: cells cell * ;
 
 \ input ===
 
-t: source source-ptr @ ?dup 0= if input-buffer then source-len @ t;
+: source source-ptr @ ?dup 0= if input-buffer then source-len @ ;
 
-t: source@ source drop >in @ + t;
-t: next-char source@ c@ 1 literal >in +! t;
-t: source-rest source@ source + over - t;
+: source@     source drop >in @ + ;
+: next-char   source@ c@ 1 literal >in +! ;
+: source-rest source@ source + over - ;
 
-t: 1/string 1- swap 1+ swap t;
-t: -leading dup if over c@ bl = if 1/string loop then then t;
-t: range over + swap t;
+: 1/string 1- swap 1+ swap ;
+: -leading dup if over c@ bl = if 1/string loop then then ;
+: range    over + swap ;
 
-t: token -leading 2dup range
+: token -leading 2dup range
   |: 2dup u> if dup c@ bl = 0= if 1+ loop then then nip
-  nip over - t;
+  nip over - ;
 
-t: word source-rest token 2dup + source drop - >in ! t;
+: word source-rest token 2dup + source drop - >in ! ;
 
 \ lookups ===
 
-t: c@+ dup 1+ swap c@ t;
-
-t: name cell + c@+ t;
-
-t: string= rot over = if mem= else drop 2drop false then t;
-
-t: locate dup if 3dup name string= 0= if @ loop then then nip nip t;
-
-t: find 2dup context @ @ locate ?dup if nip nip else fvocab @ locate then t;
+: c@+     dup 1+ swap c@ ;
+: name    cell + c@+ ;
+: string= rot over = if mem= else drop 2drop false then ;
+: locate  dup if 3dup name string= 0= if @ loop then then nip nip ;
+: skip    dup current @ @ = if @ then ;
+: (find)  >r #order @ |: dup 0 literal > if
+    3dup 1- cells wordlists + @ @ r@ if skip then locate ?dup 0= if 1- loop then
+  else 0 literal then r> drop >r 3drop r> ;
 
 \ number conversion ===
 
-t: here h @ t;
-t: pad here 64 literal + t;
+: here h @ ;
+: pad  here 64 literal + ;
 
-t: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
-  r> r> and and t;
+: str>char 3 literal = >r c@+ ''' literal = >r c@+ swap c@ ''' literal =
+  r> r> and and ;
 
-t: str>neg over c@ '-' literal = if 1/string true else false then t;
+: str>neg over c@ '-' literal = if 1/string true else false then ;
 
-t: str>base over c@
+: str>base over c@
    dup '%' literal = if drop 1/string  2 literal else
    dup '#' literal = if drop 1/string 10 literal else
        '$' literal = if      1/string 16 literal else
      base @
-   then then then t;
+   then then then ;
 
-t: in[,] rot tuck >= -rot <= and t;
+: in[,] rot tuck >= -rot <= and ;
 
-t: char>digit
+: char>digit
     dup '0' literal '9' literal in[,] if '0' literal - else
     dup 'A' literal 'Z' literal in[,] if '7' literal - else
     dup 'a' literal 'z' literal in[,] if 'W' literal - else
     drop -1 literal
-  then then then t;
+  then then then ;
 
-t: str>number 0 literal pad ! >r range |: 2dup u> if
-    dup c@ char>digit r@ 2dup < if pad @ * + pad ! 1+ loop else 2drop then
-  then r> drop = pad @ swap t;
+: str>number 0 literal pad ! >r range |: 2dup u> if
+    dup c@ char>digit r@ 2dup u< if pad @ * + pad ! 1+ loop else 2drop then
+  then r> drop = pad @ swap ;
 
-t: >number 2dup str>char if -rot 2drop true exit else drop then
-  str>neg >r str>base str>number tuck r> and if negate then swap t;
+: >number 2dup str>char if -rot 2drop true exit else drop then
+  str>neg >r str>base str>number tuck r> and if negate then swap ;
 
 \ interpret/compile ===
 
-t: allot h +! t;
-t: ,  here ! cell allot t;
-t: c, here c! 1 literal allot t;
-t: lit, lit lit , t;
+: allot   h +! ;
+: ,       here ! cell allot ;
+: c,      here c! 1 literal allot ;
+: lit,    lit lit , ;
+: aligned dup cell mod + ;
+: align   here aligned h ! ;
+: >cfa    name + aligned ;
 
-t: execute execreg literal ! jump execreg t, t;
+: execute execreg literal ! execreg litjump ;
 
-t: aligned dup cell mod + t;
-t: align here aligned h ! t;
-t: >cfa name + aligned t;
-
-t: refill
+: refill
   source-ptr @ if false else
     input-buffer 128 literal accept
     dup eof = if drop false else source-len ! 0 literal >in ! true then
-  then t;
+  then ;
 
-t: word! word ?dup 0= if drop refill if loop else
-   0 literal 0 literal then then t;
+: word! word ?dup 0= if drop refill if loop else
+   0 literal 0 literal then then ;
 
-t: cfind dup current @ @ = if @ then locate t;
-
-t: interpret word! ?dup if
+: interpret word! ?dup if
     state @ if
-      2dup cvocab @    cfind ?dup if -rot 2drop >cfa execute else
-      2dup context @ @ cfind ?dup if -rot 2drop >cfa , else
-      2dup fvocab @    cfind ?dup if -rot 2drop >cfa , else
-      2dup >number if -rot 2drop lit, , else
+      2dup cvocab @ skip locate ?dup if -rot 2drop >cfa execute else
+      2dup true (find) ?dup          if -rot 2drop >cfa , else
+      2dup >number                   if -rot 2drop lit, , else
         drop 0 literal state ! align wnf @ execute
-      then then then then
+      then then then
     else
-      2dup find ?dup if -rot 2drop >cfa execute else
-      2dup >number   if -rot 2drop              else
+      2dup false (find) ?dup if -rot 2drop >cfa execute else
+      2dup >number           if -rot 2drop              else
         drop wnf @ execute
       then then
     then
     stay @ if loop then
   else
     drop
-  then t;
+  then ;
 
-\ todo this should stop accepting the current file too ?
-\ todo this should only kill the 'closest' interpreter ?
-t: quit 0 literal source-ptr ! source-len @ >in !
-  'tcfa interpret literal rclear t;
-t: abort s0 s* ! quit t;
-t: bye false stay ! t;
+: (quit) on-quit @ execute
+  0 literal source-ptr ! source-len @ >in ! interpret ;
 
-t: define align here >r current @ @ ,
+: abort s0 s* ! quit ;
+: bye false stay ! ;
+
+: define align here >r current @ @ ,
   dup c, tuck here swap move allot
-  align r> current @ ! t;
+  align r> current @ ! ;
 
-t: external word 2dup extid -rot define , t;
+' exit
+' 2drop
+exit-addr
+' (quit)
+>sysinit
 
 \ extras ===
 
-t: ' word find dup if >cfa then t;
+: find false (find) ;
 
-t: ] 1 literal state ! t;
-tcompiler tdefinitions
-t: [ 0 literal state ! t;
-tforth tdefinitions
+: ] 1 literal state ! ;
+t.compiler t.definitions
+: [ 0 literal state ! ;
+t.forth t.definitions
 
 t: : word define docol# literal , ] t;
-tcompiler tdefinitions
-t: ; 'tcfa exit literal , [ t;
-tforth tdefinitions
+t.compiler t.definitions
+t: ; ' exit literal , [ t;
+t.forth t.definitions
+
+t: ' word find dup if >cfa then t;
 
 \ ===
 
-'tcfa 2drop exit-addr 'tcfa interpret >init/exec/wnf
+forth
 
-\ ===
-
-0 there mem.
+0 there .mem
 println after compile: 
 .s cr
 println mem size: 
 there . cr
 
 mem there
-forth bye
+bye

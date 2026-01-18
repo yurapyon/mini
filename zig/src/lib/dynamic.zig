@@ -47,17 +47,10 @@ fn getCellSliceFromHandle(k: *Kernel, handle_id: Cell) ![]Cell {
     return cell_slice;
 }
 
-//
-
-fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    const size = k.data_stack.popCell();
-
-    const adj_size: usize = if (size == 0) mem.memory_size else size;
-    const slice = k.allocator.allocWithOptions(
-        u8,
-        adj_size,
-        std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
-        null,
+fn allocateAndGetHandleId(k: *Kernel, size: usize) External.Error!Cell {
+    const slice = mem.allocate(
+        k.allocator,
+        size,
     ) catch return error.ExternalPanic;
     errdefer k.allocator.free(slice);
 
@@ -67,13 +60,30 @@ fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
 
     ptr.* = slice;
 
-    const handle_id = k.handles.getHandleForPtr(@ptrCast(ptr)) catch
+    const handle_id = k.handles.getHandleForPtr(k.allocator, @ptrCast(ptr)) catch
         return error.ExternalPanic;
 
+    return handle_id;
+}
+
+//
+
+fn allocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
+    const size = k.data_stack.popCell();
+    const handle_id = try allocateAndGetHandleId(k, size);
+    k.data_stack.pushCell(handle_id);
+}
+
+fn allocatePage(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    const handle_id = try allocateAndGetHandleId(k, mem.forth_memory_size);
     k.data_stack.pushCell(handle_id);
 }
 
 fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
     const handle_id = k.data_stack.popCell();
 
     const m = getMemoryFromHandle(k, handle_id) catch
@@ -81,10 +91,12 @@ fn free(k: *Kernel, _: ?*anyopaque) External.Error!void {
 
     k.allocator.free(m.slice);
     k.allocator.destroy(m.ptr);
-    k.handles.freeHandle(handle_id);
+    k.handles.freeHandle(k.allocator, handle_id);
 }
 
 fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const new_size = k.data_stack.popCell();
 
@@ -95,7 +107,20 @@ fn reallocate(k: *Kernel, _: ?*anyopaque) External.Error!void {
     m.ptr.* = realloced_slice;
 }
 
+fn dynSize(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(1);
+
+    const handle_id = k.data_stack.popCell();
+
+    const slice = getSliceFromHandle(k, handle_id) catch
+        return error.ExternalPanic;
+
+    k.data_stack.pushCell(@truncate(slice.len));
+}
+
 fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -113,6 +138,8 @@ fn dynStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynPlusStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -130,6 +157,8 @@ fn dynPlusStore(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynFetch(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 
@@ -147,6 +176,8 @@ fn dynFetch(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -162,6 +193,8 @@ fn dynStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynPlusStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(3);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
     const value = k.data_stack.popCell();
@@ -177,6 +210,8 @@ fn dynPlusStoreC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynFetchC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(2);
+
     const handle_id = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
 
@@ -192,6 +227,8 @@ fn dynFetchC(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(4);
+
     const count = k.data_stack.popCell();
     const handle_id = k.data_stack.popCell();
     const destination = k.data_stack.popCell();
@@ -219,6 +256,8 @@ fn toDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
+    try k.data_stack.assertWontUnderflow(4);
+
     const count = k.data_stack.popCell();
     const destination = k.data_stack.popCell();
     const handle_id = k.data_stack.popCell();
@@ -246,13 +285,29 @@ fn fromDyn(k: *Kernel, _: ?*anyopaque) External.Error!void {
 }
 
 fn dynMove(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    _ = k;
+    try k.data_stack.assertWontUnderflow(5);
+
+    const count = k.data_stack.popCell();
+    const destination_id = k.data_stack.popCell();
+    const destination = k.data_stack.popCell();
+    const source_id = k.data_stack.popCell();
+    const source = k.data_stack.popCell();
+
     // TODO
+    _ = count;
+    _ = destination_id;
+    _ = destination;
+    _ = source_id;
+    _ = source;
 }
 
 pub fn registerExternals(k: *Kernel) !void {
     try k.addExternal("allocate", .{
         .callback = allocate,
+        .userdata = null,
+    });
+    try k.addExternal("allocate-page", .{
+        .callback = allocatePage,
         .userdata = null,
     });
     try k.addExternal("free", .{
@@ -261,6 +316,10 @@ pub fn registerExternals(k: *Kernel) !void {
     });
     try k.addExternal("reallocate", .{
         .callback = reallocate,
+        .userdata = null,
+    });
+    try k.addExternal("dynsize", .{
+        .callback = dynSize,
         .userdata = null,
     });
     try k.addExternal("dyn!", .{

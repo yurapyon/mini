@@ -9,19 +9,25 @@ const Cell = kernel.Cell;
 // NOTE
 // in bounds memory access is guaranteed because
 //   the size of memory is defined in terms of the max address a cell can hold
-pub const memory_size = std.math.maxInt(Cell) + 1;
-pub const Memory = [memory_size]u8;
+pub const forth_memory_size = std.math.maxInt(Cell) + 1;
+pub const Memory = [forth_memory_size]u8;
 pub const MemoryPtr = *align(@alignOf(Cell)) Memory;
 pub const ConstMemoryPtr = *align(@alignOf(Cell)) const Memory;
 
-pub fn allocateMemory(allocator: Allocator) Allocator.Error!MemoryPtr {
+// Allocates Cell aligned memory
+pub fn allocate(allocator: Allocator, size: usize) Allocator.Error![]u8 {
     const slice = try allocator.allocWithOptions(
         u8,
-        memory_size,
+        size,
         std.mem.Alignment.fromByteUnits(@alignOf(Cell)),
         null,
     );
-    return @ptrCast(slice.ptr);
+    return slice;
+}
+
+pub fn allocateForthMemory(allocator: Allocator) Allocator.Error!MemoryPtr {
+    const slice = try allocate(allocator, forth_memory_size);
+    return @ptrCast(@alignCast(slice.ptr));
 }
 
 pub fn assertOffsetInBounds(addr: Cell, offset: Cell) !void {
@@ -86,4 +92,46 @@ pub fn constSliceFromAddrAndLen(
         try assertOffsetInBounds(addr, len - 1);
     }
     return memory[addr..][0..len];
+}
+
+pub fn cellSliceFromAddrAndLen(
+    memory: []u8,
+    addr: Cell,
+    len: Cell,
+) ![]Cell {
+    const byte_len = len * @sizeOf(Cell);
+
+    if (byte_len > 0) {
+        try assertCellAccess(addr);
+        try assertCellAccess(addr + byte_len);
+        try assertOffsetInBounds(addr, byte_len - 1);
+    }
+
+    const u8_slice = try sliceFromAddrAndLen(memory, addr, byte_len);
+
+    var cell_slice: []Cell = undefined;
+    cell_slice.ptr = @ptrCast(@alignCast(u8_slice.ptr));
+    cell_slice.len = len;
+    return cell_slice;
+}
+
+pub fn constCellSliceFromAddrAndLen(
+    memory: []const u8,
+    addr: Cell,
+    len: Cell,
+) ![]const Cell {
+    const byte_len = len * @sizeOf(Cell);
+
+    if (byte_len > 0) {
+        try assertCellAccess(addr);
+        try assertCellAccess(addr + byte_len);
+        try assertOffsetInBounds(addr, byte_len - 1);
+    }
+
+    const u8_slice = try constSliceFromAddrAndLen(memory, addr, byte_len);
+
+    var cell_slice: []const Cell = undefined;
+    cell_slice.ptr = @ptrCast(@alignCast(u8_slice.ptr));
+    cell_slice.len = len;
+    return cell_slice;
 }
