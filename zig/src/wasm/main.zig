@@ -3,13 +3,33 @@ const std = @import("std");
 const mini = @import("mini");
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
+const Cell = kernel.Cell;
+
+const externals = mini.externals;
+const External = externals.External;
 
 // ===
 
 var k: Kernel = undefined;
 
-export fn getKernelMemory() [*]u8 {
-    return @ptrCast(&k.memory);
+extern fn callJs(Cell) void;
+fn callJs_(k_: *Kernel, _: ?*anyopaque) void {
+    const value = k_.data_stack.pop();
+    callJs(value);
+}
+
+const exts = [_]External{
+    .{
+        .name = "js",
+        .callback = callJs_,
+        .userdata = null,
+    },
+};
+
+var mini_mem = std.mem.zeroes(mini.mem.Memory);
+
+export fn getKernelMemoryPtr() [*]u8 {
+    return @ptrCast(k.memory);
 }
 
 // TODO
@@ -19,18 +39,14 @@ export fn getKernelMemory() [*]u8 {
 extern fn wasmPrint(usize) void;
 
 export fn init() void {
-    // const allocator = std.heap.wasm_allocator;
-
-    // TODO memory error
-    // k.init() catch unreachable;
-
-    // k.memory[0] = 123;
+    k.init(@alignCast(&mini_mem));
+    k.setExternals(&exts);
 
     // if no system ===
 
     // create kernel
-    // load precompile image into kernel
     // register externals
+    // load precompile image into kernel
 
     // clear accept closure
     // set emit closure

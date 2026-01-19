@@ -1,28 +1,45 @@
-const wasm = process.argv[2];
-
 const fs = require('fs');
-const source = fs.readFileSync(wasm);
-const typedArray = new Uint8Array(source);
 
+const wasm_filepath = process.argv[2];
+const source = fs.readFileSync(wasm_binary);
+const wasm_bin = new Uint8Array(source);
 
-const imports = {
+const MEMORY_PAGE_COUNT = 4;
+
+const memory = new WebAssembly.Memory({
+  initial: MEMORY_PAGE_COUNT,
+  maximum: MEMORY_PAGE_COUNT,
+});
+
+const importObject = {
   env: {
     wasmPrint: (result) => {
       console.log("zig: ", result);
     },
-    // memory: mini_memory,
+    callJs: (id) => {
+      console.log("ext: ", id);
+    },
+    memory: memory,
   }
 };
 
-WebAssembly.instantiate(typedArray, imports).then((result) => {
+WebAssembly.instantiate(wasm_bin, importObject).then((result) => {
+  const arr = new Uint8Array(memory.buffer);
+
   const init = result.instance.exports.init;
   const deinit = result.instance.exports.deinit;
-  const getKernelMemory = result.instance.exports.getKernelMemory;
+  const getKernelMemoryPtr = result.instance.exports.getKernelMemoryPtr
 
   init();
 
-  const mem = new Uint8Array(getKernelMemory());
-  console.log(getKernelMemory(), mem, mem[0])
+  const miniMemOffset = getKernelMemoryPtr();
+  const mem = arr.slice(
+      miniMemOffset,
+      miniMemOffset + 64 * 1024
+  );
+  console.log(mem[0], miniMemOffset, arr)
+
+  // TODO copy image into forth memory
 
   deinit();
 });

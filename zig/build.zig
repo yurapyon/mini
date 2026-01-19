@@ -74,7 +74,7 @@ pub fn build(b: *std.Build) void {
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/wasm/main.zig"),
             .target = target_wasm,
-            .optimize = optimize,
+            .optimize = .ReleaseSmall,
             .imports = &.{
                 .{ .name = "mini", .module = mod_mini },
             },
@@ -85,11 +85,13 @@ pub fn build(b: *std.Build) void {
     wasm.entry = .disabled;
     wasm.rdynamic = true;
 
-    // wasm.import_memory = true;
-    // wasm.global_base = 6560;
-    // wasm.stack_size = std.wasm.page_size;
-    // wasm.initial_memory = std.wasm.page_size;
-    // wasm.max_memory = std.wasm.page_size;
+    const wasm_memory_page_count = 4;
+
+    wasm.import_memory = true;
+    wasm.global_base = 6560;
+    wasm.stack_size = std.wasm.page_size;
+    wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
+    wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
 
     b.installArtifact(wasm);
 
