@@ -7,6 +7,7 @@ const Kernel = kernel.Kernel;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const mem = mini.mem;
 
@@ -130,8 +131,8 @@ fn stringToF(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.data_stack.pushBoolean(true);
 }
 
-pub fn getExternals() []const External {
-    const exts = [_]External{
+pub fn pushExternals(exts: *ExternalsList) !void {
+    try exts.pushSlice(&.{
         .{
             .name = "f+",
             .callback = fPlus,
@@ -162,7 +163,5 @@ pub fn getExternals() []const External {
             .callback = stringToF,
             .userdata = null,
         },
-    };
-
-    return &exts;
+    });
 }

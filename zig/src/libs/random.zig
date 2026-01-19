@@ -8,6 +8,7 @@ const Cell = kernel.Cell;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const mem = mini.mem;
 
@@ -70,8 +71,8 @@ pub const Randomizer = struct {
         self.randomizer.random().shuffle(u8, array);
     }
 
-    pub fn getExternals(self: *@This()) []const External {
-        const exts = [_]External{
+    pub fn pushExternals(self: *@This(), exts: *ExternalsList) !void {
+        try exts.pushSlice(&.{
             .{
                 .name = "random",
                 .callback = random,
@@ -92,8 +93,6 @@ pub const Randomizer = struct {
                 .callback = shuffle,
                 .userdata = self,
             },
-        };
-
-        return &exts;
+        });
     }
 };

@@ -14,6 +14,7 @@ const Handles = mini.utils.Handles;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const c = @import("c.zig").c;
 
@@ -674,8 +675,8 @@ pub const System = struct {
 
     // ===
 
-    pub fn getExternals(self: *@This()) []const External {
-        const es = [_]External{
+    pub fn pushExternals(self: *@This(), es: *ExternalsList) !void {
+        try es.pushSlice(&.{
             .{
                 .name = "poll",
                 .callback = exts.poll,
@@ -796,8 +797,6 @@ pub const System = struct {
                 .callback = exts.charsFetch,
                 .userdata = self,
             },
-        };
-
-        return &es;
+        });
     }
 };

@@ -11,6 +11,7 @@ const Cell = kernel.Cell;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const Handles = mini.utils.Handles;
 
@@ -349,8 +350,8 @@ pub const Dynamic = struct {
         _ = source;
     }
 
-    pub fn getExternals(self: *@This()) []const External {
-        const exts = [_]External{
+    pub fn pushExternals(self: *@This(), exts: *ExternalsList) !void {
+        try exts.pushSlice(&.{
             .{
                 .name = "allocate",
                 .callback = allocate,
@@ -421,8 +422,6 @@ pub const Dynamic = struct {
                 .callback = dynMove,
                 .userdata = self,
             },
-        };
-
-        return &exts;
+        });
     }
 };

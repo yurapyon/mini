@@ -8,6 +8,7 @@ const Kernel = kernel.Kernel;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const mem = mini.mem;
 
@@ -166,8 +167,8 @@ pub const OS = struct {
         k.debug.enable_tco = false;
     }
 
-    pub fn getExternals(self: *@This()) []const External {
-        const exts = [_]External{
+    pub fn pushExternals(self: *@This(), exts: *ExternalsList) !void {
+        try exts.pushSlice(&.{
             .{
                 .name = "sleep",
                 .callback = sleep,
@@ -223,8 +224,6 @@ pub const OS = struct {
                 .callback = disableTCO,
                 .userdata = self,
             },
-        };
-
-        return &exts;
+        });
     }
 };

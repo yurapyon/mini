@@ -13,6 +13,7 @@ const Cell = kernel.Cell;
 
 const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const Handles = mini.utils.Handles;
 
@@ -102,7 +103,8 @@ pub fn main() !void {
     if (cli_options.kernel_filepath) |precompiled_filepath| {
         const forth_memory = try mini.mem.allocateForthMemory(allocator);
 
-        var exts: ArrayList(External) = .empty;
+        var exts: ExternalsList = undefined;
+        exts.init(allocator);
 
         var k: Kernel = undefined;
         k.init(forth_memory);
@@ -141,24 +143,24 @@ pub fn main() !void {
             });
             mini.utils.writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            try exts.appendSlice(allocator, libs.floats.getExternals());
+            try libs.floats.pushExternals(&exts);
 
             var os: OS = undefined;
             os.init(allocator);
-            try exts.appendSlice(allocator, os.getExternals());
+            try os.pushExternals(&exts);
 
             var dyn: Dynamic = undefined;
             dyn.init(allocator, &h);
-            try exts.appendSlice(allocator, dyn.getExternals());
+            try dyn.pushExternals(&exts);
 
             var r: Randomizer = undefined;
             r.init();
-            try exts.appendSlice(allocator, r.getExternals());
+            try r.pushExternals(&exts);
 
             var sys: System = undefined;
-            try exts.appendSlice(allocator, sys.getExternals());
+            try sys.pushExternals(&exts);
 
-            try k.setExternals(exts.items);
+            try k.setExternals(exts.externals.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -187,21 +189,21 @@ pub fn main() !void {
 
             kernel_thread.join();
         } else {
-            try exts.appendSlice(allocator, libs.floats.getExternals());
+            try libs.floats.pushExternals(&exts);
 
             var os: OS = undefined;
             os.init(allocator);
-            try exts.appendSlice(allocator, os.getExternals());
+            try os.pushExternals(&exts);
 
             var dyn: Dynamic = undefined;
             dyn.init(allocator, &h);
-            try exts.appendSlice(allocator, dyn.getExternals());
+            try dyn.pushExternals(&exts);
 
             var r: Randomizer = undefined;
             r.init();
-            try exts.appendSlice(allocator, r.getExternals());
+            try r.pushExternals(&exts);
 
-            try k.setExternals(exts.items);
+            try k.setExternals(exts.externals.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
