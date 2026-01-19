@@ -89,8 +89,8 @@ pub fn build(b: *std.Build) void {
     const wasm_memory_page_count = 4;
 
     // <https://github.com/ziglang/zig/issues/8633>
+    // wasm.global_base = 6560;
     wasm.import_memory = true;
-    wasm.global_base = 6560;
     wasm.stack_size = std.wasm.page_size;
     wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
     wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;

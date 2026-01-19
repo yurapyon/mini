@@ -3,23 +3,12 @@ import { TitleBar } from "./components/TitleBar";
 import { Documentation } from "./components/documentation/Documentation";
 import { init as initMini } from "./lib/Mini";
 
-const ScriptEditor = () => {
-  return <div class="bg-[#201010] text-xs" style={{
-    width: "64ch"
-  }}>
-    Script editor
-  </div>;
-}
-
 const Terminal = () => {
   return <div class="bg-[#000010] text-xs flex flex-col" style={{
     width: "64ch"
   }}>
     <div class="min-h-0 grow">
-      History
-    </div>
-    <div class="bg-[#101020]">
-      Command line
+      Console
     </div>
   </div>;
 }
@@ -31,7 +20,6 @@ const App: Component = () => {
       <TitleBar />
       <div class="w-full min-h-0 grow flex flex-row">
         <Documentation />
-        <ScriptEditor />
         <Terminal />
       </div>
     </div>

@@ -24,23 +24,19 @@ const importObject = {
 };
 
 WebAssembly.instantiate(wasm_bin, importObject).then((result) => {
+  const ptr = result.instance.exports.init();
+
   const arr = new Uint8Array(memory.buffer);
 
-  const init = result.instance.exports.init;
-  const deinit = result.instance.exports.deinit;
-  const getKernelMemoryPtr = result.instance.exports.getKernelMemoryPtr
-
-  init();
-
-  const miniMemOffset = getKernelMemoryPtr();
   const mem = arr.slice(
-      miniMemOffset,
-      miniMemOffset + 64 * 1024
+      ptr,
+      ptr + 64 * 1024
   );
-  console.log(mem[0], miniMemOffset, arr)
+
+  console.log(mem, mem[0]);
 
   // TODO copy image into forth memory
 
-  deinit();
+  // deinit();
 });
 
