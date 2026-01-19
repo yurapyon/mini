@@ -1,1 +1,1 @@
-./zig-out/bin/zig -k mini-out/precompiled.mini.bin -s -- $@
+./zig-out/bin/mini -k mini-out/precompiled.mini.bin -s -- $@

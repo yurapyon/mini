@@ -1,10 +1,11 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
+const mini = @import("mini");
+const random = mini.utils.random;
+
 const c = @import("c.zig").c;
 const cgfx = @import("c.zig").gfx;
-
-const random = @import("../utils/random.zig");
 
 const loadImageFromFilepath = @import("utils/load-image.zig").loadImageFromFilepath;
 

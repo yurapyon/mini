@@ -1,12 +1,15 @@
 const std = @import("std");
 
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 
-const externals = @import("../externals.zig");
+const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
-const mem = @import("../memory.zig");
+const mem = mini.mem;
 
 // ===
 
@@ -128,29 +131,37 @@ fn stringToF(k: *Kernel, _: ?*anyopaque) External.Error!void {
     k.data_stack.pushBoolean(true);
 }
 
-pub fn registerExternals(k: *Kernel) !void {
-    try k.addExternal("f+", .{
-        .callback = fPlus,
-        .userdata = null,
-    });
-    try k.addExternal("f-", .{
-        .callback = fMinus,
-        .userdata = null,
-    });
-    try k.addExternal("f*", .{
-        .callback = fMultiply,
-        .userdata = null,
-    });
-    try k.addExternal("f/", .{
-        .callback = fDivide,
-        .userdata = null,
-    });
-    try k.addExternal("f>str", .{
-        .callback = fToString,
-        .userdata = null,
-    });
-    try k.addExternal("str>f", .{
-        .callback = stringToF,
-        .userdata = null,
+pub fn pushExternals(exts: *ExternalsList) !void {
+    try exts.pushSlice(&.{
+        .{
+            .name = "f+",
+            .callback = fPlus,
+            .userdata = null,
+        },
+        .{
+            .name = "f-",
+            .callback = fMinus,
+            .userdata = null,
+        },
+        .{
+            .name = "f*",
+            .callback = fMultiply,
+            .userdata = null,
+        },
+        .{
+            .name = "f/",
+            .callback = fDivide,
+            .userdata = null,
+        },
+        .{
+            .name = "f>str",
+            .callback = fToString,
+            .userdata = null,
+        },
+        .{
+            .name = "str>f",
+            .callback = stringToF,
+            .userdata = null,
+        },
     });
 }

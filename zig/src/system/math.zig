@@ -1,5 +1,8 @@
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+const kernel = mini.kernel;
 const Cell = kernel.Cell;
+
+// ===
 
 pub const m3 = struct {
     pub const Mat3 = [9]f32;

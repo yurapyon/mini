@@ -1,12 +1,14 @@
 const std = @import("std");
 
+const mini = @import("mini");
+
+const kernel = mini.kernel;
+const SignedCell = kernel.SignedCell;
+
 const c = @import("c.zig").c;
 
 const input_event = @import("input-event.zig");
 const InputChannel = input_event.InputChannel;
-
-const kernel = @import("../kernel.zig");
-const SignedCell = kernel.SignedCell;
 
 // ===
 

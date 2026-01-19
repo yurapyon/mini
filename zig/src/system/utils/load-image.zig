@@ -1,7 +1,9 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const readFile = @import("../../utils/read-file.zig").readFile;
+const mini = @import("mini");
+
+const readFile = mini.utils.readFile;
 
 const c = @import("../c.zig").c;
 

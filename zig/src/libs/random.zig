@@ -1,15 +1,18 @@
 const std = @import("std");
 
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const externals = @import("../externals.zig");
+const externals = mini.externals;
 const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
-const mem = @import("../memory.zig");
+const mem = mini.mem;
 
-const readFile = @import("../utils/read-file.zig").readFile;
+const readFile = mini.utils.readFile;
 
 const c = @cImport({
     @cInclude("stdio.h");
@@ -68,22 +71,28 @@ pub const Randomizer = struct {
         self.randomizer.random().shuffle(u8, array);
     }
 
-    pub fn registerExternals(self: *@This(), k: *Kernel) !void {
-        try k.addExternal("random", .{
-            .callback = random,
-            .userdata = self,
-        });
-        try k.addExternal(">rng", .{
-            .callback = seedRng,
-            .userdata = self,
-        });
-        try k.addExternal("shuffle", .{
-            .callback = shuffle,
-            .userdata = self,
-        });
-        try k.addExternal("shufflec", .{
-            .callback = shuffle,
-            .userdata = self,
+    pub fn pushExternals(self: *@This(), exts: *ExternalsList) !void {
+        try exts.pushSlice(&.{
+            .{
+                .name = "random",
+                .callback = random,
+                .userdata = self,
+            },
+            .{
+                .name = ">rng",
+                .callback = seedRng,
+                .userdata = self,
+            },
+            .{
+                .name = "shuffle",
+                .callback = shuffle,
+                .userdata = self,
+            },
+            .{
+                .name = "shufflec",
+                .callback = shuffle,
+                .userdata = self,
+            },
         });
     }
 };

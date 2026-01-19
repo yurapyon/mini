@@ -3,20 +3,29 @@ const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 const Thread = std.Thread;
 
-const mem = @import("memory.zig");
+const mini = @import("mini");
 
-const CliOptions = @import("cli_options.zig").CliOptions;
+const mem = mini.mem;
 
-const readFile = @import("utils/read-file.zig").readFile;
-const writeFile = @import("utils/read-file.zig").writeFile;
-
-const kernel = @import("kernel.zig");
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const System = @import("system/system.zig").System;
+const externals = mini.externals;
+const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
-const Randomizer = @import("lib/random.zig").Randomizer;
+const Handles = mini.utils.Handles;
+
+const libs = @import("libs");
+
+const System = @import("pyon").system.System;
+
+const OS = libs.os.OS;
+const Dynamic = libs.dynamic.Dynamic;
+const Randomizer = libs.random.Randomizer;
+
+const CliOptions = @import("cli_options.zig").CliOptions;
 
 // ===
 
@@ -50,6 +59,7 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
 fn kernelRunFiles(
     system: *System,
     k: *Kernel,
+    allocator: Allocator,
     filepaths: ArrayList([]u8),
     start_repl: bool,
 ) !void {
@@ -58,8 +68,8 @@ fn kernelRunFiles(
     var input_file = std.fs.File.stdin();
 
     for (filepaths.items) |fp| {
-        const file = try readFile(k.allocator, fp);
-        defer k.allocator.free(file);
+        const file = try mini.utils.readFile(allocator, fp);
+        defer allocator.free(file);
 
         std.debug.print(">> {s}\n", .{fp});
         try k.evaluate(file);
@@ -91,11 +101,19 @@ pub fn main() !void {
     var output_file = std.fs.File.stdout();
 
     if (cli_options.kernel_filepath) |precompiled_filepath| {
-        var k: Kernel = undefined;
-        try k.init(allocator);
-        defer k.deinit();
+        const forth_memory = try mini.mem.allocateForthMemory(allocator);
 
-        const image = try readFile(allocator, precompiled_filepath);
+        var exts: ExternalsList = undefined;
+        exts.init(allocator);
+
+        var k: Kernel = undefined;
+        k.init(forth_memory);
+
+        var h: Handles = undefined;
+        h.init();
+        defer h.deinit(allocator);
+
+        const image = try mini.utils.readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
         k.loadImage(image);
 
@@ -123,17 +141,26 @@ pub fn main() !void {
             std.debug.print("saving: {s} \n", .{
                 filename,
             });
-            writeFile(filename, bytes) catch unreachable;
+            mini.utils.writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            try @import("lib/os.zig").registerExternals(&k);
-            try @import("lib/floats.zig").registerExternals(&k);
-            try @import("lib/dynamic.zig").registerExternals(&k);
+            try libs.floats.pushExternals(&exts);
+
+            var os: OS = undefined;
+            os.init(allocator);
+            try os.pushExternals(&exts);
+
+            var dyn: Dynamic = undefined;
+            dyn.init(allocator, &h);
+            try dyn.pushExternals(&exts);
 
             var r: Randomizer = undefined;
             r.init();
-            try r.registerExternals(&k);
+            try r.pushExternals(&exts);
 
             var sys: System = undefined;
+            try sys.pushExternals(&exts);
+
+            try k.setExternals(exts.externals.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -143,7 +170,7 @@ pub fn main() !void {
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
 
-            try sys.init(&k);
+            try sys.init(&k, &h, allocator);
             defer sys.deinit();
 
             const kernel_thread = try Thread.spawn(
@@ -152,6 +179,7 @@ pub fn main() !void {
                 .{
                     &sys,
                     &k,
+                    allocator,
                     cli_options.filepaths,
                     should_start_repl,
                 },
@@ -161,13 +189,21 @@ pub fn main() !void {
 
             kernel_thread.join();
         } else {
-            try @import("lib/os.zig").registerExternals(&k);
-            try @import("lib/floats.zig").registerExternals(&k);
-            try @import("lib/dynamic.zig").registerExternals(&k);
+            try libs.floats.pushExternals(&exts);
+
+            var os: OS = undefined;
+            os.init(allocator);
+            try os.pushExternals(&exts);
+
+            var dyn: Dynamic = undefined;
+            dyn.init(allocator, &h);
+            try dyn.pushExternals(&exts);
 
             var r: Randomizer = undefined;
             r.init();
-            try r.registerExternals(&k);
+            try r.pushExternals(&exts);
+
+            try k.setExternals(exts.externals.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -178,7 +214,7 @@ pub fn main() !void {
             try k.evaluate(startup_file);
 
             for (cli_options.filepaths.items) |fp| {
-                const file = try readFile(allocator, fp);
+                const file = try mini.utils.readFile(allocator, fp);
                 defer allocator.free(file);
 
                 std.debug.print(">> {s}\n", .{fp});
@@ -204,6 +240,7 @@ pub fn main() !void {
 test "lib-testing" {}
 
 test "end-to-end" {
-    _ = @import("utils/os-timer.zig");
-    _ = @import("utils/channel.zig");
+    // TODO
+    // _ = @import("utils/os-timer.zig");
+    // _ = @import("utils/channel.zig");
 }

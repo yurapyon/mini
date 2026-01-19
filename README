@@ -36,6 +36,7 @@ features:
 
 roadmap:
   in progress:
+    webassembly target
   planned:
     io
       audio

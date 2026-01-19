@@ -1,11 +1,13 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const channel = @import("../utils/channel.zig");
-const Queue = channel.Queue;
+const mini = @import("mini");
 
-const kernel = @import("../kernel.zig");
+const kernel = mini.kernel;
 const Cell = kernel.Cell;
+
+const channel = mini.utils.channel;
+const Queue = channel.Queue;
 
 // ===
 

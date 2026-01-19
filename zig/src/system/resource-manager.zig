@@ -2,10 +2,12 @@ const std = @import("std");
 const Allocator = std.mem.Allocator;
 const ArrayList = std.ArrayList;
 
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+
+const kernel = mini.kernel;
 const Cell = kernel.Cell;
 
-const Handles = @import("../utils/handles.zig").Handles;
+const Handles = mini.utils.Handles;
 
 const Image = @import("image.zig").Image;
 const Timer = @import("timer.zig").Timer;

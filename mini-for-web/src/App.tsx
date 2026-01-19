@@ -1,6 +1,7 @@
 import type { Component } from 'solid-js';
 import { TitleBar } from "./components/TitleBar";
 import { Documentation } from "./components/documentation/Documentation";
+import { init as initMini } from "./lib/Mini";
 
 const ScriptEditor = () => {
   return <div class="bg-[#201010] text-xs" style={{
@@ -24,6 +25,7 @@ const Terminal = () => {
 }
 
 const App: Component = () => {
+  initMini();
   return (
     <div class="w-screen h-screen flex flex-col font-mono bg-[#080808] text-white">
       <TitleBar />
