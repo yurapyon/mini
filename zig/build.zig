@@ -95,12 +95,17 @@ pub fn build(b: *std.Build) void {
     wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
     wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
 
-    const wasm_install = b.addInstallArtifact(wasm, .{ .dest_dir = "../mini-for-web" });
+    const wasm_install = b.addInstallArtifact(wasm, .{});
+
+    const wasm_copy = b.addSystemCommand(&.{"cp"});
+    wasm_copy.addArg("zig-out/bin/mini-wasm.wasm");
+    wasm_copy.addArg("../mini-for-web/public/");
+    wasm_copy.step.dependOn(&wasm_install.step);
 
     // const wasm_cmd = b.addRunArtifact(wasm);
 
     const wasm_step = b.step("wasm", "Build and install wasm");
-    wasm_step.dependOn(&wasm_install.step);
+    wasm_step.dependOn(&wasm_copy.step);
     // wasm_step.dependOn(&wasm_cmd.step);
 
     // ===
