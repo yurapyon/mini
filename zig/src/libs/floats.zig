@@ -1,12 +1,14 @@
 const std = @import("std");
 
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 
-const externals = @import("../externals.zig");
+const externals = mini.externals;
 const External = externals.External;
 
-const mem = @import("../memory.zig");
+const mem = mini.mem;
 
 // ===
 

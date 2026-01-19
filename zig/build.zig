@@ -14,6 +14,17 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/system/root.zig"),
         .target = target,
         .optimize = optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "mini", .module = mod_mini },
+        },
+    });
+
+    const mod_libs = b.addModule("libs", .{
+        .root_source_file = b.path("src/libs/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
         },
@@ -21,9 +32,9 @@ pub fn build(b: *std.Build) void {
 
     switch (target.result.os.tag) {
         .macos => {
-            mod_mini.linkSystemLibrary("c", .{});
+            // mod_libs.linkSystemLibrary("c", .{});
 
-            mod_pyon.linkSystemLibrary("c", .{});
+            // mod_pyon.linkSystemLibrary("c", .{});
             mod_pyon.linkSystemLibrary("glfw3", .{});
             mod_pyon.linkFramework("OpenGL", .{});
             mod_pyon.linkFramework("Cocoa", .{});
@@ -47,10 +58,32 @@ pub fn build(b: *std.Build) void {
             .optimize = optimize,
             .imports = &.{
                 .{ .name = "mini", .module = mod_mini },
+                .{ .name = "libs", .module = mod_libs },
                 .{ .name = "pyon", .module = mod_pyon },
             },
         }),
     });
+
+    const target_wasm = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm64,
+        .os_tag = .freestanding,
+    });
+
+    const wasm = b.addExecutable(.{
+        .name = "mini-wasm",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm/main.zig"),
+            .target = target_wasm,
+            .optimize = optimize,
+            .imports = &.{
+                .{ .name = "mini", .module = mod_mini },
+            },
+        }),
+    });
+
+    wasm.entry = .disabled;
+
+    b.installArtifact(wasm);
 
     // ===
 

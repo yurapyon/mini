@@ -11,9 +11,11 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
+const libs = @import("libs");
+
 const System = @import("pyon").system.System;
 
-const Randomizer = mini.lib.random.Randomizer;
+const Randomizer = libs.random.Randomizer;
 
 const CliOptions = @import("cli_options.zig").CliOptions;
 
@@ -124,9 +126,9 @@ pub fn main() !void {
             });
             mini.utils.writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            try mini.lib.os.registerExternals(&k);
-            try mini.lib.floats.registerExternals(&k);
-            try mini.lib.dynamic.registerExternals(&k);
+            try libs.os.registerExternals(&k);
+            try libs.floats.registerExternals(&k);
+            try libs.dynamic.registerExternals(&k);
 
             var r: Randomizer = undefined;
             r.init();
@@ -160,9 +162,9 @@ pub fn main() !void {
 
             kernel_thread.join();
         } else {
-            try mini.lib.os.registerExternals(&k);
-            try mini.lib.floats.registerExternals(&k);
-            try mini.lib.dynamic.registerExternals(&k);
+            try libs.os.registerExternals(&k);
+            try libs.floats.registerExternals(&k);
+            try libs.dynamic.registerExternals(&k);
 
             var r: Randomizer = undefined;
             r.init();

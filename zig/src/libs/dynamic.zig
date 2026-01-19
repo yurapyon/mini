@@ -1,13 +1,15 @@
 const std = @import("std");
 // const Allocator = std.mem.Allocator;
 
-const mem = @import("../memory.zig");
+const mini = @import("mini");
 
-const kernel = @import("../kernel.zig");
+const mem = mini.mem;
+
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const externals = @import("../externals.zig");
+const externals = mini.externals;
 const External = externals.External;
 
 // ===
