@@ -297,6 +297,8 @@ pub const Kernel = struct {
 
     // ===
 
+    // TODO
+    // This needs to be tested/reworked after buffer copying has been removed
     // NOTE
     // Buffer must stay in memory until clearAcceptBuffer is called
     pub fn setAcceptBuffer(

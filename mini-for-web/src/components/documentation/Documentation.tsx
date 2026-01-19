@@ -518,7 +518,8 @@ doer make ;and undo
       }
     }).join("\n");
 
-    console.log(wordList, longestNameLength);
+    // TODO
+    // console.log(wordList, longestNameLength);
 
     return `${vocab.name} definitions\n${wordList}\n\n`
   });

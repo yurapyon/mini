@@ -83,12 +83,12 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // <https://github.com/ziglang/zig/issues/8633>
     wasm.entry = .disabled;
     wasm.rdynamic = true;
 
     const wasm_memory_page_count = 4;
 
+    // <https://github.com/ziglang/zig/issues/8633>
     wasm.import_memory = true;
     wasm.global_base = 6560;
     wasm.stack_size = std.wasm.page_size;
@@ -102,11 +102,8 @@ pub fn build(b: *std.Build) void {
     wasm_copy.addArg("../mini-for-web/public/");
     wasm_copy.step.dependOn(&wasm_install.step);
 
-    // const wasm_cmd = b.addRunArtifact(wasm);
-
     const wasm_step = b.step("wasm", "Build and install wasm");
     wasm_step.dependOn(&wasm_copy.step);
-    // wasm_step.dependOn(&wasm_cmd.step);
 
     // ===
 

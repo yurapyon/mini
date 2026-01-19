@@ -40,10 +40,9 @@ pub const ExternalsList = struct {
         // TODO
     }
 
+    // TODO
+    // rename to pushExternals or addExternals or something
     pub fn pushSlice(self: *@This(), exts: []const External) !void {
         try self.externals.appendSlice(self.allocator, exts);
     }
-
-    // TODO
-    // can put search and exec in here
 };

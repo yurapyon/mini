@@ -545,7 +545,6 @@ pub const System = struct {
 
     resource_manager: ResourceManager,
 
-    // TODO allow for different allocator than the kernels
     pub fn init(
         self: *@This(),
         k: *Kernel,
