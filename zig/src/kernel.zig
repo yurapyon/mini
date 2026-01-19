@@ -17,8 +17,6 @@ const Stack = stack.Stack;
 const register = @import("register.zig");
 const Register = register.Register;
 
-const Handles = @import("utils/handles.zig").Handles;
-
 // ===
 
 comptime {
@@ -45,11 +43,6 @@ pub const block_size = 1024;
 pub const block_count = 256;
 
 pub const EoF = 0xffff;
-
-const NamedExternal = struct {
-    name: []const u8,
-    external: External,
-};
 
 pub const RAMLayout = MemoryLayout(struct {
     program_counter: Cell,
@@ -78,11 +71,8 @@ pub const EmitCallback =
     *const fn (char: u8, userdata: ?*anyopaque) void;
 
 pub const Kernel = struct {
-    allocator: Allocator,
-
     memory: mem.MemoryPtr,
-    handles: Handles,
-    externals: ArrayList(NamedExternal),
+    externals: []External,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -128,13 +118,10 @@ pub const Kernel = struct {
 
     pub fn init(
         self: *@This(),
-        allocator: Allocator,
-    ) !void {
-        self.allocator = allocator;
-
-        self.memory = try mem.allocateForthMemory(allocator);
-        self.handles.init();
-        self.externals = .empty;
+        memory: mem.MemoryPtr,
+    ) void {
+        self.memory = memory;
+        self.externals = &[_]External{};
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -149,12 +136,6 @@ pub const Kernel = struct {
 
         self.debug.enable_tco = true;
         self.debug.exec_counter = 0;
-    }
-
-    pub fn deinit(self: *@This()) void {
-        self.externals.deinit(self.allocator);
-        self.handles.deinit(self.allocator);
-        self.allocator.free(self.memory);
     }
 
     pub fn clear(self: *@This()) void {
@@ -248,7 +229,7 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
-                    const name = self.externals.items[ext_token].name;
+                    const name = self.externals[ext_token].name;
 
                     std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     self.abort();
@@ -286,27 +267,37 @@ pub const Kernel = struct {
 
     // ===
 
-    pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
-        try self.externals.append(self.allocator, .{
-            .name = name,
-            .external = external,
-        });
-        if (self.externals.items.len > std.math.maxInt(Cell)) {
+    // pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
+    // try self.externals.append(self.allocator, .{
+    // .name = name,
+    // .external = external,
+    // });
+    // if (self.externals.items.len > std.math.maxInt(Cell)) {
+    // return error.TooManyExternals;
+    // }
+    // }
+
+    pub fn setExternals(self: *@This(), exts: []External) !void {
+        // TODO
+        // this should account for # of bytecodes
+        if (exts.len > std.math.maxInt(Cell)) {
             return error.TooManyExternals;
         }
+
+        self.externals = exts;
     }
 
     fn processExternals(self: *@This(), ext_token: Cell) !void {
-        if (ext_token < self.externals.items.len) {
-            try self.externals.items[ext_token].external.call(self);
+        if (ext_token < self.externals.len) {
+            try self.externals[ext_token].call(self);
         } else {
             return error.UnhandledExternal;
         }
     }
 
     pub fn lookupExternal(self: *@This(), name: []const u8) ?Cell {
-        for (self.externals.items, 0..) |namedExternal, i| {
-            if (std.mem.eql(u8, namedExternal.name, name)) {
+        for (self.externals, 0..) |external, i| {
+            if (std.mem.eql(u8, external.name, name)) {
                 return @intCast(i);
             }
         }
@@ -316,6 +307,8 @@ pub const Kernel = struct {
 
     // ===
 
+    // NOTE
+    // Buffer must stay in memory until clearAcceptBuffer is called
     pub fn setAcceptBuffer(
         self: *@This(),
         buffer: []const u8,
@@ -323,21 +316,19 @@ pub const Kernel = struct {
         if (self.debug_accept_buffer) {
             std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
         }
-        const copied = try self.allocator.alloc(u8, buffer.len);
-        @memcpy(copied, buffer);
-        const const_copied: []const u8 = copied;
+        // const copied = try self.allocator.alloc(u8, buffer.len);
+        // @memcpy(copied, buffer);
+        // const const_copied: []const u8 = copied;
         self.accept_buffer = .{
-            .stream = std.io.fixedBufferStream(const_copied),
-            .mem = const_copied,
+            // .stream = std.io.fixedBufferStream(const_copied),
+            .stream = std.io.fixedBufferStream(buffer),
+            .mem = buffer,
         };
     }
 
     pub fn clearAcceptBuffer(self: *@This()) void {
         if (self.debug_accept_buffer) {
             std.debug.print(">> Accept buffer cleared\n", .{});
-        }
-        if (self.accept_buffer) |buf| {
-            self.allocator.free(buf.mem);
         }
         self.accept_buffer = null;
     }

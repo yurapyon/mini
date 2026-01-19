@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 
 const mini = @import("mini");
 
@@ -19,84 +20,123 @@ const c = @cImport({
 
 // ===
 
-fn sleep(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(1);
+pub const OS = struct {
+    allocator: Allocator,
 
-    const value: u64 = k.data_stack.popCell();
-    std.Thread.sleep(value * 1000000);
-}
+    pub fn init(self: *@This(), allocator: Allocator) void {
+        self.allocator = allocator;
+    }
 
-fn sleepS(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(1);
+    // ===
 
-    const value: u64 = k.data_stack.popCell();
-    std.Thread.sleep(value * 1000000000);
-}
+    fn sleep(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        try k.data_stack.assertWontUnderflow(1);
 
-fn time(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    const timestamp = std.time.timestamp();
-    const seconds = @rem(timestamp, 60);
-    const minutes = @rem(@divFloor(timestamp, 60), 60);
-    const hours = @rem(@divFloor(timestamp, 3600), 24);
-    k.data_stack.pushCell(@intCast(hours));
-    k.data_stack.pushCell(@intCast(minutes));
-    k.data_stack.pushCell(@intCast(seconds));
-}
+        const value: u64 = k.data_stack.popCell();
+        std.Thread.sleep(value * 1000000);
+    }
 
-fn shell(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(2);
+    fn sleepS(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        try k.data_stack.assertWontUnderflow(1);
 
-    const len = k.data_stack.popCell();
-    const addr = k.data_stack.popCell();
-    const command = try mem.constSliceFromAddrAndLen(
-        k.memory,
-        addr,
-        len,
-    );
-    const temp = k.allocator.alloc(u8, len + 1) catch unreachable;
-    defer k.allocator.free(temp);
-    std.mem.copyForwards(u8, temp, command);
-    temp[len] = 0;
-    _ = c.system(temp.ptr);
-}
+        const value: u64 = k.data_stack.popCell();
+        std.Thread.sleep(value * 1000000000);
+    }
 
-fn setAcceptFile(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(2);
+    fn time(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        const timestamp = std.time.timestamp();
+        const seconds = @rem(timestamp, 60);
+        const minutes = @rem(@divFloor(timestamp, 60), 60);
+        const hours = @rem(@divFloor(timestamp, 3600), 24);
+        k.data_stack.pushCell(@intCast(hours));
+        k.data_stack.pushCell(@intCast(minutes));
+        k.data_stack.pushCell(@intCast(seconds));
+    }
 
-    k.debug_accept_buffer = true;
+    fn shell(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const os: *@This() = @ptrCast(@alignCast(userdata));
 
-    const len = k.data_stack.popCell();
-    const addr = k.data_stack.popCell();
-    const filepath = try mem.constSliceFromAddrAndLen(k.memory, addr, len);
-    const file = readFile(
-        k.allocator,
-        filepath,
-    ) catch return error.ExternalPanic;
-    defer k.allocator.free(file);
-    k.setAcceptBuffer(file) catch return error.ExternalPanic;
-}
+        try k.data_stack.assertWontUnderflow(2);
 
-fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(4);
+        const len = k.data_stack.popCell();
+        const addr = k.data_stack.popCell();
+        const command = try mem.constSliceFromAddrAndLen(
+            k.memory,
+            addr,
+            len,
+        );
+        const temp = os.allocator.alloc(u8, len + 1) catch unreachable;
+        defer os.allocator.free(temp);
+        std.mem.copyForwards(u8, temp, command);
+        temp[len] = 0;
+        _ = c.system(temp.ptr);
+    }
 
-    const buf_len = k.data_stack.popCell();
-    const buf_addr = k.data_stack.popCell();
-    const env_len = k.data_stack.popCell();
-    const env_addr = k.data_stack.popCell();
+    fn setAcceptFile(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const os: *@This() = @ptrCast(@alignCast(userdata));
 
-    const env_var = try mem.constSliceFromAddrAndLen(
-        k.memory,
-        env_addr,
-        env_len,
-    );
+        try k.data_stack.assertWontUnderflow(2);
 
-    const value = std.process.getEnvVarOwned(k.allocator, env_var) catch |err| switch (err) {
-        error.EnvironmentVariableNotFound => null,
-        else => return error.ExternalPanic,
-    };
+        k.debug_accept_buffer = true;
 
-    if (value) |str| {
-        defer k.allocator.free(str);
+        const len = k.data_stack.popCell();
+        const addr = k.data_stack.popCell();
+        const filepath = try mem.constSliceFromAddrAndLen(k.memory, addr, len);
+        const file = readFile(
+            os.allocator,
+            filepath,
+        ) catch return error.ExternalPanic;
+        defer os.allocator.free(file);
+        k.setAcceptBuffer(file) catch return error.ExternalPanic;
+    }
+
+    fn getEnv(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const os: *@This() = @ptrCast(@alignCast(userdata));
+
+        try k.data_stack.assertWontUnderflow(4);
+
+        const buf_len = k.data_stack.popCell();
+        const buf_addr = k.data_stack.popCell();
+        const env_len = k.data_stack.popCell();
+        const env_addr = k.data_stack.popCell();
+
+        const env_var = try mem.constSliceFromAddrAndLen(
+            k.memory,
+            env_addr,
+            env_len,
+        );
+
+        const value = std.process.getEnvVarOwned(os.allocator, env_var) catch |err| switch (err) {
+            error.EnvironmentVariableNotFound => null,
+            else => return error.ExternalPanic,
+        };
+
+        if (value) |str| {
+            defer os.allocator.free(str);
+
+            const buf = try mem.sliceFromAddrAndLen(
+                k.memory,
+                buf_addr,
+                buf_len,
+            );
+
+            // TODO think about how to handle this error
+            if (str.len <= buf.len) {
+                @memcpy(buf[0..str.len], str);
+                k.data_stack.pushCell(@truncate(str.len));
+            } else {
+                k.data_stack.pushSignedCell(-1);
+            }
+        } else {
+            k.data_stack.pushCell(0);
+        }
+    }
+
+    fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        try k.data_stack.assertWontUnderflow(2);
+
+        const buf_len = k.data_stack.popCell();
+        const buf_addr = k.data_stack.popCell();
 
         const buf = try mem.sliceFromAddrAndLen(
             k.memory,
@@ -104,95 +144,87 @@ fn getEnv(k: *Kernel, _: ?*anyopaque) External.Error!void {
             buf_len,
         );
 
-        // TODO think about how to handle this error
-        if (str.len <= buf.len) {
-            @memcpy(buf[0..str.len], str);
-            k.data_stack.pushCell(@truncate(str.len));
-        } else {
-            k.data_stack.pushSignedCell(-1);
-        }
-    } else {
-        k.data_stack.pushCell(0);
+        const str = std.fs.cwd().realpath(".", buf) catch return error.ExternalPanic;
+
+        k.data_stack.pushCell(@truncate(str.len));
     }
-}
 
-fn cwd(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    try k.data_stack.assertWontUnderflow(2);
+    // TODO could move these somewhere else maybe?
+    fn zeroEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        k.debug.exec_counter = 0;
+    }
 
-    const buf_len = k.data_stack.popCell();
-    const buf_addr = k.data_stack.popCell();
+    fn fetchEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        k.data_stack.pushCell(k.debug.exec_counter);
+    }
 
-    const buf = try mem.sliceFromAddrAndLen(
-        k.memory,
-        buf_addr,
-        buf_len,
-    );
+    fn enableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        k.debug.enable_tco = true;
+    }
 
-    const str = std.fs.cwd().realpath(".", buf) catch return error.ExternalPanic;
+    fn disableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
+        k.debug.enable_tco = false;
+    }
 
-    k.data_stack.pushCell(@truncate(str.len));
-}
+    pub fn getExternals(self: *@This()) []const External {
+        const exts = [_]External{
+            .{
+                .name = "sleep",
+                .callback = sleep,
+                .userdata = self,
+            },
+            .{
+                .name = "sleeps",
+                .callback = sleepS,
+                .userdata = self,
+            },
+            .{
+                .name = "time-utc",
+                .callback = time,
+                .userdata = self,
+            },
+            .{
+                .name = "shell",
+                .callback = shell,
+                .userdata = self,
+            },
+            .{
+                .name = "accept-file",
+                .callback = setAcceptFile,
+                .userdata = self,
+            },
+            .{
+                .name = "get-env",
+                .callback = getEnv,
+                .userdata = self,
+            },
+            .{
+                .name = "cwd",
+                .callback = cwd,
+                .userdata = self,
+            },
+            .{
+                .name = "_0ec!",
+                .callback = zeroEC,
+                .userdata = self,
+            },
+            .{
+                .name = "_ec@",
+                .callback = fetchEC,
+                .userdata = self,
+            },
+            .{
+                .name = "_tco",
+                .callback = enableTCO,
+                .userdata = self,
+            },
+            .{
+                .name = "_no-tco",
+                .callback = disableTCO,
+                .userdata = self,
+            },
+        };
 
-// TODO could move these somewhere else maybe?
-fn zeroEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    k.debug.exec_counter = 0;
-}
-
-fn fetchEC(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    k.data_stack.pushCell(k.debug.exec_counter);
-}
-
-fn enableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    k.debug.enable_tco = true;
-}
-
-fn disableTCO(k: *Kernel, _: ?*anyopaque) External.Error!void {
-    k.debug.enable_tco = false;
-}
-
-pub fn registerExternals(k: *Kernel) !void {
-    try k.addExternal("sleep", .{
-        .callback = sleep,
-        .userdata = null,
-    });
-    try k.addExternal("sleeps", .{
-        .callback = sleepS,
-        .userdata = null,
-    });
-    try k.addExternal("time-utc", .{
-        .callback = time,
-        .userdata = null,
-    });
-    try k.addExternal("shell", .{
-        .callback = shell,
-        .userdata = null,
-    });
-    try k.addExternal("accept-file", .{
-        .callback = setAcceptFile,
-        .userdata = null,
-    });
-    try k.addExternal("get-env", .{
-        .callback = getEnv,
-        .userdata = null,
-    });
-    try k.addExternal("cwd", .{
-        .callback = cwd,
-        .userdata = null,
-    });
-    try k.addExternal("_0ec!", .{
-        .callback = zeroEC,
-        .userdata = null,
-    });
-    try k.addExternal("_ec@", .{
-        .callback = fetchEC,
-        .userdata = null,
-    });
-    try k.addExternal("_tco", .{
-        .callback = enableTCO,
-        .userdata = null,
-    });
-    try k.addExternal("_no-tco", .{
-        .callback = disableTCO,
-        .userdata = null,
-    });
-}
+        return &exts;
+    }
+};

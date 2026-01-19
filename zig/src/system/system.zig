@@ -1,4 +1,5 @@
 const std = @import("std");
+const Allocator = std.mem.Allocator;
 const Mutex = std.Thread.Mutex;
 const Semaphore = std.Thread.Semaphore;
 
@@ -8,6 +9,8 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
+
+const Handles = mini.utils.Handles;
 
 const externals = mini.externals;
 const External = externals.External;
@@ -518,6 +521,7 @@ pub const screen_height = 400;
 
 pub const System = struct {
     k: *Kernel,
+    allocator: Allocator,
 
     window: *c.GLFWwindow,
 
@@ -541,16 +545,21 @@ pub const System = struct {
     resource_manager: ResourceManager,
 
     // TODO allow for different allocator than the kernels
-    pub fn init(self: *@This(), k: *Kernel) !void {
+    pub fn init(
+        self: *@This(),
+        k: *Kernel,
+        handles: *Handles,
+        allocator: Allocator,
+    ) !void {
         self.k = k;
+        self.allocator = allocator;
 
-        try self.input_channel.init(k.allocator);
+        try self.input_channel.init(self.allocator);
         self.video_mutex = .{};
         self.startup_semaphore = .{};
 
-        try self.resource_manager.init(k.allocator, &k.handles);
+        try self.resource_manager.init(self.allocator, handles);
 
-        try self.registerExternals(k);
         try k.evaluate(system_file);
     }
 
@@ -615,10 +624,10 @@ pub const System = struct {
         try self.initWindow();
         defer c.glfwDestroyWindow(self.window);
 
-        try self.pixels.init(self.k.allocator);
+        try self.pixels.init(self.allocator);
         defer self.pixels.deinit();
 
-        try self.characters.init(self.k.allocator);
+        try self.characters.init(self.allocator);
         defer self.characters.deinit();
 
         self.resources.screen.resource.image = &self.pixels.image;
@@ -665,102 +674,130 @@ pub const System = struct {
 
     // ===
 
-    fn registerExternals(self: *@This(), k: *Kernel) !void {
-        try k.addExternal("poll", .{
-            .callback = exts.poll,
-            .userdata = self,
-        });
-        try k.addExternal("deinit", .{
-            .callback = exts.deinit,
-            .userdata = self,
-        });
-        try k.addExternal("<v", .{
-            .callback = exts.videoLock,
-            .userdata = self,
-        });
-        try k.addExternal("<v?", .{
-            .callback = exts.videoTryLock,
-            .userdata = self,
-        });
-        try k.addExternal("v>", .{
-            .callback = exts.videoUnlock,
-            .userdata = self,
-        });
-        try k.addExternal("image-ids", .{
-            .callback = exts.getImageIds,
-            .userdata = self,
-        });
-        try k.addExternal("p!", .{
-            .callback = exts.paletteStore,
-            .userdata = self,
-        });
-        try k.addExternal("p@", .{
-            .callback = exts.paletteFetch,
-            .userdata = self,
-        });
-        try k.addExternal("talloc", .{
-            .callback = exts.createTimer,
-            .userdata = self,
-        });
-        try k.addExternal("tfree", .{
-            .callback = exts.freeTimer,
-            .userdata = self,
-        });
-        try k.addExternal("t!", .{
-            .callback = exts.setTimer,
-            .userdata = self,
-        });
-        try k.addExternal("t@", .{
-            .callback = exts.checkTimer,
-            .userdata = self,
-        });
-        try k.addExternal("ialloc", .{
-            .callback = exts.createImage,
-            .userdata = self,
-        });
-        try k.addExternal("ifree", .{
-            .callback = exts.freeImage,
-            .userdata = self,
-        });
-        try k.addExternal("i!mask", .{
-            .callback = exts.imageSetMask,
-            .userdata = self,
-        });
-        try k.addExternal("i!fill", .{
-            .callback = exts.imageFill,
-            .userdata = self,
-        });
-        try k.addExternal("i!rand", .{
-            .callback = exts.imageRandomize,
-            .userdata = self,
-        });
-        try k.addExternal("i!xy", .{
-            .callback = exts.imagePutXY,
-            .userdata = self,
-        });
-        try k.addExternal("i!line", .{
-            .callback = exts.imagePutLine,
-            .userdata = self,
-        });
-        try k.addExternal("i!rect", .{
-            .callback = exts.imagePutRect,
-            .userdata = self,
-        });
-        try k.addExternal("i!blit", .{
-            .callback = exts.imageBlit,
-            .userdata = self,
-        });
-        try k.addExternal("i!blitline", .{
-            .callback = exts.imageBlitLine,
-            .userdata = self,
-        });
-        try k.addExternal("chars!", .{
-            .callback = exts.charsStore,
-            .userdata = self,
-        });
-        try k.addExternal("chars@", .{
-            .callback = exts.charsFetch,
-            .userdata = self,
-        });
+    pub fn getExternals(self: *@This()) []const External {
+        const es = [_]External{
+            .{
+                .name = "poll",
+                .callback = exts.poll,
+                .userdata = self,
+            },
+            .{
+                .name = "deinit",
+                .callback = exts.deinit,
+                .userdata = self,
+            },
+            .{
+                .name = "<v",
+                .callback = exts.videoLock,
+                .userdata = self,
+            },
+            .{
+                .name = "<v?",
+                .callback = exts.videoTryLock,
+                .userdata = self,
+            },
+            .{
+                .name = "v>",
+                .callback = exts.videoUnlock,
+                .userdata = self,
+            },
+            .{
+                .name = "image-ids",
+                .callback = exts.getImageIds,
+                .userdata = self,
+            },
+            .{
+                .name = "p!",
+                .callback = exts.paletteStore,
+                .userdata = self,
+            },
+            .{
+                .name = "p@",
+                .callback = exts.paletteFetch,
+                .userdata = self,
+            },
+            .{
+                .name = "talloc",
+                .callback = exts.createTimer,
+                .userdata = self,
+            },
+            .{
+                .name = "tfree",
+                .callback = exts.freeTimer,
+                .userdata = self,
+            },
+            .{
+                .name = "t!",
+                .callback = exts.setTimer,
+                .userdata = self,
+            },
+            .{
+                .name = "t@",
+                .callback = exts.checkTimer,
+                .userdata = self,
+            },
+            .{
+                .name = "ialloc",
+                .callback = exts.createImage,
+                .userdata = self,
+            },
+            .{
+                .name = "ifree",
+                .callback = exts.freeImage,
+                .userdata = self,
+            },
+            .{
+                .name = "i!mask",
+                .callback = exts.imageSetMask,
+                .userdata = self,
+            },
+            .{
+                .name = "i!fill",
+                .callback = exts.imageFill,
+                .userdata = self,
+            },
+            .{
+                .name = "i!rand",
+                .callback = exts.imageRandomize,
+                .userdata = self,
+            },
+            .{
+                .name = "i!xy",
+                .callback = exts.imagePutXY,
+                .userdata = self,
+            },
+            .{
+                .name = "i!line",
+                .callback = exts.imagePutLine,
+                .userdata = self,
+            },
+            .{
+                .name = "i!rect",
+                .callback = exts.imagePutRect,
+                .userdata = self,
+            },
+            .{
+                .name = "i!blit",
+                .callback = exts.imageBlit,
+                .userdata = self,
+            },
+            .{
+                .name = "i!blitline",
+                .callback = exts.imageBlitLine,
+                .userdata = self,
+            },
+            .{
+                .name = "chars!",
+                .callback = exts.charsStore,
+                .userdata = self,
+            },
+            .{
+                .name = "chars@",
+                .callback = exts.charsFetch,
+                .userdata = self,
+            },
+        };
+
+        return &es;
     }
 };

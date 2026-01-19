@@ -32,9 +32,6 @@ pub fn build(b: *std.Build) void {
 
     switch (target.result.os.tag) {
         .macos => {
-            // mod_libs.linkSystemLibrary("c", .{});
-
-            // mod_pyon.linkSystemLibrary("c", .{});
             mod_pyon.linkSystemLibrary("glfw3", .{});
             mod_pyon.linkFramework("OpenGL", .{});
             mod_pyon.linkFramework("Cocoa", .{});
@@ -68,7 +65,7 @@ pub fn build(b: *std.Build) void {
     // https://github.com/daneelsan/minimal-zig-wasm-canvas
 
     const target_wasm = b.resolveTargetQuery(.{
-        .cpu_arch = .wasm64,
+        .cpu_arch = .wasm32,
         .os_tag = .freestanding,
     });
 
@@ -84,8 +81,15 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // <https://github.com/ziglang/zig/issues/8633>
     wasm.entry = .disabled;
     wasm.rdynamic = true;
+
+    // wasm.import_memory = true;
+    // wasm.global_base = 6560;
+    // wasm.stack_size = std.wasm.page_size;
+    // wasm.initial_memory = std.wasm.page_size;
+    // wasm.max_memory = std.wasm.page_size;
 
     b.installArtifact(wasm);
 

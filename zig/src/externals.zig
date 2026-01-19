@@ -14,6 +14,7 @@ pub const External = struct {
         userdata: ?*anyopaque,
     ) Error!void;
 
+    name: []const u8,
     callback: Callback,
     userdata: ?*anyopaque,
 

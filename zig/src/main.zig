@@ -11,10 +11,17 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
+const externals = mini.externals;
+const External = externals.External;
+
+const Handles = mini.utils.Handles;
+
 const libs = @import("libs");
 
 const System = @import("pyon").system.System;
 
+const OS = libs.os.OS;
+const Dynamic = libs.dynamic.Dynamic;
 const Randomizer = libs.random.Randomizer;
 
 const CliOptions = @import("cli_options.zig").CliOptions;
@@ -51,6 +58,7 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
 fn kernelRunFiles(
     system: *System,
     k: *Kernel,
+    allocator: Allocator,
     filepaths: ArrayList([]u8),
     start_repl: bool,
 ) !void {
@@ -59,8 +67,8 @@ fn kernelRunFiles(
     var input_file = std.fs.File.stdin();
 
     for (filepaths.items) |fp| {
-        const file = try mini.utils.readFile(k.allocator, fp);
-        defer k.allocator.free(file);
+        const file = try mini.utils.readFile(allocator, fp);
+        defer allocator.free(file);
 
         std.debug.print(">> {s}\n", .{fp});
         try k.evaluate(file);
@@ -92,9 +100,16 @@ pub fn main() !void {
     var output_file = std.fs.File.stdout();
 
     if (cli_options.kernel_filepath) |precompiled_filepath| {
+        const forth_memory = try mini.mem.allocateForthMemory(allocator);
+
+        var exts: ArrayList(External) = .empty;
+
         var k: Kernel = undefined;
-        try k.init(allocator);
-        defer k.deinit();
+        k.init(forth_memory);
+
+        var h: Handles = undefined;
+        h.init();
+        defer h.deinit(allocator);
 
         const image = try mini.utils.readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
@@ -126,15 +141,24 @@ pub fn main() !void {
             });
             mini.utils.writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            try libs.os.registerExternals(&k);
-            try libs.floats.registerExternals(&k);
-            try libs.dynamic.registerExternals(&k);
+            try exts.appendSlice(allocator, libs.floats.getExternals());
+
+            var os: OS = undefined;
+            os.init(allocator);
+            try exts.appendSlice(allocator, os.getExternals());
+
+            var dyn: Dynamic = undefined;
+            dyn.init(allocator, &h);
+            try exts.appendSlice(allocator, dyn.getExternals());
 
             var r: Randomizer = undefined;
             r.init();
-            try r.registerExternals(&k);
+            try exts.appendSlice(allocator, r.getExternals());
 
             var sys: System = undefined;
+            try exts.appendSlice(allocator, sys.getExternals());
+
+            try k.setExternals(exts.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -144,7 +168,7 @@ pub fn main() !void {
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
 
-            try sys.init(&k);
+            try sys.init(&k, &h, allocator);
             defer sys.deinit();
 
             const kernel_thread = try Thread.spawn(
@@ -153,6 +177,7 @@ pub fn main() !void {
                 .{
                     &sys,
                     &k,
+                    allocator,
                     cli_options.filepaths,
                     should_start_repl,
                 },
@@ -162,13 +187,21 @@ pub fn main() !void {
 
             kernel_thread.join();
         } else {
-            try libs.os.registerExternals(&k);
-            try libs.floats.registerExternals(&k);
-            try libs.dynamic.registerExternals(&k);
+            try exts.appendSlice(allocator, libs.floats.getExternals());
+
+            var os: OS = undefined;
+            os.init(allocator);
+            try exts.appendSlice(allocator, os.getExternals());
+
+            var dyn: Dynamic = undefined;
+            dyn.init(allocator, &h);
+            try exts.appendSlice(allocator, dyn.getExternals());
 
             var r: Randomizer = undefined;
             r.init();
-            try r.registerExternals(&k);
+            try exts.appendSlice(allocator, r.getExternals());
+
+            try k.setExternals(exts.items);
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);

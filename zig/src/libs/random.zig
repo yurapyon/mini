@@ -70,22 +70,30 @@ pub const Randomizer = struct {
         self.randomizer.random().shuffle(u8, array);
     }
 
-    pub fn registerExternals(self: *@This(), k: *Kernel) !void {
-        try k.addExternal("random", .{
-            .callback = random,
-            .userdata = self,
-        });
-        try k.addExternal(">rng", .{
-            .callback = seedRng,
-            .userdata = self,
-        });
-        try k.addExternal("shuffle", .{
-            .callback = shuffle,
-            .userdata = self,
-        });
-        try k.addExternal("shufflec", .{
-            .callback = shuffle,
-            .userdata = self,
-        });
+    pub fn getExternals(self: *@This()) []const External {
+        const exts = [_]External{
+            .{
+                .name = "random",
+                .callback = random,
+                .userdata = self,
+            },
+            .{
+                .name = ">rng",
+                .callback = seedRng,
+                .userdata = self,
+            },
+            .{
+                .name = "shuffle",
+                .callback = shuffle,
+                .userdata = self,
+            },
+            .{
+                .name = "shufflec",
+                .callback = shuffle,
+                .userdata = self,
+            },
+        };
+
+        return &exts;
     }
 };
