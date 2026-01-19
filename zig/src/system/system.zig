@@ -2,12 +2,14 @@ const std = @import("std");
 const Mutex = std.Thread.Mutex;
 const Semaphore = std.Thread.Semaphore;
 
-const kernel = @import("../kernel.zig");
+const mini = @import("mini");
+
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
 
-const externals = @import("../externals.zig");
+const externals = mini.externals;
 const External = externals.External;
 
 const c = @import("c.zig").c;

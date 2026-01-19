@@ -1,6 +1,8 @@
-const c = @import("c.zig").c;
+const mini = @import("mini");
 
-const random = @import("../utils/random.zig");
+const random = mini.utils.random;
+
+const c = @import("c.zig").c;
 
 // ===
 

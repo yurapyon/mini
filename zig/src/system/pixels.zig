@@ -1,14 +1,16 @@
 const std = @import("std");
 const Allocator = std.mem.Allocator;
 
-const c = @import("c.zig").c;
-const cgfx = @import("c.zig").gfx;
+const mini = @import("mini");
 
-const random = @import("../utils/random.zig");
-
-const kernel = @import("../kernel.zig");
+const kernel = mini.kernel;
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
+
+const random = mini.utils.random;
+
+const c = @import("c.zig").c;
+const cgfx = @import("c.zig").gfx;
 
 const system = @import("system.zig");
 
