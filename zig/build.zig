@@ -64,6 +64,9 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // example setup for reference
+    // https://github.com/daneelsan/minimal-zig-wasm-canvas
+
     const target_wasm = b.resolveTargetQuery(.{
         .cpu_arch = .wasm64,
         .os_tag = .freestanding,
@@ -82,6 +85,7 @@ pub fn build(b: *std.Build) void {
     });
 
     wasm.entry = .disabled;
+    wasm.rdynamic = true;
 
     b.installArtifact(wasm);
 
