@@ -28,4 +28,4 @@ gitignore
 .DS_Store
 Thumbs.db
 
-public/mini-wasm.wasm
+/public/mini-wasm.wasm
