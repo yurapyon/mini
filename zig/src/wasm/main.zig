@@ -13,8 +13,8 @@ const External = externals.External;
 var k: Kernel = undefined;
 
 extern fn callJs(Cell) void;
-fn callJs_(k_: *Kernel, _: ?*anyopaque) void {
-    const value = k_.data_stack.pop();
+fn callJs_(k_: *Kernel, _: ?*anyopaque) External.Error!void {
+    const value = k_.data_stack.popCell();
     callJs(value);
 }
 
@@ -40,7 +40,7 @@ extern fn wasmPrint(usize) void;
 
 export fn init() void {
     k.init(@alignCast(&mini_mem));
-    k.setExternals(&exts);
+    k.setExternals(&exts) catch unreachable;
 
     // if no system ===
 

@@ -72,7 +72,7 @@ pub const EmitCallback =
 
 pub const Kernel = struct {
     memory: mem.MemoryPtr,
-    externals: []External,
+    externals: []const External,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -267,17 +267,7 @@ pub const Kernel = struct {
 
     // ===
 
-    // pub fn addExternal(self: *@This(), name: []const u8, external: External) !void {
-    // try self.externals.append(self.allocator, .{
-    // .name = name,
-    // .external = external,
-    // });
-    // if (self.externals.items.len > std.math.maxInt(Cell)) {
-    // return error.TooManyExternals;
-    // }
-    // }
-
-    pub fn setExternals(self: *@This(), exts: []External) !void {
+    pub fn setExternals(self: *@This(), exts: []const External) !void {
         // TODO
         // this should account for # of bytecodes
         if (exts.len > std.math.maxInt(Cell)) {

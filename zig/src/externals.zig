@@ -22,7 +22,7 @@ pub const External = struct {
     callback: Callback,
     userdata: ?*anyopaque,
 
-    pub fn call(self: *@This(), k: *Kernel) !void {
+    pub fn call(self: @This(), k: *Kernel) !void {
         try self.callback(k, self.userdata);
     }
 };

@@ -61,6 +61,8 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
+    // wasm ===
+
     // example setup for reference
     // https://github.com/daneelsan/minimal-zig-wasm-canvas
 
@@ -93,7 +95,13 @@ pub fn build(b: *std.Build) void {
     wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
     wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
 
-    b.installArtifact(wasm);
+    const wasm_install = b.addInstallArtifact(wasm, .{ .dest_dir = "../mini-for-web" });
+
+    // const wasm_cmd = b.addRunArtifact(wasm);
+
+    const wasm_step = b.step("wasm", "Build and install wasm");
+    wasm_step.dependOn(&wasm_install.step);
+    // wasm_step.dependOn(&wasm_cmd.step);
 
     // ===
 

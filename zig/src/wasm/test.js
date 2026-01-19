@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 const wasm_filepath = process.argv[2];
-const source = fs.readFileSync(wasm_binary);
+const source = fs.readFileSync(wasm_filepath);
 const wasm_bin = new Uint8Array(source);
 
 const MEMORY_PAGE_COUNT = 4;
