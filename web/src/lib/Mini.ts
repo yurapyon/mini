@@ -132,7 +132,8 @@ export const fetchMini = async () => {
           name: extName,
           fn,
         });
-        run("external " + extName)
+        run("external " + extName);
+        console.log("ext added:", extName);
       };
 
       kernel.pop = kPop;
