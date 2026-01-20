@@ -178,7 +178,6 @@ pub fn main() !void {
             var sys: System = undefined;
             try sys.pushExternals(&exts);
 
-            // try k.setExternals(exts.externals.items);
             k.setFFIClosure(.{
                 .callback = ffiCallback,
                 .lookup = ffiLookup,
@@ -230,7 +229,6 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
-            // try k.setExternals(exts.externals.items);
             k.setFFIClosure(.{
                 .callback = ffiCallback,
                 .lookup = ffiLookup,
