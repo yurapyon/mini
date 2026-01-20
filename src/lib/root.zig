@@ -1,6 +1,6 @@
 pub const kernel = @import("kernel.zig");
 pub const mem = @import("memory.zig");
-pub const externals = @import("externals.zig");
+pub const bytecodes = @import("bytecodes.zig");
 
 pub const utils = struct {
     const read_file = @import("utils/read-file.zig");

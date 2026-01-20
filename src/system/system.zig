@@ -12,7 +12,7 @@ const SignedCell = kernel.SignedCell;
 
 const Handles = mini.utils.Handles;
 
-const externals = mini.externals;
+const externals = @import("libs").externals;
 const External = externals.External;
 const ExternalsList = externals.ExternalsList;
 

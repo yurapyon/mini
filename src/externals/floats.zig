@@ -5,7 +5,7 @@ const mini = @import("mini");
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 
-const externals = mini.externals;
+const externals = @import("externals.zig");
 const External = externals.External;
 const ExternalsList = externals.ExternalsList;
 

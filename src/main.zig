@@ -10,16 +10,16 @@ const mem = mini.mem;
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
-
-const externals = mini.externals;
-const External = externals.External;
-const ExternalsList = externals.ExternalsList;
+const FFI = kernel.FFI;
 
 const Handles = mini.utils.Handles;
 
-const libs = @import("libs");
-
 const System = @import("pyon").system.System;
+
+const libs = @import("libs");
+const externals = libs.externals;
+const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const OS = libs.os.OS;
 const Dynamic = libs.dynamic.Dynamic;
@@ -54,6 +54,24 @@ fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
     ) catch return error.CannotAccept;
 
     return @truncate(len);
+}
+
+fn ffiCallback(k: *Kernel, userdata: ?*anyopaque, ext_token: Cell) FFI.Error!void {
+    const exts: *ExternalsList = @ptrCast(@alignCast(userdata));
+    if (ext_token < exts.externals.items.len) {
+        const ext = exts.externals.items[ext_token];
+        ext.call(k) catch |err| switch (err) {
+            error.ExternalPanic => return error.Panic,
+            else => |e| return e,
+        };
+    } else {
+        return error.UnhandledExternal;
+    }
+}
+
+fn ffiLookup(_: *Kernel, userdata: ?*anyopaque, name: []const u8) ?Cell {
+    const exts: *ExternalsList = @ptrCast(@alignCast(userdata));
+    return exts.lookup(name);
 }
 
 fn kernelRunFiles(
@@ -160,7 +178,11 @@ pub fn main() !void {
             var sys: System = undefined;
             try sys.pushExternals(&exts);
 
-            try k.setExternals(exts.externals.items);
+            k.setFFIClosure(.{
+                .callback = ffiCallback,
+                .lookup = ffiLookup,
+                .userdata = &exts,
+            });
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);
@@ -207,7 +229,11 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
-            try k.setExternals(exts.externals.items);
+            k.setFFIClosure(.{
+                .callback = ffiCallback,
+                .lookup = ffiLookup,
+                .userdata = &exts,
+            });
 
             k.clearAcceptClosure();
             k.setEmitClosure(emitStdOut, &output_file);

@@ -8,9 +8,6 @@ const bytecodes = @import("bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
-const externals = @import("externals.zig");
-const External = externals.External;
-
 const stack = @import("stack.zig");
 const Stack = stack.Stack;
 
@@ -68,6 +65,24 @@ pub const RAMLayout = MemoryLayout(struct {
     _rs_top_space: Cell,
 });
 
+pub const FFI = struct {
+    pub const Error = error{
+        UnhandledExternal,
+    } || bytecodes.Error;
+
+    pub const Callback =
+        *const fn (k: *Kernel, userdata: ?*anyopaque, id: Cell) Error!void;
+
+    pub const Lookup =
+        *const fn (k: *Kernel, userdata: ?*anyopaque, name: []const u8) ?Cell;
+
+    pub const Closure = struct {
+        callback: Callback,
+        lookup: Lookup,
+        userdata: ?*anyopaque,
+    };
+};
+
 pub const AcceptCallback =
     *const fn (out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell;
 
@@ -76,7 +91,6 @@ pub const EmitCallback =
 
 pub const Kernel = struct {
     memory: mem.MemoryPtr,
-    externals: []const External,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -93,6 +107,8 @@ pub const Kernel = struct {
         callback: EmitCallback,
         userdata: ?*anyopaque,
     },
+
+    ffi_closure: ?FFI.Closure,
 
     program_counter: Register(
         RAMLayout.offsetOf("program_counter"),
@@ -125,7 +141,6 @@ pub const Kernel = struct {
         memory: mem.MemoryPtr,
     ) void {
         self.memory = memory;
-        self.externals = &[_]External{};
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -228,10 +243,10 @@ pub const Kernel = struct {
                 };
             } else {
                 const ext_token = token - @as(Cell, @intCast(bytecodes.bytecode_count));
-                self.processExternals(ext_token) catch |err| {
+                self.processFFI(ext_token) catch |err| {
                     const message = switch (err) {
                         error.Panic => "Panic",
-                        error.ExternalPanic => "External Panic",
+                        // error.ExternalPanic => "External Panic",
                         error.InvalidProgramCounter => "Invalid Program Counter",
                         error.OutOfBounds => "Out of Bounds",
                         error.MisalignedAddress => "Misaligned Address",
@@ -241,11 +256,13 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
-                    const name = self.externals[ext_token].name;
+                    // const name = self.externals[ext_token].name;
 
                     if (builtin.target.cpu.arch != .wasm32) {
-                        std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
+                        // std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     }
+
+                    _ = message;
 
                     self.abort();
                 };
@@ -282,32 +299,34 @@ pub const Kernel = struct {
 
     // ===
 
-    pub fn setExternals(self: *@This(), exts: []const External) !void {
-        // TODO
-        // this should account for # of bytecodes
-        if (exts.len > std.math.maxInt(Cell)) {
-            return error.TooManyExternals;
-        }
-
-        self.externals = exts;
-    }
-
-    fn processExternals(self: *@This(), ext_token: Cell) !void {
-        if (ext_token < self.externals.len) {
-            try self.externals[ext_token].call(self);
+    fn processFFI(self: *@This(), ext_token: Cell) !void {
+        if (self.ffi_closure) |ffi| {
+            try ffi.callback(self, ffi.userdata, ext_token);
         } else {
+            // TODO
+            // return error.CannotFFI
             return error.UnhandledExternal;
         }
     }
 
-    pub fn lookupExternal(self: *@This(), name: []const u8) ?Cell {
-        for (self.externals, 0..) |external, i| {
-            if (std.mem.eql(u8, external.name, name)) {
-                return @intCast(i);
-            }
+    pub fn lookupFFI(self: *@This(), name: []const u8) ?Cell {
+        if (self.ffi_closure) |ffi| {
+            return ffi.lookup(self, ffi.userdata, name);
+        } else {
+            // TODO return error here?
+            return null;
         }
+    }
 
-        return null;
+    pub fn setFFIClosure(
+        self: *@This(),
+        closure: FFI.Closure,
+    ) void {
+        self.ffi_closure = closure;
+    }
+
+    pub fn clearFFIClosure(self: *@This()) void {
+        self.ffi_closure = null;
     }
 
     // ===

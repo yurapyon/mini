@@ -58,6 +58,12 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
     copy_startup.addArg(web_public);
     copy_startup.step.dependOn(&copy_precompiled.step);
 
+    // TODO
+    // const copy_specs = b.addSystemCommand(&.{"cp"});
+    // copy_specs.addArg("specs");
+    // copy_specs.addArg(web_public);
+    // copy_specs.step.dependOn(&copy_precompiled.step);
+
     return &copy_startup.step;
 }
 
@@ -71,8 +77,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const mod_pyon = b.addModule("pyon", .{
-        .root_source_file = b.path("src/system/root.zig"),
+    const mod_libs = b.addModule("libs", .{
+        .root_source_file = b.path("src/externals/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -81,13 +87,14 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const mod_libs = b.addModule("libs", .{
-        .root_source_file = b.path("src/externals/root.zig"),
+    const mod_pyon = b.addModule("pyon", .{
+        .root_source_file = b.path("src/system/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
+            .{ .name = "libs", .module = mod_libs },
         },
     });
 

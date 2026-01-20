@@ -6,7 +6,7 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const externals = mini.externals;
+const externals = @import("externals.zig");
 const External = externals.External;
 const ExternalsList = externals.ExternalsList;
 

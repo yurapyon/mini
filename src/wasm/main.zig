@@ -4,16 +4,15 @@ const mini = @import("mini");
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
-
-const externals = mini.externals;
-const External = externals.External;
+const FFI = kernel.FFI;
 
 // ===
 
 const allocator = std.heap.wasm_allocator;
 
-var k: Kernel = undefined;
+var global_k: Kernel = undefined;
 var forth_mem: mini.mem.MemoryPtr = undefined;
+var ext_lookup: []u8 = undefined;
 var image_mem: []u8 = undefined;
 var script_mem: []u8 = undefined;
 
@@ -32,26 +31,27 @@ export fn allocateScriptMemory(size: usize) [*]u8 {
     return @ptrCast(script_mem.ptr);
 }
 
-// ===
-
-extern fn callJs(Cell) void;
-fn callJs_(k_: *Kernel, _: ?*anyopaque) External.Error!void {
-    const value = k_.data_stack.popCell();
-    callJs(value);
+export fn allocateExtLookupMemory() [*]u8 {
+    ext_lookup = mini.mem.allocate(allocator, 128) catch unreachable;
+    return @ptrCast(ext_lookup.ptr);
 }
 
-const exts = [_]External{
-    .{
-        .name = "js",
-        .callback = callJs_,
-        .userdata = null,
-    },
-};
+// ===
 
 extern fn wasmPrint(usize) void;
 
+export fn kPop() Cell {
+    return global_k.data_stack.popCell();
+}
+
+export fn kPush(value: Cell) void {
+    global_k.data_stack.pushCell(value);
+}
+
 extern fn jsEmit(u8) void;
 extern fn jsRead() u8;
+extern fn jsFFICallback(Cell) void;
+extern fn jsFFILookup(usize) isize;
 
 fn emit(char: u8, _: ?*anyopaque) void {
     jsEmit(char);
@@ -63,55 +63,57 @@ fn accept(out: []u8, _: ?*anyopaque) error{CannotAccept}!Cell {
     return 0;
 }
 
+fn ffiCallback(_: *Kernel, _: ?*anyopaque, ext_token: Cell) FFI.Error!void {
+    jsFFICallback(ext_token);
+}
+
+fn ffiLookup(_: *Kernel, _: ?*anyopaque, name: []const u8) ?Cell {
+    const len = @min(name.len, ext_lookup.len);
+    @memcpy(ext_lookup[0..len], name[0..len]);
+
+    const code = jsFFILookup(name.len);
+    // TODO check maxint
+    if (code < 0) {
+        return null;
+    } else {
+        return @intCast(code);
+    }
+}
+
 // NOTE
 // Frees image and script mem
 //   TODO maybe don't do this
 // TODO handle kernel errors
 export fn init() void {
-    k.init(forth_mem);
+    global_k.init(forth_mem);
 
-    k.loadImage(image_mem);
+    global_k.loadImage(image_mem);
     allocator.free(image_mem);
 
-    k.setExternals(&exts) catch unreachable;
+    global_k.setFFIClosure(.{
+        .callback = ffiCallback,
+        .lookup = ffiLookup,
+        .userdata = null,
+    });
 
-    k.clearAcceptClosure();
-    k.setEmitClosure(emit, null);
+    global_k.clearAcceptClosure();
+    global_k.setEmitClosure(emit, null);
 
-    k.evaluate(script_mem) catch unreachable;
+    global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
 
-    // Start repl
+    // Start repl ?
     // k.setAcceptClosure(accept, null);
     // k.initForth();
     // k.execute() catch unreachable;
-
-    // _ = jsRead();
-    // _ = jsRead();
-
-    // if no system ===
-
-    // create kernel
-    // register externals
-    // load precompile image into kernel
-
-    // clear accept closure
-    // set emit closure
-    // read in startup file
-    // read in other files
-
-    // set accept closure to read from stdin
-    // run forth loop
-    // return 1;
-
-    // return m;
 }
 
 export fn deinit() void {
+    // TODO
     // return 0;
 }
 
 export fn evaluateScript() void {
-    k.evaluate(script_mem) catch unreachable;
+    global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
 }
