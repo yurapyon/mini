@@ -19,6 +19,10 @@ const Register = register.Register;
 
 // ===
 
+// TODO
+// might be nice to figure out a way to exit out early of
+//   scripts that are being evaluated
+
 comptime {
     const native_endianness = builtin.target.cpu.arch.endian();
     if (native_endianness != .little) {
@@ -152,6 +156,8 @@ pub const Kernel = struct {
     }
 
     pub fn initForth(self: *@This()) void {
+        // TODO
+        //   should set 'stay' to true??
         const init_xt = self.init_xt.fetch();
         self.execute_register.store(init_xt);
     }

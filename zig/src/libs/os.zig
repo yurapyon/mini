@@ -73,6 +73,12 @@ pub const OS = struct {
         _ = c.system(temp.ptr);
     }
 
+    // TODO
+    //   this shouldn't allocate
+    //   instead,
+    //     read file from disc into dynamic memory
+    //     set that memory as the accept file
+    //     free file when finished, from forth
     fn setAcceptFile(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
         const os: *@This() = @ptrCast(@alignCast(userdata));
 

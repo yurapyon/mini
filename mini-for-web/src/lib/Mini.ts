@@ -14,6 +14,7 @@ const putc = (char) => {
 const initWasm = async () => {
   const WASM_FILEPATH = "/mini/mini-wasm.wasm";
   const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
+  const STARTUP_FILEPATH = "/mini/startup.mini.fth";
 
   const memory = new WebAssembly.Memory({
     initial: 20,
@@ -39,27 +40,42 @@ const initWasm = async () => {
   const image_response = await fetch(IMAGE_FILEPATH);
   const image = await image_response.bytes();
 
+  const startup_response = await fetch(STARTUP_FILEPATH);
+  const startup = await startup_response.bytes();
+
   WebAssembly
     .instantiateStreaming(fetch(WASM_FILEPATH), importObject)
     .then((result) => {
       const {
         allocateForthMemory,
-        allocateTempMemory,
+        allocateImageMemory,
+        allocateScriptMemory,
+        evaluateScript
       } = result.instance.exports;
 
       const forth_ptr = allocateForthMemory();
-      const image_ptr = allocateTempMemory(image.byteLength);
-
+      const image_ptr = allocateImageMemory(image.byteLength);
+      const script_ptr = allocateScriptMemory(startup.byteLength);
 
       var wasm_mem = new Uint8Array(memory.buffer);
       wasm_mem.set(image, image_ptr);
+      wasm_mem.set(startup, script_ptr);
+
       result.instance.exports.init();
 
-      console.log(
-        wasm_mem,
-        wasm_mem.slice(forth_ptr, (forth_ptr + 256)),
-        wasm_mem.slice(image_ptr, (image_ptr + 256)),
-      );
+      const forthEval = (str) => {
+        const utf8 = new TextEncoder();
+        const bytes = utf8.encode(str);
+
+        const script_ptr = allocateScriptMemory(bytes.byteLength);
+
+        var wasm_mem = new Uint8Array(memory.buffer);
+        wasm_mem.set(bytes, script_ptr);
+
+        evaluateScript();
+      };
+
+      forthEval("words cr ashy");
   });
 }
 

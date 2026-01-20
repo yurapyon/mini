@@ -1,3 +1,19 @@
+const readline = require('readline');
+const rl = readline.createInterface({
+  input: process.stdin,
+  output: process.stdout,
+});
+
+rl.prompt();
+rl.pause();
+
+/*
+const lines = [];
+rl.on('line' (line) => {
+  lines.push(line);
+});
+*/
+
 const fs = require('fs');
 
 const wasm_filepath = process.argv[2];
@@ -7,6 +23,10 @@ const wasm_bin = new Uint8Array(source);
 const image_filepath = process.argv[3];
 const image = fs.readFileSync(image_filepath);
 const image_bin = new Uint8Array(image);
+
+const startup_filepath = "src/wasm/startup.mini.fth";
+const startup = fs.readFileSync(startup_filepath);
+const startup_bin = new Uint8Array(startup);
 
 const memory = new WebAssembly.Memory({
   initial: 20,
@@ -46,7 +66,6 @@ function inspectMemory() {
   );
 }
 
-
 const importObject = {
   env: {
     wasmPrint: (result) => {
@@ -55,39 +74,64 @@ const importObject = {
     callJs: (id) => {
       console.log("ext: ", id);
     },
-
     jsEmit: (ch) => {
-      // console.log(String.fromCharCode(ch));
       process.stdout.write(String.fromCharCode(ch));
+    },
+    jsRead: (ch) => {
+      // const val = 0;
+
+      const p = new Promise((resolve) => {
+        rl.resume();
+        rl.on('line', (line) => {
+          rl.pause();
+          resolve(line);
+        });
+      });
+
+      p.then((line)=>console.log("asdf", line));
+
+      // process.stdout.write(String.fromCharCode(ch));
     },
     memory: memory,
   }
 };
 
-
 WebAssembly.instantiate(wasm_bin, importObject).then((result) => {
   const {
     allocateForthMemory,
-    allocateTempMemory,
+    allocateImageMemory,
+    allocateScriptMemory,
+    evaluateScript
   } = result.instance.exports;
 
-  inspectMemory();
-
   const forth_ptr = allocateForthMemory();
-  const image_ptr = allocateTempMemory(image_bin.byteLength);
-
-  inspectMemory();
+  const image_ptr = allocateImageMemory(image_bin.byteLength);
+  const script_ptr = allocateScriptMemory(startup_bin.byteLength);
 
   var wasm_mem = new Uint8Array(memory.buffer);
+
   wasm_mem.set(image_bin, image_ptr);
+  wasm_mem.set(startup_bin, script_ptr);
+
   result.instance.exports.init();
 
-  inspectMemory();
+  const forthEval = (str) => {
+    const utf8 = new TextEncoder();
+    const bytes = utf8.encode(str);
 
-  console.log(
-    wasm_mem,
-    wasm_mem.slice(forth_ptr, (forth_ptr + 256)),
-    wasm_mem.slice(image_ptr, (image_ptr + 256)),
-  );
+    console.log(bytes);
+
+    const script_ptr = allocateScriptMemory(bytes.byteLength);
+
+    var wasm_mem = new Uint8Array(memory.buffer);
+    wasm_mem.set(bytes, script_ptr);
+
+    console.log(wasm_mem.slice(script_ptr, script_ptr + 30));
+
+    evaluateScript();
+  };
+
+  forthEval("words cr ashy");
+  // forthEval("ashy");
 });
 

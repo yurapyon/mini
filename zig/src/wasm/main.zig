@@ -14,7 +14,25 @@ const allocator = std.heap.wasm_allocator;
 
 var k: Kernel = undefined;
 var forth_mem: mini.mem.MemoryPtr = undefined;
-var temp_mem: []u8 = undefined;
+var image_mem: []u8 = undefined;
+var script_mem: []u8 = undefined;
+
+export fn allocateForthMemory() [*]u8 {
+    forth_mem = mini.mem.allocateForthMemory(allocator) catch unreachable;
+    return @ptrCast(forth_mem);
+}
+
+export fn allocateImageMemory(size: usize) [*]u8 {
+    image_mem = mini.mem.allocate(allocator, size) catch unreachable;
+    return @ptrCast(image_mem.ptr);
+}
+
+export fn allocateScriptMemory(size: usize) [*]u8 {
+    script_mem = mini.mem.allocate(allocator, size) catch unreachable;
+    return @ptrCast(script_mem.ptr);
+}
+
+// ===
 
 extern fn callJs(Cell) void;
 fn callJs_(k_: *Kernel, _: ?*anyopaque) External.Error!void {
@@ -30,42 +48,46 @@ const exts = [_]External{
     },
 };
 
-// TODO
-// wasm startup file
-// wasm externals
-
-export fn allocateForthMemory() [*]u8 {
-    forth_mem = mini.mem.allocateForthMemory(allocator) catch unreachable;
-    return @ptrCast(forth_mem);
-}
-
-export fn allocateTempMemory(size: usize) [*]u8 {
-    temp_mem = mini.mem.allocate(allocator, size) catch unreachable;
-    return @ptrCast(temp_mem.ptr);
-}
-
 extern fn wasmPrint(usize) void;
-extern fn jsEmit(u8) void;
 
-fn emitStdOut(char: u8, _: ?*anyopaque) void {
+extern fn jsEmit(u8) void;
+extern fn jsRead() u8;
+
+fn emit(char: u8, _: ?*anyopaque) void {
     jsEmit(char);
 }
 
+fn accept(out: []u8, _: ?*anyopaque) error{CannotAccept}!Cell {
+    _ = out;
+    // TODO
+    return 0;
+}
+
+// NOTE
+// Frees image and script mem
+//   TODO maybe don't do this
+// TODO handle kernel errors
 export fn init() void {
     k.init(forth_mem);
 
-    k.loadImage(temp_mem);
-    allocator.free(temp_mem);
+    k.loadImage(image_mem);
+    allocator.free(image_mem);
 
     k.setExternals(&exts) catch unreachable;
 
     k.clearAcceptClosure();
-    k.setEmitClosure(emitStdOut, null);
+    k.setEmitClosure(emit, null);
 
-    const str = "65 emit 66 emit 10 emit";
-    k.evaluate(str) catch unreachable;
+    k.evaluate(script_mem) catch unreachable;
+    allocator.free(script_mem);
 
-    // k.memory[0] = 123;
+    // Start repl
+    // k.setAcceptClosure(accept, null);
+    // k.initForth();
+    // k.execute() catch unreachable;
+
+    // _ = jsRead();
+    // _ = jsRead();
 
     // if no system ===
 
@@ -87,4 +109,9 @@ export fn init() void {
 
 export fn deinit() void {
     // return 0;
+}
+
+export fn evaluateScript() void {
+    k.evaluate(script_mem) catch unreachable;
+    allocator.free(script_mem);
 }
