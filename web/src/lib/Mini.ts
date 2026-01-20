@@ -11,7 +11,29 @@ const putc = (char) => {
 }
 
 export const fetchMini = async () => {
-  const callbacks = {};
+  var ext_ptr = 0;
+
+  const kernel = {
+    pop: null,
+    push: null,
+  };
+
+  const externals = [
+    {
+      name: "js",
+      fn: ()=>{
+        const value = kernel.pop()
+        console.log("ext: ", value);
+      }
+    },
+    {
+      name: "js2",
+      fn: ()=>{
+        const value = kernel.pop()
+        console.log("ext2: ", value);
+      }
+    }
+  ];
 
   const WASM_FILEPATH = "/mini/mini-wasm.wasm";
   const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
@@ -28,11 +50,36 @@ export const fetchMini = async () => {
       wasmPrint: (result) => {
         console.log("zig: ", result);
       },
-      callJs: (id) => {
-        callbacks[id]();
+      jsFFICallback: (id) => {
+        externals[id].fn()
+      },
+      jsFFILookup: (len) => {
+        const wasm_mem = new Uint8Array(memory.buffer);
+        const chars = wasm_mem.slice(ext_ptr, ext_ptr + len);
+        const str = String.fromCharCode(...chars);
+
+        const idx = externals.findIndex((ext) => ext.name === str);
+        return idx;
       },
       jsEmit: (ch) => {
         putc(ch);
+      },
+      jsRead: (ch) => {
+        // const val = 0;
+
+        /*
+        const p = new Promise((resolve) => {
+          rl.resume();
+          rl.on('line', (line) => {
+            rl.pause();
+            resolve(line);
+          });
+        });
+
+        p.then((line)=>console.log("asdf", line));
+        */
+
+        // process.stdout.write(String.fromCharCode(ch));
       },
       memory: memory,
     }
@@ -51,12 +98,16 @@ export const fetchMini = async () => {
         allocateForthMemory,
         allocateImageMemory,
         allocateScriptMemory,
-        evaluateScript
+        allocateExtLookupMemory,
+        evaluateScript,
+        kPop,
+        kPush,
       } = result.instance.exports;
 
       const forth_ptr = allocateForthMemory();
       const image_ptr = allocateImageMemory(image.byteLength);
       const script_ptr = allocateScriptMemory(startup.byteLength);
+      ext_ptr = allocateExtLookupMemory();
 
       var wasm_mem = new Uint8Array(memory.buffer);
       wasm_mem.set(image, image_ptr);
@@ -76,15 +127,24 @@ export const fetchMini = async () => {
         evaluateScript();
       };
 
-      const addCallback = (id, func) => {
-        callbacks[id] = func;
+      const addExternal = (extName, fn) => {
+        externals.push({
+          name: extName,
+          fn,
+        });
+        run("external " + extName)
       };
 
-      run("external js");
+      kernel.pop = kPop;
+      kernel.push = kPush;
+
+      run("external js")
+      run("external js2")
 
       return {
         run,
-        addCallback,
+        addExternal,
+        kernel,
       }
   });
 

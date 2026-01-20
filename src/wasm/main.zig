@@ -38,6 +38,8 @@ export fn allocateExtLookupMemory() [*]u8 {
 
 // ===
 
+extern fn wasmPrint(usize) void;
+
 export fn kPop() Cell {
     return global_k.data_stack.popCell();
 }
@@ -46,13 +48,10 @@ export fn kPush(value: Cell) void {
     global_k.data_stack.pushCell(value);
 }
 
-extern fn jsFFICallback(Cell) void;
-extern fn jsFFILookup(usize) isize;
-
-extern fn wasmPrint(usize) void;
-
 extern fn jsEmit(u8) void;
 extern fn jsRead() u8;
+extern fn jsFFICallback(Cell) void;
+extern fn jsFFILookup(usize) isize;
 
 fn emit(char: u8, _: ?*anyopaque) void {
     jsEmit(char);
@@ -103,7 +102,7 @@ export fn init() void {
     global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
 
-    // Start repl
+    // Start repl ?
     // k.setAcceptClosure(accept, null);
     // k.initForth();
     // k.execute() catch unreachable;
