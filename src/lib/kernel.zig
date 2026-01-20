@@ -8,9 +8,6 @@ const bytecodes = @import("bytecodes.zig");
 
 const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
 
-const externals = @import("externals.zig");
-const External = externals.External;
-
 const stack = @import("stack.zig");
 const Stack = stack.Stack;
 
@@ -94,7 +91,6 @@ pub const EmitCallback =
 
 pub const Kernel = struct {
     memory: mem.MemoryPtr,
-    externals: []const External,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -145,7 +141,6 @@ pub const Kernel = struct {
         memory: mem.MemoryPtr,
     ) void {
         self.memory = memory;
-        self.externals = &[_]External{};
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -261,11 +256,13 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
-                    const name = self.externals[ext_token].name;
+                    // const name = self.externals[ext_token].name;
 
                     if (builtin.target.cpu.arch != .wasm32) {
-                        std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
+                        // std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     }
+
+                    _ = message;
 
                     self.abort();
                 };

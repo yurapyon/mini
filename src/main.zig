@@ -12,15 +12,14 @@ const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const FFI = kernel.FFI;
 
-const externals = mini.externals;
-const External = externals.External;
-const ExternalsList = externals.ExternalsList;
-
 const Handles = mini.utils.Handles;
 
-const libs = @import("libs");
-
 const System = @import("pyon").system.System;
+
+const libs = @import("libs");
+const externals = libs.externals;
+const External = externals.External;
+const ExternalsList = externals.ExternalsList;
 
 const OS = libs.os.OS;
 const Dynamic = libs.dynamic.Dynamic;

@@ -2,11 +2,12 @@ const std = @import("std");
 const ArrayList = std.ArrayList;
 const Allocator = std.mem.Allocator;
 
-const kernel = @import("kernel.zig");
+const mini = @import("mini");
+const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 
-const bytecodes = @import("bytecodes.zig");
+const bytecodes = mini.bytecodes;
 
 pub const External = struct {
     pub const Error = error{

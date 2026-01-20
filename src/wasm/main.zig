@@ -6,15 +6,13 @@ const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const FFI = kernel.FFI;
 
-const externals = mini.externals;
-const External = externals.External;
-
 // ===
 
 const allocator = std.heap.wasm_allocator;
 
 var global_k: Kernel = undefined;
 var forth_mem: mini.mem.MemoryPtr = undefined;
+var ext_lookup: []u8 = undefined;
 var image_mem: []u8 = undefined;
 var script_mem: []u8 = undefined;
 
@@ -33,21 +31,23 @@ export fn allocateScriptMemory(size: usize) [*]u8 {
     return @ptrCast(script_mem.ptr);
 }
 
-// ===
-
-extern fn callJs(Cell) void;
-fn callJs_(k_: *Kernel, _: ?*anyopaque) External.Error!void {
-    const value = k_.data_stack.popCell();
-    callJs(value);
+export fn allocateExtLookupMemory() [*]u8 {
+    ext_lookup = mini.mem.allocate(allocator, 128) catch unreachable;
+    return @ptrCast(ext_lookup.ptr);
 }
 
-const exts = [_]External{
-    .{
-        .name = "js",
-        .callback = callJs_,
-        .userdata = null,
-    },
-};
+// ===
+
+export fn kPop() Cell {
+    return global_k.data_stack.popCell();
+}
+
+export fn kPush(value: Cell) void {
+    global_k.data_stack.pushCell(value);
+}
+
+extern fn jsFFICallback(Cell) void;
+extern fn jsFFILookup(usize) isize;
 
 extern fn wasmPrint(usize) void;
 
@@ -64,24 +64,21 @@ fn accept(out: []u8, _: ?*anyopaque) error{CannotAccept}!Cell {
     return 0;
 }
 
-fn ffiCallback(k: *Kernel, _: ?*anyopaque, ext_token: Cell) FFI.Error!void {
-    if (ext_token < exts.len) {
-        const ext = exts[ext_token];
-        ext.call(k) catch |err| switch (err) {
-            error.ExternalPanic => return error.Panic,
-            else => |e| return e,
-        };
-    } else {
-        return error.UnhandledExternal;
-    }
+fn ffiCallback(_: *Kernel, _: ?*anyopaque, ext_token: Cell) FFI.Error!void {
+    jsFFICallback(ext_token);
 }
 
 fn ffiLookup(_: *Kernel, _: ?*anyopaque, name: []const u8) ?Cell {
-    // const exts: *ExternalsList = @ptrCast(@alignCast(userdata));
-    // return exts.lookup(name);
-    _ = name;
-    // TODO
-    return 0;
+    const len = @min(name.len, ext_lookup.len);
+    @memcpy(ext_lookup[0..len], name[0..len]);
+
+    const code = jsFFILookup(name.len);
+    // TODO check maxint
+    if (code < 0) {
+        return null;
+    } else {
+        return @intCast(code);
+    }
 }
 
 // NOTE
@@ -94,7 +91,6 @@ export fn init() void {
     global_k.loadImage(image_mem);
     allocator.free(image_mem);
 
-    //k.setExternals(&exts) catch unreachable;
     global_k.setFFIClosure(.{
         .callback = ffiCallback,
         .lookup = ffiLookup,
@@ -111,29 +107,10 @@ export fn init() void {
     // k.setAcceptClosure(accept, null);
     // k.initForth();
     // k.execute() catch unreachable;
-
-    // _ = jsRead();
-    // _ = jsRead();
-
-    // if no system ===
-
-    // create kernel
-    // register externals
-    // load precompile image into kernel
-
-    // clear accept closure
-    // set emit closure
-    // read in startup file
-    // read in other files
-
-    // set accept closure to read from stdin
-    // run forth loop
-    // return 1;
-
-    // return m;
 }
 
 export fn deinit() void {
+    // TODO
     // return 0;
 }
 

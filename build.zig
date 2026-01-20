@@ -77,8 +77,8 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
-    const mod_pyon = b.addModule("pyon", .{
-        .root_source_file = b.path("src/system/root.zig"),
+    const mod_libs = b.addModule("libs", .{
+        .root_source_file = b.path("src/externals/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -87,13 +87,14 @@ pub fn build(b: *std.Build) void {
         },
     });
 
-    const mod_libs = b.addModule("libs", .{
-        .root_source_file = b.path("src/externals/root.zig"),
+    const mod_pyon = b.addModule("pyon", .{
+        .root_source_file = b.path("src/system/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
+            .{ .name = "libs", .module = mod_libs },
         },
     });
 
