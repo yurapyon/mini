@@ -1,2 +1,2 @@
-zig/src/system/deps/* linguist-vendored
-mini-for-web/* linguist-vendored
+src/system/deps/* linguist-vendored
+web/* linguist-vendored
