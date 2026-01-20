@@ -10,9 +10,11 @@ const External = externals.External;
 
 // ===
 
-var k: Kernel = undefined;
+const allocator = std.heap.wasm_allocator;
 
-// var mini_mem = std.mem.zeroes(mini.mem.Memory);
+var k: Kernel = undefined;
+var forth_mem: mini.mem.MemoryPtr = undefined;
+var temp_mem: []u8 = undefined;
 
 extern fn callJs(Cell) void;
 fn callJs_(k_: *Kernel, _: ?*anyopaque) External.Error!void {
@@ -32,15 +34,38 @@ const exts = [_]External{
 // wasm startup file
 // wasm externals
 
-extern fn wasmPrint(usize) void;
+export fn allocateForthMemory() [*]u8 {
+    forth_mem = mini.mem.allocateForthMemory(allocator) catch unreachable;
+    return @ptrCast(forth_mem);
+}
 
-export fn init() mini.mem.MemoryPtr {
-    const allocator = std.heap.wasm_allocator;
-    const m = mini.mem.allocateForthMemory(allocator) catch unreachable;
-    k.init(m);
+export fn allocateTempMemory(size: usize) [*]u8 {
+    temp_mem = mini.mem.allocate(allocator, size) catch unreachable;
+    return @ptrCast(temp_mem.ptr);
+}
+
+extern fn wasmPrint(usize) void;
+extern fn jsEmit(u8) void;
+
+fn emitStdOut(char: u8, _: ?*anyopaque) void {
+    jsEmit(char);
+}
+
+export fn init() void {
+    k.init(forth_mem);
+
+    k.loadImage(temp_mem);
+    allocator.free(temp_mem);
+
     k.setExternals(&exts) catch unreachable;
 
-    m[0] = 123;
+    k.clearAcceptClosure();
+    k.setEmitClosure(emitStdOut, null);
+
+    const str = "65 emit 66 emit 10 emit";
+    k.evaluate(str) catch unreachable;
+
+    // k.memory[0] = 123;
 
     // if no system ===
 
@@ -57,7 +82,7 @@ export fn init() mini.mem.MemoryPtr {
     // run forth loop
     // return 1;
 
-    return m;
+    // return m;
 }
 
 export fn deinit() void {

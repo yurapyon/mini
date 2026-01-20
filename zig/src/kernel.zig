@@ -191,7 +191,11 @@ pub const Kernel = struct {
                     error.MisalignedAddress => "Misaligned Address",
                 };
 
-                std.debug.print("Token Lookup Error: {s}\n", .{message});
+                // TODO
+                //   dont use std debug here ?
+                if (builtin.target.cpu.arch != .wasm32) {
+                    std.debug.print("Token Lookup Error: {s}\n", .{message});
+                }
                 self.abort();
 
                 continue;
@@ -211,7 +215,9 @@ pub const Kernel = struct {
 
                     const name = bytecodes.getBytecodeName(token) orelse "Unknown";
 
-                    std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
+                    if (builtin.target.cpu.arch != .wasm32) {
+                        std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
+                    }
                     self.abort();
                 };
             } else {
@@ -231,7 +237,10 @@ pub const Kernel = struct {
 
                     const name = self.externals[ext_token].name;
 
-                    std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
+                    if (builtin.target.cpu.arch != .wasm32) {
+                        std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
+                    }
+
                     self.abort();
                 };
             }
@@ -305,7 +314,7 @@ pub const Kernel = struct {
         self: *@This(),
         buffer: []const u8,
     ) !void {
-        if (self.debug_accept_buffer) {
+        if (builtin.target.cpu.arch != .wasm32 and self.debug_accept_buffer) {
             std.debug.print(">> Accept buffer set:\n{s}...\n", .{buffer[0..@min(buffer.len, 128)]});
         }
         // const copied = try self.allocator.alloc(u8, buffer.len);
@@ -319,7 +328,7 @@ pub const Kernel = struct {
     }
 
     pub fn clearAcceptBuffer(self: *@This()) void {
-        if (self.debug_accept_buffer) {
+        if (builtin.target.cpu.arch != .wasm32 and self.debug_accept_buffer) {
             std.debug.print(">> Accept buffer cleared\n", .{});
         }
         self.accept_buffer = null;

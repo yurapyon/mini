@@ -63,12 +63,14 @@ pub fn build(b: *std.Build) void {
 
     // wasm ===
 
-    // example setup for reference
+    // references
+    // https://github.com/CornSnek/wasm-shared-memory-zig
     // https://github.com/daneelsan/minimal-zig-wasm-canvas
 
     const target_wasm = b.resolveTargetQuery(.{
         .cpu_arch = .wasm32,
         .os_tag = .freestanding,
+        .cpu_features_add = std.Target.wasm.featureSet(&.{ .atomics, .bulk_memory }),
     });
 
     const wasm = b.addExecutable(.{
@@ -86,14 +88,15 @@ pub fn build(b: *std.Build) void {
     wasm.entry = .disabled;
     wasm.rdynamic = true;
 
-    const wasm_memory_page_count = 4;
+    // const wasm_memory_page_count = 4;
 
     // <https://github.com/ziglang/zig/issues/8633>
     // wasm.global_base = 6560;
     wasm.import_memory = true;
-    wasm.stack_size = std.wasm.page_size;
-    wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
-    wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
+    // wasm.shared_memory = true;
+    // wasm.stack_size = std.wasm.page_size;
+    // wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
+    // wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
 
