@@ -524,7 +524,7 @@ doer make ;and undo
     return `${vocab.name} definitions\n${wordList}\n\n`
   });
 
-  return <div class="text-wrap text-xs overflow-y-auto whitespace-pre-wrap w-[80ch]">
+  return <div class="text-wrap text-xs overflow-y-auto whitespace-pre-wrap w-[80ch] bg-[#201010]">
     {body}
     {vocabularies}
   </div>
