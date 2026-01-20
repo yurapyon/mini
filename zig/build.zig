@@ -100,9 +100,11 @@ pub fn build(b: *std.Build) void {
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
 
+    // TODO
+    // move precompiled to mini-for-web public
     const wasm_copy = b.addSystemCommand(&.{"cp"});
     wasm_copy.addArg("zig-out/bin/mini-wasm.wasm");
-    wasm_copy.addArg("../mini-for-web/public/");
+    wasm_copy.addArg("../mini-for-web/public/mini/");
     wasm_copy.step.dependOn(&wasm_install.step);
 
     const wasm_step = b.step("wasm", "Build and install wasm");

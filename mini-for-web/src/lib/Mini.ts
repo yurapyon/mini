@@ -1,11 +1,24 @@
-const initWasm = () => {
-  const WASM_FILEPATH = "/mini-wasm.wasm"
+const consoleBuffer = [];
 
-  const MEMORY_PAGE_COUNT = 4;
+const putc = (char) => {
+  if (char === 10) {
+    const str = String.fromCharCode(...consoleBuffer);
+    console.log(str);
+    consoleBuffer.length = 0;
+  } else {
+    consoleBuffer.push(char);
+  }
+}
+
+
+const initWasm = async () => {
+  const WASM_FILEPATH = "/mini/mini-wasm.wasm";
+  const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
 
   const memory = new WebAssembly.Memory({
-    initial: MEMORY_PAGE_COUNT,
-    maximum: MEMORY_PAGE_COUNT,
+    initial: 20,
+    // initial: MEMORY_PAGE_COUNT,
+    // maximum: MEMORY_PAGE_COUNT,
   });
 
   const importObject = {
@@ -16,29 +29,37 @@ const initWasm = () => {
       callJs: (id) => {
         console.log("ext: ", id);
       },
+      jsEmit: (ch) => {
+        putc(ch);
+      },
       memory: memory,
     }
   };
 
-  WebAssembly.instantiateStreaming(fetch(WASM_FILEPATH), importObject).then((result) => {
-    const arr = new Uint8Array(memory.buffer);
+  const image_response = await fetch(IMAGE_FILEPATH);
+  const image = await image_response.bytes();
 
-    const init = result.instance.exports.init;
-    const deinit = result.instance.exports.deinit;
-    const getKernelMemoryPtr = result.instance.exports.getKernelMemoryPtr
+  WebAssembly
+    .instantiateStreaming(fetch(WASM_FILEPATH), importObject)
+    .then((result) => {
+      const {
+        allocateForthMemory,
+        allocateTempMemory,
+      } = result.instance.exports;
 
-    init();
+      const forth_ptr = allocateForthMemory();
+      const image_ptr = allocateTempMemory(image.byteLength);
 
-    const miniMemOffset = getKernelMemoryPtr();
-    const mem = arr.slice(
-        miniMemOffset,
-        miniMemOffset + 64 * 1024
-    );
-    console.log(mem[0], miniMemOffset, arr)
 
-    // TODO copy image into forth memory
+      var wasm_mem = new Uint8Array(memory.buffer);
+      wasm_mem.set(image, image_ptr);
+      result.instance.exports.init();
 
-    deinit();
+      console.log(
+        wasm_mem,
+        wasm_mem.slice(forth_ptr, (forth_ptr + 256)),
+        wasm_mem.slice(image_ptr, (image_ptr + 256)),
+      );
   });
 }
 
