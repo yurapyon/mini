@@ -1,5 +1,7 @@
-zig implementation ==
+implementation notes ==
 
+// NOTE
+// Setup might be outdated for now, until wasm support is finalized
 setup:
   mac OS, using homebrew:
     $ brew install zig glfw
@@ -12,10 +14,14 @@ files:
     precomiled-stable.mini.bin - backup startup image, for if there is an error in precompiled.mini.bin, created manually
 
   shell/
+    build-fast.sh              - run 'zig build', optimizing for exe speed
     precompile-stable.sh       - compile the startup image, using precompiled-stable.mini.bin as the runtime
     precompile.sh              - compile the startup image, using precompiled.mini.bin as the runtime
     run.sh                     - run the forth repl, expects 'zig build' has already been called
     system.sh                  - run the virtual pc, expects 'zig build' has already been called
+    wasm.sh                    - run the testing script in src/wasm
+
+  web/                         - web demo
 
   src/
     examples/                  - more complete scripts
@@ -27,12 +33,14 @@ files:
       vpc-life.mini.fth        - GUI program, conways game of life
       vpc-console.mini.fth     - [WIP] GUI program, simple terminal interface
 
-    sketch/                    - random unfinished/testing scripts
-
-    lib/                       - "libraries" of external functions
+    externals/                 - "libraries" of external functions
       os.zig                   - OS access
       floats.zig               - 32 bit floats
       dynamic.zig              - dynamic memory
+      random.zig               - RNG
+      root.zig                 - library root
+
+    sketch/                    - random unfinished/testing scripts
 
     system/                    - virtual PC
       content/                 - system resources (images)
@@ -42,27 +50,32 @@ files:
 
       c.zig                    - c bindings
       characters.zig           - character buffer
+      gamepad.zig              - gamepad support
       image.zig                - images (the main data structure for working with pixel data)
+      input-event.zig          - event channel
       math.zig                 - graphics math
       palette.zig              - structure to manage sets of colors
       pixels.zig               - pixel buffer
       resource-manager.zig     - for working with images and timers
+      root.zig                 - library root
       system.mini.fth          - system startup file for mini
       system.zig               - main file for the virtual PC
       timer.zig                - abstraction for time and fps management
-      video.zig                - sets up the character and pixel buffers
 
     utils/                     - zig utils
 
-    bytecodes.zig              - bytecode behaviors and the code-field lookup table
+    lib/
+      bytecodes.zig            - bytecode behaviors and the code-field lookup table
+      externals.zig            - struct for defining external functions
+      kernel.zig               - defines some types, contains execution loop
+      memory.zig               - memory-related type definitions and error-returning memory access utils
+      register.zig             - 'pointer' that stores an offset into forth memory
+      stack.zig                - data/return stack struct
+      root.zig                 - library root
+
     cli_options.zig            - basic commandline option interpreter
-    externals.zig              - struct for defining external functions
-    kernel.zig                 - defines some types, contains execution loop
     main.zig                   - processes commandline options and starts the system
-    memory.zig                 - memory-related type definitions and error-returning memory access utils
-    register.zig               - 'pointer' that stores an offset into forth memory
     self-host.mini.fth         - metacompiler to create a bytecode image for selfhosting
-    stack.zig                  - data/return stack struct
     startup.mini.fith          - a forth file that defines the 'std library' and most of the language features
 
 undefined behavior:

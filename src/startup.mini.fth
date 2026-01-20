@@ -282,56 +282,6 @@ also compiler definitions
 : [defined] [defined] ;
 previous definitions
 
-\ os ===
-
-external sleep
-external sleeps
-external get-env
-external cwd
-
-external time-utc
-\ todo get timezone and daylight savings somehow
--6 value hour-adj
-: 24>12     12 mod dup 0= if drop 12 then ;
-: time      time-utc flip hour-adj + 24 mod flip ;
-: 00:#      # # drop ':' hold ;
-: .time24   <# 00:# 00:# # # #> type ;
-: .time12hm drop <# 00:# 24>12 # # #> type ;
-
-external shell
-: $ source-rest -leading 2dup shell ." exec: " type cr [compile] \ ;
-
-external accept-file
-: include source-rest 1/string source-len @ >in ! accept-file ;
-
-\ floats ===
-
-external f+
-external f-
-external f*
-external f/
-external f>str
-external str>f
-
-: fswap 2swap ;
-: fdrop 2drop ;
-: fdup  2dup ;
-
-create fbuf 128 allot
-: f. fbuf 128 f>str fbuf swap type ;
-
-: F word str>f drop ;
-also compiler definitions
-: F word str>f drop swap lit, , lit, , ;
-previous definitions
-
-: f, swap , , ;
-: f@ @+ swap @ ;
-: fconstant create f, does> f@ ;
-
-\ todo this is messy
-: u>f <# #s #> str>f drop ;
-
 \ tags ===
 
 : s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
@@ -344,31 +294,6 @@ also compiler definitions
 0 tag @0 1 tag @1 2 tag @2 3 tag @3
 4 tag @4 5 tag @5 6 tag @6 7 tag @7
 previous definitions
-
-\ dynamic ===
-
-external allocate
-external allocate-page
-external free
-external reallocate
-external dynsize
-external dyn!
-external dyn+!
-external dyn@
-external dync!
-external dyn+c!
-external dync@
-
-external >dyn    \ ( s d h l -- )     copies from forth memory to dynamic memory
-external dyn>    \ ( s h d l -- )     copies from dynamic memory to forth memory
-external dynmove \ ( s sh d dh l -- ) copies between dynamic memory
-
-\ ===
-
-external random
-external >rng
-external shuffle
-external shufflec
 
 \ ===
 
@@ -383,7 +308,6 @@ external shufflec
                         (lit), lit, r@ , ['] s>mem , ['] jump , (later),
                         swap this! r> allot this! here tags* ! ;
 [then]
-
 
 \ blocks ===
 

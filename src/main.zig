@@ -169,6 +169,10 @@ pub fn main() !void {
 
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
+            try k.evaluate(libs.floats.getStartupFile());
+            try k.evaluate(os.getStartupFile());
+            try k.evaluate(dyn.getStartupFile());
+            try k.evaluate(r.getStartupFile());
 
             try sys.init(&k, &h, allocator);
             defer sys.deinit();
@@ -212,6 +216,10 @@ pub fn main() !void {
 
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
+            try k.evaluate(libs.floats.getStartupFile());
+            try k.evaluate(os.getStartupFile());
+            try k.evaluate(dyn.getStartupFile());
+            try k.evaluate(r.getStartupFile());
 
             for (cli_options.filepaths.items) |fp| {
                 const file = try mini.utils.readFile(allocator, fp);

@@ -424,4 +424,8 @@ pub const Dynamic = struct {
             },
         });
     }
+
+    pub fn getStartupFile(_: *@This()) []const u8 {
+        return @embedFile("dynamic.mini.fth");
+    }
 };

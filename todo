@@ -6,13 +6,10 @@ x: probably won't do
 
 === os/build ===
 * make sure it compiles on linux
-* set up installation
-- typescript executor for web
-    npm package?
+* set up system-wide installation
 * cleanup 'accept' flow when switching from reading from file->stdin
 
 === libraries ===
-* random number generation
 - posits
 x 32bit math
 

@@ -24,7 +24,7 @@ const image_filepath = process.argv[3];
 const image = fs.readFileSync(image_filepath);
 const image_bin = new Uint8Array(image);
 
-const startup_filepath = "src/wasm/startup.mini.fth";
+const startup_filepath = "src/startup.mini.fth";
 const startup = fs.readFileSync(startup_filepath);
 const startup_bin = new Uint8Array(startup);
 
