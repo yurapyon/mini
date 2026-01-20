@@ -38,6 +38,9 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
 
+    // TODO
+    // copy the docs to /web
+
     const web_public = "web/public/mini/";
 
     const copy_wasm = b.addSystemCommand(&.{"cp"});

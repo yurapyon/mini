@@ -6,7 +6,7 @@ goals:
   evolution of a classic
     "writing a forth" is more important than "designing a modern language"
 
-checkout zig/src/examples for code samples
+checkout src/examples for code samples
 
 features:
   overall:
