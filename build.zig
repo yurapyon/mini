@@ -1,11 +1,69 @@
 const std = @import("std");
 
+fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
+    // references
+    // https://github.com/CornSnek/wasm-shared-memory-zig
+    // https://github.com/daneelsan/minimal-zig-wasm-canvas
+
+    const target_wasm = b.resolveTargetQuery(.{
+        .cpu_arch = .wasm32,
+        .os_tag = .freestanding,
+        .cpu_features_add = std.Target.wasm.featureSet(&.{ .atomics, .bulk_memory }),
+    });
+
+    const wasm = b.addExecutable(.{
+        .name = "mini-wasm",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm/main.zig"),
+            .target = target_wasm,
+            .optimize = .ReleaseSmall,
+            .imports = &.{
+                .{ .name = "mini", .module = mod_mini },
+            },
+        }),
+    });
+
+    wasm.entry = .disabled;
+    wasm.rdynamic = true;
+
+    // const wasm_memory_page_count = 4;
+
+    // <https://github.com/ziglang/zig/issues/8633>
+    // wasm.global_base = 6560;
+    wasm.import_memory = true;
+    // wasm.shared_memory = true;
+    // wasm.stack_size = std.wasm.page_size;
+    // wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
+    // wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
+
+    const wasm_install = b.addInstallArtifact(wasm, .{});
+
+    const web_public = "web/public/mini/";
+
+    const copy_wasm = b.addSystemCommand(&.{"cp"});
+    copy_wasm.addArg("zig-out/bin/mini-wasm.wasm");
+    copy_wasm.addArg(web_public);
+    copy_wasm.step.dependOn(&wasm_install.step);
+
+    const copy_precompiled = b.addSystemCommand(&.{"cp"});
+    copy_precompiled.addArg("mini-out/precompiled.mini.bin");
+    copy_precompiled.addArg(web_public);
+    copy_precompiled.step.dependOn(&copy_wasm.step);
+
+    const copy_startup = b.addSystemCommand(&.{"cp"});
+    copy_startup.addArg("src/startup.mini.fth");
+    copy_startup.addArg(web_public);
+    copy_startup.step.dependOn(&copy_precompiled.step);
+
+    return &copy_startup.step;
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
     const mod_mini = b.addModule("mini", .{
-        .root_source_file = b.path("src/root.zig"),
+        .root_source_file = b.path("src/lib/root.zig"),
         .target = target,
         .optimize = optimize,
     });
@@ -21,7 +79,7 @@ pub fn build(b: *std.Build) void {
     });
 
     const mod_libs = b.addModule("libs", .{
-        .root_source_file = b.path("src/libs/root.zig"),
+        .root_source_file = b.path("src/externals/root.zig"),
         .target = target,
         .optimize = optimize,
         .link_libc = true,
@@ -61,56 +119,12 @@ pub fn build(b: *std.Build) void {
         }),
     });
 
-    // wasm ===
+    // ===
 
-    // references
-    // https://github.com/CornSnek/wasm-shared-memory-zig
-    // https://github.com/daneelsan/minimal-zig-wasm-canvas
-
-    const target_wasm = b.resolveTargetQuery(.{
-        .cpu_arch = .wasm32,
-        .os_tag = .freestanding,
-        .cpu_features_add = std.Target.wasm.featureSet(&.{ .atomics, .bulk_memory }),
-    });
-
-    const wasm = b.addExecutable(.{
-        .name = "mini-wasm",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/wasm/main.zig"),
-            .target = target_wasm,
-            .optimize = .ReleaseSmall,
-            .imports = &.{
-                .{ .name = "mini", .module = mod_mini },
-            },
-        }),
-    });
-
-    wasm.entry = .disabled;
-    wasm.rdynamic = true;
-
-    // const wasm_memory_page_count = 4;
-
-    // <https://github.com/ziglang/zig/issues/8633>
-    // wasm.global_base = 6560;
-    wasm.import_memory = true;
-    // wasm.shared_memory = true;
-    // wasm.stack_size = std.wasm.page_size;
-    // wasm.initial_memory = std.wasm.page_size * wasm_memory_page_count;
-    // wasm.max_memory = std.wasm.page_size * wasm_memory_page_count;
-
-    const wasm_install = b.addInstallArtifact(wasm, .{});
-
-    // TODO
-    // copy into mini-for-web public
-    //   precompiles.mini.bin
-    //   startup file
-    const wasm_copy = b.addSystemCommand(&.{"cp"});
-    wasm_copy.addArg("zig-out/bin/mini-wasm.wasm");
-    wasm_copy.addArg("../mini-for-web/public/mini/");
-    wasm_copy.step.dependOn(&wasm_install.step);
+    const wasm = setupWasm(b, mod_mini);
 
     const wasm_step = b.step("wasm", "Build and install wasm");
-    wasm_step.dependOn(&wasm_copy.step);
+    wasm_step.dependOn(wasm);
 
     // ===
 
@@ -141,6 +155,11 @@ pub fn build(b: *std.Build) void {
     // This will evaluate the `run` step rather than the default, which is "install".
     const run_step = b.step("run", "Run the app");
     run_step.dependOn(&run_cmd.step);
+
+    // TODO make build all the default
+    const all_step = b.step("all", "Build and install everything");
+    all_step.dependOn(b.getInstallStep());
+    all_step.dependOn(wasm);
 
     // Creates a step for unit testing. This only builds the test executable
     // but does not run it.

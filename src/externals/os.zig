@@ -232,4 +232,8 @@ pub const OS = struct {
             },
         });
     }
+
+    pub fn getStartupFile(_: *@This()) []const u8 {
+        return @embedFile("os.mini.fth");
+    }
 };

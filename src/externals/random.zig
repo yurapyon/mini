@@ -95,4 +95,8 @@ pub const Randomizer = struct {
             },
         });
     }
+
+    pub fn getStartupFile(_: *@This()) []const u8 {
+        return @embedFile("random.mini.fth");
+    }
 };

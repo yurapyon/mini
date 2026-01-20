@@ -282,3 +282,49 @@ also compiler definitions
 : [defined] [defined] ;
 previous definitions
 
+\ tags ===
+
+: s>mem ( ... a n -- ) tuck s* @ 3 cells + -rot move s* +! ;
+
+0 variable tags*
+: tags, ( n -- )        cells >r ['] jump , (later), here swap r@ allot this! here tags* !
+                        lit, , lit, r> , ['] s>mem , ;
+: tag   ( n "name" -- ) create cells , does> @ tags* @ swap - cell - lit, , ['] @ , ;
+also compiler definitions
+0 tag @0 1 tag @1 2 tag @2 3 tag @3
+4 tag @4 5 tag @5 6 tag @6 7 tag @7
+previous definitions
+
+\ ===
+
+0 [if]
+: postpone word cond
+  2dup cvocab @ cfind ?dup if -rot 2drop >cfa , else
+  2dup find           ?dup if -rot 2drop >cfa literal ['] , , else
+    wnf
+  endcond ;
+
+: tags, ( n -- )        cells >r
+                        (lit), lit, r@ , ['] s>mem , ['] jump , (later),
+                        swap this! r> allot this! here tags* ! ;
+[then]
+
+\ blocks ===
+
+: fill  ( a n n -- ) >r range check> if r@ swap c!+ loop then r> 3drop ;
+: erase ( a n -- )   0 fill ;
+: blank ( a n -- )   bl fill ;
+
+\ : bthis-line 64 / 64 * ;
+\ : bnext-line 64 + bthis-line ;
+\ : \ blk @ if >in @ bnext-line >in ! else [compile] \ then ;
+\ : line. swap 64 * + 64 range print. ;
+\ : list. >r 16 0 u>?|: dup dup 2 u.r space r@ line. cr 1+ loop then r> 3drop ;
+\ : list block list. ;
+
+\ evaluate ===
+
+: src@ source-ptr @ source-len @ >in @ ;
+: src! >in ! source-len ! source-ptr ! ;
+
+: evaluate src@ >r >r >r 0 src! interpret r> r> r> src! ;

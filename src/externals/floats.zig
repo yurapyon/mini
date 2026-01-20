@@ -165,3 +165,7 @@ pub fn pushExternals(exts: *ExternalsList) !void {
         },
     });
 }
+
+pub fn getStartupFile() []const u8 {
+    return @embedFile("floats.mini.fth");
+}
