@@ -58,6 +58,12 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
     copy_startup.addArg(web_public);
     copy_startup.step.dependOn(&copy_precompiled.step);
 
+    // TODO
+    // const copy_specs = b.addSystemCommand(&.{"cp"});
+    // copy_specs.addArg("specs");
+    // copy_specs.addArg(web_public);
+    // copy_specs.step.dependOn(&copy_precompiled.step);
+
     return &copy_startup.step;
 }
 

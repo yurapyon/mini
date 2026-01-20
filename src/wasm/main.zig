@@ -4,6 +4,7 @@ const mini = @import("mini");
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
+const FFI = kernel.FFI;
 
 const externals = mini.externals;
 const External = externals.External;
@@ -12,7 +13,7 @@ const External = externals.External;
 
 const allocator = std.heap.wasm_allocator;
 
-var k: Kernel = undefined;
+var global_k: Kernel = undefined;
 var forth_mem: mini.mem.MemoryPtr = undefined;
 var image_mem: []u8 = undefined;
 var script_mem: []u8 = undefined;
@@ -63,22 +64,47 @@ fn accept(out: []u8, _: ?*anyopaque) error{CannotAccept}!Cell {
     return 0;
 }
 
+fn ffiCallback(k: *Kernel, _: ?*anyopaque, ext_token: Cell) FFI.Error!void {
+    if (ext_token < exts.len) {
+        const ext = exts[ext_token];
+        ext.call(k) catch |err| switch (err) {
+            error.ExternalPanic => return error.Panic,
+            else => |e| return e,
+        };
+    } else {
+        return error.UnhandledExternal;
+    }
+}
+
+fn ffiLookup(_: *Kernel, _: ?*anyopaque, name: []const u8) ?Cell {
+    // const exts: *ExternalsList = @ptrCast(@alignCast(userdata));
+    // return exts.lookup(name);
+    _ = name;
+    // TODO
+    return 0;
+}
+
 // NOTE
 // Frees image and script mem
 //   TODO maybe don't do this
 // TODO handle kernel errors
 export fn init() void {
-    k.init(forth_mem);
+    global_k.init(forth_mem);
 
-    k.loadImage(image_mem);
+    global_k.loadImage(image_mem);
     allocator.free(image_mem);
 
-    k.setExternals(&exts) catch unreachable;
+    //k.setExternals(&exts) catch unreachable;
+    global_k.setFFIClosure(.{
+        .callback = ffiCallback,
+        .lookup = ffiLookup,
+        .userdata = null,
+    });
 
-    k.clearAcceptClosure();
-    k.setEmitClosure(emit, null);
+    global_k.clearAcceptClosure();
+    global_k.setEmitClosure(emit, null);
 
-    k.evaluate(script_mem) catch unreachable;
+    global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
 
     // Start repl
@@ -112,6 +138,6 @@ export fn deinit() void {
 }
 
 export fn evaluateScript() void {
-    k.evaluate(script_mem) catch unreachable;
+    global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
 }

@@ -10,8 +10,9 @@ const putc = (char) => {
   }
 }
 
+export const fetchMini = async () => {
+  const callbacks = {};
 
-const initWasm = async () => {
   const WASM_FILEPATH = "/mini/mini-wasm.wasm";
   const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
   const STARTUP_FILEPATH = "/mini/startup.mini.fth";
@@ -28,7 +29,7 @@ const initWasm = async () => {
         console.log("zig: ", result);
       },
       callJs: (id) => {
-        console.log("ext: ", id);
+        callbacks[id]();
       },
       jsEmit: (ch) => {
         putc(ch);
@@ -43,7 +44,7 @@ const initWasm = async () => {
   const startup_response = await fetch(STARTUP_FILEPATH);
   const startup = await startup_response.bytes();
 
-  WebAssembly
+  const mini = await WebAssembly
     .instantiateStreaming(fetch(WASM_FILEPATH), importObject)
     .then((result) => {
       const {
@@ -63,7 +64,7 @@ const initWasm = async () => {
 
       result.instance.exports.init();
 
-      const forthEval = (str) => {
+      const run = (str) => {
         const utf8 = new TextEncoder();
         const bytes = utf8.encode(str);
 
@@ -75,14 +76,17 @@ const initWasm = async () => {
         evaluateScript();
       };
 
-      forthEval("words cr ashy");
+      const addCallback = (id, func) => {
+        callbacks[id] = func;
+      };
+
+      run("external js");
+
+      return {
+        run,
+        addCallback,
+      }
   });
+
+  return mini;
 }
-
-export const init = () => {
-  initWasm();
-};
-
-export const deinit = () => {
-};
-

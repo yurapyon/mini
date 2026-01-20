@@ -1,5 +1,6 @@
 pub const kernel = @import("kernel.zig");
 pub const mem = @import("memory.zig");
+// TODO move this to libs module
 pub const externals = @import("externals.zig");
 
 pub const utils = struct {

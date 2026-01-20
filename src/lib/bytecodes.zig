@@ -570,7 +570,9 @@ pub fn extId(k: *Kernel) Error!void {
         len,
     );
 
-    const ext_token = k.lookupExternal(name) orelse
+    // const ext_token = k.lookupExternal(name) orelse
+    // return error.Panic;
+    const ext_token = k.lookupFFI(name) orelse
         return error.Panic;
     const token = ext_token + @as(Cell, @intCast(callbacks.len));
     k.data_stack.pushCell(token);

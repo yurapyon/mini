@@ -1,7 +1,8 @@
+import { createResource } from "solid-js";
 import type { Component } from 'solid-js';
 import { TitleBar } from "./components/TitleBar";
 import { Documentation } from "./components/documentation/Documentation";
-import { init as initMini } from "./lib/Mini";
+import { fetchMini } from "./lib/mini";
 
 const Terminal = () => {
   return <div class="bg-[#000010] text-xs flex flex-col" style={{
@@ -13,8 +14,21 @@ const Terminal = () => {
   </div>;
 }
 
+const Btn = (props) => {
+  props.mini.addCallback(0, () => {
+    console.log("asdf");
+  });
+  return (
+    <button on:click={()=>{
+      props.mini.run("0 js");
+    }}>
+      hi
+    </button>
+  );
+}
+
 const App: Component = () => {
-  initMini();
+  const [mini] = createResource(fetchMini);
   return (
     <div class="w-screen h-screen flex flex-col font-mono bg-[#080808] text-white">
       <TitleBar />
@@ -22,6 +36,9 @@ const App: Component = () => {
         <Documentation />
         <Terminal />
       </div>
+      <Show when={mini()}>
+        <Btn mini={mini()} />
+      </Show>
     </div>
   );
 };
