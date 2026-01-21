@@ -1,8 +1,8 @@
 # : mini ;
-## a 16bit Forth for desktop and web
-
-checkout src/examples for code samples
-(try it out online)[https://mini-nrlx.onrender.com/]
+a 16bit Forth for desktop and web  
+  
+checkout src/examples for code samples  
+[try it out online](https://mini-nrlx.onrender.com/)  
 
 ### goals
 - clear, simple and obvious
