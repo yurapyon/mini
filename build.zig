@@ -38,6 +38,15 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
 
+    const wasm_optimize = b.addSystemCommand(&.{"wasm-opt"});
+    wasm_optimize.addArg("-O2");
+    wasm_optimize.addArg("--asyncify");
+    wasm_optimize.addArg("--pass-args=asyncify-imports@env.jsRead");
+    wasm_optimize.addArg("zig-out/bin/mini-wasm.wasm");
+    wasm_optimize.addArg("-o");
+    wasm_optimize.addArg("zig-out/bin/mini-wasm.wasm");
+    wasm_optimize.step.dependOn(&wasm_install.step);
+
     // TODO
     // copy the docs to /web
 
@@ -46,7 +55,7 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
     const copy_wasm = b.addSystemCommand(&.{"cp"});
     copy_wasm.addArg("zig-out/bin/mini-wasm.wasm");
     copy_wasm.addArg(web_public);
-    copy_wasm.step.dependOn(&wasm_install.step);
+    copy_wasm.step.dependOn(&wasm_optimize.step);
 
     const copy_precompiled = b.addSystemCommand(&.{"cp"});
     copy_precompiled.addArg("mini-out/precompiled.mini.bin");
