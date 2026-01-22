@@ -3,7 +3,10 @@ const consoleBuffer = [];
 const putc = (char) => {
   if (char === 10) {
     const str = String.fromCharCode(...consoleBuffer);
-    console.log(str);
+    const ev = new CustomEvent("mini.print", {
+      detail: str
+    });
+    document.dispatchEvent(ev);
     consoleBuffer.length = 0;
   } else {
     consoleBuffer.push(char);
