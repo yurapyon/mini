@@ -12,44 +12,43 @@ checkout src/examples for code samples
 
 ### features
 - overall
-    - clean, self-documenting codebase (hopefully)
-    - well-defined, obvious memory layout
-    - self-hosting with metacompiler
-      - parser and interpreter written in forth
-      - boots from a system image
-        - included system image is pretty small, around 2.5kb
-    - automatic tailcall optimization
-    - cross-platform on desktop and web
- - language
-   - covers most of the ANSI Forth 'Core' word set
-   - vocabularies, search order
-   - string escapes, including multiline strings
-   - easy-to-use FFI, currently builds in:
-     - OS access
-     - 32-bit floats
-     - dynamic memory
-     - random number generation
- - virtual PC
-   - based off of the PC-98 computer
-	   - pixel buffer
-	   - character buffer
-   - mouse/keyboard callbacks
-   - separate threads for graphics and interpreter
-   - gamepad support
+  - clean, self-documenting codebase (hopefully)
+  - well-defined, obvious memory layout
+  - self-hosting with metacompiler
+    - parser and interpreter written in forth
+    - boots from a system image
+      - included system image is pretty small, around 2.5kb
+  - automatic tailcall optimization
+  - cross-platform on desktop and web
+- language
+  - covers most of the ANSI Forth 'Core' word set
+  - vocabularies, search order
+  - string escapes, including multiline strings
+  - easy-to-use FFI, currently builds in:
+    - OS access
+    - 32-bit floats
+    - dynamic memory
+    - random number generation
+- virtual PC
+  - based off of the PC-98 computer
+    - pixel buffer
+    - character buffer
+  - mouse/keyboard callbacks
+  - separate threads for graphics and interpreter
+  - gamepad support
 
 ### roadmap
-  - in progress
-    - webassembly target
-  - planned
-    - io
-      - audio
-    - cross-compiler for avr/pic
-  - maybe
+- in progress
+  - webassembly target
+- planned
+  - io
+    - audio
+  - cross-compiler for avr/pic
+- maybe
 
 ### building
 you need:
   - mac OS
   - zig
-  - binaryen
 
 MIT

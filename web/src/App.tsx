@@ -31,7 +31,10 @@ const TerminalComponent = (props) => {
     }}
     tabIndex="0"
     on:click={()=>{
-      props.mini().run("1 2 3 put-xy");
+      // props.mini().run("1 2 3 put-xy");
+      console.log("asdf");
+      props.mini().repl();
+      console.log("asdf after");
     }}
     on:keydown={(ev)=>{
       ev.preventDefault();

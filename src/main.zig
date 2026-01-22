@@ -11,6 +11,7 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const FFI = kernel.FFI;
+const Accept = kernel.Accept;
 
 const Handles = mini.utils.Handles;
 
@@ -39,7 +40,18 @@ fn emitStdOut(char: u8, userdata: ?*anyopaque) void {
     fw.interface.flush() catch unreachable;
 }
 
-fn acceptStdIn(out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell {
+fn acceptStdIn(
+    k: *Kernel,
+    userdata: ?*anyopaque,
+    buf_addr: Cell,
+    buf_len: Cell,
+) Accept.Error!Cell {
+    const out = try mem.sliceFromAddrAndLen(
+        k.memory,
+        buf_addr,
+        buf_len,
+    );
+
     // TODO handle EoF
 
     var buf = [_]u8{0} ** 256;
@@ -99,7 +111,11 @@ fn kernelRunFiles(
     if (start_repl) {
         std.debug.print("(mini)\n", .{});
 
-        k.setAcceptClosure(acceptStdIn, &input_file);
+        k.setAcceptClosure(.{
+            .callback = acceptStdIn,
+            .userdata = &input_file,
+            .is_async = false,
+        });
         k.initForth();
         try k.execute();
     }
@@ -140,8 +156,16 @@ pub fn main() !void {
             cli_options.filepaths.items.len == 0;
 
         if (cli_options.precompile) {
-            k.setAcceptClosure(acceptStdIn, &input_file);
-            k.setEmitClosure(emitStdOut, &output_file);
+            k.setAcceptClosure(.{
+                .callback = acceptStdIn,
+                .userdata = &input_file,
+                .is_async = false,
+            });
+
+            k.setEmitClosure(.{
+                .callback = emitStdOut,
+                .userdata = &output_file,
+            });
 
             try k.setAcceptBuffer(self_host_file);
             k.initForth();
@@ -185,7 +209,10 @@ pub fn main() !void {
             });
 
             k.clearAcceptClosure();
-            k.setEmitClosure(emitStdOut, &output_file);
+            k.setEmitClosure(.{
+                .callback = emitStdOut,
+                .userdata = &output_file,
+            });
 
             k.debug_accept_buffer = false;
 
@@ -236,7 +263,10 @@ pub fn main() !void {
             });
 
             k.clearAcceptClosure();
-            k.setEmitClosure(emitStdOut, &output_file);
+            k.setEmitClosure(.{
+                .callback = emitStdOut,
+                .userdata = &output_file,
+            });
 
             k.debug_accept_buffer = false;
 
@@ -258,7 +288,11 @@ pub fn main() !void {
             if (should_start_repl) {
                 std.debug.print("(mini)\n", .{});
 
-                k.setAcceptClosure(acceptStdIn, &input_file);
+                k.setAcceptClosure(.{
+                    .callback = acceptStdIn,
+                    .userdata = &input_file,
+                    .is_async = false,
+                });
                 // TODO note
                 // This restarts the interpreter
                 // Not sure if this is best to do

@@ -83,14 +83,50 @@ pub const FFI = struct {
     };
 };
 
-pub const AcceptCallback =
-    *const fn (out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell;
+pub const Accept = struct {
+    pub const Error = error{
+        CannotAccept,
+    } || bytecodes.Error;
 
-pub const EmitCallback =
-    *const fn (char: u8, userdata: ?*anyopaque) void;
+    // TODO this output should not be ab array
+    //   it should be kernel, arr, len,
+    pub const Callback = *const fn (
+        k: *Kernel,
+        userdata: ?*anyopaque,
+        buf_addr: Cell,
+        buf_len: Cell,
+    ) Error!Cell;
+
+    // NOTE
+    // If accept is async, callback should
+    //   fill the output memory and
+    //   push arraysize to the stack before resuming
+    pub const Closure = struct {
+        callback: Callback,
+        userdata: ?*anyopaque,
+        is_async: bool,
+    };
+};
+
+pub const Emit = struct {
+    pub const Callback =
+        *const fn (char: u8, userdata: ?*anyopaque) void;
+
+    pub const Closure = struct {
+        callback: Callback,
+        userdata: ?*anyopaque,
+    };
+};
+
+const ExecutionStatus = enum {
+    playing,
+    paused,
+    resuming,
+};
 
 pub const Kernel = struct {
     memory: mem.MemoryPtr,
+    execution_status: ExecutionStatus,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -98,16 +134,8 @@ pub const Kernel = struct {
         mem: []const u8,
     },
 
-    accept_closure: ?struct {
-        callback: AcceptCallback,
-        userdata: ?*anyopaque,
-    },
-
-    emit_closure: ?struct {
-        callback: EmitCallback,
-        userdata: ?*anyopaque,
-    },
-
+    accept_closure: ?Accept.Closure,
+    emit_closure: ?Emit.Closure,
     ffi_closure: ?FFI.Closure,
 
     program_counter: Register(
@@ -141,6 +169,7 @@ pub const Kernel = struct {
         memory: mem.MemoryPtr,
     ) void {
         self.memory = memory;
+        self.execution_status = .playing;
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -184,8 +213,17 @@ pub const Kernel = struct {
     }
 
     pub fn execute(self: *@This()) !void {
-        self.return_stack.pushCell(0);
-        self.program_counter.store(@TypeOf(self.execute_register).offset);
+        // TODO maybe move this out of here somehow
+        switch (self.execution_status) {
+            .playing => {
+                self.return_stack.pushCell(0);
+                self.program_counter.store(@TypeOf(self.execute_register).offset);
+            },
+            .paused => return,
+            .resuming => {
+                self.execution_status = .playing;
+            },
+        }
 
         // Execution strategy:
         //   1. increment PC, then
@@ -267,6 +305,10 @@ pub const Kernel = struct {
                     self.abort();
                 };
             }
+
+            if (self.execution_status == .paused) {
+                break;
+            }
         }
     }
 
@@ -295,6 +337,14 @@ pub const Kernel = struct {
         if (!(self.debug.enable_tco and deref == exit_code)) {
             self.return_stack.pushCell(pc);
         }
+    }
+
+    pub fn pause(self: *@This()) void {
+        self.execution_status = .paused;
+    }
+
+    pub fn unpause(self: *@This()) void {
+        self.execution_status = .resuming;
     }
 
     // ===
@@ -361,13 +411,9 @@ pub const Kernel = struct {
 
     pub fn setAcceptClosure(
         self: *@This(),
-        callback: AcceptCallback,
-        userdata: ?*anyopaque,
+        closure: Accept.Closure,
     ) void {
-        self.accept_closure = .{
-            .callback = callback,
-            .userdata = userdata,
-        };
+        self.accept_closure = closure;
     }
 
     pub fn clearAcceptClosure(self: *@This()) void {
@@ -376,13 +422,9 @@ pub const Kernel = struct {
 
     pub fn setEmitClosure(
         self: *@This(),
-        callback: EmitCallback,
-        userdata: ?*anyopaque,
+        closure: Emit.Closure,
     ) void {
-        self.emit_closure = .{
-            .callback = callback,
-            .userdata = userdata,
-        };
+        self.emit_closure = closure;
     }
 
     pub fn clearEmitClosure(self: *@This()) void {

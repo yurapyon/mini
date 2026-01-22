@@ -11,11 +11,13 @@ const putc = (char) => {
 }
 
 export const fetchMini = async () => {
+  var forth_ptr = 0;
   var ext_ptr = 0;
 
   const kernel = {
     pop: null,
     push: null,
+    resumeAfterRead: null,
   };
 
   const externals = [
@@ -64,22 +66,29 @@ export const fetchMini = async () => {
       jsEmit: (ch) => {
         putc(ch);
       },
-      jsRead: (ch) => {
-        // const val = 0;
+      jsStartRead: (addr, len) => {
+        const utf8Encode = new TextEncoder();
 
-        /*
         const p = new Promise((resolve) => {
-          rl.resume();
-          rl.on('line', (line) => {
-            rl.pause();
-            resolve(line);
-          });
+          if (confirm()) {
+            resolve("s\" hi\" type cr\n")
+          } else {
+            resolve("s\" wawa\" type cr\n")
+          }
         });
 
-        p.then((line)=>console.log("asdf", line));
-        */
+        p.then((str)=>{
+          const wasm_mem = new Uint8Array(memory.buffer);
 
-        // process.stdout.write(String.fromCharCode(ch));
+          const bytes = utf8Encode.encode(str);
+          wasm_mem.set(bytes, forth_ptr);
+
+          console.log(bytes, str)
+
+          kernel.push(str.length);
+          kernel.resumeAfterRead();
+          console.log("here")
+        });
       },
       memory: memory,
     }
@@ -91,10 +100,14 @@ export const fetchMini = async () => {
   const startup_response = await fetch(STARTUP_FILEPATH);
   const startup = await startup_response.bytes();
 
+  console.log("here");
+
   const mini = await WebAssembly
     .instantiateStreaming(fetch(WASM_FILEPATH), importObject)
     .then((result) => {
       const {
+        init,
+        repl,
         allocateForthMemory,
         allocateImageMemory,
         allocateScriptMemory,
@@ -102,9 +115,10 @@ export const fetchMini = async () => {
         evaluateScript,
         kPop,
         kPush,
+        resumeAfterRead,
       } = result.instance.exports;
 
-      const forth_ptr = allocateForthMemory();
+      forth_ptr = allocateForthMemory();
       const image_ptr = allocateImageMemory(image.byteLength);
       const script_ptr = allocateScriptMemory(startup.byteLength);
       ext_ptr = allocateExtLookupMemory();
@@ -113,7 +127,7 @@ export const fetchMini = async () => {
       wasm_mem.set(image, image_ptr);
       wasm_mem.set(startup, script_ptr);
 
-      result.instance.exports.init();
+      init();
 
       const run = (str) => {
         const utf8 = new TextEncoder();
@@ -138,6 +152,7 @@ export const fetchMini = async () => {
 
       kernel.pop = kPop;
       kernel.push = kPush;
+      kernel.resumeAfterRead = resumeAfterRead;
 
       run("external js")
       run("external js2")
@@ -146,8 +161,11 @@ export const fetchMini = async () => {
         run,
         addExternal,
         kernel,
+        repl,
       }
   });
+
+  console.log("here2");
 
   return mini;
 }
