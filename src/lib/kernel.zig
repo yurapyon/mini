@@ -83,14 +83,48 @@ pub const FFI = struct {
     };
 };
 
-pub const AcceptCallback =
-    *const fn (out: []u8, userdata: ?*anyopaque) error{CannotAccept}!Cell;
+pub const Accept = struct {
+    pub const Error = error{
+        CannotAccept,
+    } || bytecodes.Error;
 
-pub const EmitCallback =
-    *const fn (char: u8, userdata: ?*anyopaque) void;
+    pub const Callback = *const fn (
+        k: *Kernel,
+        userdata: ?*anyopaque,
+        buf_addr: Cell,
+        buf_len: Cell,
+    ) Error!Cell;
+
+    // NOTE
+    // If accept is async, before resuming callback should:
+    //   fill the output memory at addr, accounting for max_len
+    //   push string size to the stack
+    pub const Closure = struct {
+        callback: Callback,
+        userdata: ?*anyopaque,
+        is_async: bool,
+    };
+};
+
+pub const Emit = struct {
+    pub const Callback =
+        *const fn (char: u8, userdata: ?*anyopaque) void;
+
+    pub const Closure = struct {
+        callback: Callback,
+        userdata: ?*anyopaque,
+    };
+};
+
+const ExecutionStatus = enum {
+    playing,
+    paused,
+    resuming,
+};
 
 pub const Kernel = struct {
     memory: mem.MemoryPtr,
+    execution_status: ExecutionStatus,
 
     debug_accept_buffer: bool,
     accept_buffer: ?struct {
@@ -98,16 +132,8 @@ pub const Kernel = struct {
         mem: []const u8,
     },
 
-    accept_closure: ?struct {
-        callback: AcceptCallback,
-        userdata: ?*anyopaque,
-    },
-
-    emit_closure: ?struct {
-        callback: EmitCallback,
-        userdata: ?*anyopaque,
-    },
-
+    accept_closure: ?Accept.Closure,
+    emit_closure: ?Emit.Closure,
     ffi_closure: ?FFI.Closure,
 
     program_counter: Register(
@@ -141,6 +167,7 @@ pub const Kernel = struct {
         memory: mem.MemoryPtr,
     ) void {
         self.memory = memory;
+        self.execution_status = .playing;
 
         self.program_counter.init(self.memory);
         self.current_token_addr.init(self.memory);
@@ -173,6 +200,7 @@ pub const Kernel = struct {
     pub fn initForth(self: *@This()) void {
         // TODO
         //   should set 'stay' to true??
+        //   should set exec_state to .playing?
         const init_xt = self.init_xt.fetch();
         self.execute_register.store(init_xt);
     }
@@ -184,8 +212,17 @@ pub const Kernel = struct {
     }
 
     pub fn execute(self: *@This()) !void {
-        self.return_stack.pushCell(0);
-        self.program_counter.store(@TypeOf(self.execute_register).offset);
+        // TODO maybe move this out of here somehow
+        switch (self.execution_status) {
+            .playing => {
+                self.return_stack.pushCell(0);
+                self.program_counter.store(@TypeOf(self.execute_register).offset);
+            },
+            .paused => return,
+            .resuming => {
+                self.execution_status = .playing;
+            },
+        }
 
         // Execution strategy:
         //   1. increment PC, then
@@ -213,7 +250,7 @@ pub const Kernel = struct {
                 };
 
                 // TODO
-                //   dont use std debug here ?
+                // some type of "report error" callback instad of std.debug
                 if (builtin.target.cpu.arch != .wasm32) {
                     std.debug.print("Token Lookup Error: {s}\n", .{message});
                 }
@@ -224,6 +261,7 @@ pub const Kernel = struct {
 
             if (bytecodes.getBytecode(token)) |callback| {
                 callback(self) catch |err| {
+                    // TODO err -> string function
                     const message = switch (err) {
                         error.Panic => "Panic",
                         error.InvalidProgramCounter => "Invalid Program Counter",
@@ -236,6 +274,8 @@ pub const Kernel = struct {
 
                     const name = bytecodes.getBytecodeName(token) orelse "Unknown";
 
+                    // TODO
+                    // some type of "report error" callback instad of std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
                         std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
                     }
@@ -256,16 +296,22 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
+                    _ = message;
+
                     // const name = self.externals[ext_token].name;
 
+                    // TODO
+                    // some type of "report error" callback instad of std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
                         // std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     }
 
-                    _ = message;
-
                     self.abort();
                 };
+            }
+
+            if (self.execution_status == .paused) {
+                break;
             }
         }
     }
@@ -295,6 +341,14 @@ pub const Kernel = struct {
         if (!(self.debug.enable_tco and deref == exit_code)) {
             self.return_stack.pushCell(pc);
         }
+    }
+
+    pub fn pause(self: *@This()) void {
+        self.execution_status = .paused;
+    }
+
+    pub fn unpause(self: *@This()) void {
+        self.execution_status = .resuming;
     }
 
     // ===
@@ -361,13 +415,9 @@ pub const Kernel = struct {
 
     pub fn setAcceptClosure(
         self: *@This(),
-        callback: AcceptCallback,
-        userdata: ?*anyopaque,
+        closure: Accept.Closure,
     ) void {
-        self.accept_closure = .{
-            .callback = callback,
-            .userdata = userdata,
-        };
+        self.accept_closure = closure;
     }
 
     pub fn clearAcceptClosure(self: *@This()) void {
@@ -376,13 +426,9 @@ pub const Kernel = struct {
 
     pub fn setEmitClosure(
         self: *@This(),
-        callback: EmitCallback,
-        userdata: ?*anyopaque,
+        closure: Emit.Closure,
     ) void {
-        self.emit_closure = .{
-            .callback = callback,
-            .userdata = userdata,
-        };
+        self.emit_closure = closure;
     }
 
     pub fn clearEmitClosure(self: *@This()) void {

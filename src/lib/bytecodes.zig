@@ -155,13 +155,14 @@ pub fn accept(k: *Kernel) Error!void {
 
     const len = k.data_stack.popCell();
     const addr = k.data_stack.popCell();
-    const out = try mem.sliceFromAddrAndLen(
-        k.memory,
-        addr,
-        len,
-    );
 
     if (k.accept_buffer) |*accept_buffer| {
+        const out = try mem.sliceFromAddrAndLen(
+            k.memory,
+            addr,
+            len,
+        );
+
         const reader = accept_buffer.stream.reader();
         const slice =
             reader.readUntilDelimiterOrEof(
@@ -182,8 +183,13 @@ pub fn accept(k: *Kernel) Error!void {
             }
         }
     } else if (k.accept_closure) |closure| {
-        const size = try closure.callback(out, closure.userdata);
-        k.data_stack.pushCell(size);
+        if (closure.is_async) {
+            _ = try closure.callback(k, closure.userdata, addr, len);
+            k.pause();
+        } else {
+            const size = try closure.callback(k, closure.userdata, addr, len);
+            k.data_stack.pushCell(size);
+        }
     } else {
         return error.CannotAccept;
     }

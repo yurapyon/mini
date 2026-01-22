@@ -5,6 +5,7 @@ const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
 const FFI = kernel.FFI;
+const Accept = kernel.Accept;
 
 // ===
 
@@ -49,7 +50,7 @@ export fn kPush(value: Cell) void {
 }
 
 extern fn jsEmit(u8) void;
-extern fn jsRead() u8;
+extern fn jsStartRead(Cell, Cell) void;
 extern fn jsFFICallback(Cell) void;
 extern fn jsFFILookup(usize) isize;
 
@@ -57,9 +58,8 @@ fn emit(char: u8, _: ?*anyopaque) void {
     jsEmit(char);
 }
 
-fn accept(out: []u8, _: ?*anyopaque) error{CannotAccept}!Cell {
-    _ = out;
-    // TODO
+fn accept(_: *Kernel, _: ?*anyopaque, buf_addr: Cell, buf_len: Cell) Accept.Error!Cell {
+    jsStartRead(buf_addr, buf_len);
     return 0;
 }
 
@@ -97,15 +97,28 @@ export fn init() void {
     });
 
     global_k.clearAcceptClosure();
-    global_k.setEmitClosure(emit, null);
+    global_k.setEmitClosure(.{
+        .callback = emit,
+        .userdata = null,
+    });
 
     global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
+}
 
-    // Start repl ?
-    // k.setAcceptClosure(accept, null);
-    // k.initForth();
-    // k.execute() catch unreachable;
+export fn repl() void {
+    global_k.setAcceptClosure(.{
+        .callback = accept,
+        .userdata = null,
+        .is_async = true,
+    });
+    global_k.initForth();
+    global_k.execute() catch unreachable;
+}
+
+export fn resumeAfterRead() void {
+    global_k.unpause();
+    global_k.execute() catch unreachable;
 }
 
 export fn deinit() void {

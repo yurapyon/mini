@@ -38,6 +38,16 @@ fn setupWasm(b: *std.Build, mod_mini: *std.Build.Module) *std.Build.Step {
 
     const wasm_install = b.addInstallArtifact(wasm, .{});
 
+    // const wasm_optimize = b.addSystemCommand(&.{"wasm-opt"});
+    // wasm_optimize.addArg("-O2");
+    // wasm_optimize.addArg("--enable-bulk-memory");
+    // wasm_optimize.addArg("--asyncify");
+    // wasm_optimize.addArg("--pass-arg=asyncify-imports@env.jsRead");
+    // wasm_optimize.addArg("zig-out/bin/mini-wasm.wasm");
+    // wasm_optimize.addArg("-o");
+    // wasm_optimize.addArg("zig-out/bin/mini-wasm.wasm");
+    // wasm_optimize.step.dependOn(&wasm_install.step);
+
     // TODO
     // copy the docs to /web
 
