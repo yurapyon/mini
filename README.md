@@ -1,7 +1,5 @@
 # : mini ;
 a 16bit Forth for desktop and web  
-  
-checkout src/examples for code samples  
 [try it out online](https://mini-nrlx.onrender.com/)  
 
 ### goals
@@ -9,6 +7,11 @@ checkout src/examples for code samples
   - don't sacrifice readibility for performance
 - evolution of a classic
   - "writing a forth" is more important than "designing a modern language"
+
+### see
+- `/repo-overview` for repo info
+- `/mini-specs` for language/vm specs
+- `src/examples` for code samples  
 
 ### features
 - overall
@@ -50,5 +53,13 @@ checkout src/examples for code samples
 you need:
   - mac OS
   - zig
+  - glfw
 
+### setup:
+mac OS, using homebrew:
+- `$ brew install zig glfw`
+- `$ zig build`
+- `$ ./shell/run.sh`
+
+### license
 MIT

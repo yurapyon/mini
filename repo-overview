@@ -1,13 +1,3 @@
-implementation notes ==
-
-// NOTE
-// Setup might be outdated for now, until wasm support is finalized
-setup:
-  mac OS, using homebrew:
-    $ brew install zig glfw
-    $ zig build
-    $ ./shell/run.sh
-
 files:
   mini-out/
     precomiled.mini.bin        - main startup image, created as output of self-host.mini.fth
@@ -39,6 +29,7 @@ files:
       dynamic.zig              - dynamic memory
       random.zig               - RNG
       root.zig                 - library root
+      externals.zig            - struct for defining external functions
 
     sketch/                    - random unfinished/testing scripts
 
@@ -64,9 +55,8 @@ files:
 
     utils/                     - zig utils
 
-    lib/
+    lib/                       - main mini library
       bytecodes.zig            - bytecode behaviors and the code-field lookup table
-      externals.zig            - struct for defining external functions
       kernel.zig               - defines some types, contains execution loop
       memory.zig               - memory-related type definitions and error-returning memory access utils
       register.zig             - 'pointer' that stores an offset into forth memory
@@ -77,9 +67,4 @@ files:
     main.zig                   - processes commandline options and starts the system
     self-host.mini.fth         - metacompiler to create a bytecode image for selfhosting
     startup.mini.fith          - a forth file that defines the 'std library' and most of the language features
-
-undefined behavior:
-  mini shouldn't segfault due to invalid memory access
-    alignment needs to be checked and turned into a MemoryError
-    out of bounds access of the forth memory block needs to be checked too
 
