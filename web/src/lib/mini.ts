@@ -23,22 +23,7 @@ export const fetchMini = async () => {
     resumeAfterRead: null,
   };
 
-  const externals = [
-    {
-      name: "js",
-      fn: ()=>{
-        const value = kernel.pop()
-        console.log("ext: ", value);
-      }
-    },
-    {
-      name: "js2",
-      fn: ()=>{
-        const value = kernel.pop()
-        console.log("ext2: ", value);
-      }
-    }
-  ];
+  const externals = []
 
   const WASM_FILEPATH = "/mini/mini-wasm.wasm";
   const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
@@ -161,9 +146,6 @@ export const fetchMini = async () => {
       kernel.pop = kPop;
       kernel.push = kPush;
       kernel.resumeAfterRead = resumeAfterRead;
-
-      runScript("external js")
-      runScript("external js2")
 
       return {
         runScript,
