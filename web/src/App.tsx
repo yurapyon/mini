@@ -31,10 +31,7 @@ const TerminalComponent = (props) => {
     }}
     tabIndex="0"
     on:click={()=>{
-      // props.mini().run("1 2 3 put-xy");
-      console.log("asdf");
       props.mini().repl();
-      console.log("asdf after");
     }}
     on:keydown={(ev)=>{
       ev.preventDefault();
@@ -42,7 +39,10 @@ const TerminalComponent = (props) => {
       if (ev.key === "Enter") {
         if (c.length > 0) {
           console.log("exec: " + c);
-          props.mini().run(c);
+          const ev = new CustomEvent("mini.read", {
+            detail: c,
+          });
+          document.dispatchEvent(ev);
           setHistory((p)=>[c, ...p]);
           setCmd("");
         }

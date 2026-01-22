@@ -202,6 +202,7 @@ pub const Kernel = struct {
     pub fn initForth(self: *@This()) void {
         // TODO
         //   should set 'stay' to true??
+        //   should set exec_state to .playing?
         const init_xt = self.init_xt.fetch();
         self.execute_register.store(init_xt);
     }
@@ -251,7 +252,7 @@ pub const Kernel = struct {
                 };
 
                 // TODO
-                //   dont use std debug here ?
+                // some type of "report error" callback instad of std.debug
                 if (builtin.target.cpu.arch != .wasm32) {
                     std.debug.print("Token Lookup Error: {s}\n", .{message});
                 }
@@ -262,6 +263,7 @@ pub const Kernel = struct {
 
             if (bytecodes.getBytecode(token)) |callback| {
                 callback(self) catch |err| {
+                    // TODO err -> string function
                     const message = switch (err) {
                         error.Panic => "Panic",
                         error.InvalidProgramCounter => "Invalid Program Counter",
@@ -274,6 +276,8 @@ pub const Kernel = struct {
 
                     const name = bytecodes.getBytecodeName(token) orelse "Unknown";
 
+                    // TODO
+                    // some type of "report error" callback instad of std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
                         std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
                     }
@@ -294,13 +298,15 @@ pub const Kernel = struct {
                         error.UnhandledExternal => "Unhandled External",
                     };
 
+                    _ = message;
+
                     // const name = self.externals[ext_token].name;
 
+                    // TODO
+                    // some type of "report error" callback instad of std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
                         // std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
                     }
-
-                    _ = message;
 
                     self.abort();
                 };
