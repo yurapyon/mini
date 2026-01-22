@@ -1,9 +1,12 @@
 # : mini ;
 a 16bit Forth for desktop and web  
-  
-checkout src/examples for code samples  
 [try it out online](https://mini-nrlx.onrender.com/)  
-
+  
+checkout:
+- `/repo-overview` for repo info
+- `/mini-specs` for language/vm specs
+- `src/examples` for code samples  
+  
 ### goals
 - clear, simple and obvious
   - don't sacrifice readibility for performance
@@ -50,5 +53,13 @@ checkout src/examples for code samples
 you need:
   - mac OS
   - zig
+  - glfw
 
+### setup:
+mac OS, using homebrew:
+- `$ brew install zig glfw`
+- `$ zig build`
+- `$ ./shell/run.sh`
+
+### license
 MIT
