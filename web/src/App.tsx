@@ -29,6 +29,18 @@ const TerminalComponent = (props) => {
         m.kernel.push(month)
         m.kernel.push(day)
       })
+      m.addExternal("h/m/s", ()=>{
+        const date    = new Date();
+        const hours   = date.getHours();
+        const minutes = date.getMinutes();
+        const seconds = date.getSeconds();
+        m.kernel.push(hours)
+        m.kernel.push(minutes)
+        m.kernel.push(seconds)
+      })
+      m.addExternal("clear", ()=>{
+        props.clearHistory()
+      })
       await fetch("/mini/scripts/cal.mini.fth")
         .then((response) => {
           if (response.ok) {
@@ -40,6 +52,14 @@ const TerminalComponent = (props) => {
         .then((script) => {
           m.runScript(script)
         })
+
+      m.runScript(`
+        : 24>12     12 mod dup 0= if drop 12 then ;
+        : time      h/m/s flip 24 mod flip ;
+        : 00:#      # # drop ':' hold ;
+        : .time24   <# 00:# 00:# # # #> type ;
+        : .time12hm drop <# 00:# 24>12 # # #> type ;
+      `);
 
       document.addEventListener("mini.print", (e)=>{
         const str = e.detail
@@ -59,7 +79,7 @@ const TerminalComponent = (props) => {
 
   return (
     <div
-      class="bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-scroll"
+      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-scroll"
       style={{
         width: terminal.width + "ch",
         height: terminal.height + "lh",
@@ -85,8 +105,11 @@ const TerminalComponent = (props) => {
         }
       }}
     >
-      <pre class="h-[1lh] shrink-0">
-        {PROMPT + cmd()}
+      <pre class="h-[1lh] shrink-0 flex flex-row">
+        <pre>
+          {PROMPT + cmd()}
+        </pre>
+        <div class="w-[1ch] shrink-0 bg-gray-400 group-focus:bg-white group-focus:animate-(--animate-blink) h-full"/>
       </pre>
       <Index each={props.history().toReversed()}>
         {(line)=>{
@@ -104,7 +127,7 @@ const TerminalComponent = (props) => {
 const RunButton = (props) => {
   return (
     <button
-      class="bg-[#606060] hover:bg-[#101010] hover:cursor-pointer"
+      class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch]"
       on:click={()=>{
         props.pushLine(PROMPT + props.cmd)
         document.dispatchEvent(new CustomEvent("mini.read", {
@@ -132,11 +155,20 @@ const App: Component = () => {
     });
   };
 
+  const clearHistory = () => {
+    setHistory([]);
+  };
+
   return (
     <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white items-center">
       <TitleBar />
       <div class="flex flex-row gap-20 items-center grow min-h-0">
-        <TerminalComponent mini={mini()} history={history} pushLine={pushLine} />
+        <TerminalComponent
+          mini={mini()}
+          history={history}
+          pushLine={pushLine}
+          clearHistory={clearHistory}
+        />
         <div>
           <div>
             Click on the terminal to activate it
@@ -147,14 +179,14 @@ const App: Component = () => {
           <div>
             (you can also just click on the commands below)
           </div>
-          <div>
-            <RunButton cmd="ashy" mini={mini()} pushLine={pushLine} />{" "}
-            <RunButton cmd="words cr" mini={mini()} pushLine={pushLine} />{" "}
-            <RunButton cmd="0 256 dump" mini={mini()} pushLine={pushLine} />{" "}
-            <RunButton cmd="2026 to year 1 3cal" mini={mini()} pushLine={pushLine} />{" "}
-          </div>
-          <div>
+          <div class="flex flex-row flex-wrap gap-x-[1ch] max-w-lg">
+            <RunButton cmd="ashy" mini={mini()} pushLine={pushLine} />
+            <RunButton cmd="words cr" mini={mini()} pushLine={pushLine} />
+            <RunButton cmd="0 256 dump" mini={mini()} pushLine={pushLine} />
+            <RunButton cmd="2026 to year 1 3cal" mini={mini()} pushLine={pushLine} />
             <RunButton cmd="this-month" mini={mini()} pushLine={pushLine} />
+            <RunButton cmd="time .time24 cr" mini={mini()} pushLine={pushLine} />
+            <RunButton cmd="clear" mini={mini()} pushLine={pushLine} />
           </div>
         </div>
       </div>
