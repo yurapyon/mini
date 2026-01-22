@@ -1,17 +1,17 @@
 # : mini ;
 a 16bit Forth for desktop and web  
 [try it out online](https://mini-nrlx.onrender.com/)  
-  
-checkout:
-- `/repo-overview` for repo info
-- `/mini-specs` for language/vm specs
-- `src/examples` for code samples  
-  
+
 ### goals
 - clear, simple and obvious
   - don't sacrifice readibility for performance
 - evolution of a classic
   - "writing a forth" is more important than "designing a modern language"
+
+### see
+- `/repo-overview` for repo info
+- `/mini-specs` for language/vm specs
+- `src/examples` for code samples  
 
 ### features
 - overall
