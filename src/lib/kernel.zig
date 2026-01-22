@@ -88,8 +88,6 @@ pub const Accept = struct {
         CannotAccept,
     } || bytecodes.Error;
 
-    // TODO this output should not be ab array
-    //   it should be kernel, arr, len,
     pub const Callback = *const fn (
         k: *Kernel,
         userdata: ?*anyopaque,
@@ -98,9 +96,9 @@ pub const Accept = struct {
     ) Error!Cell;
 
     // NOTE
-    // If accept is async, callback should
-    //   fill the output memory and
-    //   push arraysize to the stack before resuming
+    // If accept is async, before resuming callback should:
+    //   fill the output memory at addr, accounting for max_len
+    //   push string size to the stack
     pub const Closure = struct {
         callback: Callback,
         userdata: ?*anyopaque,

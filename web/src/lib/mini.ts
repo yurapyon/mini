@@ -170,7 +170,5 @@ export const fetchMini = async () => {
       }
   });
 
-  console.log("here2");
-
   return mini;
 }
