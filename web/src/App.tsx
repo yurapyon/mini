@@ -1,8 +1,10 @@
 import { createResource, createEffect, createSignal, Index } from "solid-js";
 import type { Component } from 'solid-js';
 import { TitleBar } from "./components/TitleBar";
+import { SystemComponent } from "./components/SystemComponent";
 import { Documentation } from "./components/documentation/Documentation";
-import { fetchMini } from "./lib/mini";
+// import { fetchMini } from "./lib/mini";
+import { MiniProvider, useMiniContext } from "./components/providers/MiniProvider";
 
 import { Terminal } from "./lib/console";
 
@@ -15,10 +17,12 @@ const terminal = new Terminal();
 //   figure out a nice way to do this
 
 const TerminalComponent = (props) => {
+  const mini = useMiniContext();
+
   const [cmd, setCmd] = createSignal("");
 
   createEffect(async ()=>{
-    const m = props.mini
+    const m = mini();
     if (m) {
       m.addExternal("y/m/d", ()=>{
         const date  = new Date();
@@ -79,10 +83,10 @@ const TerminalComponent = (props) => {
 
   return (
     <div
-      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-scroll"
+      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-scroll h-full"
       style={{
         width: terminal.width + "ch",
-        height: terminal.height + "lh",
+        // height: terminal.height + "lh",
       }}
       tabIndex="0"
       on:keydown={(ev)=>{
@@ -141,7 +145,6 @@ const RunButton = (props) => {
 }
 
 const App: Component = () => {
-  const [mini] = createResource(fetchMini);
   const [history, setHistory] = createSignal([]);
 
   const pushLine = (str) => {
@@ -160,37 +163,58 @@ const App: Component = () => {
   };
 
   return (
-    <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white items-center">
-      <TitleBar />
-      <div class="flex flex-row gap-20 items-center grow min-h-0">
-        <TerminalComponent
-          mini={mini()}
-          history={history}
-          pushLine={pushLine}
-          clearHistory={clearHistory}
-        />
-        <div>
-          <div>
-            Click on the terminal to activate it
+    <MiniProvider>
+      <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
+        <TitleBar />
+        <div class="flex flex-row grow min-h-0 text-sm">
+          <div class="flex flex-col grow min-w-0 p-4">
+            <SystemComponent mini={mini()} />
+            <div class="grow min-h-0" />
+            <div>
+              <div>
+                Click on the terminal to activate it
+              </div>
+              <div>
+                Enter commands and press enter!
+              </div>
+              <div>
+                (you can also just click on the commands below)
+              </div>
+              <div class="h-[1lh]"/>
+              <div class="flex flex-col">
+                <div class="flex flex-row gap-[1ch]">
+                  terminal:
+                  <RunButton cmd="clear" pushLine={pushLine} />
+                </div>
+                <div class="flex flex-row gap-[1ch]">
+                  printing:
+                  <RunButton cmd="ashy" pushLine={pushLine} />
+                  <RunButton cmd="words cr" pushLine={pushLine} />
+                  <RunButton cmd="0 256 dump" pushLine={pushLine} />
+                </div>
+                <div class="flex flex-row gap-[1ch]">
+                  date/time:
+                  <RunButton cmd="2026 to year 1 3cal" pushLine={pushLine} />
+                  <RunButton cmd="this-month" pushLine={pushLine} />
+                  <RunButton cmd="time .time24 cr" pushLine={pushLine} />
+                </div>
+                <div class="flex flex-row gap-[1ch]">
+                  graphics:
+                  <RunButton cmd="random random random >bg" pushLine={pushLine} />
+                </div>
+              </div>
+            </div>
           </div>
-          <div>
-            Enter commands and press enter!
-          </div>
-          <div>
-            (you can also just click on the commands below)
-          </div>
-          <div class="flex flex-row flex-wrap gap-x-[1ch] max-w-lg">
-            <RunButton cmd="ashy" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="words cr" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="0 256 dump" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="2026 to year 1 3cal" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="this-month" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="time .time24 cr" mini={mini()} pushLine={pushLine} />
-            <RunButton cmd="clear" mini={mini()} pushLine={pushLine} />
+          <div class="">
+            <TerminalComponent
+              history={history}
+              pushLine={pushLine}
+              clearHistory={clearHistory}
+            />
           </div>
         </div>
       </div>
-    </div>
+    </MiniProvider>
   );
 };
 
