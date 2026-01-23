@@ -286,7 +286,6 @@ pub const Kernel = struct {
                 self.processFFI(ext_token) catch |err| {
                     const message = switch (err) {
                         error.Panic => "Panic",
-                        // error.ExternalPanic => "External Panic",
                         error.InvalidProgramCounter => "Invalid Program Counter",
                         error.OutOfBounds => "Out of Bounds",
                         error.MisalignedAddress => "Misaligned Address",

@@ -15,6 +15,7 @@ const mem = mini.mem;
 
 // ===
 
+// TODO
 // Float pool
 // 'floats' are an index on the stack
 //  slows down math but makes it so you can reuse all th existing dup/swap/drop words

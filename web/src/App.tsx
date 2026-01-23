@@ -72,7 +72,7 @@ const TerminalComponent = (props) => {
 
       m.repl();
 
-      const startingCmd = ": this-month y/m/d flip to year nip 1cal ;";
+      const startingCmd = ": this-month y/m/d flip to year nip ;";
 
       props.pushLine(PROMPT + startingCmd)
       document.dispatchEvent(new CustomEvent("mini.read", {
@@ -171,6 +171,8 @@ const App: Component = () => {
             <SystemComponent mini={mini()} />
             <div class="grow min-h-0" />
             <div>
+              <div>[WIP]</div>
+              <div class="h-[1lh]"/>
               <div>
                 Click on the terminal to activate it
               </div>
@@ -194,13 +196,14 @@ const App: Component = () => {
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   date/time:
-                  <RunButton cmd="2026 to year 1 3cal" pushLine={pushLine} />
-                  <RunButton cmd="this-month" pushLine={pushLine} />
+                  <RunButton cmd="this-month 1cal" pushLine={pushLine} />
+                  <RunButton cmd="this-month 3cal" pushLine={pushLine} />
                   <RunButton cmd="time .time24 cr" pushLine={pushLine} />
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   graphics:
-                  <RunButton cmd="random random random >bg" pushLine={pushLine} />
+                  <RunButton cmd=": random-color random random random ;" pushLine={pushLine} />
+                  <RunButton cmd="random-color >bg" pushLine={pushLine} />
                 </div>
               </div>
             </div>

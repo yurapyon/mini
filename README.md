@@ -42,7 +42,9 @@ a 16bit Forth for desktop and web
 
 ### roadmap
 - in progress
-  - webassembly target
+  - web
+    - graphics
+    - file loading
 - planned
   - io
     - audio
