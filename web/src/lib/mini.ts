@@ -143,6 +143,8 @@ export const fetchMini = async () => {
         console.log("ext added:", extName);
       };
 
+      // TODO
+      // need a kernel.popString
       kernel.pop = kPop;
       kernel.push = kPush;
       kernel.resumeAfterRead = resumeAfterRead;
