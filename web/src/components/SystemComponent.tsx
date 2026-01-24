@@ -17,7 +17,12 @@ const loadSystem = async (container) => {
 
   const createSprite = () => {
     const sprite = new Graphics();
-    sprite.rect(0, 0, 100, 100).fill({ color: "white" })
+    sprite
+      .rect(-40, -40, 80, 80)
+      .fill({ color: "white" })
+
+    sprite.position.x = 320
+    sprite.position.y = 200
 
     app.stage.addChild(sprite);
 
@@ -82,7 +87,11 @@ const Screen = () => {
       })
 
       document.dispatchEvent(new CustomEvent("mini.read", {
-        detail: ": random-color random random random ;"
+        detail: `
+          : random-color random random random ;
+          : random-point random 640 mod random 400 mod ;
+          s.new value sprite
+        `
       }));
     }
   });

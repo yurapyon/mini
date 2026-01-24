@@ -3,11 +3,7 @@ const consoleBuffer = [];
 const putc = (char) => {
   if (char === 10) {
     const str = String.fromCharCode(...consoleBuffer);
-    // TODO split this to lines?
-    const ev = new CustomEvent("mini.print", {
-      detail: str
-    });
-    document.dispatchEvent(ev);
+    console.log(str)
     consoleBuffer.length = 0;
   } else {
     consoleBuffer.push(char);
@@ -21,8 +17,10 @@ enum Filepaths {
 }
 
 export const fetchMini = async () => {
-  let forth_ptr = 0;
-  let ext_ptr = 0;
+  const offsets = {
+    forth: 0,
+    extLookup: 0,
+  };
 
   const kernel = {
     pop: null,
@@ -33,9 +31,18 @@ export const fetchMini = async () => {
     resume: null,
   };
 
+  let emitCallback = () => {};
+  const setEmitCallback = (cb) => {
+    emitCallback = cb;
+  }
+
   const externals = []
 
   const readQueue = [];
+  const readDestination = {
+    addr: 0,
+    maxLen: 0,
+  };
 
   const memory = new WebAssembly.Memory({
     initial: 20,
@@ -43,14 +50,28 @@ export const fetchMini = async () => {
 
   const utf8Encode = new TextEncoder();
 
-  const readToForth = (addr, len, str) => {
+  const readToForth = (addr, maxLen, str) => {
     const wasm_mem = new Uint8Array(memory.buffer);
 
     const bytes = utf8Encode.encode(str);
-    wasm_mem.set(bytes, forth_ptr + addr);
+    wasm_mem.set(bytes, offsets.forth + addr);
 
     kernel.push(str.length);
   };
+
+  const addToReadQueue = (lines: string[]) => {
+    const shouldResume = readQueue.length === 0 && lines.length > 0;
+    readQueue.push(...lines);
+
+    if (shouldResume) {
+      readToForth(
+        readDestination.addr,
+        readDestination.maxLen,
+        readQueue.shift()
+      );
+      kernel.resume();
+    }
+  }
 
   const importObject = {
     env: {
@@ -62,19 +83,25 @@ export const fetchMini = async () => {
       },
       jsFFILookup: (len) => {
         const wasm_mem = new Uint8Array(memory.buffer);
-        const chars = wasm_mem.slice(ext_ptr, ext_ptr + len);
+        const chars = wasm_mem.slice(
+          offsets.extLookup,
+          offsets.extLookup + len
+        );
         const str = String.fromCharCode(...chars);
 
         const idx = externals.findIndex((ext) => ext.name === str);
         return idx;
       },
       jsEmit: (ch) => {
-        putc(ch);
+        emitCallback(ch)
       },
-      jsStartRead: (addr, len) => {
+      jsStartRead: (addr, maxLen) => {
+        readDestination.addr = addr;
+        readDestination.maxLen = maxLen;
+
         let nextLine = readQueue.shift()
         if (nextLine !== undefined) {
-          readToForth(addr, len, nextLine)
+          readToForth(addr, maxLen, nextLine)
         } else {
           kernel.pause();
         }
@@ -86,17 +113,12 @@ export const fetchMini = async () => {
   document.addEventListener("mini.read", (e)=>{
     const str = e.detail
     const lines = str.split("\n")
-    readQueue.push(...lines);
-    kernel.resume();
+    addToReadQueue(lines)
   })
 
   const addExternal = (extName, fn) => {
-    externals.push({
-      name: extName,
-      fn,
-    });
-    readQueue.push("external " + extName);
-    kernel.resume();
+    externals.push({ name: extName, fn, });
+    addToReadQueue(["external " + extName]);
     console.log("ext added:", extName);
   };
 
@@ -134,19 +156,21 @@ export const fetchMini = async () => {
         kExecute();
       };
 
-      forth_ptr = allocateForthMemory();
+      offsets.forth = allocateForthMemory();
       const image_ptr = allocateImageMemory(image.byteLength);
       const script_ptr = allocateScriptMemory(startup.byteLength);
-      ext_ptr = allocateExtLookupMemory();
+      offsets.extLookup = allocateExtLookupMemory();
 
       let wasm_mem = new Uint8Array(memory.buffer);
       wasm_mem.set(image, image_ptr);
       wasm_mem.set(startup, script_ptr);
 
+      setEmitCallback(putc);
       run();
 
       return {
         addExternal,
+        setEmitCallback,
         kernel,
       }
   });
