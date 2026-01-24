@@ -58,6 +58,7 @@ export fn kUnpause() void {
 }
 
 export fn kExecute() void {
+    // TODO handle errors
     global_k.execute() catch unreachable;
 }
 
@@ -96,7 +97,7 @@ fn ffiLookup(_: *Kernel, _: ?*anyopaque, name: []const u8) ?Cell {
 // Frees image and script mem
 //   TODO maybe don't do this
 // TODO handle kernel errors
-export fn init() void {
+export fn run() void {
     global_k.init(forth_mem);
 
     global_k.loadImage(image_mem);
@@ -116,9 +117,7 @@ export fn init() void {
 
     global_k.evaluate(script_mem) catch unreachable;
     allocator.free(script_mem);
-}
 
-export fn repl() void {
     global_k.setAcceptClosure(.{
         .callback = accept,
         .userdata = null,
@@ -128,17 +127,7 @@ export fn repl() void {
     global_k.execute() catch unreachable;
 }
 
-export fn resumeAfterRead() void {
-    global_k.unpause();
-    global_k.execute() catch unreachable;
-}
-
 export fn deinit() void {
     // TODO
     // return 0;
-}
-
-export fn evaluateScript() void {
-    global_k.evaluate(script_mem) catch unreachable;
-    allocator.free(script_mem);
 }

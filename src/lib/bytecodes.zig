@@ -185,8 +185,6 @@ pub fn accept(k: *Kernel) Error!void {
     } else if (k.accept_closure) |closure| {
         if (closure.is_async) {
             _ = try closure.callback(k, closure.userdata, addr, len);
-            // TODO
-            // k.pause();
         } else {
             const size = try closure.callback(k, closure.userdata, addr, len);
             k.data_stack.pushCell(size);

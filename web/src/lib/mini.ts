@@ -3,6 +3,7 @@ const consoleBuffer = [];
 const putc = (char) => {
   if (char === 10) {
     const str = String.fromCharCode(...consoleBuffer);
+    // TODO split this to lines?
     const ev = new CustomEvent("mini.print", {
       detail: str
     });
@@ -13,6 +14,12 @@ const putc = (char) => {
   }
 }
 
+enum Filepaths {
+  WASM = "/mini/mini-wasm.wasm",
+  IMAGE = "/mini/precompiled.mini.bin",
+  STARTUP = "/mini/startup.mini.fth",
+}
+
 export const fetchMini = async () => {
   let forth_ptr = 0;
   let ext_ptr = 0;
@@ -20,45 +27,29 @@ export const fetchMini = async () => {
   const kernel = {
     pop: null,
     push: null,
-    // resumeAfterRead: null,
     pause: null,
     unpause: null,
     execute: null,
+    resume: null,
   };
 
   const externals = []
 
   const readQueue = [];
 
-  const WASM_FILEPATH = "/mini/mini-wasm.wasm";
-  const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
-  const STARTUP_FILEPATH = "/mini/startup.mini.fth";
-
   const memory = new WebAssembly.Memory({
     initial: 20,
-    // initial: MEMORY_PAGE_COUNT,
-    // maximum: MEMORY_PAGE_COUNT,
   });
 
-  let read_data = null;
+  const utf8Encode = new TextEncoder();
 
-  const readToForth = (str) => {
-    if (!!read_data) {
-      const {
-        addr,
-        len,
-      } = read_data;
+  const readToForth = (addr, len, str) => {
+    const wasm_mem = new Uint8Array(memory.buffer);
 
-      read_data = null;
+    const bytes = utf8Encode.encode(str);
+    wasm_mem.set(bytes, forth_ptr + addr);
 
-      const wasm_mem = new Uint8Array(memory.buffer);
-
-      const bytes = utf8Encode.encode(str);
-      wasm_mem.set(bytes, forth_ptr + addr);
-
-      kernel.push(str.length);
-      // kernel.resumeAfterRead();
-    }
+    kernel.push(str.length);
   };
 
   const importObject = {
@@ -81,11 +72,9 @@ export const fetchMini = async () => {
         putc(ch);
       },
       jsStartRead: (addr, len) => {
-        read_data = { addr, len, };
-
         let nextLine = readQueue.shift()
         if (nextLine !== undefined) {
-          readToForth(nextLine)
+          readToForth(addr, len, nextLine)
         } else {
           kernel.pause();
         }
@@ -94,41 +83,56 @@ export const fetchMini = async () => {
     }
   };
 
-  const image_response = await fetch(IMAGE_FILEPATH);
-  const image = await image_response.bytes();
-
-  const startup_response = await fetch(STARTUP_FILEPATH);
-  const startup = await startup_response.bytes();
-
-  const utf8Encode = new TextEncoder();
-
   document.addEventListener("mini.read", (e)=>{
-    // readAndResume(e.detail);
     const str = e.detail
     const lines = str.split("\n")
     readQueue.push(...lines);
-    kernel.unpause();
-    kernel.execute();
+    kernel.resume();
   })
 
+  const addExternal = (extName, fn) => {
+    externals.push({
+      name: extName,
+      fn,
+    });
+    readQueue.push("external " + extName);
+    kernel.resume();
+    console.log("ext added:", extName);
+  };
+
+  const image_response = await fetch(Filepaths.IMAGE);
+  const image = await image_response.bytes();
+
+  const startup_response = await fetch(Filepaths.STARTUP);
+  const startup = await startup_response.bytes();
+
   const mini = await WebAssembly
-    .instantiateStreaming(fetch(WASM_FILEPATH), importObject)
+    .instantiateStreaming(fetch(Filepaths.WASM), importObject)
     .then((result) => {
       const {
-        init,
-        repl,
+        run,
         allocateForthMemory,
         allocateImageMemory,
         allocateScriptMemory,
         allocateExtLookupMemory,
-        evaluateScript,
         kPop,
         kPush,
         kPause,
         kUnpause,
         kExecute,
-        resumeAfterRead,
       } = result.instance.exports;
+
+      // TODO
+      // need a kernel.popString
+      kernel.pop = kPop;
+      kernel.push = kPush;
+      kernel.pause = kPause;
+      kernel.unpause = kUnpause;
+      kernel.execute = kExecute;
+      kernel.resume = () => {
+        kUnpause();
+        kExecute();
+      };
 
       forth_ptr = allocateForthMemory();
       const image_ptr = allocateImageMemory(image.byteLength);
@@ -139,47 +143,11 @@ export const fetchMini = async () => {
       wasm_mem.set(image, image_ptr);
       wasm_mem.set(startup, script_ptr);
 
-      init();
-
-      const runScript = (str) => {
-        const utf8 = new TextEncoder();
-        const bytes = utf8.encode(str);
-
-        const script_ptr = allocateScriptMemory(bytes.byteLength);
-
-        let wasm_mem = new Uint8Array(memory.buffer);
-        wasm_mem.set(bytes, script_ptr);
-
-        evaluateScript();
-      };
-
-      const addExternal = (extName, fn) => {
-        externals.push({
-          name: extName,
-          fn,
-        });
-        readQueue.unshift("external " + extName);
-        kernel.unpause();
-        kernel.execute();
-        console.log("ext added:", extName);
-      };
-
-      // TODO
-      // need a kernel.popString
-      kernel.pop = kPop;
-      kernel.push = kPush;
-      // kernel.resumeAfterRead = resumeAfterRead;
-      kernel.pause = kPause;
-      kernel.unpause = kUnpause;
-      kernel.execute = kExecute;
-
-      repl();
+      run();
 
       return {
-        runScript,
         addExternal,
         kernel,
-        repl,
       }
   });
 
