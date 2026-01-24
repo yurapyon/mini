@@ -70,8 +70,6 @@ const TerminalComponent = (props) => {
           }
         })
         .then((script) => {
-          // m.runScript(script)
-
           document.dispatchEvent(new CustomEvent("mini.read", {
             detail: script,
           }));
