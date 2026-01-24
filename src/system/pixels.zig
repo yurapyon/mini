@@ -7,7 +7,7 @@ const kernel = mini.kernel;
 const Cell = kernel.Cell;
 const SignedCell = kernel.SignedCell;
 
-const random = mini.utils.random;
+const random = @import("utils/random.zig").random;
 
 const c = @import("c.zig").c;
 const cgfx = @import("c.zig").gfx;

@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const mem = @import("memory.zig");
 const bytecodes = @import("bytecodes.zig");
 
-const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
+const MemoryLayout = @import("memory-layout.zig").MemoryLayout;
 
 const stack = @import("stack.zig");
 const Stack = stack.Stack;

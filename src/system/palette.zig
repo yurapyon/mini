@@ -1,6 +1,6 @@
 const mini = @import("mini");
 
-const random = mini.utils.random;
+const random = @import("utils/random.zig");
 
 const c = @import("c.zig").c;
 

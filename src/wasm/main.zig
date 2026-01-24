@@ -49,6 +49,18 @@ export fn kPush(value: Cell) void {
     global_k.data_stack.pushCell(value);
 }
 
+export fn kPause() void {
+    global_k.pause();
+}
+
+export fn kUnpause() void {
+    global_k.unpause();
+}
+
+export fn kExecute() void {
+    global_k.execute() catch unreachable;
+}
+
 extern fn jsEmit(u8) void;
 extern fn jsStartRead(Cell, Cell) void;
 extern fn jsFFICallback(Cell) void;

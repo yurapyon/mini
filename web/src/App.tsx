@@ -24,6 +24,11 @@ const TerminalComponent = (props) => {
   createEffect(async ()=>{
     const m = mini();
     if (m) {
+      document.addEventListener("mini.print", (e)=>{
+        const str = e.detail
+        props.pushLine(str);
+      })
+
       m.addExternal("y/m/d", ()=>{
         const date  = new Date();
         const year  = date.getFullYear();
@@ -45,6 +50,7 @@ const TerminalComponent = (props) => {
       m.addExternal("clear", ()=>{
         props.clearHistory()
       })
+
       await fetch("/mini/scripts/cal.mini.fth")
         .then((response) => {
           if (response.ok) {
@@ -54,23 +60,25 @@ const TerminalComponent = (props) => {
           }
         })
         .then((script) => {
-          m.runScript(script)
+          // m.runScript(script)
+
+          document.dispatchEvent(new CustomEvent("mini.read", {
+            detail: script,
+          }));
         })
 
-      m.runScript(`
+      const timeScript = `
         : 24>12     12 mod dup 0= if drop 12 then ;
         : time      h/m/s flip 24 mod flip ;
         : 00:#      # # drop ':' hold ;
         : .time24   <# 00:# 00:# # # #> type ;
         : .time12hm drop <# 00:# 24>12 # # #> type ;
-      `);
+      `;
+      document.dispatchEvent(new CustomEvent("mini.read", {
+        detail: timeScript,
+      }));
 
-      document.addEventListener("mini.print", (e)=>{
-        const str = e.detail
-        props.pushLine(str);
-      })
-
-      m.repl();
+      // m.repl();
 
       const startingCmd = ": this-month y/m/d flip to year nip ;";
 
@@ -131,7 +139,7 @@ const TerminalComponent = (props) => {
 const RunButton = (props) => {
   return (
     <button
-      class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch]"
+      class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap"
       on:click={()=>{
         props.pushLine(PROMPT + props.cmd)
         document.dispatchEvent(new CustomEvent("mini.read", {
@@ -202,8 +210,9 @@ const App: Component = () => {
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   graphics:
-                  <RunButton cmd=": random-color random random random ;" pushLine={pushLine} />
                   <RunButton cmd="random-color >bg" pushLine={pushLine} />
+                  <RunButton cmd="s.new value sprite" pushLine={pushLine} />
+                  <RunButton cmd="40 40 sprite >s.pos" pushLine={pushLine} />
                 </div>
               </div>
             </div>

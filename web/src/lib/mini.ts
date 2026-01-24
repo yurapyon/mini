@@ -20,10 +20,15 @@ export const fetchMini = async () => {
   const kernel = {
     pop: null,
     push: null,
-    resumeAfterRead: null,
+    // resumeAfterRead: null,
+    pause: null,
+    unpause: null,
+    execute: null,
   };
 
   const externals = []
+
+  const readQueue = [];
 
   const WASM_FILEPATH = "/mini/mini-wasm.wasm";
   const IMAGE_FILEPATH = "/mini/precompiled.mini.bin";
@@ -36,6 +41,25 @@ export const fetchMini = async () => {
   });
 
   let read_data = null;
+
+  const readToForth = (str) => {
+    if (!!read_data) {
+      const {
+        addr,
+        len,
+      } = read_data;
+
+      read_data = null;
+
+      const wasm_mem = new Uint8Array(memory.buffer);
+
+      const bytes = utf8Encode.encode(str);
+      wasm_mem.set(bytes, forth_ptr + addr);
+
+      kernel.push(str.length);
+      // kernel.resumeAfterRead();
+    }
+  };
 
   const importObject = {
     env: {
@@ -57,10 +81,14 @@ export const fetchMini = async () => {
         putc(ch);
       },
       jsStartRead: (addr, len) => {
-        read_data = {
-          addr,
-          len,
-        };
+        read_data = { addr, len, };
+
+        let nextLine = readQueue.shift()
+        if (nextLine !== undefined) {
+          readToForth(nextLine)
+        } else {
+          kernel.pause();
+        }
       },
       memory: memory,
     }
@@ -75,24 +103,12 @@ export const fetchMini = async () => {
   const utf8Encode = new TextEncoder();
 
   document.addEventListener("mini.read", (e)=>{
-    if (!!read_data) {
-      const {
-        addr,
-        len,
-      } = read_data;
-
-      read_data = null;
-
-      const str = e.detail
-
-      const wasm_mem = new Uint8Array(memory.buffer);
-
-      const bytes = utf8Encode.encode(str);
-      wasm_mem.set(bytes, forth_ptr + addr);
-
-      kernel.push(str.length);
-      kernel.resumeAfterRead();
-    }
+    // readAndResume(e.detail);
+    const str = e.detail
+    const lines = str.split("\n")
+    readQueue.push(...lines);
+    kernel.unpause();
+    kernel.execute();
   })
 
   const mini = await WebAssembly
@@ -108,6 +124,9 @@ export const fetchMini = async () => {
         evaluateScript,
         kPop,
         kPush,
+        kPause,
+        kUnpause,
+        kExecute,
         resumeAfterRead,
       } = result.instance.exports;
 
@@ -139,7 +158,9 @@ export const fetchMini = async () => {
           name: extName,
           fn,
         });
-        runScript("external " + extName);
+        readQueue.unshift("external " + extName);
+        kernel.unpause();
+        kernel.execute();
         console.log("ext added:", extName);
       };
 
@@ -147,7 +168,12 @@ export const fetchMini = async () => {
       // need a kernel.popString
       kernel.pop = kPop;
       kernel.push = kPush;
-      kernel.resumeAfterRead = resumeAfterRead;
+      // kernel.resumeAfterRead = resumeAfterRead;
+      kernel.pause = kPause;
+      kernel.unpause = kUnpause;
+      kernel.execute = kExecute;
+
+      repl();
 
       return {
         runScript,
