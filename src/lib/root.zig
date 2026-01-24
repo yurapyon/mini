@@ -9,8 +9,4 @@ pub const utils = struct {
 
     const handles = @import("utils/handles.zig");
     pub const Handles = handles.Handles;
-
-    pub const channel = @import("utils/channel.zig");
-
-    pub const random = @import("utils/random.zig");
 };

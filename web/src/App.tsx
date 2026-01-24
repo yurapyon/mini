@@ -6,9 +6,13 @@ import { Documentation } from "./components/documentation/Documentation";
 // import { fetchMini } from "./lib/mini";
 import { MiniProvider, useMiniContext } from "./components/providers/MiniProvider";
 
-import { Terminal } from "./lib/console";
+import { Shell } from "./lib/shell";
+
+const shell = new Shell();
 
 const PROMPT = "mini> ";
+
+import { Terminal } from "./lib/console";
 
 const terminal = new Terminal();
 
@@ -19,11 +23,22 @@ const terminal = new Terminal();
 const TerminalComponent = (props) => {
   const mini = useMiniContext();
 
+  const [history, setHistory] = createSignal([], {
+    equals: false
+  });
+
+  shell.onUpdate = () => {
+    setHistory(shell.history)
+  }
+
   const [cmd, setCmd] = createSignal("");
 
   createEffect(async ()=>{
     const m = mini();
     if (m) {
+      m.setEmitCallback((ch)=>{
+        shell.putc(ch)
+      });
       m.addExternal("y/m/d", ()=>{
         const date  = new Date();
         const year  = date.getFullYear();
@@ -43,8 +58,9 @@ const TerminalComponent = (props) => {
         m.kernel.push(seconds)
       })
       m.addExternal("clear", ()=>{
-        props.clearHistory()
+        shell.clearHistory()
       })
+
       await fetch("/mini/scripts/cal.mini.fth")
         .then((response) => {
           if (response.ok) {
@@ -54,27 +70,28 @@ const TerminalComponent = (props) => {
           }
         })
         .then((script) => {
-          m.runScript(script)
+          document.dispatchEvent(new CustomEvent("mini.read", {
+            detail: script,
+          }));
         })
 
-      m.runScript(`
+      const timeScript = `
         : 24>12     12 mod dup 0= if drop 12 then ;
         : time      h/m/s flip 24 mod flip ;
         : 00:#      # # drop ':' hold ;
         : .time24   <# 00:# 00:# # # #> type ;
         : .time12hm drop <# 00:# 24>12 # # #> type ;
-      `);
-
-      document.addEventListener("mini.print", (e)=>{
-        const str = e.detail
-        props.pushLine(str);
-      })
-
-      m.repl();
+      `;
+      document.dispatchEvent(new CustomEvent("mini.read", {
+        detail: timeScript,
+      }));
 
       const startingCmd = ": this-month y/m/d flip to year nip ;";
 
-      props.pushLine(PROMPT + startingCmd)
+      shell.pushLine({
+        isUser: true,
+        text: startingCmd
+      });
       document.dispatchEvent(new CustomEvent("mini.read", {
         detail: startingCmd,
       }));
@@ -83,7 +100,7 @@ const TerminalComponent = (props) => {
 
   return (
     <div
-      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-scroll h-full"
+      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-y-auto h-full"
       style={{
         width: terminal.width + "ch",
         // height: terminal.height + "lh",
@@ -94,8 +111,10 @@ const TerminalComponent = (props) => {
         const c = cmd();
         if (ev.key === "Enter") {
           if (c.length > 0) {
-            console.log("exec: " + c);
-            props.pushLine(PROMPT + c);
+            shell.pushLine({
+              isUser: true,
+              text: c,
+            });
             const ev = new CustomEvent("mini.read", {
               detail: c,
             });
@@ -115,11 +134,11 @@ const TerminalComponent = (props) => {
         </pre>
         <div class="w-[1ch] shrink-0 bg-gray-400 group-focus:bg-white group-focus:animate-(--animate-blink) h-full"/>
       </pre>
-      <Index each={props.history().toReversed()}>
+      <Index each={history().toReversed()}>
         {(line)=>{
           return (
             <pre class="text-wrap">
-              {line()}
+              {line().isUser && PROMPT}{line().text}
             </pre>
           );
         }}
@@ -131,9 +150,12 @@ const TerminalComponent = (props) => {
 const RunButton = (props) => {
   return (
     <button
-      class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch]"
+      class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap"
       on:click={()=>{
-        props.pushLine(PROMPT + props.cmd)
+        shell.pushLine({
+          isUser: true,
+          text: props.cmd,
+        });
         document.dispatchEvent(new CustomEvent("mini.read", {
           detail: props.cmd,
         }));
@@ -145,23 +167,6 @@ const RunButton = (props) => {
 }
 
 const App: Component = () => {
-  const [history, setHistory] = createSignal([]);
-
-  const pushLine = (str) => {
-    setHistory((prev) => {
-      const next = [...prev]
-      if (next.length >= 300) {
-        next.shift()
-      }
-      next.push(str)
-      return next;
-    });
-  };
-
-  const clearHistory = () => {
-    setHistory([]);
-  };
-
   return (
     <MiniProvider>
       <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
@@ -186,34 +191,30 @@ const App: Component = () => {
               <div class="flex flex-col">
                 <div class="flex flex-row gap-[1ch]">
                   terminal:
-                  <RunButton cmd="clear" pushLine={pushLine} />
+                  <RunButton cmd="clear" />
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   printing:
-                  <RunButton cmd="ashy" pushLine={pushLine} />
-                  <RunButton cmd="words cr" pushLine={pushLine} />
-                  <RunButton cmd="0 256 dump" pushLine={pushLine} />
+                  <RunButton cmd="ashy" />
+                  <RunButton cmd="words cr" />
+                  <RunButton cmd="0 256 dump" />
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   date/time:
-                  <RunButton cmd="this-month 1cal" pushLine={pushLine} />
-                  <RunButton cmd="this-month 3cal" pushLine={pushLine} />
-                  <RunButton cmd="time .time24 cr" pushLine={pushLine} />
+                  <RunButton cmd="this-month 1cal" />
+                  <RunButton cmd="this-month 3cal" />
+                  <RunButton cmd="time .time24 cr" />
                 </div>
                 <div class="flex flex-row gap-[1ch]">
                   graphics:
-                  <RunButton cmd=": random-color random random random ;" pushLine={pushLine} />
-                  <RunButton cmd="random-color >bg" pushLine={pushLine} />
+                  <RunButton cmd="random-color >bg" />
+                  <RunButton cmd="random-point sprite >s.pos" />
                 </div>
               </div>
             </div>
           </div>
           <div class="">
-            <TerminalComponent
-              history={history}
-              pushLine={pushLine}
-              clearHistory={clearHistory}
-            />
+            <TerminalComponent />
           </div>
         </div>
       </div>

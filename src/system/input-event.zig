@@ -6,7 +6,7 @@ const mini = @import("mini");
 const kernel = mini.kernel;
 const Cell = kernel.Cell;
 
-const channel = mini.utils.channel;
+const channel = @import("utils/channel.zig");
 const Queue = channel.Queue;
 
 // ===

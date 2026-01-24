@@ -1,5 +1,5 @@
 import { onMount, createSignal, createEffect } from "solid-js";
-import { Application } from "pixi.js";
+import { Application, Graphics } from "pixi.js";
 
 import { useMiniContext } from "./providers/MiniProvider";
 
@@ -13,7 +13,33 @@ const loadSystem = async (container) => {
 
   container.appendChild(app.canvas);
 
-  return app;
+  const sprites = [];
+
+  const createSprite = () => {
+    const sprite = new Graphics();
+    sprite
+      .rect(-40, -40, 80, 80)
+      .fill({ color: "white" })
+
+    sprite.position.x = 320
+    sprite.position.y = 200
+
+    app.stage.addChild(sprite);
+
+    const idx = sprites.len;
+    sprites.push(sprite);
+    return idx
+  };
+
+  const getSprite = (idx) => {
+    return sprites[idx];
+  }
+
+  return {
+    app,
+    createSprite,
+    getSprite
+  };
 };
 
 const Screen = () => {
@@ -35,12 +61,38 @@ const Screen = () => {
         const g = m.kernel.pop() % 2**8;
         const b = m.kernel.pop() % 2**8;
         const str = [r,g,b].map((v)=>v.toString(16).padStart(2, '0')).join("")
-        a.renderer.background.color = "#" + str;
+        a.app.renderer.background.color = "#" + str;
       })
       m.addExternal("random", ()=>{
         const value = Math.floor(Math.random() * 2**16);
         m.kernel.push(value);
       })
+      m.addExternal("s.new", ()=>{
+        const idx = a.createSprite();
+        m.kernel.push(idx);
+      })
+      m.addExternal("s.delete", ()=>{
+        const idx = m.kernel.pop();
+        // TODO
+      })
+      m.addExternal(">s.pos", ()=>{
+        const idx = m.kernel.pop();
+        const y = m.kernel.pop();
+        const x = m.kernel.pop();
+        const sprite = a.getSprite(idx);
+        if (!!sprite) {
+          sprite.position.x = x;
+          sprite.position.y = y;
+        }
+      })
+
+      document.dispatchEvent(new CustomEvent("mini.read", {
+        detail: `
+          : random-color random random random ;
+          : random-point random 640 mod random 400 mod ;
+          s.new value sprite
+        `
+      }));
     }
   });
 

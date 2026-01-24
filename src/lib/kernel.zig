@@ -6,7 +6,7 @@ const builtin = @import("builtin");
 const mem = @import("memory.zig");
 const bytecodes = @import("bytecodes.zig");
 
-const MemoryLayout = @import("utils/memory-layout.zig").MemoryLayout;
+const MemoryLayout = @import("memory-layout.zig").MemoryLayout;
 
 const stack = @import("stack.zig");
 const Stack = stack.Stack;
@@ -96,9 +96,12 @@ pub const Accept = struct {
     ) Error!Cell;
 
     // NOTE
-    // If accept is async, before resuming callback should:
+    // If accept is async, callback should:
+    //   pause
     //   fill the output memory at addr, accounting for max_len
     //   push string size to the stack
+    //   unpause
+    //   execute
     pub const Closure = struct {
         callback: Callback,
         userdata: ?*anyopaque,
