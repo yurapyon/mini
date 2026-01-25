@@ -12,13 +12,17 @@ const introScript = `\\ ===
 \\
 \\ This is the web demo for mini, a 16bit forth
 \\
-\\ You can edit the text here and run it as mini code with the buttons above
+\\ You can edit the text here and run it as mini code with the buttons above.
+\\ You can also click on the commands below the editor
 \\
 \\ Theres a terminal you can activate by clicking on it.
 \\ Just type commands and press enter!
-\\   (you can also click on the commands below the editor)
 \\
 \\ This site is a work in progress, please see the mini repo for more info
+\\
+\\ Notes:
+\\ - 'reset then run' will reinitialize the forth runtime before running the script
+\\ - the command buttons under the editor may stop working after a reset
 \\
 \\ ===
 
@@ -80,7 +84,7 @@ export const Editor = () => {
             runScript();
           }}
         >
-          reset forth and run script
+          reset forth then run script
         </button>
         <button
           class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap basis-1/2"
