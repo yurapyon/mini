@@ -3,8 +3,8 @@ import type { Component } from 'solid-js';
 import { TitleBar } from "./components/TitleBar";
 import { SystemComponent } from "./components/SystemComponent";
 import { Documentation } from "./components/documentation/Documentation";
-// import { fetchMini } from "./lib/mini";
 import { MiniProvider, useMiniContext } from "./components/providers/MiniProvider";
+import { Editor } from "./components/Editor";
 
 import { Shell } from "./lib/shell";
 
@@ -100,10 +100,10 @@ const TerminalComponent = (props) => {
 
   return (
     <div
-      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-y-auto h-full"
+      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-y-auto min-h-0 grow"
       style={{
         width: terminal.width + "ch",
-        // height: terminal.height + "lh",
+        height: "10lh",
       }}
       tabIndex="0"
       on:keydown={(ev)=>{
@@ -166,54 +166,48 @@ const RunButton = (props) => {
   );
 }
 
+const Tutorial = () => {
+  return (
+    <div>
+      <div class="flex flex-col">
+        <div class="flex flex-row gap-[1ch]">
+          terminal:
+          <RunButton cmd="clear" />
+        </div>
+        <div class="flex flex-row gap-[1ch]">
+          printing:
+          <RunButton cmd="ashy" />
+          <RunButton cmd="words cr" />
+          <RunButton cmd="0 256 dump" />
+        </div>
+        <div class="flex flex-row gap-[1ch]">
+          date/time:
+          <RunButton cmd="this-month 1cal" />
+          <RunButton cmd="this-month 3cal" />
+          <RunButton cmd="time .time24 cr" />
+        </div>
+        <div class="flex flex-row gap-[1ch]">
+          graphics:
+          <RunButton cmd="random-color >bg" />
+          <RunButton cmd="random-point sprite >s.pos" />
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const App: Component = () => {
   return (
     <MiniProvider>
       <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
         <TitleBar />
-        <div class="flex flex-row grow min-h-0 text-sm">
-          <div class="flex flex-col grow min-w-0 p-4">
-            <SystemComponent mini={mini()} />
-            <div class="grow min-h-0" />
-            <div>
-              <div>[WIP]</div>
-              <div class="h-[1lh]"/>
-              <div>
-                Click on the terminal to activate it
-              </div>
-              <div>
-                Enter commands and press enter!
-              </div>
-              <div>
-                (you can also just click on the commands below)
-              </div>
-              <div class="h-[1lh]"/>
-              <div class="flex flex-col">
-                <div class="flex flex-row gap-[1ch]">
-                  terminal:
-                  <RunButton cmd="clear" />
-                </div>
-                <div class="flex flex-row gap-[1ch]">
-                  printing:
-                  <RunButton cmd="ashy" />
-                  <RunButton cmd="words cr" />
-                  <RunButton cmd="0 256 dump" />
-                </div>
-                <div class="flex flex-row gap-[1ch]">
-                  date/time:
-                  <RunButton cmd="this-month 1cal" />
-                  <RunButton cmd="this-month 3cal" />
-                  <RunButton cmd="time .time24 cr" />
-                </div>
-                <div class="flex flex-row gap-[1ch]">
-                  graphics:
-                  <RunButton cmd="random-color >bg" />
-                  <RunButton cmd="random-point sprite >s.pos" />
-                </div>
-              </div>
-            </div>
+        <div class="flex flex-row grow min-h-0 text-sm gap-[1ch]">
+          <div class="flex flex-col w-[80ch] gap-2">
+            <Editor />
+            <Tutorial />
           </div>
-          <div class="">
+          <div class="flex flex-col grow min-w-0 items-center">
+            <SystemComponent mini={mini()} />
             <TerminalComponent />
           </div>
         </div>

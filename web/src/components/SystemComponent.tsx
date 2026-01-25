@@ -26,7 +26,7 @@ const loadSystem = async (container) => {
 
     app.stage.addChild(sprite);
 
-    const idx = sprites.len;
+    const idx = sprites.length;
     sprites.push(sprite);
     return idx
   };
@@ -106,7 +106,7 @@ const Screen = () => {
 
 export const SystemComponent = (props) => {
   return (
-    <div class="w-full flex flex-row justify-center">
+    <div class="w-full flex flex-row justify-center p-2">
       <Screen />
     </div>
   );
