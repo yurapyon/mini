@@ -19,6 +19,8 @@ enum Filepaths {
 export const fetchMini = async () => {
   const offsets = {
     forth: 0,
+    image: 0,
+    script: 0,
     extLookup: 0,
   };
 
@@ -132,7 +134,7 @@ export const fetchMini = async () => {
     .instantiateStreaming(fetch(Filepaths.WASM), importObject)
     .then((result) => {
       const {
-        run,
+        main,
         allocateForthMemory,
         allocateImageMemory,
         allocateScriptMemory,
@@ -142,6 +144,7 @@ export const fetchMini = async () => {
         kPause,
         kUnpause,
         kExecute,
+        reset,
       } = result.instance.exports;
 
       // TODO
@@ -157,21 +160,22 @@ export const fetchMini = async () => {
       };
 
       offsets.forth = allocateForthMemory();
-      const image_ptr = allocateImageMemory(image.byteLength);
-      const script_ptr = allocateScriptMemory(startup.byteLength);
+      offsets.image = allocateImageMemory(image.byteLength);
+      offsets.script = allocateScriptMemory(startup.byteLength);
       offsets.extLookup = allocateExtLookupMemory();
 
       let wasm_mem = new Uint8Array(memory.buffer);
-      wasm_mem.set(image, image_ptr);
-      wasm_mem.set(startup, script_ptr);
+      wasm_mem.set(image, offsets.image);
+      wasm_mem.set(startup, offsets.script);
 
       setEmitCallback(putc);
-      run();
+      main();
 
       return {
         addExternal,
         setEmitCallback,
         kernel,
+        reset,
       }
   });
 

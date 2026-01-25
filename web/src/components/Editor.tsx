@@ -1,7 +1,31 @@
 import { onMount, createSignal } from "solid-js";
+
 import * as monaco from "monaco-editor";
 
 import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+
+import { useMiniContext } from "../components/providers/MiniProvider";
+
+// ===
+
+const introScript = `\\ ===
+\\
+\\ This is the web demo for mini, a 16bit forth
+\\
+\\ You can edit the text here and run it as mini code with the buttons above
+\\
+\\ Theres a terminal you can activate by clicking on it.
+\\ Just type commands and press enter!
+\\   (you can also click on the commands below the editor)
+\\
+\\ This site is a work in progress, please see the mini repo for more info
+\\
+\\ ===
+
+: wahoo s" wahoo" type cr ;
+
+wahoo
+`;
 
 window.MonacoEnvironment = {
     getWorker(_workerId: any, _label: string) {
@@ -10,6 +34,8 @@ window.MonacoEnvironment = {
 };
 
 export const Editor = () => {
+  const mini = useMiniContext();
+
   const [model, setModel] = createSignal(null);
   const [editor, setEditor] = createSignal(null);
 
@@ -19,8 +45,7 @@ export const Editor = () => {
     // monaco.languages.register({ id: "typescript" })
 
     const model = monaco.editor.createModel(
-      "",
-      // "typescript",
+      introScript,
       // monaco.Uri.parse("file:///main.ts"),
     );
 
@@ -28,7 +53,6 @@ export const Editor = () => {
 
     const editor = monaco.editor.create(container, {
       model,
-      // language: 'typescript',
       theme: 'vs-dark',
       minimap: {
         enabled: false,
@@ -37,40 +61,40 @@ export const Editor = () => {
 
     setModel(model)
     setEditor(editor)
-
-    document.dispatchEvent(new CustomEvent("mini.read", {
-      detail: `
-        \\ vocabulary script
-      `,
-    }));
   });
+
+  const runScript = () => {
+    const script = model().getValue()
+    document.dispatchEvent(new CustomEvent("mini.read", {
+      detail: script,
+    }));
+  }
 
   return (
     <div class="flex flex-col min-h-0 grow w-full">
+      <div class="flex flex-row gap-[1ch]">
+        <button
+          class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap basis-1/2"
+          on:click={() => {
+            mini().reset();
+            runScript();
+          }}
+        >
+          reset forth and run script
+        </button>
+        <button
+          class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap basis-1/2"
+          on:click={() => {
+            runScript();
+          }}
+        >
+          just run script
+        </button>
+      </div>
       <div
         ref={container}
-        // id="asdf"
-        // class="w-full aspect-[16/10] max-w-[640px]"
-        class="w-[80ch] min-h-0 grow"
+        class="min-h-0 grow"
       />
-      <button
-        class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap"
-        on:click={()=>{
-          const cmd = model().getValue()
-          // TODO
-          // script needs to reset current vocabulary too
-          document.dispatchEvent(new CustomEvent("mini.read", {
-            detail: `
-              \\ also script definitions
-              ${cmd}
-              \\ previous definitions
-              \\ also script
-            `,
-          }));
-        }}
-      >
-        run script
-      </button>
     </div>
   );
 }

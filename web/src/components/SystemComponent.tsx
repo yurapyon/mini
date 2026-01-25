@@ -106,7 +106,7 @@ const Screen = () => {
 
 export const SystemComponent = (props) => {
   return (
-    <div class="w-full flex flex-row justify-center p-2">
+    <div class="w-full flex flex-row justify-center p-2 bg-black">
       <Screen />
     </div>
   );
