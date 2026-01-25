@@ -328,3 +328,9 @@ previous definitions
 : src! >in ! source-len ! source-ptr ! ;
 
 : evaluate src@ >r >r >r 0 src! interpret r> r> r> src! ;
+
+0 [if]
+\ note this doesnt work for builtins
+: redef: word 2dup find >cfa -rot define ['] docre @ swap !+ this!
+  ['] docol @ , ['] drop , set-loop ] ;
+[then]
