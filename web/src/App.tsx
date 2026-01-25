@@ -76,12 +76,12 @@ const TerminalComponent = (props) => {
         })
 
       const timeScript = `
-        : 24>12     12 mod dup 0= if drop 12 then ;
-        : time      h/m/s flip 24 mod flip ;
-        : 00:#      # # drop ':' hold ;
-        : .time24   <# 00:# 00:# # # #> type ;
-        : .time12hm drop <# 00:# 24>12 # # #> type ;
-        : this-month y/m/d flip to year nip ;
+        : 24>12      12 mod dup 0= if drop 12 then ;
+        : time       h/m/s flip 24 mod flip ;
+        : 00:#       # # drop ':' hold ;
+        : .time24    <# 00:# 00:# # # #> type ;
+        : .time12hm  drop <# 00:# 24>12 # # #> type ;
+        : this-month y/m/d drop swap ;
       `;
 
       document.dispatchEvent(new CustomEvent("mini.read", {
