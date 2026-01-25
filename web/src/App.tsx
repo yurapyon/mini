@@ -81,28 +81,20 @@ const TerminalComponent = (props) => {
         : 00:#      # # drop ':' hold ;
         : .time24   <# 00:# 00:# # # #> type ;
         : .time12hm drop <# 00:# 24>12 # # #> type ;
+        : this-month y/m/d flip to year nip ;
       `;
+
       document.dispatchEvent(new CustomEvent("mini.read", {
         detail: timeScript,
-      }));
-
-      const startingCmd = ": this-month y/m/d flip to year nip ;";
-
-      shell.pushLine({
-        isUser: true,
-        text: startingCmd
-      });
-      document.dispatchEvent(new CustomEvent("mini.read", {
-        detail: startingCmd,
       }));
     }
   });
 
   return (
     <div
-      class="group bg-[#202020] focus:bg-[#000010] text-gray-400 focus:text-white text-xs flex flex-col-reverse overflow-y-auto min-h-0 grow"
+      class="group bg-[#181818] focus:bg-[#000010] text-[#b0b0b0] focus:text-white text-xs flex flex-col-reverse overflow-y-auto min-h-0 grow w-full"
       style={{
-        width: terminal.width + "ch",
+        // width: terminal.width + "ch",
         height: "10lh",
       }}
       tabIndex="0"
@@ -168,29 +160,27 @@ const RunButton = (props) => {
 
 const Tutorial = () => {
   return (
-    <div>
-      <div class="flex flex-col">
-        <div class="flex flex-row gap-[1ch]">
-          terminal:
-          <RunButton cmd="clear" />
-        </div>
-        <div class="flex flex-row gap-[1ch]">
-          printing:
-          <RunButton cmd="ashy" />
-          <RunButton cmd="words cr" />
-          <RunButton cmd="0 256 dump" />
-        </div>
-        <div class="flex flex-row gap-[1ch]">
-          date/time:
-          <RunButton cmd="this-month 1cal" />
-          <RunButton cmd="this-month 3cal" />
-          <RunButton cmd="time .time24 cr" />
-        </div>
-        <div class="flex flex-row gap-[1ch]">
-          graphics:
-          <RunButton cmd="random-color >bg" />
-          <RunButton cmd="random-point sprite >s.pos" />
-        </div>
+    <div class="flex flex-row gap-x-[1ch] flex-wrap text-sm p-2">
+      <div class="flex flex-row gap-[1ch]">
+        terminal:
+        <RunButton cmd="clear" />
+      </div>
+      <div class="flex flex-row gap-[1ch]">
+        printing:
+        <RunButton cmd="ashy" />
+        <RunButton cmd="words cr" />
+        <RunButton cmd="0 256 dump" />
+      </div>
+      <div class="flex flex-row gap-[1ch]">
+        date/time:
+        <RunButton cmd="this-month 1cal" />
+        <RunButton cmd="2000 12cal" />
+        <RunButton cmd="time .time24 cr" />
+      </div>
+      <div class="flex flex-row gap-[1ch]">
+        graphics:
+        <RunButton cmd="random-color >bg" />
+        <RunButton cmd="random-point sprite >s.pos" />
       </div>
     </div>
   );
@@ -201,12 +191,12 @@ const App: Component = () => {
     <MiniProvider>
       <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
         <TitleBar />
-        <div class="flex flex-row grow min-h-0 text-sm gap-[1ch]">
-          <div class="flex flex-col w-[80ch] gap-2">
+        <div class="flex flex-row grow min-h-0 text-sm">
+          <div class="flex flex-col basis-1/2">
             <Editor />
             <Tutorial />
           </div>
-          <div class="flex flex-col grow min-w-0 items-center">
+          <div class="flex flex-col grow min-w-0 items-center basis-1/2">
             <SystemComponent mini={mini()} />
             <TerminalComponent />
           </div>

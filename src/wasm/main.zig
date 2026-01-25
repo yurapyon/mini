@@ -93,15 +93,9 @@ fn ffiLookup(_: *Kernel, _: ?*anyopaque, name: []const u8) ?Cell {
     }
 }
 
-// NOTE
-// Frees image and script mem
-//   TODO maybe don't do this
-// TODO handle kernel errors
-export fn run() void {
+// TODO handle errors
+export fn main() void {
     global_k.init(forth_mem);
-
-    global_k.loadImage(image_mem);
-    allocator.free(image_mem);
 
     global_k.setFFIClosure(.{
         .callback = ffiCallback,
@@ -109,14 +103,21 @@ export fn run() void {
         .userdata = null,
     });
 
-    global_k.clearAcceptClosure();
     global_k.setEmitClosure(.{
         .callback = emit,
         .userdata = null,
     });
 
+    reset();
+}
+
+export fn reset() void {
+    global_k.execution_status = .playing;
+
+    global_k.loadImage(image_mem);
+
+    global_k.clearAcceptClosure();
     global_k.evaluate(script_mem) catch unreachable;
-    allocator.free(script_mem);
 
     global_k.setAcceptClosure(.{
         .callback = accept,
@@ -129,5 +130,8 @@ export fn run() void {
 
 export fn deinit() void {
     // TODO
-    // return 0;
+    // free other memory
+    // call this as needed in js?
+    allocator.free(image_mem);
+    allocator.free(script_mem);
 }
