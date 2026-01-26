@@ -19,22 +19,26 @@ enum Filepaths {
 export const fetchMini = async () => {
   const offsets = {
     forth: 0,
+    jsBuf: 0,
     image: 0,
     script: 0,
     extLookup: 0,
   };
 
   const kernel = {
-    pop: null,
-    push: null,
-    pause: null,
-    unpause: null,
-    execute: null,
-    resume: null,
+    pop: undefined,
+    popString: undefined,
+    push: undefined,
+    pushString: undefined,
+
+    pause: undefined,
+    unpause: undefined,
+    execute: undefined,
+    resume: undefined,
   };
 
-  let emitCallback = (_:number) => {};
-  const setEmitCallback = (cb : (_:number)=>void) => {
+  let emitCallback = (_: number) => {};
+  const setEmitCallback = (cb: (_: number) => void) => {
     emitCallback = cb;
   };
 
@@ -49,6 +53,13 @@ export const fetchMini = async () => {
   const memory = new WebAssembly.Memory({
     initial: 20,
   });
+
+  const readStringFromMemory = (ptr, len) => {
+    const wasm_mem = new Uint8Array(memory.buffer);
+    const chars = wasm_mem.slice(ptr, ptr + len);
+    const str = String.fromCharCode(...chars);
+    return str;
+  };
 
   const utf8Encode = new TextEncoder();
 
@@ -84,13 +95,7 @@ export const fetchMini = async () => {
         externals[id].fn();
       },
       jsFFILookup: (len) => {
-        const wasm_mem = new Uint8Array(memory.buffer);
-        const chars = wasm_mem.slice(
-          offsets.extLookup,
-          offsets.extLookup + len
-        );
-        const str = String.fromCharCode(...chars);
-
+        const str = readStringFromMemory(offsets.extLookup, len);
         const idx = externals.findIndex((ext) => ext.name === str);
         return idx;
       },
@@ -124,6 +129,11 @@ export const fetchMini = async () => {
     console.log("ext added:", extName);
   };
 
+  const miniEvaluate = (str) => {
+    const lines = str.split("\n");
+    addToReadQueue(lines);
+  };
+
   const image_response = await fetch(Filepaths.IMAGE);
   const image = await image_response.bytes();
 
@@ -143,6 +153,9 @@ export const fetchMini = async () => {
   );
 
   const initJsBindings = () => {
+    miniEvaluate("create __js-buf 128 allot __js-buf");
+    offsets.jsBuf = offsets.forth + kernel.pop();
+
     addExternal("y/m/d", () => {
       const date = new Date();
       const year = date.getFullYear();
@@ -170,6 +183,10 @@ export const fetchMini = async () => {
         kernel.resume();
       }, time);
     });
+
+    // addExternal("hello", () => {
+    //   kernel.pushString("hihi");
+    // });
 
     document.dispatchEvent(
       new CustomEvent("mini.read", {
@@ -211,10 +228,29 @@ export const fetchMini = async () => {
       reset: mReset,
     } = result.instance.exports;
 
-    // TODO
-    // need a kernel.popString
     kernel.pop = kPop;
+    kernel.popString = () => {
+      const len = kPop();
+      const addr = kPop();
+      const str = readStringFromMemory(offsets.forth + addr, len);
+      return str;
+    };
+
     kernel.push = kPush;
+    kernel.pushString = (str) => {
+      // TODO handle max len
+      const addr = offsets.jsBuf;
+      const len = str.length;
+
+      const wasm_mem = new Uint8Array(memory.buffer);
+
+      const bytes = utf8Encode.encode(str);
+      wasm_mem.set(bytes, addr);
+
+      kernel.push(addr);
+      kernel.push(len);
+    };
+
     kernel.pause = kPause;
     kernel.unpause = kUnpause;
     kernel.execute = kExecute;
@@ -228,7 +264,7 @@ export const fetchMini = async () => {
     offsets.script = allocateScriptMemory(startup.byteLength);
     offsets.extLookup = allocateExtLookupMemory();
 
-    let wasm_mem = new Uint8Array(memory.buffer);
+    const wasm_mem = new Uint8Array(memory.buffer);
     wasm_mem.set(image, offsets.image);
     wasm_mem.set(startup, offsets.script);
 
