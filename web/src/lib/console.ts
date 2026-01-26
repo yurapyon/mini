@@ -3,14 +3,14 @@ export class Terminal {
   height: number;
   buffer: Array<number>;
 
-  onRedraw: any
+  onRedraw: any;
 
   constructor() {
     this.width = 80;
     this.height = 40;
 
     this.buffer = new Array(this.width * this.height);
-    this.buffer.fill(0)
+    this.buffer.fill(0);
   }
 
   putXY(ch: number, x: number, y: number) {

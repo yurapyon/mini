@@ -1,9 +1,12 @@
 import { createResource, createEffect, createSignal, Index } from "solid-js";
-import type { Component } from 'solid-js';
+import type { Component } from "solid-js";
 import { TitleBar } from "./components/TitleBar";
 import { SystemComponent } from "./components/SystemComponent";
 import { Documentation } from "./components/documentation/Documentation";
-import { MiniProvider, useMiniContext } from "./components/providers/MiniProvider";
+import {
+  MiniProvider,
+  useMiniContext,
+} from "./components/providers/MiniProvider";
 import { Editor } from "./components/Editor";
 
 import { Shell } from "./lib/shell";
@@ -24,25 +27,25 @@ const TerminalComponent = (props) => {
   const mini = useMiniContext();
 
   const [history, setHistory] = createSignal([], {
-    equals: false
+    equals: false,
   });
 
   shell.onUpdate = () => {
-    setHistory(shell.history)
-  }
+    setHistory(shell.history);
+  };
 
   const [cmd, setCmd] = createSignal("");
 
-  createEffect(async ()=>{
+  createEffect(async () => {
     const m = mini();
     if (m) {
-      m.setEmitCallback((ch)=>{
-        shell.putc(ch)
+      m.setEmitCallback((ch) => {
+        shell.putc(ch);
       });
 
-      m.addExternal("clear", ()=>{
-        shell.clearHistory()
-      })
+      m.addExternal("clear", () => {
+        shell.clearHistory();
+      });
     }
   });
 
@@ -54,7 +57,7 @@ const TerminalComponent = (props) => {
         height: "10lh",
       }}
       tabIndex="0"
-      on:keydown={(ev)=>{
+      on:keydown={(ev) => {
         ev.preventDefault();
         const c = cmd();
         if (ev.key === "Enter") {
@@ -70,49 +73,50 @@ const TerminalComponent = (props) => {
             setCmd("");
           }
         } else if (ev.key === "Backspace") {
-          setCmd((p)=>p.slice(0, p.length-1));
+          setCmd((p) => p.slice(0, p.length - 1));
         } else if (ev.key.length === 1) {
-          setCmd((p)=>p+ev.key);
+          setCmd((p) => p + ev.key);
         }
       }}
     >
       <pre class="h-[1lh] shrink-0 flex flex-row">
-        <pre>
-          {PROMPT + cmd()}
-        </pre>
-        <div class="w-[1ch] shrink-0 bg-gray-400 group-focus:bg-white group-focus:animate-(--animate-blink) h-full"/>
+        <pre>{PROMPT + cmd()}</pre>
+        <div class="w-[1ch] shrink-0 bg-gray-400 group-focus:bg-white group-focus:animate-(--animate-blink) h-full" />
       </pre>
       <Index each={history().toReversed()}>
-        {(line)=>{
+        {(line) => {
           return (
             <pre class="text-wrap">
-              {line().isUser && PROMPT}{line().text}
+              {line().isUser && PROMPT}
+              {line().text}
             </pre>
           );
         }}
       </Index>
     </div>
   );
-}
+};
 
 const RunButton = (props) => {
   return (
     <button
       class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap"
-      on:click={()=>{
+      on:click={() => {
         shell.pushLine({
           isUser: true,
           text: props.cmd,
         });
-        document.dispatchEvent(new CustomEvent("mini.read", {
-          detail: props.cmd,
-        }));
+        document.dispatchEvent(
+          new CustomEvent("mini.read", {
+            detail: props.cmd,
+          })
+        );
       }}
     >
       {props.cmd}
     </button>
   );
-}
+};
 
 const Tutorial = () => {
   return (
@@ -140,7 +144,7 @@ const Tutorial = () => {
       </div>
     </div>
   );
-}
+};
 
 const App: Component = () => {
   return (

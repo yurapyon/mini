@@ -5,7 +5,7 @@ import { fetchMini } from "../../lib/mini";
 export const MiniContext = createContext();
 
 export const MiniProvider = (props) => {
-  const [mini, {mutate}] = createResource(fetchMini);
+  const [mini, { mutate }] = createResource(fetchMini);
 
   /*
   const reset = () => {
@@ -22,12 +22,10 @@ export const MiniProvider = (props) => {
   */
 
   return (
-    <MiniContext.Provider value={mini}>
-      {props.children}
-    </MiniContext.Provider>
-  )
+    <MiniContext.Provider value={mini}>{props.children}</MiniContext.Provider>
+  );
 };
 
 export const useMiniContext = () => {
   return useContext(MiniContext);
-}
+};

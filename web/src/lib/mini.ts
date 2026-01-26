@@ -3,12 +3,12 @@ const consoleBuffer = [];
 const putc = (char) => {
   if (char === 10) {
     const str = String.fromCharCode(...consoleBuffer);
-    console.log(str)
+    console.log(str);
     consoleBuffer.length = 0;
   } else {
     consoleBuffer.push(char);
   }
-}
+};
 
 enum Filepaths {
   WASM = "/mini/mini-wasm.wasm",
@@ -36,9 +36,9 @@ export const fetchMini = async () => {
   let emitCallback = () => {};
   const setEmitCallback = (cb) => {
     emitCallback = cb;
-  }
+  };
 
-  const externals = []
+  const externals = [];
 
   const readQueue = [];
   const readDestination = {
@@ -73,7 +73,7 @@ export const fetchMini = async () => {
       );
       kernel.resume();
     }
-  }
+  };
 
   const importObject = {
     env: {
@@ -81,7 +81,7 @@ export const fetchMini = async () => {
         console.log("zig: ", result);
       },
       jsFFICallback: (id) => {
-        externals[id].fn()
+        externals[id].fn();
       },
       jsFFILookup: (len) => {
         const wasm_mem = new Uint8Array(memory.buffer);
@@ -95,31 +95,31 @@ export const fetchMini = async () => {
         return idx;
       },
       jsEmit: (ch) => {
-        emitCallback(ch)
+        emitCallback(ch);
       },
       jsStartRead: (addr, maxLen) => {
         readDestination.addr = addr;
         readDestination.maxLen = maxLen;
 
-        let nextLine = readQueue.shift()
+        let nextLine = readQueue.shift();
         if (nextLine !== undefined) {
-          readToForth(addr, maxLen, nextLine)
+          readToForth(addr, maxLen, nextLine);
         } else {
           kernel.pause();
         }
       },
       memory: memory,
-    }
+    },
   };
 
-  document.addEventListener("mini.read", (e)=>{
-    const str = e.detail
-    const lines = str.split("\n")
-    addToReadQueue(lines)
-  })
+  document.addEventListener("mini.read", (e) => {
+    const str = e.detail;
+    const lines = str.split("\n");
+    addToReadQueue(lines);
+  });
 
   const addExternal = (extName, fn) => {
-    externals.push({ name: extName, fn, });
+    externals.push({ name: extName, fn });
     addToReadQueue(["external " + extName]);
     console.log("ext added:", extName);
   };
@@ -130,49 +130,52 @@ export const fetchMini = async () => {
   const startup_response = await fetch(Filepaths.STARTUP);
   const startup = await startup_response.bytes();
 
-  const calScript = await fetch("/mini/scripts/cal.mini.fth")
-    .then((response) => {
+  const calScript = await fetch("/mini/scripts/cal.mini.fth").then(
+    (response) => {
       if (response.ok) {
         return response.text();
       } else {
-        const err = new Error("Couldnt get file")
+        const err = new Error("Couldnt get file");
         console.error(err);
         return "";
       }
-    })
+    }
+  );
 
   const initJsBindings = () => {
-    addExternal("y/m/d", ()=>{
-      const date  = new Date();
-      const year  = date.getFullYear();
+    addExternal("y/m/d", () => {
+      const date = new Date();
+      const year = date.getFullYear();
       const month = date.getMonth() + 1;
-      const day   = date.getDate();
-      kernel.push(year)
-      kernel.push(month)
-      kernel.push(day)
-    })
+      const day = date.getDate();
+      kernel.push(year);
+      kernel.push(month);
+      kernel.push(day);
+    });
 
-    addExternal("h/m/s", ()=>{
-      const date    = new Date();
-      const hours   = date.getHours();
+    addExternal("h/m/s", () => {
+      const date = new Date();
+      const hours = date.getHours();
       const minutes = date.getMinutes();
       const seconds = date.getSeconds();
-      kernel.push(hours)
-      kernel.push(minutes)
-      kernel.push(seconds)
-    })
+      kernel.push(hours);
+      kernel.push(minutes);
+      kernel.push(seconds);
+    });
 
-    addExternal("sleep", ()=>{
-      const time = m.kernel.pop()
+    addExternal("sleep", () => {
+      const time = m.kernel.pop();
       kernel.pause();
-      setTimeout(()=>{
+      setTimeout(() => {
         kernel.resume();
-      }, time)
-    })
+      }, time);
+    });
 
-    document.dispatchEvent(new CustomEvent("mini.read", {
-      detail: calScript,
-    }));
+    document.dispatchEvent(
+      new CustomEvent("mini.read", {
+        detail: calScript,
+      })
+    );
 
     const timeScript = `
       : 24>12      12 mod dup 0= if drop 12 then ;
@@ -183,67 +186,70 @@ export const fetchMini = async () => {
       : this-month y/m/d drop swap ;
     `;
 
-    document.dispatchEvent(new CustomEvent("mini.read", {
-      detail: timeScript,
-    }));
-  }
+    document.dispatchEvent(
+      new CustomEvent("mini.read", {
+        detail: timeScript,
+      })
+    );
+  };
 
-  const mini = await WebAssembly
-    .instantiateStreaming(fetch(Filepaths.WASM), importObject)
-    .then((result) => {
-      const {
-        main,
-        allocateForthMemory,
-        allocateImageMemory,
-        allocateScriptMemory,
-        allocateExtLookupMemory,
-        kPop,
-        kPush,
-        kPause,
-        kUnpause,
-        kExecute,
-        reset: mReset,
-      } = result.instance.exports;
+  const mini = await WebAssembly.instantiateStreaming(
+    fetch(Filepaths.WASM),
+    importObject
+  ).then((result) => {
+    const {
+      main,
+      allocateForthMemory,
+      allocateImageMemory,
+      allocateScriptMemory,
+      allocateExtLookupMemory,
+      kPop,
+      kPush,
+      kPause,
+      kUnpause,
+      kExecute,
+      reset: mReset,
+    } = result.instance.exports;
 
-      // TODO
-      // need a kernel.popString
-      kernel.pop = kPop;
-      kernel.push = kPush;
-      kernel.pause = kPause;
-      kernel.unpause = kUnpause;
-      kernel.execute = kExecute;
-      kernel.resume = () => {
-        kUnpause();
-        kExecute();
-      };
+    // TODO
+    // need a kernel.popString
+    kernel.pop = kPop;
+    kernel.push = kPush;
+    kernel.pause = kPause;
+    kernel.unpause = kUnpause;
+    kernel.execute = kExecute;
+    kernel.resume = () => {
+      kUnpause();
+      kExecute();
+    };
 
-      offsets.forth = allocateForthMemory();
-      offsets.image = allocateImageMemory(image.byteLength);
-      offsets.script = allocateScriptMemory(startup.byteLength);
-      offsets.extLookup = allocateExtLookupMemory();
+    offsets.forth = allocateForthMemory();
+    offsets.image = allocateImageMemory(image.byteLength);
+    offsets.script = allocateScriptMemory(startup.byteLength);
+    offsets.extLookup = allocateExtLookupMemory();
 
-      let wasm_mem = new Uint8Array(memory.buffer);
-      wasm_mem.set(image, offsets.image);
-      wasm_mem.set(startup, offsets.script);
+    let wasm_mem = new Uint8Array(memory.buffer);
+    wasm_mem.set(image, offsets.image);
+    wasm_mem.set(startup, offsets.script);
 
-      setEmitCallback(putc);
-      main();
+    setEmitCallback(putc);
+    main();
 
-      const reset = () => {
-        externals.length = 0;
-        mReset();
-        initJsBindings();
-      }
+    const reset = () => {
+      externals.length = 0;
+      mReset();
+      initJsBindings();
+    };
 
-      return {
-        addExternal,
-        setEmitCallback,
-        kernel,
-        reset,
-      }
+    return {
+      addExternal,
+      setEmitCallback,
+      kernel,
+      reset,
+    };
   });
 
   await initJsBindings();
 
   return mini;
-}
+};

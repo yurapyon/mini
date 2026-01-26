@@ -2,7 +2,7 @@ import { onMount, createSignal } from "solid-js";
 
 import * as monaco from "monaco-editor";
 
-import editorWorker from 'monaco-editor/esm/vs/editor/editor.worker?worker';
+import editorWorker from "monaco-editor/esm/vs/editor/editor.worker?worker";
 
 import { useMiniContext } from "../components/providers/MiniProvider";
 
@@ -32,9 +32,9 @@ wahoo
 `;
 
 window.MonacoEnvironment = {
-    getWorker(_workerId: any, _label: string) {
-        return new editorWorker();
-    }
+  getWorker(_workerId: any, _label: string) {
+    return new editorWorker();
+  },
 };
 
 export const Editor = () => {
@@ -45,11 +45,11 @@ export const Editor = () => {
 
   let container;
 
-  onMount(()=>{
+  onMount(() => {
     // monaco.languages.register({ id: "typescript" })
 
     const model = monaco.editor.createModel(
-      introScript,
+      introScript
       // monaco.Uri.parse("file:///main.ts"),
     );
 
@@ -57,22 +57,24 @@ export const Editor = () => {
 
     const editor = monaco.editor.create(container, {
       model,
-      theme: 'vs-dark',
+      theme: "vs-dark",
       minimap: {
         enabled: false,
       },
     });
 
-    setModel(model)
-    setEditor(editor)
+    setModel(model);
+    setEditor(editor);
   });
 
   const runScript = () => {
-    const script = model().getValue()
-    document.dispatchEvent(new CustomEvent("mini.read", {
-      detail: script,
-    }));
-  }
+    const script = model().getValue();
+    document.dispatchEvent(
+      new CustomEvent("mini.read", {
+        detail: script,
+      })
+    );
+  };
 
   return (
     <div class="flex flex-col min-h-0 grow w-full">
@@ -80,7 +82,7 @@ export const Editor = () => {
         <button
           class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap basis-1/2"
           on:click={() => {
-            mini().reset()
+            mini().reset();
             runScript();
           }}
         >
@@ -95,10 +97,7 @@ export const Editor = () => {
           just run script
         </button>
       </div>
-      <div
-        ref={container}
-        class="min-h-0 grow"
-      />
+      <div ref={container} class="min-h-0 grow" />
     </div>
   );
-}
+};

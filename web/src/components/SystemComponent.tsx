@@ -7,8 +7,8 @@ const loadSystem = async (container) => {
   const app = new Application();
 
   await app.init({
-    background: '#1099bb',
-    resizeTo: container
+    background: "#1099bb",
+    resizeTo: container,
   });
 
   container.appendChild(app.canvas);
@@ -17,28 +17,26 @@ const loadSystem = async (container) => {
 
   const createSprite = () => {
     const sprite = new Graphics();
-    sprite
-      .rect(-40, -40, 80, 80)
-      .fill({ color: "white" })
+    sprite.rect(-40, -40, 80, 80).fill({ color: "white" });
 
-    sprite.position.x = 320
-    sprite.position.y = 200
+    sprite.position.x = 320;
+    sprite.position.y = 200;
 
     app.stage.addChild(sprite);
 
     const idx = sprites.length;
     sprites.push(sprite);
-    return idx
+    return idx;
   };
 
   const getSprite = (idx) => {
     return sprites[idx];
-  }
+  };
 
   return {
     app,
     createSprite,
-    getSprite
+    getSprite,
   };
 };
 
@@ -49,33 +47,35 @@ const Screen = () => {
   let container;
 
   onMount(() => {
-    loadSystem(container).then(setApp)
+    loadSystem(container).then(setApp);
   });
 
-  createEffect(()=>{
+  createEffect(() => {
     const m = mini();
     const a = app();
     if (m && !!a) {
-      m.addExternal(">bg", ()=>{
-        const r = m.kernel.pop() % 2**8;
-        const g = m.kernel.pop() % 2**8;
-        const b = m.kernel.pop() % 2**8;
-        const str = [r,g,b].map((v)=>v.toString(16).padStart(2, '0')).join("")
+      m.addExternal(">bg", () => {
+        const r = m.kernel.pop() % 2 ** 8;
+        const g = m.kernel.pop() % 2 ** 8;
+        const b = m.kernel.pop() % 2 ** 8;
+        const str = [r, g, b]
+          .map((v) => v.toString(16).padStart(2, "0"))
+          .join("");
         a.app.renderer.background.color = "#" + str;
-      })
-      m.addExternal("random", ()=>{
-        const value = Math.floor(Math.random() * 2**16);
+      });
+      m.addExternal("random", () => {
+        const value = Math.floor(Math.random() * 2 ** 16);
         m.kernel.push(value);
-      })
-      m.addExternal("s.new", ()=>{
+      });
+      m.addExternal("s.new", () => {
         const idx = a.createSprite();
         m.kernel.push(idx);
-      })
-      m.addExternal("s.delete", ()=>{
+      });
+      m.addExternal("s.delete", () => {
         const idx = m.kernel.pop();
         // TODO
-      })
-      m.addExternal(">s.pos", ()=>{
+      });
+      m.addExternal(">s.pos", () => {
         const idx = m.kernel.pop();
         const y = m.kernel.pop();
         const x = m.kernel.pop();
@@ -84,25 +84,22 @@ const Screen = () => {
           sprite.position.x = x;
           sprite.position.y = y;
         }
-      })
+      });
 
-      document.dispatchEvent(new CustomEvent("mini.read", {
-        detail: `
+      document.dispatchEvent(
+        new CustomEvent("mini.read", {
+          detail: `
           : random-color random random random ;
           : random-point random 640 mod random 400 mod ;
           s.new value sprite
-        `
-      }));
+        `,
+        })
+      );
     }
   });
 
-  return (
-    <div
-      ref={container}
-      class="w-full aspect-[16/10] max-w-[640px]"
-    />
-  );
-}
+  return <div ref={container} class="w-full aspect-[16/10] max-w-[640px]" />;
+};
 
 export const SystemComponent = (props) => {
   return (
