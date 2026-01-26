@@ -1,15 +1,14 @@
-import { createResource, createEffect, createSignal, Index } from "solid-js";
 import type { Component } from "solid-js";
-import { TitleBar } from "./components/TitleBar";
-import { SystemComponent } from "./components/SystemComponent";
-import { Documentation } from "./components/documentation/Documentation";
-import {
-  MiniProvider,
-  useMiniContext,
-} from "./components/providers/MiniProvider";
+import { createEffect, createSignal, Index } from "solid-js";
 import { Editor } from "./components/Editor";
+import { SystemComponent } from "./components/SystemComponent";
+import { TitleBar } from "./components/TitleBar";
+import {
+    MiniProvider,
+    useMiniContext,
+} from "./components/providers/MiniProvider";
 
-import { Shell } from "./lib/shell";
+import { Shell, Line } from "./lib/shell";
 
 const shell = new Shell();
 
@@ -26,7 +25,7 @@ const terminal = new Terminal();
 const TerminalComponent = (props) => {
   const mini = useMiniContext();
 
-  const [history, setHistory] = createSignal([], {
+  const [history, setHistory] = createSignal<Line[]>([], {
     equals: false,
   });
 

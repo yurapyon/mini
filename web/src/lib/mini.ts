@@ -1,6 +1,6 @@
-const consoleBuffer = [];
+const consoleBuffer: number[] = [];
 
-const putc = (char) => {
+const putc = (char: number) => {
   if (char === 10) {
     const str = String.fromCharCode(...consoleBuffer);
     console.log(str);
@@ -33,8 +33,8 @@ export const fetchMini = async () => {
     resume: null,
   };
 
-  let emitCallback = () => {};
-  const setEmitCallback = (cb) => {
+  let emitCallback = (_:number) => {};
+  const setEmitCallback = (cb : (_:number)=>void) => {
     emitCallback = cb;
   };
 

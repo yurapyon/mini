@@ -1,6 +1,6 @@
 const PROMPT = "mini> ";
 
-interface Line {
+export interface Line {
   isUser: boolean;
   text: string;
 }
