@@ -80,7 +80,7 @@ export const Editor = () => {
         <button
           class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap basis-1/2"
           on:click={() => {
-            mini().reset();
+            mini().reset()
             runScript();
           }}
         >

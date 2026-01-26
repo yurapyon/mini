@@ -130,6 +130,64 @@ export const fetchMini = async () => {
   const startup_response = await fetch(Filepaths.STARTUP);
   const startup = await startup_response.bytes();
 
+  const calScript = await fetch("/mini/scripts/cal.mini.fth")
+    .then((response) => {
+      if (response.ok) {
+        return response.text();
+      } else {
+        const err = new Error("Couldnt get file")
+        console.error(err);
+        return "";
+      }
+    })
+
+  const initJsBindings = () => {
+    addExternal("y/m/d", ()=>{
+      const date  = new Date();
+      const year  = date.getFullYear();
+      const month = date.getMonth() + 1;
+      const day   = date.getDate();
+      kernel.push(year)
+      kernel.push(month)
+      kernel.push(day)
+    })
+
+    addExternal("h/m/s", ()=>{
+      const date    = new Date();
+      const hours   = date.getHours();
+      const minutes = date.getMinutes();
+      const seconds = date.getSeconds();
+      kernel.push(hours)
+      kernel.push(minutes)
+      kernel.push(seconds)
+    })
+
+    addExternal("sleep", ()=>{
+      const time = m.kernel.pop()
+      kernel.pause();
+      setTimeout(()=>{
+        kernel.resume();
+      }, time)
+    })
+
+    document.dispatchEvent(new CustomEvent("mini.read", {
+      detail: calScript,
+    }));
+
+    const timeScript = `
+      : 24>12      12 mod dup 0= if drop 12 then ;
+      : time       h/m/s flip 24 mod flip ;
+      : 00:#       # # drop ':' hold ;
+      : .time24    <# 00:# 00:# # # #> type ;
+      : .time12hm  drop <# 00:# 24>12 # # #> type ;
+      : this-month y/m/d drop swap ;
+    `;
+
+    document.dispatchEvent(new CustomEvent("mini.read", {
+      detail: timeScript,
+    }));
+  }
+
   const mini = await WebAssembly
     .instantiateStreaming(fetch(Filepaths.WASM), importObject)
     .then((result) => {
@@ -144,7 +202,7 @@ export const fetchMini = async () => {
         kPause,
         kUnpause,
         kExecute,
-        reset,
+        reset: mReset,
       } = result.instance.exports;
 
       // TODO
@@ -171,6 +229,12 @@ export const fetchMini = async () => {
       setEmitCallback(putc);
       main();
 
+      const reset = () => {
+        externals.length = 0;
+        mReset();
+        initJsBindings();
+      }
+
       return {
         addExternal,
         setEmitCallback,
@@ -178,6 +242,8 @@ export const fetchMini = async () => {
         reset,
       }
   });
+
+  await initJsBindings();
 
   return mini;
 }

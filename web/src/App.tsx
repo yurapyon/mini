@@ -39,54 +39,10 @@ const TerminalComponent = (props) => {
       m.setEmitCallback((ch)=>{
         shell.putc(ch)
       });
-      m.addExternal("y/m/d", ()=>{
-        const date  = new Date();
-        const year  = date.getFullYear();
-        const month = date.getMonth() + 1;
-        const day   = date.getDate();
-        m.kernel.push(year)
-        m.kernel.push(month)
-        m.kernel.push(day)
-      })
-      m.addExternal("h/m/s", ()=>{
-        const date    = new Date();
-        const hours   = date.getHours();
-        const minutes = date.getMinutes();
-        const seconds = date.getSeconds();
-        m.kernel.push(hours)
-        m.kernel.push(minutes)
-        m.kernel.push(seconds)
-      })
+
       m.addExternal("clear", ()=>{
         shell.clearHistory()
       })
-
-      await fetch("/mini/scripts/cal.mini.fth")
-        .then((response) => {
-          if (response.ok) {
-            return response.text();
-          } else {
-            throw new Error("Couldnt get file")
-          }
-        })
-        .then((script) => {
-          document.dispatchEvent(new CustomEvent("mini.read", {
-            detail: script,
-          }));
-        })
-
-      const timeScript = `
-        : 24>12      12 mod dup 0= if drop 12 then ;
-        : time       h/m/s flip 24 mod flip ;
-        : 00:#       # # drop ':' hold ;
-        : .time24    <# 00:# 00:# # # #> type ;
-        : .time12hm  drop <# 00:# 24>12 # # #> type ;
-        : this-month y/m/d drop swap ;
-      `;
-
-      document.dispatchEvent(new CustomEvent("mini.read", {
-        detail: timeScript,
-      }));
     }
   });
 
