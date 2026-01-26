@@ -13,7 +13,7 @@ const putc = (char: number) => {
 enum Filepaths {
   WASM = "/mini/mini-wasm.wasm",
   IMAGE = "/mini/precompiled.mini.bin",
-  STARTUP = "/mini/startup.mini.fth",
+  STARTUP_SCRIPT = "/mini/startup.mini.fth",
 }
 
 export const fetchMini = async () => {
@@ -74,15 +74,12 @@ export const fetchMini = async () => {
   };
 
   const readToForth = (addr, maxLen, str) => {
-    console.log(addr, maxLen, str, str.length);
     // TODO check max len
     memsetString(offsets.forth + addr, str);
     kernel.push(str.length);
   };
 
   const addToReadQueue = (lines: string[]) => {
-    console.log(lines);
-
     const shouldResume = readQueue.length === 0 && lines.length > 0;
     readQueue.push(...lines);
 
@@ -102,7 +99,6 @@ export const fetchMini = async () => {
         console.log("zig: ", result);
       },
       jsFFICallback: (id) => {
-        console.log(id);
         externals[id].fn();
       },
       jsFFILookup: (len) => {
@@ -137,7 +133,7 @@ export const fetchMini = async () => {
   const addExternal = (extName, fn) => {
     externals.push({ name: extName, fn });
     addToReadQueue(["external " + extName]);
-    console.log("ext added:", extName);
+    // console.log("ext added:", extName);
   };
 
   const miniEvaluate = (str) => {
@@ -145,11 +141,11 @@ export const fetchMini = async () => {
     addToReadQueue(lines);
   };
 
-  const image_response = await fetch(Filepaths.IMAGE);
-  const image = await image_response.bytes();
+  const imageResponse = await fetch(Filepaths.IMAGE);
+  const image = await imageResponse.bytes();
 
-  const startup_response = await fetch(Filepaths.STARTUP);
-  const startup = await startup_response.bytes();
+  const startupScriptResponse = await fetch(Filepaths.STARTUP_SCRIPT);
+  const startupScript = await startupScriptResponse.bytes();
 
   const calScript = await fetch("/mini/scripts/cal.mini.fth").then(
     (response) => {
@@ -251,8 +247,8 @@ export const fetchMini = async () => {
     kernel.pushString = (str) => {
       // TODO handle max len
       memsetString(offsets.jsBuf, str);
-      kernel.push(addr);
-      kernel.push(len);
+      kernel.push(offsets.jsBuf);
+      kernel.push(str.length);
     };
 
     kernel.pause = kPause;
@@ -265,11 +261,11 @@ export const fetchMini = async () => {
 
     offsets.forth = allocateForthMemory();
     offsets.image = allocateImageMemory(image.byteLength);
-    offsets.script = allocateScriptMemory(startup.byteLength);
+    offsets.script = allocateScriptMemory(startupScript.byteLength);
     offsets.extLookup = allocateExtLookupMemory();
 
     memsetBytes(offsets.image, image);
-    memsetBytes(offsets.startup, startup);
+    memsetBytes(offsets.script, startupScript);
 
     setEmitCallback(putc);
     main();
