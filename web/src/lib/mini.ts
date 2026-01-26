@@ -54,6 +54,18 @@ export const fetchMini = async () => {
     initial: 20,
   });
 
+  const memsetBytes = (addr, bytes) => {
+    const wasm_mem = new Uint8Array(memory.buffer);
+    wasm_mem.set(bytes, addr);
+  };
+
+  const utf8Encode = new TextEncoder();
+
+  const memsetString = (addr, str) => {
+    const bytes = utf8Encode.encode(str);
+    memsetBytes(addr, bytes);
+  };
+
   const readStringFromMemory = (ptr, len) => {
     const wasm_mem = new Uint8Array(memory.buffer);
     const chars = wasm_mem.slice(ptr, ptr + len);
@@ -61,18 +73,16 @@ export const fetchMini = async () => {
     return str;
   };
 
-  const utf8Encode = new TextEncoder();
-
   const readToForth = (addr, maxLen, str) => {
-    const wasm_mem = new Uint8Array(memory.buffer);
-
-    const bytes = utf8Encode.encode(str);
-    wasm_mem.set(bytes, offsets.forth + addr);
-
+    console.log(addr, maxLen, str, str.length);
+    // TODO check max len
+    memsetString(offsets.forth + addr, str);
     kernel.push(str.length);
   };
 
   const addToReadQueue = (lines: string[]) => {
+    console.log(lines);
+
     const shouldResume = readQueue.length === 0 && lines.length > 0;
     readQueue.push(...lines);
 
@@ -92,6 +102,7 @@ export const fetchMini = async () => {
         console.log("zig: ", result);
       },
       jsFFICallback: (id) => {
+        console.log(id);
         externals[id].fn();
       },
       jsFFILookup: (len) => {
@@ -184,9 +195,9 @@ export const fetchMini = async () => {
       }, time);
     });
 
-    // addExternal("hello", () => {
-    //   kernel.pushString("hihi");
-    // });
+    addExternal("hello", () => {
+      kernel.pushString("hihi");
+    });
 
     document.dispatchEvent(
       new CustomEvent("mini.read", {
@@ -239,14 +250,7 @@ export const fetchMini = async () => {
     kernel.push = kPush;
     kernel.pushString = (str) => {
       // TODO handle max len
-      const addr = offsets.jsBuf;
-      const len = str.length;
-
-      const wasm_mem = new Uint8Array(memory.buffer);
-
-      const bytes = utf8Encode.encode(str);
-      wasm_mem.set(bytes, addr);
-
+      memsetString(offsets.jsBuf, str);
       kernel.push(addr);
       kernel.push(len);
     };
@@ -264,9 +268,8 @@ export const fetchMini = async () => {
     offsets.script = allocateScriptMemory(startup.byteLength);
     offsets.extLookup = allocateExtLookupMemory();
 
-    const wasm_mem = new Uint8Array(memory.buffer);
-    wasm_mem.set(image, offsets.image);
-    wasm_mem.set(startup, offsets.script);
+    memsetBytes(offsets.image, image);
+    memsetBytes(offsets.startup, startup);
 
     setEmitCallback(putc);
     main();
