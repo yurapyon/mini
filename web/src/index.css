@@ -1,9 +1,10 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @theme {
   --animate-blink: blink 1.5s step-start infinite;
   @keyframes blink {
-    0%, 100% {
+    0%,
+    100% {
       opacity: 0;
     }
     50% {

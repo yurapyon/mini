@@ -1,27 +1,27 @@
-const PROMPT = "mini> ";
-
-interface Line {
-  isUser: boolean,
-  text: string,
+export interface Line {
+  isUser: boolean;
+  text: string;
 }
 
 export class Shell {
   history: Line[];
   onUpdate: () => void;
   consoleBuffer: [];
+  prompt: string;
 
   constructor() {
-    this.history = []
-    this.onUpdate = () => {}
+    this.history = [];
+    this.onUpdate = () => {};
     this.consoleBuffer = [];
+    this.prompt = "mini> ";
   }
 
   pushLine(line) {
     if (this.history.length >= 300) {
-      this.history.shift()
+      this.history.shift();
     }
-    this.history.push(line)
-    this.onUpdate()
+    this.history.push(line);
+    this.onUpdate();
   }
 
   clearHistory() {
