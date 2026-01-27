@@ -5,28 +5,27 @@ import {
   createEffect,
 } from "solid-js";
 import { usePixiContext } from "./PixiProvider";
+import { useShellContext } from "./ShellProvider";
 import { fetchMini } from "../../lib/mini";
 
 export const MiniContext = createContext();
 
 export const MiniProvider = (props) => {
   const pixi = usePixiContext();
+  const shell = useShellContext();
 
-  const [mini] = createResource(pixi, fetchMini);
-
-  /*
-  const reset = () => {
-    mini().reset();
-    mutate(m => ({...m}));
-  }
-
-  const val = () => {
-    const m = mini()
-    if (!!m) {
-      return { ...m, reset };
+  const pixiAndShell = () => {
+    if (!!pixi() && !!shell) {
+      return {
+        pixi: pixi(),
+        shell,
+      };
+    } else {
+      return undefined;
     }
-  }
-  */
+  };
+
+  const [mini] = createResource(pixiAndShell, fetchMini);
 
   return (
     <MiniContext.Provider value={mini}>{props.children}</MiniContext.Provider>

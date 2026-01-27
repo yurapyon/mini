@@ -3,28 +3,21 @@ import { createEffect, createSignal, Index } from "solid-js";
 import { Editor } from "./components/Editor";
 import { SystemComponent } from "./components/SystemComponent";
 import { TitleBar } from "./components/TitleBar";
-import {
-  MiniProvider,
-  useMiniContext,
-} from "./components/providers/MiniProvider";
+import { MiniProvider } from "./components/providers/MiniProvider";
 import { PixiProvider } from "./components/providers/PixiProvider";
+import {
+  ShellProvider,
+  useShellContext,
+} from "./components/providers/ShellProvider";
 
-import { Shell, Line } from "./lib/shell";
-
-const shell = new Shell();
-
-const PROMPT = "mini> ";
-
-import { Terminal } from "./lib/console";
-
-const terminal = new Terminal();
+import { Line } from "./lib/shell";
 
 // TODO
 //   technically you should pause and resume for all async calls from forth
 //   figure out a nice way to do this
 
 const TerminalComponent = (props) => {
-  const mini = useMiniContext();
+  const shell = useShellContext();
 
   const [history, setHistory] = createSignal<Line[]>([], {
     equals: false,
@@ -35,19 +28,6 @@ const TerminalComponent = (props) => {
   };
 
   const [cmd, setCmd] = createSignal("");
-
-  createEffect(async () => {
-    const m = mini();
-    if (m) {
-      m.setEmitCallback((ch) => {
-        shell.putc(ch);
-      });
-
-      m.addExternal("clear", () => {
-        shell.clearHistory();
-      });
-    }
-  });
 
   return (
     <div
@@ -79,15 +59,15 @@ const TerminalComponent = (props) => {
         }
       }}
     >
-      <pre class="h-[1lh] shrink-0 flex flex-row">
-        <pre>{PROMPT + cmd()}</pre>
+      <pre class="min-h-[1lh] shrink-0 flex flex-row">
+        <pre>{shell.prompt + cmd()}</pre>
         <div class="w-[1ch] shrink-0 bg-gray-400 group-focus:bg-white group-focus:animate-(--animate-blink) h-full" />
       </pre>
       <Index each={history().toReversed()}>
         {(line) => {
           return (
-            <pre class="text-wrap">
-              {line().isUser && PROMPT}
+            <pre class="text-wrap min-h-[1lh]">
+              {line().isUser && shell.prompt}
               {line().text}
             </pre>
           );
@@ -98,6 +78,8 @@ const TerminalComponent = (props) => {
 };
 
 const RunButton = (props) => {
+  const shell = useShellContext();
+
   return (
     <button
       class="bg-[#505050] hover:bg-[#101010] hover:cursor-pointer px-[0.5ch] whitespace-nowrap"
@@ -148,23 +130,25 @@ const Tutorial = () => {
 
 const App: Component = () => {
   return (
-    <PixiProvider>
-      <MiniProvider>
-        <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
-          <TitleBar />
-          <div class="flex flex-row grow min-h-0 text-sm">
-            <div class="flex flex-col basis-1/2">
-              <Editor />
-              <Tutorial />
-            </div>
-            <div class="flex flex-col grow min-w-0 items-center basis-1/2">
-              <SystemComponent mini={mini()} />
-              <TerminalComponent />
+    <ShellProvider>
+      <PixiProvider>
+        <MiniProvider>
+          <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
+            <TitleBar />
+            <div class="flex flex-row grow min-h-0 text-sm">
+              <div class="flex flex-col basis-1/2">
+                <Editor />
+                <Tutorial />
+              </div>
+              <div class="flex flex-col grow min-w-0 items-center basis-1/2">
+                <SystemComponent mini={mini()} />
+                <TerminalComponent />
+              </div>
             </div>
           </div>
-        </div>
-      </MiniProvider>
-    </PixiProvider>
+        </MiniProvider>
+      </PixiProvider>
+    </ShellProvider>
   );
 };
 

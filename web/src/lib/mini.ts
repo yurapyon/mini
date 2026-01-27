@@ -16,7 +16,9 @@ enum Filepaths {
   STARTUP_SCRIPT = "/mini/startup.mini.fth",
 }
 
-export const fetchMini = async (pixi) => {
+export const fetchMini = async (props) => {
+  const { pixi, shell } = props;
+
   const offsets = {
     forth: 0,
     jsBuf: 0,
@@ -261,6 +263,14 @@ export const fetchMini = async (pixi) => {
         `,
       })
     );
+
+    setEmitCallback((ch) => {
+      shell.putc(ch);
+    });
+
+    addExternal("clear", () => {
+      shell.clearHistory();
+    });
   };
 
   const mini = await WebAssembly.instantiateStreaming(

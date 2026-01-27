@@ -1,5 +1,3 @@
-const PROMPT = "mini> ";
-
 export interface Line {
   isUser: boolean;
   text: string;
@@ -9,11 +7,13 @@ export class Shell {
   history: Line[];
   onUpdate: () => void;
   consoleBuffer: [];
+  prompt: string;
 
   constructor() {
     this.history = [];
     this.onUpdate = () => {};
     this.consoleBuffer = [];
+    this.prompt = "mini> ";
   }
 
   pushLine(line) {
