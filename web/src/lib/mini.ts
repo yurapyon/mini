@@ -16,7 +16,7 @@ enum Filepaths {
   STARTUP_SCRIPT = "/mini/startup.mini.fth",
 }
 
-export const fetchMini = async () => {
+export const fetchMini = async (pixi) => {
   const offsets = {
     forth: 0,
     jsBuf: 0,
@@ -133,7 +133,6 @@ export const fetchMini = async () => {
   const addExternal = (extName, fn) => {
     externals.push({ name: extName, fn });
     addToReadQueue(["external " + extName]);
-    // console.log("ext added:", extName);
   };
 
   const miniEvaluate = (str) => {
@@ -213,6 +212,53 @@ export const fetchMini = async () => {
     document.dispatchEvent(
       new CustomEvent("mini.read", {
         detail: timeScript,
+      })
+    );
+
+    addExternal(">bg", () => {
+      const r = kernel.pop() % 2 ** 8;
+      const g = kernel.pop() % 2 ** 8;
+      const b = kernel.pop() % 2 ** 8;
+      const str = [r, g, b]
+        .map((v) => v.toString(16).padStart(2, "0"))
+        .join("");
+      pixi.app.renderer.background.color = "#" + str;
+    });
+
+    addExternal("random", () => {
+      const value = Math.floor(Math.random() * 2 ** 16);
+      kernel.push(value);
+    });
+
+    addExternal("s.new", () => {
+      const idx = pixi.createSprite();
+      kernel.push(idx);
+    });
+
+    addExternal("s.delete", () => {
+      const idx = kernel.pop();
+      // TODO
+    });
+
+    addExternal(">s.pos", () => {
+      const idx = kernel.pop();
+      const y = kernel.pop();
+      const x = kernel.pop();
+      const sprite = pixi.getSprite(idx);
+      if (!!sprite) {
+        sprite.position.x = x;
+        sprite.position.y = y;
+      }
+    });
+
+    document.dispatchEvent(
+      new CustomEvent("mini.read", {
+        detail: `
+          : random-color random random random ;
+          : random-point random 640 mod random 400 mod ;
+          \\ todo delete old sprite on reset
+          s.new value sprite
+        `,
       })
     );
   };

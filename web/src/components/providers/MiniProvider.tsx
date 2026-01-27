@@ -1,11 +1,18 @@
-import { createContext, createResource, useContext } from "solid-js";
-
+import {
+  createContext,
+  createResource,
+  useContext,
+  createEffect,
+} from "solid-js";
+import { usePixiContext } from "./PixiProvider";
 import { fetchMini } from "../../lib/mini";
 
 export const MiniContext = createContext();
 
 export const MiniProvider = (props) => {
-  const [mini, { mutate }] = createResource(fetchMini);
+  const pixi = usePixiContext();
+
+  const [mini] = createResource(pixi, fetchMini);
 
   /*
   const reset = () => {

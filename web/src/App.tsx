@@ -4,9 +4,10 @@ import { Editor } from "./components/Editor";
 import { SystemComponent } from "./components/SystemComponent";
 import { TitleBar } from "./components/TitleBar";
 import {
-    MiniProvider,
-    useMiniContext,
+  MiniProvider,
+  useMiniContext,
 } from "./components/providers/MiniProvider";
+import { PixiProvider } from "./components/providers/PixiProvider";
 
 import { Shell, Line } from "./lib/shell";
 
@@ -147,21 +148,23 @@ const Tutorial = () => {
 
 const App: Component = () => {
   return (
-    <MiniProvider>
-      <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
-        <TitleBar />
-        <div class="flex flex-row grow min-h-0 text-sm">
-          <div class="flex flex-col basis-1/2">
-            <Editor />
-            <Tutorial />
-          </div>
-          <div class="flex flex-col grow min-w-0 items-center basis-1/2">
-            <SystemComponent mini={mini()} />
-            <TerminalComponent />
+    <PixiProvider>
+      <MiniProvider>
+        <div class="w-screen h-screen flex flex-col font-mono bg-[#303030] text-white">
+          <TitleBar />
+          <div class="flex flex-row grow min-h-0 text-sm">
+            <div class="flex flex-col basis-1/2">
+              <Editor />
+              <Tutorial />
+            </div>
+            <div class="flex flex-col grow min-w-0 items-center basis-1/2">
+              <SystemComponent mini={mini()} />
+              <TerminalComponent />
+            </div>
           </div>
         </div>
-      </div>
-    </MiniProvider>
+      </MiniProvider>
+    </PixiProvider>
   );
 };
 
