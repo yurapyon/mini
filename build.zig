@@ -87,6 +87,13 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const dep_nitori = b.dependency("nitori", .{
+        .target = target,
+        .optimize = optimize,
+    });
+
+    const mod_nitori = dep_nitori.module("nitori");
+
     const mod_libs = b.addModule("libs", .{
         .root_source_file = b.path("src/externals/root.zig"),
         .target = target,
@@ -94,6 +101,7 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
+            .{ .name = "nitori", .module = mod_nitori },
         },
     });
 
@@ -135,6 +143,7 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "mini", .module = mod_mini },
                 .{ .name = "libs", .module = mod_libs },
                 .{ .name = "pyon", .module = mod_pyon },
+                // .{ .name = "nitori", .module = mod_nitori },
             },
         }),
     });
