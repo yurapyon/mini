@@ -6,7 +6,7 @@ const mini = @import("mini");
 const kernel = mini.kernel;
 const Cell = kernel.Cell;
 
-const channel = @import("utils/channel.zig");
+const channel = @import("nitori").channel;
 const Queue = channel.Queue;
 
 // ===

@@ -22,6 +22,7 @@ const externals = libs.externals;
 const External = externals.External;
 const ExternalsList = externals.ExternalsList;
 
+const Floats = libs.floats.Floats;
 const OS = libs.os.OS;
 const Dynamic = libs.dynamic.Dynamic;
 const Randomizer = libs.random.Randomizer;
@@ -185,7 +186,9 @@ pub fn main() !void {
             });
             mini.utils.writeFile(filename, bytes) catch unreachable;
         } else if (cli_options.run_system) {
-            try libs.floats.pushExternals(&exts);
+            var floats: Floats = undefined;
+            try floats.init(allocator, 32);
+            try floats.pushExternals(&exts);
 
             var os: OS = undefined;
             os.init(allocator);
@@ -218,7 +221,7 @@ pub fn main() !void {
 
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
-            try k.evaluate(libs.floats.getStartupFile());
+            try k.evaluate(floats.getStartupFile());
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
@@ -242,7 +245,9 @@ pub fn main() !void {
 
             kernel_thread.join();
         } else {
-            try libs.floats.pushExternals(&exts);
+            var floats: Floats = undefined;
+            try floats.init(allocator, 32);
+            try floats.pushExternals(&exts);
 
             var os: OS = undefined;
             os.init(allocator);
@@ -272,7 +277,7 @@ pub fn main() !void {
 
             std.debug.print(">> startup\n", .{});
             try k.evaluate(startup_file);
-            try k.evaluate(libs.floats.getStartupFile());
+            try k.evaluate(floats.getStartupFile());
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
