@@ -117,6 +117,23 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    mod_pyon.addIncludePath(b.path("src/system/deps"));
+    mod_pyon.addCSourceFile(.{
+        .file = b.path("src/system/deps/stb_image.c"),
+        .flags = &[_][]const u8{"-std=c99"},
+    });
+
+    const mod_main = b.addModule("main", .{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "mini", .module = mod_mini },
+            .{ .name = "libs", .module = mod_libs },
+            .{ .name = "pyon", .module = mod_pyon },
+        },
+    });
+
     switch (target.result.os.tag) {
         .macos => {
             mod_pyon.linkSystemLibrary("glfw3", .{});
@@ -124,28 +141,21 @@ pub fn build(b: *std.Build) void {
             mod_pyon.linkFramework("Cocoa", .{});
             mod_pyon.linkFramework("IOKit", .{});
             mod_pyon.linkFramework("CoreVideo", .{});
+
+            mod_main.addLibraryPath(.{
+                .cwd_relative = "/opt/homebrew/lib",
+            });
+            mod_main.addIncludePath(.{
+                .cwd_relative = "/opt/homebrew/include",
+            });
+            mod_main.linkSystemLibrary("portaudio", .{});
         },
         else => {},
     }
 
-    mod_pyon.addIncludePath(b.path("src/system/deps"));
-    mod_pyon.addCSourceFile(.{
-        .file = b.path("src/system/deps/stb_image.c"),
-        .flags = &[_][]const u8{"-std=c99"},
-    });
-
     const desktop = b.addExecutable(.{
         .name = "mini",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "mini", .module = mod_mini },
-                .{ .name = "libs", .module = mod_libs },
-                .{ .name = "pyon", .module = mod_pyon },
-            },
-        }),
+        .root_module = mod_main,
     });
 
     const desktop_install = b.addInstallArtifact(desktop, .{});

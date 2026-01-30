@@ -17,6 +17,8 @@ const Handles = mini.utils.Handles;
 
 const System = @import("pyon").system.System;
 
+const AudioSystem = @import("audio/audio_system.zig").AudioSystem;
+
 const libs = @import("libs");
 const externals = libs.externals;
 const External = externals.External;
@@ -147,6 +149,10 @@ pub fn main() !void {
         var h: Handles = undefined;
         h.init();
         defer h.deinit(allocator);
+
+        var audio: AudioSystem = undefined;
+        try audio.init();
+        defer audio.deinit();
 
         const image = try mini.utils.readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
