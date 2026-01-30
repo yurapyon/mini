@@ -208,6 +208,8 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
+            try audio.pushExternals(&exts);
+
             var sys: System = undefined;
             try sys.pushExternals(&exts);
 
@@ -231,6 +233,7 @@ pub fn main() !void {
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
+            try k.evaluate(audio.getStartupFile());
 
             try sys.init(&k, &h, allocator);
             defer sys.deinit();
