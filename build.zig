@@ -113,6 +113,7 @@ pub fn build(b: *std.Build) void {
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
             .{ .name = "libs", .module = mod_libs },
+            .{ .name = "nitori", .module = mod_nitori },
         },
     });
 
@@ -143,7 +144,6 @@ pub fn build(b: *std.Build) void {
                 .{ .name = "mini", .module = mod_mini },
                 .{ .name = "libs", .module = mod_libs },
                 .{ .name = "pyon", .module = mod_pyon },
-                // .{ .name = "nitori", .module = mod_nitori },
             },
         }),
     });

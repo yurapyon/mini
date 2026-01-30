@@ -24,8 +24,8 @@
     // internet connectivity.
     .dependencies = .{
         .nitori = .{
-            .url = "git+https://github.com/yurapyon/nitori.git#0d05e8cfa3ecedb9b7e79b2bd0efaf7694ca93b4",
-            .hash = "nitori-0.0.0-RfTKT_E9AAC4ZxAfXKCgJ404W1p9jpdOp8e8YCx-c5uc",
+            .url = "git+https://github.com/yurapyon/nitori.git#f96fa78c5267d058f52c76e9fb92d820626ac50a",
+            .hash = "nitori-0.0.0-RfTKTzRcAADNq83ZF0j-n8jFXH-6s00MoK8FQxTmd7td",
         },
     },
     .paths = .{
