@@ -49,18 +49,6 @@ pub const AudioSystem = struct {
         self.opl = opl;
 
         c.OPL_setChipType(opl, 2);
-        // _ = c.OPL_setMask(opl, 0xffffffff);
-
-        // opl.slot[0].type = 0;
-
-        // c.OPL_writeReg(opl, 0x20, 0x20);
-        // c.OPL_writeReg(opl, 0x40, 0x00);
-        // c.OPL_writeReg(opl, 0x60, 0xf0);
-        // c.OPL_writeReg(opl, 0x80, 0xf7);
-        // c.OPL_writeReg(opl, 0xc0, 0x01);
-
-        // c.OPL_writeReg(opl, 0xa0, 0x40);
-        // c.OPL_writeReg(opl, 0xb0, 0x2f);
 
         var err = c.Pa_Initialize();
         if (err != c.paNoError) {
@@ -130,15 +118,7 @@ pub const AudioSystem = struct {
 
         for (0..frames_per_buffer) |i| {
             const opl_out = c.OPL_calc(self.opl);
-
             const f32_opl: f32 = @floatFromInt(opl_out);
-            // const f32_max: f32 = @floatFromInt(std.math.maxInt(i16));
-
-            // std.debug.print("{} {}\n", .{
-            // f32_opl,
-            // f32_opl / 2048,
-            // });
-
             out[i * 2 + 0] = f32_opl / 2048;
             out[i * 2 + 1] = f32_opl / 2048;
         }

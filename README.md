@@ -56,7 +56,7 @@ you need:
   - mac OS
   - zig
   - glfw
-  - port audio
+  - portaudio
 
 ### setup:
 mac OS, using homebrew:
