@@ -94,7 +94,7 @@ pub fn build(b: *std.Build) void {
 
     const mod_nitori = dep_nitori.module("nitori");
 
-    const mod_libs = b.addModule("libs", .{
+    const mod_externals = b.addModule("libs", .{
         .root_source_file = b.path("src/externals/root.zig"),
         .target = target,
         .optimize = optimize,
@@ -105,6 +105,36 @@ pub fn build(b: *std.Build) void {
         },
     });
 
+    const mod_audio = b.addModule("audio", .{
+        .root_source_file = b.path("src/audio/root.zig"),
+        .target = target,
+        .optimize = optimize,
+        .link_libc = true,
+        .imports = &.{
+            .{ .name = "mini", .module = mod_mini },
+            .{ .name = "nitori", .module = mod_nitori },
+            .{ .name = "libs", .module = mod_externals },
+        },
+    });
+
+    mod_audio.addIncludePath(b.path("src/audio/deps/emu8950"));
+    mod_audio.addCSourceFile(.{
+        .file = b.path("src/audio/deps/emu8950/emu8950.c"),
+        .flags = &[_][]const u8{
+            "-std=c99",
+            "-O3",
+            "-Wall",
+        },
+    });
+    mod_audio.addCSourceFile(.{
+        .file = b.path("src/audio/deps/emu8950/emuadpcm.c"),
+        .flags = &[_][]const u8{
+            "-std=c99",
+            "-O3",
+            "-Wall",
+        },
+    });
+
     const mod_pyon = b.addModule("pyon", .{
         .root_source_file = b.path("src/system/root.zig"),
         .target = target,
@@ -112,8 +142,26 @@ pub fn build(b: *std.Build) void {
         .link_libc = true,
         .imports = &.{
             .{ .name = "mini", .module = mod_mini },
-            .{ .name = "libs", .module = mod_libs },
+            .{ .name = "libs", .module = mod_externals },
             .{ .name = "nitori", .module = mod_nitori },
+        },
+    });
+
+    mod_pyon.addIncludePath(b.path("src/system/deps"));
+    mod_pyon.addCSourceFile(.{
+        .file = b.path("src/system/deps/stb_image.c"),
+        .flags = &[_][]const u8{"-std=c99"},
+    });
+
+    const mod_main = b.addModule("main", .{
+        .root_source_file = b.path("src/main.zig"),
+        .target = target,
+        .optimize = optimize,
+        .imports = &.{
+            .{ .name = "mini", .module = mod_mini },
+            .{ .name = "libs", .module = mod_externals },
+            .{ .name = "pyon", .module = mod_pyon },
+            .{ .name = "audio", .module = mod_audio },
         },
     });
 
@@ -124,28 +172,21 @@ pub fn build(b: *std.Build) void {
             mod_pyon.linkFramework("Cocoa", .{});
             mod_pyon.linkFramework("IOKit", .{});
             mod_pyon.linkFramework("CoreVideo", .{});
+
+            mod_audio.addLibraryPath(.{
+                .cwd_relative = "/opt/homebrew/lib",
+            });
+            mod_audio.addIncludePath(.{
+                .cwd_relative = "/opt/homebrew/include",
+            });
+            mod_audio.linkSystemLibrary("portaudio", .{});
         },
         else => {},
     }
 
-    mod_pyon.addIncludePath(b.path("src/system/deps"));
-    mod_pyon.addCSourceFile(.{
-        .file = b.path("src/system/deps/stb_image.c"),
-        .flags = &[_][]const u8{"-std=c99"},
-    });
-
     const desktop = b.addExecutable(.{
         .name = "mini",
-        .root_module = b.createModule(.{
-            .root_source_file = b.path("src/main.zig"),
-            .target = target,
-            .optimize = optimize,
-            .imports = &.{
-                .{ .name = "mini", .module = mod_mini },
-                .{ .name = "libs", .module = mod_libs },
-                .{ .name = "pyon", .module = mod_pyon },
-            },
-        }),
+        .root_module = mod_main,
     });
 
     const desktop_install = b.addInstallArtifact(desktop, .{});

@@ -35,7 +35,7 @@ const gamepad = @import("gamepad.zig");
 // ===
 
 // Multithreading strategy
-// There need to be 3 different threads
+// There are 3 different threads
 //   1. Forth kernel
 //   2. Graphics
 //   3. Audio

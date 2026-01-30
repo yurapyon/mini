@@ -17,6 +17,8 @@ const Handles = mini.utils.Handles;
 
 const System = @import("pyon").system.System;
 
+const AudioSystem = @import("audio").system.AudioSystem;
+
 const libs = @import("libs");
 const externals = libs.externals;
 const External = externals.External;
@@ -148,6 +150,10 @@ pub fn main() !void {
         h.init();
         defer h.deinit(allocator);
 
+        var audio: AudioSystem = undefined;
+        try audio.init(allocator);
+        defer audio.deinit();
+
         const image = try mini.utils.readFile(allocator, precompiled_filepath);
         defer allocator.free(image);
         k.loadImage(image);
@@ -202,6 +208,8 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
+            try audio.pushExternals(&exts);
+
             var sys: System = undefined;
             try sys.pushExternals(&exts);
 
@@ -225,6 +233,7 @@ pub fn main() !void {
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
+            try k.evaluate(audio.getStartupFile());
 
             try sys.init(&k, &h, allocator);
             defer sys.deinit();
@@ -261,6 +270,8 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
+            try audio.pushExternals(&exts);
+
             k.setFFIClosure(.{
                 .callback = ffiCallback,
                 .lookup = ffiLookup,
@@ -281,6 +292,7 @@ pub fn main() !void {
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
+            try k.evaluate(audio.getStartupFile());
 
             for (cli_options.filepaths.items) |fp| {
                 const file = try mini.utils.readFile(allocator, fp);
