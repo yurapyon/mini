@@ -17,9 +17,9 @@ also compiler definitions
 : F word str>f drop swap lit, , lit, , ;
 previous definitions
 
-: f, swap , , ;
-: f@ @+ swap @ ;
-: fconstant create f, does> f@ ;
+\ : f, swap , , ;
+\ : f@ @+ swap @ ;
+\ : fconstant create f, does> f@ ;
 
 \ todo this is messy
 : u>f <# #s #> str>f drop ;
