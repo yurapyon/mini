@@ -1,0 +1,3 @@
+[submodule "src/audio/deps/emu8950"]
+	path = src/audio/deps/emu8950
+	url = git@github.com:digital-sound-antiques/emu8950.git
