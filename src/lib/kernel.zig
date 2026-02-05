@@ -102,6 +102,13 @@ pub const Accept = struct {
     //   push string size to the stack
     //   unpause
     //   execute
+
+    // TODO NOTE
+    // It's possible to restructure the 'accept' bytecode so
+    //   is_async doesn't have to be set like this and pause() can be called in the callback itself
+    // This would mean non-async callbacks would have to push the size of the read to the stack explicitly
+    //   but thats probably fine
+
     pub const Closure = struct {
         callback: Callback,
         userdata: ?*anyopaque,
@@ -333,7 +340,6 @@ pub const Kernel = struct {
         // NOTE
         //   if k.pc.fetch().* === exit, then you don't need to push pc to the return stack
         // but you need to make sure that:
-        //   everywhere raw data is compiled into a definition, its preceded by a builtin
         //   (something when dereferenced isn't docol)
 
         const pc = self.program_counter.fetch();

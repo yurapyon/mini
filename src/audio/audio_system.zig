@@ -11,6 +11,7 @@ const External = externals.External;
 const ExternalsList = externals.ExternalsList;
 
 const mini = @import("mini");
+const mem = mini.mem;
 const kernel = mini.kernel;
 const Kernel = kernel.Kernel;
 const Cell = kernel.Cell;
@@ -148,6 +149,22 @@ pub const AudioSystem = struct {
                 .value = @truncate(value),
             },
         }) catch return error.Panic;
+    }
+
+    fn docolWait(k: *Kernel, userdata: ?*anyopaque) External.Error!void {
+        const self: *@This() = @ptrCast(@alignCast(userdata));
+        _ = self;
+
+        try k.pushReturnAddr();
+        const resume_at_addr = k.current_token_addr.fetch() + @sizeOf(Cell) * 2;
+        k.program_counter.store(resume_at_addr);
+
+        const wait_addr = k.current_token_addr.fetch() + @sizeOf(Cell);
+        const wait_amt = try mem.readCell(k.memory, wait_addr);
+        // TODO do something with wait_amt
+        _ = wait_amt;
+
+        k.pause();
     }
 
     pub fn getStartupFile(_: *@This()) []const u8 {

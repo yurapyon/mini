@@ -189,6 +189,14 @@ pub fn accept(k: *Kernel) Error!void {
             const size = try closure.callback(k, closure.userdata, addr, len);
             k.data_stack.pushCell(size);
         }
+
+        // TODO NOTE
+        // If removing is_async from the accept closure, we can just call this
+        // Have to make sure that the accept closure is always
+        //   called last in this function, we don't want to pause the kernel
+        //   then do other things after that
+
+        // try closure.callback(k, closure.userdata, addr, len);
     } else {
         return error.CannotAccept;
     }

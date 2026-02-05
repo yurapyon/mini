@@ -89,6 +89,8 @@ fn ffiLookup(_: *Kernel, userdata: ?*anyopaque, name: []const u8) ?Cell {
     return exts.lookup(name);
 }
 
+// TODO put scheduler here
+
 fn kernelRunFiles(
     system: *System,
     k: *Kernel,
