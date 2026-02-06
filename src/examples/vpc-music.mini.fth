@@ -4,6 +4,136 @@
 \
 \ ===
 
+65  enum %ka
+    enum %kb
+    enum %kc
+    enum %kd
+    enum %ke
+    enum %kf
+    enum %kg
+    enum %kh
+    enum %ki
+    enum %kj
+    enum %kk
+    enum %kl
+    enum %km
+    enum %kn
+    enum %ko
+    enum %kp
+    enum %kq
+    enum %kr
+    enum %ks
+    enum %kt
+    enum %ku
+    enum %kv
+    enum %kw
+    enum %kx
+    enum %ky
+constant %kz
+
+\ OPL info
+\ https://www.shipbrook.net/jeff/sb.html
+
+0 constant off
+1 constant on
+
+create freqs
+\ c      c#     d      d#     e      f
+  $157 , $16b , $181 , $198 , $1b0 , $1ca ,
+\ f#     g      g#     a      a#     b
+  $1e5 , $202 , $220 , $241 , $263 , $287 ,
+\ c
+\ $2ae ,
+
+: note ( o n -- n ) cells freqs + @ swap 10 lshift or ;
+
+s[
+  cell field >is-on
+  cell field >adsr
+  cell field >note
+]s voice
+
+create v0 voice allot
+false v0 >is-on !
+
+: voice.note
+  dup >is-on @ 1 and 13 lshift swap >note @ $1fff and or
+  \ todo acct for voice index
+  $a0 over opl
+  $b0 swap 8 rshift opl ;
+
+: key>note cond
+  dup %kz = if 4  0 else
+  dup %ks = if 4  1 else
+  dup %kx = if 4  2 else
+  dup %kd = if 4  3 else
+  dup %kc = if 4  4 else
+  dup %kv = if 4  5 else
+  dup %kg = if 4  6 else
+  dup %kb = if 4  7 else
+  dup %kh = if 4  8 else
+  dup %kn = if 4  9 else
+  dup %kj = if 4 10 else
+  dup %km = if 4 11 else
+    4 0
+  endcond note nip ;
+
+create held-keys 32 allot
+0 variable #held-keys
+
+: hk.depth #held-keys @ ;
+: hk.top held-keys #held-keys @ 1- cells + @ ;
+: hk.push
+  held-keys #held-keys @ cells + !
+  1 #held-keys +!
+  ;
+
+: hk.find ( key -- idx/0 t/f )
+  >r
+  hk.depth 0 check> if
+    dup cells held-keys + @ r@ = if
+      nip r> drop true exit
+    else
+      1+ loop
+    then
+  then r> 3drop 0 false ;
+
+\ todo check depth maybe
+: hk.remove ( idx -- )
+  dup 1+ cells held-keys +
+  over cells held-keys +
+  rot hk.depth swap - 1-
+  move
+  -1 #held-keys +! ;
+
+: hk.play hk.depth 0 >
+  dup if hk.top key>note v0 >note ! then
+  v0 >is-on ! v0 voice.note ;
+
+\ : hk.play
+  \ hk.depth . cr
+  \ held-keys 32 dump cr ;
+
+make on-key cond
+  dup 0= if drop hk.find if hk.remove hk.play else drop then else
+  dup 1 = if drop hk.push hk.play else
+    2drop
+  endcond ;
+
+: main true continue ! |: continue @ if
+    frame poll! 30 sleep
+  loop then ;
+
+$20 $20 opl
+$40 $00 opl
+$60 $f0 opl
+$80 $f2 opl
+$c0 $01 opl
+
+main
+
+0 [if]
+
 : build here >r execute r> ;
 
 0   enum %wait
@@ -25,10 +155,6 @@ constant %note-on
 ' haha build drop
 
 64 dump
-
-
-
-
 
 
 bye
@@ -154,3 +280,5 @@ $c0 $01 opl
  ;
 
 main
+
+[then]
