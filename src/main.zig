@@ -28,6 +28,7 @@ const Floats = libs.floats.Floats;
 const OS = libs.os.OS;
 const Dynamic = libs.dynamic.Dynamic;
 const Randomizer = libs.random.Randomizer;
+const Hashtables = libs.hashtables.Hashtables;
 
 const CliOptions = @import("cli_options.zig").CliOptions;
 
@@ -88,6 +89,8 @@ fn ffiLookup(_: *Kernel, userdata: ?*anyopaque, name: []const u8) ?Cell {
     const exts: *ExternalsList = @ptrCast(@alignCast(userdata));
     return exts.lookup(name);
 }
+
+// TODO put scheduler here
 
 fn kernelRunFiles(
     system: *System,
@@ -208,6 +211,10 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
+            var ht: Hashtables = undefined;
+            ht.init(allocator, &h);
+            try ht.pushExternals(&exts);
+
             try audio.pushExternals(&exts);
 
             var sys: System = undefined;
@@ -233,6 +240,7 @@ pub fn main() !void {
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
+            try k.evaluate(ht.getStartupFile());
             try k.evaluate(audio.getStartupFile());
 
             try sys.init(&k, &h, allocator);
@@ -270,6 +278,10 @@ pub fn main() !void {
             r.init();
             try r.pushExternals(&exts);
 
+            var ht: Hashtables = undefined;
+            ht.init(allocator, &h);
+            try ht.pushExternals(&exts);
+
             try audio.pushExternals(&exts);
 
             k.setFFIClosure(.{
@@ -292,6 +304,7 @@ pub fn main() !void {
             try k.evaluate(os.getStartupFile());
             try k.evaluate(dyn.getStartupFile());
             try k.evaluate(r.getStartupFile());
+            try k.evaluate(ht.getStartupFile());
             try k.evaluate(audio.getStartupFile());
 
             for (cli_options.filepaths.items) |fp| {

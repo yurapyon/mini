@@ -167,6 +167,9 @@ pub fn build(b: *std.Build) void {
 
     switch (target.result.os.tag) {
         .macos => {
+            mod_pyon.addIncludePath(.{
+                .cwd_relative = "/opt/homebrew/include",
+            });
             mod_pyon.linkSystemLibrary("glfw3", .{});
             mod_pyon.linkFramework("OpenGL", .{});
             mod_pyon.linkFramework("Cocoa", .{});

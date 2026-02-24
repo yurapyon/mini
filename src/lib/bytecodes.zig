@@ -22,6 +22,19 @@ pub const Error = error{
     StackUnderflow,
 };
 
+pub fn stringFromError(e: Error) []const u8 {
+    const message = switch (e) {
+        error.Panic => "Panic",
+        error.InvalidProgramCounter => "Invalid Program Counter",
+        error.OutOfBounds => "Out of Bounds",
+        error.MisalignedAddress => "Misaligned Address",
+        error.CannotAccept => "Cannot Accept",
+        error.CannotEmit => "Cannot Emit",
+        error.StackUnderflow => "Stack Underflow",
+    };
+    return message;
+}
+
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
 
 const callbacks = [_]BytecodeFn{
@@ -189,6 +202,14 @@ pub fn accept(k: *Kernel) Error!void {
             const size = try closure.callback(k, closure.userdata, addr, len);
             k.data_stack.pushCell(size);
         }
+
+        // TODO NOTE
+        // If removing is_async from the accept closure, we can just call this
+        // Have to make sure that the accept closure is always
+        //   called last in this function, we don't want to pause the kernel
+        //   then do other things after that
+
+        // try closure.callback(k, closure.userdata, addr, len);
     } else {
         return error.CannotAccept;
     }

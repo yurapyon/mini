@@ -102,6 +102,13 @@ pub const Accept = struct {
     //   push string size to the stack
     //   unpause
     //   execute
+
+    // TODO NOTE
+    // It's possible to restructure the 'accept' bytecode so
+    //   is_async doesn't have to be set like this and pause() can be called in the callback itself
+    // This would mean non-async callbacks would have to push the size of the read to the stack explicitly
+    //   but thats probably fine
+
     pub const Closure = struct {
         callback: Callback,
         userdata: ?*anyopaque,
@@ -215,7 +222,6 @@ pub const Kernel = struct {
     }
 
     pub fn execute(self: *@This()) !void {
-        // TODO maybe move this out of here somehow
         switch (self.execution_status) {
             .playing => {
                 self.return_stack.pushCell(0);
@@ -244,16 +250,14 @@ pub const Kernel = struct {
             self.current_token_addr.store(token_addr);
             try self.advancePC(@sizeOf(Cell));
 
-            // TODO
-            // print more debug info
-
             const token = mem.readCell(self.memory, token_addr) catch |err| {
                 const message = switch (err) {
                     error.MisalignedAddress => "Misaligned Address",
                 };
 
                 // TODO
-                // some type of "report error" callback instad of std.debug
+                // For WASM, would be good if you could supply a
+                //   "report error" callback to the kernel instead of using std.debug
                 if (builtin.target.cpu.arch != .wasm32) {
                     std.debug.print("Token Lookup Error: {s}\n", .{message});
                 }
@@ -264,21 +268,12 @@ pub const Kernel = struct {
 
             if (bytecodes.getBytecode(token)) |callback| {
                 callback(self) catch |err| {
-                    // TODO err -> string function
-                    const message = switch (err) {
-                        error.Panic => "Panic",
-                        error.InvalidProgramCounter => "Invalid Program Counter",
-                        error.OutOfBounds => "Out of Bounds",
-                        error.MisalignedAddress => "Misaligned Address",
-                        error.CannotAccept => "Cannot Accept",
-                        error.CannotEmit => "Cannot Emit",
-                        error.StackUnderflow => "Stack Underflow",
-                    };
-
+                    const message = bytecodes.stringFromError(err);
                     const name = bytecodes.getBytecodeName(token) orelse "Unknown";
 
                     // TODO
-                    // some type of "report error" callback instad of std.debug
+                    // For WASM, would be good if you could supply a
+                    //   "report error" callback to the kernel instead of using std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
                         std.debug.print("Error: {s}, Word: {s}\n", .{ message, name });
                     }
@@ -288,24 +283,15 @@ pub const Kernel = struct {
                 const ext_token = token - @as(Cell, @intCast(bytecodes.bytecode_count));
                 self.processFFI(ext_token) catch |err| {
                     const message = switch (err) {
-                        error.Panic => "Panic",
-                        error.InvalidProgramCounter => "Invalid Program Counter",
-                        error.OutOfBounds => "Out of Bounds",
-                        error.MisalignedAddress => "Misaligned Address",
-                        error.CannotAccept => "Cannot Accept",
-                        error.CannotEmit => "Cannot Emit",
-                        error.StackUnderflow => "Stack Underflow",
                         error.UnhandledExternal => "Unhandled External",
+                        else => |e| bytecodes.stringFromError(e),
                     };
 
-                    _ = message;
-
-                    // const name = self.externals[ext_token].name;
-
                     // TODO
-                    // some type of "report error" callback instad of std.debug
+                    // For WASM, would be good if you could supply a
+                    //   "report error" callback to the kernel instead of using std.debug
                     if (builtin.target.cpu.arch != .wasm32) {
-                        // std.debug.print("External error: {s}, Word: {s}\n", .{ message, name });
+                        std.debug.print("External error: {s}\n", .{message});
                     }
 
                     self.abort();
@@ -333,7 +319,6 @@ pub const Kernel = struct {
         // NOTE
         //   if k.pc.fetch().* === exit, then you don't need to push pc to the return stack
         // but you need to make sure that:
-        //   everywhere raw data is compiled into a definition, its preceded by a builtin
         //   (something when dereferenced isn't docol)
 
         const pc = self.program_counter.fetch();
