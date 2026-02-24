@@ -62,19 +62,21 @@ false v0 >is-on !
   $a0 over opl
   $b0 swap 8 rshift opl ;
 
+4 value oct
+
 : key>note cond
-  dup %kz = if 4  0 else
-  dup %ks = if 4  1 else
-  dup %kx = if 4  2 else
-  dup %kd = if 4  3 else
-  dup %kc = if 4  4 else
-  dup %kv = if 4  5 else
-  dup %kg = if 4  6 else
-  dup %kb = if 4  7 else
-  dup %kh = if 4  8 else
-  dup %kn = if 4  9 else
-  dup %kj = if 4 10 else
-  dup %km = if 4 11 else
+  dup %kz = if oct  0 else
+  dup %ks = if oct  1 else
+  dup %kx = if oct  2 else
+  dup %kd = if oct  3 else
+  dup %kc = if oct  4 else
+  dup %kv = if oct  5 else
+  dup %kg = if oct  6 else
+  dup %kb = if oct  7 else
+  dup %kh = if oct  8 else
+  dup %kn = if oct  9 else
+  dup %kj = if oct 10 else
+  dup %km = if oct 11 else
     4 0
   endcond note nip ;
 
@@ -116,7 +118,12 @@ create held-keys 32 allot
 
 make on-key cond
   dup 0= if drop hk.find if hk.remove hk.play else drop then else
-  dup 1 = if drop hk.push hk.play else
+  dup 1 = if drop cond
+    dup %kq = if drop -1 +to oct oct . cr else
+    dup %kw = if drop  1 +to oct oct . cr else
+      hk.push hk.play
+    endcond
+  else
     2drop
   endcond ;
 
@@ -127,7 +134,7 @@ make on-key cond
 $20 $20 opl
 $40 $00 opl
 $60 $f0 opl
-$80 $f2 opl
+$80 $f7 opl
 $c0 $01 opl
 
 main

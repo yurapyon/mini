@@ -22,6 +22,19 @@ pub const Error = error{
     StackUnderflow,
 };
 
+pub fn stringFromError(e: Error) []const u8 {
+    const message = switch (e) {
+        error.Panic => "Panic",
+        error.InvalidProgramCounter => "Invalid Program Counter",
+        error.OutOfBounds => "Out of Bounds",
+        error.MisalignedAddress => "Misaligned Address",
+        error.CannotAccept => "Cannot Accept",
+        error.CannotEmit => "Cannot Emit",
+        error.StackUnderflow => "Stack Underflow",
+    };
+    return message;
+}
+
 pub const BytecodeFn = *const fn (kernel: *Kernel) Error!void;
 
 const callbacks = [_]BytecodeFn{
